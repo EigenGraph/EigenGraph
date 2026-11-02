@@ -399,5 +399,38 @@ impl App for EigenGraphApp {
                 });
             self.show_settings = open;
         }
+
+        // 8. SCREENSHOT HOOK (AUTOMATED QA & PREVIEWS)
+        if let Ok(path) = std::env::var("EIGENGRAPH_SCREENSHOT_PATH") {
+            let mut screenshot_saved = false;
+            ui.ctx().input(|i| {
+                for event in &i.raw.events {
+                    if let egui::Event::Screenshot { image, .. } = event {
+                        let width = image.size[0] as u32;
+                        let height = image.size[1] as u32;
+                        let mut bytes = Vec::with_capacity((width * height * 4) as usize);
+                        for p in &image.pixels {
+                            bytes.push(p.r());
+                            bytes.push(p.g());
+                            bytes.push(p.b());
+                            bytes.push(p.a());
+                        }
+                        let _ = image::save_buffer(&path, &bytes, width, height, image::ColorType::Rgba8);
+                        screenshot_saved = true;
+                    }
+                }
+            });
+
+            if screenshot_saved {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            } else {
+                static FRAME_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+                let count = FRAME_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if count >= 3 {
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
+                }
+                ui.ctx().request_repaint();
+            }
+        }
     }
 }
