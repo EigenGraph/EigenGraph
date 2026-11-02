@@ -1,7 +1,8 @@
 //! settings.rs — Pillar 5: macOS System Preferences Style.
 
-use egui::{RichText, ScrollArea, Ui};
+use egui::{Color32, RichText, ScrollArea, Ui};
 use crate::theme::MacTheme;
+use crate::updater::AppUpdater;
 
 pub struct SettingsView {
     pub unit_system: String,
@@ -28,7 +29,7 @@ impl Default for SettingsView {
 }
 
 impl SettingsView {
-    pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme) {
+    pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme, updater: &mut AppUpdater) {
         ScrollArea::vertical().show(ui, |ui| {
             ui.add_space(8.0);
 
@@ -89,6 +90,22 @@ impl SettingsView {
                 ui.label(RichText::new("GitHub Personal Access Token (PAT) [Opsional]:").size(13.0).color(theme.text_primary));
                 ui.add(egui::TextEdit::singleline(&mut self.github_token).password(true));
                 ui.label(RichText::new("Digunakan untuk otentikasi update otomatis dari aplikasi jika repositori GitHub berstatus privat.").size(11.0).color(theme.text_muted));
+
+                ui.add_space(12.0);
+                ui.separator();
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Pembaruan Perangkat Lunak:").size(13.0).strong().color(theme.text_primary));
+                    if ui.add(
+                        egui::Button::new(RichText::new("🚀 Periksa Pembaruan Sekarang").size(12.0).strong().color(Color32::WHITE))
+                            .fill(theme.accent_blue)
+                            .corner_radius(egui::CornerRadius::same(6)),
+                    ).clicked() {
+                        updater.github_token = self.github_token.clone();
+                        updater.check_for_updates();
+                    }
+                });
+                ui.label(RichText::new("Memeriksa ketersediaan versi rilis terbaru dan rincian update resmi dari GitHub Releases.").size(11.0).color(theme.text_muted));
             });
 
             ui.add_space(16.0);
@@ -102,6 +119,14 @@ impl SettingsView {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
                     ui.label(RichText::new(format!("v{} (Universal Multi-Platform)", env!("CARGO_PKG_VERSION"))).size(13.0).color(theme.accent_green).strong());
+
+                    if ui.add(
+                        egui::Button::new(RichText::new("🚀 Update").size(11.0).color(theme.accent_blue))
+                            .fill(Color32::TRANSPARENT),
+                    ).on_hover_text("Periksa rilis versi terbaru").clicked() {
+                        updater.github_token = self.github_token.clone();
+                        updater.check_for_updates();
+                    }
                 });
 
                 ui.add_space(4.0);

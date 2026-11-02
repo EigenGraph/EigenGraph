@@ -24,7 +24,7 @@ Layout Sidebar Kiri (`src/app.rs`) dan macOS Window Chrome **DIKUNCI PENUH DAN T
   11. `🤖   Industrialized & Automation`
   12. `🔮   Prediction`
   13. `📊   Results`
-- **Bagian Bawah Tersemat**: Profil Pengguna (`👤 Harids Irawan`) dengan gear `⚙️` (System Preferences ⌘,), tombol `✨ AI Copilot` (⌘K), dan tombol `🚀 Update`.
+- **Bagian Bawah Tersemat**: Profil Pengguna (`👤 Harids Irawan`) dengan gear `⚙️` (System Preferences ⌘,). Tombol Update dipindahkan ke dalam menu Settings Preferences, dan tombol AI Copilot di sidebar dihilangkan agar antarmuka bersih minimalis.
 
 ---
 

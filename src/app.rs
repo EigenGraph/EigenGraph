@@ -256,39 +256,7 @@ impl App for EigenGraphApp {
                         self.show_settings = !self.show_settings;
                     }
 
-                    ui.add_space(4.0);
-
-                    // Secondary Tools (AI Copilot & Update Trigger)
-                    ui.horizontal(|ui| {
-                        let copilot_active = self.ai_assistant_view.is_visible;
-                        if ui.add(
-                            egui::Button::new(
-                                RichText::new("✨ AI Copilot")
-                                    .size(10.5)
-                                    .color(if copilot_active { Color32::WHITE } else { self.theme.accent_blue }),
-                            )
-                            .fill(if copilot_active { self.theme.accent_blue } else { Color32::TRANSPARENT })
-                            .corner_radius(CornerRadius::same(4)),
-                        )
-                        .on_hover_text("Buka AI Copilot Assistant (⌘K)")
-                        .clicked()
-                        {
-                            self.ai_assistant_view.is_visible = !self.ai_assistant_view.is_visible;
-                        }
-
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if ui.add(
-                                egui::Button::new(RichText::new("🚀 Update").size(10.0).color(self.theme.text_muted))
-                                    .fill(Color32::TRANSPARENT),
-                            )
-                            .on_hover_text("Periksa pembaruan perangkat lunak")
-                            .clicked()
-                            {
-                                self.updater.github_token = self.settings_view.github_token.clone();
-                                self.updater.check_for_updates();
-                            }
-                        });
-                    });
+                    ui.add_space(6.0);
                 });
             });
 
@@ -395,7 +363,7 @@ impl App for EigenGraphApp {
                     .corner_radius(CornerRadius::same(12))
                     .inner_margin(Margin::same(20)))
                 .show(ui.ctx(), |ui| {
-                    self.settings_view.show(ui, &self.theme);
+                    self.settings_view.show(ui, &self.theme, &mut self.updater);
                 });
             self.show_settings = open;
         }
