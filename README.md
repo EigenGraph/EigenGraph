@@ -5,9 +5,10 @@
 ### High-Performance Computational Framework for Adjusted Redundancy Index (ARI), SVD Kinematic Mechanism Guards, and 10D BIM Construction Lifecycle Analytics
 
 [![Release](https://img.shields.io/badge/release-v2.0.0-0A84FF.svg)](https://github.com/haridsirawan/EigenGraph/releases/latest)
+[![Website](https://img.shields.io/badge/website-live-0A84FF.svg)](https://haridsirawan.github.io/EigenGraph/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-black.svg)](https://github.com/haridsirawan/EigenGraph/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-52%20passed%20(100%25)-30D158.svg)](#-canonical-verification--numerical-benchmarks)
+[![Tests](https://img.shields.io/badge/tests-58%20passed%20(100%25)-30D158.svg)](#-canonical-verification--numerical-benchmarks)
 [![Engine](https://img.shields.io/badge/engine-Rust%20Analytical%20%26%20GPU%20Accelerated-purple.svg)](#-core-engineering-features--mathematical-formulations)
 [![Rust](https://img.shields.io/badge/built%20with-Rust%201.80+-DEA584.svg)](https://www.rust-lang.org/)
 
@@ -193,7 +194,7 @@ Requires the stable Rust toolchain (1.80+):
 git clone https://github.com/haridsirawan/EigenGraph.git
 cd EigenGraph
 
-# 2. Run the complete test suite (52 unit tests)
+# 2. Run the complete test suite (58 unit tests)
 cargo test
 
 # 3. Build optimized release binary

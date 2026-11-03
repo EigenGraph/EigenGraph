@@ -23,6 +23,8 @@ pub mod vault;
 pub mod geom;
 pub mod csg;
 pub mod bim;
+pub mod cso;
+pub mod concrete;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -81,4 +83,11 @@ pub use bim::{
     BimProject, BimRoom, BimRun, BimSlab, BimWall, CompoundLayer, LayerFunction, OpeningKind,
     RebarBar, RebarPreset, RunCategory, RunJustify, SectionCutProjection, SnapHit, SnapKind,
     ViewRange,
+};
+pub use cso::{
+    BbsScheduleItem, CsoReport, CuttingItem, CuttingStockOptimizer, MasterStockBar, PlacedCut,
+};
+pub use concrete::{
+    CardinalPoints, ConcreteEngine, ConcretePmReport, ConcreteSection, DemandAudit,
+    InteractionPoint, RebarLayer,
 };

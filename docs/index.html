@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EigenGraph — High-Performance Computational Framework for Structural Redundancy (ARI) & 10D BIM</title>
+  <meta name="description" content="High-Performance Rust Computational Framework for Adjusted Redundancy Index (ARI), Sherman-Morrison O(N²) Rank-1 Perturbation, SVD Kinematic Mechanism Guards, and 10D BIM Construction Lifecycle Analytics.">
+  <link rel="icon" type="image/png" href="assets/icon.png">
+
+  <!-- KaTeX for pristine LaTeX mathematics -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"
+          onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\[', right: '\\]', display: true}, {left: '\\(', right: '\\)', display: false}]});"></script>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ================= NAVIGATION ================= -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="#" class="nav-brand">
+        <img src="assets/icon.png" alt="EigenGraph Icon">
+        <span>EigenGraph</span>
+        <span class="brand-badge">v2.0.0 Universal</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#suite">Platform Suite</a></li>
+        <li><a href="#sandbox">Interactive Sandbox</a></li>
+        <li><a href="#pillars">10D BIM Pillars</a></li>
+        <li><a href="#benchmarks">Numerical Benchmarks</a></li>
+        <li><a href="#download">Downloads</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <a href="https://github.com/haridsirawan/EigenGraph" target="_blank" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+        <a href="#download" class="btn btn-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ================= HERO SECTION ================= -->
+  <header class="hero">
+    <div class="hero-pill">
+      <span class="pill-dot"></span>
+      <span>Official Release v2.0.0 — Universal 2 (Apple Silicon M1-M4 & Intel x64)</span>
+    </div>
+
+    <h1 class="hero-title">
+      Structural Redundancy Intelligence<br>
+      meets <span class="gradient-text">10D BIM Lifecycle</span>
+    </h1>
+
+    <p class="hero-subtitle">
+      A High-Performance Rust Computational Framework for <strong>Adjusted Redundancy Index (ARI)</strong>,
+      Sherman-Morrison \(O(N^2)\) Rank-1 Perturbation, SVD Kinematic Mechanism Guards,
+      and Full-Lifecycle OpenBIM Construction Analytics.
+    </p>
+
+    <div class="hero-cta">
+      <a href="#download" class="btn btn-primary btn-lg">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download EigenGraph (macOS Universal)
+      </a>
+      <a href="#sandbox" class="btn btn-secondary btn-lg">
+        ⚡ Try Interactive Sandbox
+      </a>
+    </div>
+
+    <div class="hero-badges">
+      <img src="https://img.shields.io/badge/release-v2.0.0-0A84FF.svg" alt="Release">
+      <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-black.svg" alt="Platforms">
+      <img src="https://img.shields.io/badge/tests-58%20passed%20(100%25)-30D158.svg" alt="Tests">
+      <img src="https://img.shields.io/badge/built%20with-Rust%201.80+-DEA584.svg" alt="Rust">
+      <img src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue.svg" alt="License">
+    </div>
+
+    <!-- Hero Interactive 3D Showcase Window -->
+    <div class="hero-showcase">
+      <div class="window-chrome">
+        <div class="traffic-lights">
+          <div class="traffic-light red"></div>
+          <div class="traffic-light yellow"></div>
+          <div class="traffic-light green"></div>
+        </div>
+        <div class="window-title">EigenGraph 3D Canvas Viewport — High-Rise Diagrid Tower LOD 350</div>
+      </div>
+      <div class="hero-canvas-wrap">
+        <canvas id="hero-canvas"></canvas>
+        <div class="canvas-overlay-card">
+          <h4>🪐 Real-Time 3D Diagrid Lattice</h4>
+          <p>Drag or hover cursor to orbit turntable. Live Euler-Bernoulli beam mechanics with Rayon multithreaded Cholesky factorization.</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= THE EIGEN PLATFORM SUITE ================= -->
+  <section class="section" id="suite">
+    <div class="section-header">
+      <span class="section-tag">Triad Architecture</span>
+      <h2 class="section-title">The Eigen Platform Suite</h2>
+      <p class="section-desc">
+        A unified triad ecosystem engineered to bridge analytical mechanics, kinematic failure prevention, and construction lifecycle dimensions.
+      </p>
+    </div>
+
+    <div class="suite-grid">
+      <!-- EigenGraph -->
+      <div class="suite-card highlight">
+        <div class="suite-icon">
+          <img src="assets/icon.png" alt="EigenGraph">
+        </div>
+        <h3>EigenGraph</h3>
+        <p>10D BIM Construction Lifecycle Dimensions, CAD/BIM Triad Dock, IFC 4.3 OpenBIM interoperability, and 2D Sheet A101 Vector Blueprints.</p>
+        <div class="suite-tags">
+          <span class="suite-tag">10D BIM</span>
+          <span class="suite-tag">Sheet A101</span>
+          <span class="suite-tag">Solid CSG</span>
+          <span class="suite-tag">IFC 4.3</span>
+        </div>
+      </div>
+
+      <!-- EigenGate -->
+      <div class="suite-card">
+        <div class="suite-icon">
+          <img src="assets/eigengate.png" alt="EigenGate">
+        </div>
+        <h3>EigenGate</h3>
+        <p>Sherman-Morrison Rank-1 SVD Kinematic Mechanism Guard, Fracture-Critical Member (FCM) screening, and zero false-positive stability certification.</p>
+        <div class="suite-tags">
+          <span class="suite-tag">SVD Guard</span>
+          <span class="suite-tag">Woodbury N-2</span>
+          <span class="suite-tag">Euler Buckling Kg(P)</span>
+          <span class="suite-tag">Rank Drop</span>
+        </div>
+      </div>
+
+      <!-- EigenFlow -->
+      <div class="suite-card">
+        <div class="suite-icon">
+          <img src="assets/eigenflow.png" alt="EigenFlow">
+        </div>
+        <h3>EigenFlow</h3>
+        <p>Non-linear APM progressive collapse simulation (DoD UFC 4-023-03), Critical Path (CPM) 4D scheduling, and 6D embodied carbon LCA pipelines.</p>
+        <div class="suite-tags">
+          <span class="suite-tag">Newmark-β DAF</span>
+          <span class="suite-tag">4D CPM Schedule</span>
+          <span class="suite-tag">6D Carbon LCA</span>
+          <span class="suite-tag">Plastic Hinges</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= INTERACTIVE WEB SANDBOX ================= -->
+  <section class="section" id="sandbox">
+    <div class="section-header">
+      <span class="section-tag">Interactive Simulation</span>
+      <h2 class="section-title">Test the Analytical Engine in Browser</h2>
+      <p class="section-desc">
+        Experience real client-side mathematical simulations of Sherman-Morrison ARI, Concrete Column P-M interaction, and 1D Cutting Stock Optimization.
+      </p>
+    </div>
+
+    <div class="sandbox-card">
+      <div class="sandbox-tabs">
+        <button class="sandbox-tab active" data-target="tab-ari">
+          ⚡ 1. Sherman-Morrison ARI & Gate 1 SVD
+        </button>
+        <button class="sandbox-tab" data-target="tab-pm">
+          🧱 2. SNI 2847 Concrete Column P-M
+        </button>
+        <button class="sandbox-tab" data-target="tab-cso">
+          ✂️ 3. 1D Cutting Stock Optimizer (CSO)
+        </button>
+      </div>
+
+      <div class="sandbox-body">
+        <!-- TAB 1: ARI & SVD SIMULATOR -->
+        <div class="sandbox-panel active" id="tab-ari">
+          <div class="sandbox-grid">
+            <div class="canvas-container">
+              <canvas id="ari-canvas"></canvas>
+            </div>
+            <div class="controls-card">
+              <h3>⚡ Warren Truss 24m APM</h3>
+              <p style="font-size:0.85rem; color:var(--text-secondary);">
+                Click on any member in the canvas to simulate sudden fracture (\(\lambda_e = 0\)).
+                The engine evaluates spectral leverage \(h_e\) and checks Gate 1 mechanism stability.
+              </p>
+
+              <div class="metric-grid">
+                <div class="metric-item">
+                  <div class="val" id="ari-val-min">0.720</div>
+                  <div class="lbl">System ARI (min)</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="ari-val-status">🟢 INTACT</div>
+                  <div class="lbl">Stability State</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="ari-val-disp">14.2 mm</div>
+                  <div class="lbl">Mid-Span Deflection</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="ari-val-gate">PASS</div>
+                  <div class="lbl">SVD Gate 1 Guard</div>
+                </div>
+              </div>
+
+              <button class="btn btn-secondary" id="btn-reset-truss" style="width:100%; margin-top:8px;">
+                🔄 Reset Intact State
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: CONCRETE P-M SIMULATOR -->
+        <div class="sandbox-panel" id="tab-pm">
+          <div class="sandbox-grid">
+            <div class="canvas-container">
+              <canvas id="pm-canvas"></canvas>
+            </div>
+            <div class="controls-card">
+              <h3>🧱 SNI 2847 Column P-M</h3>
+              <p style="font-size:0.85rem; color:var(--text-secondary);">
+                Evaluates Whitney rectangular stress block, strain compatibility, and factored design capacity \(\phi P_n - \phi M_n\).
+              </p>
+
+              <div class="control-group">
+                <label>Width \(b\) (mm): <span id="lbl-b">400</span></label>
+                <input type="range" id="pm-input-b" min="250" max="800" step="50" value="400">
+              </div>
+
+              <div class="control-group">
+                <label>Depth \(h\) (mm): <span id="lbl-h">400</span></label>
+                <input type="range" id="pm-input-h" min="250" max="800" step="50" value="400">
+              </div>
+
+              <div class="control-group">
+                <label>Concrete \(f'_c\) (MPa):</label>
+                <select id="pm-input-fc">
+                  <option value="25">25 MPa</option>
+                  <option value="30" selected>30 MPa</option>
+                  <option value="35">35 MPa</option>
+                  <option value="40">40 MPa</option>
+                </select>
+              </div>
+
+              <div class="control-group">
+                <label>Longitudinal Rebar Bars:</label>
+                <select id="pm-input-bars">
+                  <option value="6">6 D22 (1.43%)</option>
+                  <option value="8" selected>8 D22 (1.90%)</option>
+                  <option value="12">12 D25 (3.68%)</option>
+                </select>
+              </div>
+
+              <div class="metric-grid">
+                <div class="metric-item">
+                  <div class="val" id="pm-val-pnmax">2745 kN</div>
+                  <div class="lbl">\(\phi P_{n,\max}\) Limit</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="pm-val-rho">1.90%</div>
+                  <div class="lbl">Rebar Ratio \(\rho\)</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="pm-val-dcr">0.546</div>
+                  <div class="lbl">Demand DCR (Safe)</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" style="color:var(--accent-blue)">\(\beta_1 = 0.836\)</div>
+                  <div class="lbl">Whitney \(\beta_1\)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: CUTTING STOCK OPTIMIZER -->
+        <div class="sandbox-panel" id="tab-cso">
+          <div class="sandbox-grid">
+            <div class="canvas-container">
+              <canvas id="cso-canvas"></canvas>
+            </div>
+            <div class="controls-card">
+              <h3>✂️ 1D Cutting Stock Optimizer</h3>
+              <p style="font-size:0.85rem; color:var(--text-secondary);">
+                Best-Fit Decreasing (BFD) packing with kerf compensation to minimize scrap waste across standard commercial raw bars.
+              </p>
+
+              <div class="control-group">
+                <label>Stock Length \(L_{\text{stock}}\): 12.0m</label>
+                <input type="range" id="cso-input-stock" min="6.0" max="14.0" step="0.5" value="12.0">
+              </div>
+
+              <div class="control-group">
+                <label>Saw Kerf: 5.0 mm</label>
+                <input type="range" id="cso-input-kerf" min="0" max="10" step="1" value="5">
+              </div>
+
+              <div class="metric-grid">
+                <div class="metric-item">
+                  <div class="val" id="cso-val-yield">97.6%</div>
+                  <div class="lbl">Yield Efficiency</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="cso-val-bars">4 Batang</div>
+                  <div class="lbl">Raw Bars Needed</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="cso-val-scrap" style="color:var(--accent-amber)">2.4%</div>
+                  <div class="lbl">Net Scrap Waste</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" style="color:var(--accent-blue)">1.76 m</div>
+                  <div class="lbl">Reusable Offcut</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 13 NAVIGATION PILLARS ================= -->
+  <section class="section" id="pillars">
+    <div class="section-header">
+      <span class="section-tag">Comprehensive Dimensions</span>
+      <h2 class="section-title">13 Core Navigation Pillars</h2>
+      <p class="section-desc">
+        Engineered with a locked macOS App Store layout and modern vertical slide workspace cards covering the entire 10D BIM lifecycle.
+      </p>
+    </div>
+
+    <div class="pillars-grid">
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">📁</span>
+          <h4>1. My Library</h4>
+        </div>
+        <p>Obsidian-compliant engineering vault, project catalog, and reactive SHA-256 autosave persistence.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">💡</span>
+          <h4>2. Research & Concept</h4>
+        </div>
+        <p>Canonical ARI formulations, mathematical derivations, and initial feasibility structural checks.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">📐</span>
+          <h4>3. Drafting & Drawings</h4>
+        </div>
+        <p>Sheet A101 technical drawing composer with pure vector zero-dependency PDF 1.4 & SVG exports.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">🏗️</span>
+          <h4>4. Modeling & Geometry</h4>
+        </div>
+        <p>3D CSG B-Rep solid Boolean subtractions for doors, windows, and automated 3D rebar cages.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">⏱️</span>
+          <h4>5. Time & Scheduling</h4>
+        </div>
+        <p>4D Critical Path Method (CPM), Early/Late dates, float calculation, and dynamic S-Curve progress.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">💰</span>
+          <h4>6. Cost & Budgeting</h4>
+        </div>
+        <p>5D Dynamic RAB AHSP PUPR 2023/2024, material take-off (QTO), and Cost-ARI Pareto optimization.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">🌱</span>
+          <h4>7. Sustainability & Energy</h4>
+        </div>
+        <p>6D Embodied carbon LCA pipelines across EAF, BF-BOF, and H2-DRI green steel production routes.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">🏢</span>
+          <h4>8. Facility Management</h4>
+        </div>
+        <p>7D Digital twin SHM sensor telemetry, COBie asset registry, and predictive maintenance scheduling.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">🛡️</span>
+          <h4>9. Safety & Health</h4>
+        </div>
+        <p>AISC 360 LRFD steel verification, SNI 2847 column P-M interaction, and SNI 1726 seismic spectrum.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">♻️</span>
+          <h4>10. Lean Construction</h4>
+        </div>
+        <p>9D Dynamic 1D Cutting Stock Optimizer (CSO), Last Planner System, and Bar Bending Schedule (BBS).</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">🤖</span>
+          <h4>11. Industrialized Construction</h4>
+        </div>
+        <p>10D Modular DfMA prefabrication, robotic welding automation, and CNC DSTV NC1 piece export.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">🔮</span>
+          <h4>12. Prediction</h4>
+        </div>
+        <p>First-Order Second-Moment (FOSM) reliability index \(\beta\), FEMA P-58 fragility curves, and clash detection.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-header">
+          <span class="pillar-icon">📊</span>
+          <h4>13. Results</h4>
+        </div>
+        <p>Executive structural health audit, SNI/AISC code compliance matrix, and official certification export.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CANONICAL BENCHMARKS ================= -->
+  <section class="section" id="benchmarks">
+    <div class="section-header">
+      <span class="section-tag">Mathematical Exactness</span>
+      <h2 class="section-title">Canonical Model M1 Verification</h2>
+      <p class="section-desc">
+        Rigorous exact rational arithmetic comparison between theoretical closed-form derivations and the Rust analytical engine.
+      </p>
+    </div>
+
+    <div class="benchmark-card">
+      <table class="benchmark-table">
+        <thead>
+          <tr>
+            <th>Parameter / Metric</th>
+            <th>Closed-Form Rational</th>
+            <th>Theoretical Decimal</th>
+            <th>EigenGraph Engine Output</th>
+            <th>Verification Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Member 1 Weight (\(w_1^M\))</strong></td>
+            <td>\(\frac{4}{7}\)</td>
+            <td>0.571429</td>
+            <td>0.571429</td>
+            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Member 2 Weight (\(w_2^M\))</strong></td>
+            <td>\(\frac{2}{5}\)</td>
+            <td>0.400000</td>
+            <td>0.400000</td>
+            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Intact Graph Score (\(S(\mathcal{G}^M)\))</strong></td>
+            <td>\(\frac{17}{35}\)</td>
+            <td>0.485714</td>
+            <td>0.485714</td>
+            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Member 1 Redundancy Ratio (\(RR_1\))</strong></td>
+            <td>\(\frac{7}{17}\)</td>
+            <td>0.411765</td>
+            <td>0.411765</td>
+            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Member 1 Pre-Utilization (\(U_1^*\))</strong></td>
+            <td>\(\frac{1}{2}\)</td>
+            <td>0.500000</td>
+            <td>0.500000</td>
+            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Adjusted Redundancy Index (\(ARI_1\))</strong></td>
+            <td><strong>\(\frac{21}{68}\)</strong></td>
+            <td><strong>0.308824</strong></td>
+            <td><strong>0.308824</strong></td>
+            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Criticality Index (\(CI_1\))</strong></td>
+            <td><strong>\(\frac{47}{68}\)</strong></td>
+            <td><strong>0.691176</strong></td>
+            <td><strong>0.691176</strong></td>
+            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= DOWNLOAD MATRIX ================= -->
+  <section class="section" id="download">
+    <div class="section-header">
+      <span class="section-tag">Multi-Platform Packages</span>
+      <h2 class="section-title">Get EigenGraph v2.0.0</h2>
+      <p class="section-desc">
+        Pre-compiled standalone native binaries with zero external runtime dependencies.
+      </p>
+    </div>
+
+    <div class="download-grid">
+      <!-- macOS -->
+      <div class="download-card">
+        <div class="download-icon">🍎</div>
+        <h3>macOS Universal</h3>
+        <p class="sub">Apple Silicon (M1-M4) & Intel x64</p>
+        <a href="https://github.com/haridsirawan/EigenGraph/releases/latest" class="btn btn-primary">
+          Download .DMG (macOS)
+        </a>
+      </div>
+
+      <!-- Windows -->
+      <div class="download-card">
+        <div class="download-icon">🪟</div>
+        <h3>Windows x64</h3>
+        <p class="sub">Windows 10 / 11 64-bit</p>
+        <a href="https://github.com/haridsirawan/EigenGraph/releases/latest" class="btn btn-secondary">
+          Download .ZIP (Windows)
+        </a>
+      </div>
+
+      <!-- Linux -->
+      <div class="download-card">
+        <div class="download-icon">🐧</div>
+        <h3>Linux x86_64</h3>
+        <p class="sub">Ubuntu, Debian, Fedora, Arch</p>
+        <a href="https://github.com/haridsirawan/EigenGraph/releases/latest" class="btn btn-secondary">
+          Download .TAR.GZ (Linux)
+        </a>
+      </div>
+
+      <!-- Source Code -->
+      <div class="download-card">
+        <div class="download-icon">🦀</div>
+        <h3>Compile from Source</h3>
+        <p class="sub">Requires Rust 1.80+ (cargo build)</p>
+        <a href="https://github.com/haridsirawan/EigenGraph" target="_blank" class="btn btn-outline">
+          Browse GitHub Repo ↗
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <h4>EigenGraph</h4>
+        <p>
+          High-Performance Computational Framework for Adjusted Redundancy Index (ARI),
+          SVD Kinematic Mechanism Guards, and 10D BIM Construction Lifecycle Analytics.
+        </p>
+      </div>
+
+      <div class="footer-col">
+        <h5>Platform Triad</h5>
+        <ul>
+          <li><a href="#suite">EigenGraph</a></li>
+          <li><a href="#suite">EigenGate</a></li>
+          <li><a href="#suite">EigenFlow</a></li>
+          <li><a href="#pillars">13 Lifecycle Pillars</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h5>Mathematics</h5>
+        <ul>
+          <li><a href="#benchmarks">Sherman-Morrison \(O(N^2)\)</a></li>
+          <li><a href="#benchmarks">Woodbury Rank-2</a></li>
+          <li><a href="#benchmarks">Gate 1 SVD Guard</a></li>
+          <li><a href="#benchmarks">Model M1 Verification</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h5>Open Source</h5>
+        <ul>
+          <li><a href="https://github.com/haridsirawan/EigenGraph" target="_blank">GitHub Repository</a></li>
+          <li><a href="https://github.com/haridsirawan/EigenGraph/releases" target="_blank">Releases & Changelog</a></li>
+          <li><a href="https://github.com/haridsirawan/Adjusted-Redundancy-Index" target="_blank">Research Parent Repo</a></li>
+          <li><a href="https://github.com/haridsirawan/EigenGraph/blob/main/LICENSE" target="_blank">MIT / Apache 2.0 License</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div>Copyright © 2026 <strong>Harids Irawan</strong>. Distributed under dual MIT & Apache-2.0 License.</div>
+      <div>Designed with macOS Pro Dark Aesthetic & 100% Rust Engine.</div>
+    </div>
+  </footer>
+
+  <!-- App Script -->
+  <script src="app.js"></script>
+</body>
+</html>

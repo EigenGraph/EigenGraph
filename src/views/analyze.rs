@@ -10,6 +10,7 @@ pub enum AnalyzeSubTab {
     MemberCriticality,
     DisplacementForces,
     Frame3dInteraction,
+    ConcretePmInteraction,
     CascadingCollapse,
     NonlinearPushover,
     ModalDynamics,
@@ -27,6 +28,18 @@ pub struct AnalyzeView {
     pub s1_val: f32,
     pub r_val: f32,
     pub modal_report: Option<crate::core::ModalAnalysisReport>,
+    // Concrete Column P-M parameters (SNI 2847:2019 / ACI 318-19)
+    pub concrete_col_width_mm: f32,
+    pub concrete_col_height_mm: f32,
+    pub concrete_fc_mpa: f32,
+    pub concrete_fy_mpa: f32,
+    pub concrete_cover_mm: f32,
+    pub concrete_bars_per_face_x: usize,
+    pub concrete_bars_intermediate_y: usize,
+    pub concrete_bar_dia_mm: f32,
+    pub concrete_demand_pu_kn: f32,
+    pub concrete_demand_mu_knm: f32,
+    pub concrete_is_spiral: bool,
 }
 
 impl Default for AnalyzeView {
@@ -43,6 +56,17 @@ impl Default for AnalyzeView {
             s1_val: 0.50,
             r_val: 8.0,
             modal_report: None,
+            concrete_col_width_mm: 400.0,
+            concrete_col_height_mm: 400.0,
+            concrete_fc_mpa: 30.0,
+            concrete_fy_mpa: 420.0,
+            concrete_cover_mm: 40.0,
+            concrete_bars_per_face_x: 3,
+            concrete_bars_intermediate_y: 1,
+            concrete_bar_dia_mm: 22.0,
+            concrete_demand_pu_kn: 1500.0,
+            concrete_demand_mu_knm: 120.0,
+            concrete_is_spiral: false,
         }
     }
 }
@@ -93,6 +117,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::MemberCriticality => self.render_member_criticality(ui, theme, members),
                     AnalyzeSubTab::DisplacementForces => self.render_displacement_and_forces(ui, theme, members),
                     AnalyzeSubTab::Frame3dInteraction => self.render_frame_3d_interaction(ui, theme, members),
+                    AnalyzeSubTab::ConcretePmInteraction => self.render_concrete_pm_interaction(ui, theme),
                     AnalyzeSubTab::CascadingCollapse => self.render_cascading_collapse(ui, theme),
                     AnalyzeSubTab::NonlinearPushover => self.render_nonlinear_pushover(ui, theme),
                     AnalyzeSubTab::ModalDynamics => self.render_modal_dynamics(ui, theme),
@@ -110,6 +135,7 @@ impl AnalyzeView {
                 (AnalyzeSubTab::MemberCriticality, "🎯 Matriks Sensitivitas ARI"),
                 (AnalyzeSubTab::DisplacementForces, "📊 Gaya Dalam & Lendutan"),
                 (AnalyzeSubTab::Frame3dInteraction, "📐 Frame 3D P-M-V"),
+                (AnalyzeSubTab::ConcretePmInteraction, "🧱 Beton P-M (SNI 2847)"),
                 (AnalyzeSubTab::CascadingCollapse, "💥 Kolaps Kaskade"),
                 (AnalyzeSubTab::NonlinearPushover, "📉 Pushover P-Δ"),
                 (AnalyzeSubTab::ModalDynamics, "🌊 Ragam SNI 1726"),
@@ -1039,5 +1065,460 @@ impl AnalyzeView {
                     }
                 }
             });
+    }
+
+    // -------------------------------------------------------------
+    // SUB-TAB 5: Concrete Column P-M Interaction (SNI 2847:2019 / ACI 318-19)
+    // -------------------------------------------------------------
+    fn render_concrete_pm_interaction(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        use crate::core::concrete::ConcreteEngine;
+
+        // 1. Build Section and Evaluate P-M Interaction Diagram
+        let total_bars = self.concrete_bars_per_face_x * 2 + self.concrete_bars_intermediate_y * 2;
+        let col_sec = ConcreteEngine::create_rectangular_column(
+            &format!("Col_{:.0}x{:.0}", self.concrete_col_width_mm, self.concrete_col_height_mm),
+            self.concrete_col_width_mm as f64,
+            self.concrete_col_height_mm as f64,
+            self.concrete_fc_mpa as f64,
+            self.concrete_fy_mpa as f64,
+            self.concrete_cover_mm as f64,
+            self.concrete_bars_per_face_x,
+            self.concrete_bars_intermediate_y,
+            self.concrete_bar_dia_mm as f64,
+        );
+
+        let pm_report = ConcreteEngine::evaluate_pm_diagram(
+            &col_sec,
+            Some(self.concrete_demand_pu_kn as f64),
+            Some(self.concrete_demand_mu_knm as f64),
+        );
+
+        let dcr = pm_report.demand_check.as_ref().map(|d| d.dcr).unwrap_or(0.0);
+        let is_safe = pm_report.demand_check.as_ref().map(|d| d.is_safe).unwrap_or(true);
+
+        // 2. Top Metric Cards
+        ui.columns(4, |cols| {
+            self.metric_card(
+                &mut cols[0],
+                theme,
+                "BATAS AKSIAL MAKS (φPn,max)",
+                &format!("{:.0} kN", pm_report.cardinal.phi_pn_max_kn),
+                "SNI 2847:2019 Pasal 22.4.2 (Tied)",
+                theme.accent_blue,
+            );
+            self.metric_card(
+                &mut cols[1],
+                theme,
+                "TITIK BALANCED (φPb, φMb)",
+                &format!("{:.0} kN, {:.0} kNm", pm_report.cardinal.balanced.phi_pn_kn, pm_report.cardinal.balanced.phi_mn_knm),
+                "Kelelehan Tarik Simultan (εt = εy)",
+                theme.accent_orange,
+            );
+            self.metric_card(
+                &mut cols[2],
+                theme,
+                "RASIO TULANGAN (ρ)",
+                &format!("{:.2}%", pm_report.rebar_ratio_pct),
+                &format!("{} Batang D{:.0} (Ast = {:.0} mm²)", total_bars, self.concrete_bar_dia_mm, pm_report.ast_mm2),
+                if pm_report.rebar_ratio_pct >= 1.0 && pm_report.rebar_ratio_pct <= 4.0 { theme.accent_green } else { Color32::from_rgb(245, 158, 11) },
+            );
+            self.metric_card(
+                &mut cols[3],
+                theme,
+                "DEMAND AUDIT (DCR)",
+                &format!("{:.3}", dcr),
+                if is_safe { "🟢 AMAN (Kapasitas Mencukupi)" } else { "🔴 OVERSTRESSED (Melebihi Kapasitas)" },
+                if is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) },
+            );
+        });
+
+        ui.add_space(16.0);
+
+        // 3. Section Preset Buttons & Parameter Controls
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("🏛️ Preset Penampang Standar SNI 2847:").size(12.5).strong().color(theme.text_primary));
+                ui.add_space(8.0);
+
+                if ui.button(RichText::new("Kolom Gedung 400x400 (8 D22, fc' 30)").size(11.0)).clicked() {
+                    self.concrete_col_width_mm = 400.0;
+                    self.concrete_col_height_mm = 400.0;
+                    self.concrete_fc_mpa = 30.0;
+                    self.concrete_fy_mpa = 420.0;
+                    self.concrete_bars_per_face_x = 3;
+                    self.concrete_bars_intermediate_y = 1;
+                    self.concrete_bar_dia_mm = 22.0;
+                }
+                if ui.button(RichText::new("Kolom Interior 600x600 (12 D25, fc' 35)").size(11.0)).clicked() {
+                    self.concrete_col_width_mm = 600.0;
+                    self.concrete_col_height_mm = 600.0;
+                    self.concrete_fc_mpa = 35.0;
+                    self.concrete_fy_mpa = 420.0;
+                    self.concrete_bars_per_face_x = 4;
+                    self.concrete_bars_intermediate_y = 2;
+                    self.concrete_bar_dia_mm = 25.0;
+                }
+                if ui.button(RichText::new("Kolom Menara 800x800 (16 D32, fc' 40)").size(11.0)).clicked() {
+                    self.concrete_col_width_mm = 800.0;
+                    self.concrete_col_height_mm = 800.0;
+                    self.concrete_fc_mpa = 40.0;
+                    self.concrete_fy_mpa = 420.0;
+                    self.concrete_bars_per_face_x = 5;
+                    self.concrete_bars_intermediate_y = 3;
+                    self.concrete_bar_dia_mm = 32.0;
+                }
+                if ui.button(RichText::new("Kolom Pipih 250x600 (10 D19, fc' 25)").size(11.0)).clicked() {
+                    self.concrete_col_width_mm = 250.0;
+                    self.concrete_col_height_mm = 600.0;
+                    self.concrete_fc_mpa = 25.0;
+                    self.concrete_fy_mpa = 420.0;
+                    self.concrete_bars_per_face_x = 2;
+                    self.concrete_bars_intermediate_y = 3;
+                    self.concrete_bar_dia_mm = 19.0;
+                }
+            });
+
+            ui.add_space(10.0);
+            ui.separator();
+            ui.add_space(8.0);
+
+            // Parameter Sliders
+            ui.columns(3, |cols| {
+                cols[0].vertical(|ui| {
+                    ui.label(RichText::new("📐 Dimensi & Selimut Beton:").size(11.5).strong().color(theme.text_secondary));
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Lebar b:").size(11.0));
+                        ui.add(egui::Slider::new(&mut self.concrete_col_width_mm, 200.0..=1200.0).suffix(" mm").step_by(50.0));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Tinggi h:").size(11.0));
+                        ui.add(egui::Slider::new(&mut self.concrete_col_height_mm, 200.0..=1200.0).suffix(" mm").step_by(50.0));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Selimut:").size(11.0));
+                        ui.add(egui::Slider::new(&mut self.concrete_cover_mm, 25.0..=75.0).suffix(" mm").step_by(5.0));
+                    });
+                });
+
+                cols[1].vertical(|ui| {
+                    ui.label(RichText::new("🔩 Mutu Material (SNI 2847):").size(11.5).strong().color(theme.text_secondary));
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Mutu Beton f'c:").size(11.0));
+                        egui::ComboBox::from_id_salt("fc_select")
+                            .selected_text(format!("{:.0} MPa", self.concrete_fc_mpa))
+                            .show_ui(ui, |ui| {
+                                for &fc in &[20.0, 25.0, 30.0, 35.0, 40.0, 50.0] {
+                                    ui.selectable_value(&mut self.concrete_fc_mpa, fc, format!("{:.0} MPa", fc));
+                                }
+                            });
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Mutu Baja fy:").size(11.0));
+                        egui::ComboBox::from_id_salt("fy_select")
+                            .selected_text(format!("BJTS {:.0}", self.concrete_fy_mpa))
+                            .show_ui(ui, |ui| {
+                                for &fy in &[280.0, 420.0, 520.0] {
+                                    let label = if fy > 400.0 { format!("BJTS {:.0} (Ulir)", fy) } else { format!("BJTP {:.0} (Polos)", fy) };
+                                    ui.selectable_value(&mut self.concrete_fy_mpa, fy, label);
+                                }
+                            });
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Diameter Tulangan:").size(11.0));
+                        egui::ComboBox::from_id_salt("dia_select")
+                            .selected_text(format!("D{:.0}", self.concrete_bar_dia_mm))
+                            .show_ui(ui, |ui| {
+                                for &dia in &[13.0, 16.0, 19.0, 22.0, 25.0, 29.0, 32.0] {
+                                    ui.selectable_value(&mut self.concrete_bar_dia_mm, dia, format!("D{:.0}", dia));
+                                }
+                            });
+                    });
+                });
+
+                cols[2].vertical(|ui| {
+                    ui.label(RichText::new("⚡ Beban Rencana Terfaktor (Factored Demand):").size(11.5).strong().color(theme.text_secondary));
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Beban Aksial Pu:").size(11.0));
+                        ui.add(egui::Slider::new(&mut self.concrete_demand_pu_kn, -500.0..=5000.0).suffix(" kN").step_by(50.0));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Momen Lentur Mu:").size(11.0));
+                        ui.add(egui::Slider::new(&mut self.concrete_demand_mu_knm, 0.0..=800.0).suffix(" kNm").step_by(10.0));
+                    });
+                    ui.horizontal(|ui| {
+                        let status_label = if is_safe { "🟢 AMAN (Kapasitas Cukup)" } else { "🔴 TIDAK AMAN" };
+                        let status_col = if is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                        ui.label(RichText::new(format!("DCR: {:.3} • {}", dcr, status_label)).size(11.0).strong().color(status_col));
+                    });
+                });
+            });
+        });
+
+        ui.add_space(16.0);
+
+        // 4. Interactive Dual Canvas: P-M Diagram (Left) + Rebar Section View (Right)
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📊 Diagram Interaksi P-M & Visualisasi Penampang Kolom").size(13.5).strong().color(theme.text_primary));
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.label(RichText::new(format!("Standar: SNI 2847:2019 / ACI 318-19 • β₁ = {:.3}", pm_report.beta1)).size(11.0).color(theme.accent_blue));
+                });
+            });
+            ui.add_space(10.0);
+
+            let total_canvas_width = ui.available_width();
+            let pm_width = (total_canvas_width * 0.65).max(380.0);
+            let sec_width = (total_canvas_width - pm_width - 24.0).max(240.0);
+            let canvas_height = 360.0;
+
+            ui.horizontal(|ui| {
+                // LEFT CANVAS: P-M Interaction Curves
+                let (pm_rect, _) = ui.allocate_exact_size(Vec2::new(pm_width, canvas_height), egui::Sense::hover());
+                ui.painter().rect_filled(pm_rect, CornerRadius::same(8), theme.bg_canvas);
+                ui.painter().rect_stroke(pm_rect, CornerRadius::same(8), Stroke::new(1.0, theme.border_subtle), egui::StrokeKind::Inside);
+
+                let m_max = pm_report.nominal_curve.iter().map(|(m, _)| *m).fold(100.0_f64, f64::max) * 1.15;
+                let p_max = pm_report.cardinal.p0_kn * 1.08;
+                let p_min = pm_report.cardinal.pnt_kn * 1.15; // negative tension
+
+                let margin_left = 65.0;
+                let margin_bottom = 35.0;
+                let plot_w = pm_width - margin_left - 20.0;
+                let plot_h = canvas_height - margin_bottom - 20.0;
+
+                let map_pt = |m: f64, p: f64| -> egui::Pos2 {
+                    let norm_x = (m / m_max).clamp(0.0, 1.2) as f32;
+                    let norm_y = ((p - p_min) / (p_max - p_min)).clamp(0.0, 1.2) as f32;
+                    egui::Pos2::new(
+                        pm_rect.min.x + margin_left + norm_x * plot_w,
+                        pm_rect.max.y - margin_bottom - norm_y * plot_h,
+                    )
+                };
+
+                // Grid & Zero-Lines
+                let zero_pt = map_pt(0.0, 0.0);
+                // Horizontal zero-P axis
+                ui.painter().line_segment(
+                    [egui::Pos2::new(pm_rect.min.x + margin_left, zero_pt.y), egui::Pos2::new(pm_rect.max.x - 15.0, zero_pt.y)],
+                    Stroke::new(1.0, Color32::from_rgb(70, 70, 80)),
+                );
+                // Vertical zero-M axis
+                ui.painter().line_segment(
+                    [egui::Pos2::new(pm_rect.min.x + margin_left, pm_rect.min.y + 15.0), egui::Pos2::new(pm_rect.min.x + margin_left, pm_rect.max.y - margin_bottom)],
+                    Stroke::new(1.2, Color32::from_rgb(100, 100, 110)),
+                );
+
+                // Axis Labels
+                ui.painter().text(
+                    egui::Pos2::new(pm_rect.min.x + margin_left + 10.0, pm_rect.min.y + 16.0),
+                    egui::Align2::LEFT_TOP,
+                    "P (kN) [Aksial]",
+                    egui::FontId::proportional(11.0),
+                    theme.text_secondary,
+                );
+                ui.painter().text(
+                    egui::Pos2::new(pm_rect.max.x - 20.0, zero_pt.y + 14.0),
+                    egui::Align2::RIGHT_TOP,
+                    "M (kNm) [Lentur]",
+                    egui::FontId::proportional(11.0),
+                    theme.text_secondary,
+                );
+
+                // 1. Draw Nominal Envelope Curve (Pn - Mn) - Dashed Blue
+                for w in pm_report.nominal_curve.windows(2) {
+                    let p1 = map_pt(w[0].0, w[0].1);
+                    let p2 = map_pt(w[1].0, w[1].1);
+                    ui.painter().line_segment([p1, p2], Stroke::new(1.4, Color32::from_rgba_premultiplied(14, 165, 233, 160)));
+                }
+
+                // 2. Draw Factored Design Envelope Curve (phi*Pn - phi*Mn) - Solid Bright Emerald Green
+                for w in pm_report.design_curve.windows(2) {
+                    let p1 = map_pt(w[0].0, w[0].1);
+                    let p2 = map_pt(w[1].0, w[1].1);
+                    ui.painter().line_segment([p1, p2], Stroke::new(2.5, theme.accent_green));
+                }
+
+                // 3. Draw Upper Compression Cutoff (phi*Pn,max) - Amber Dashed
+                let cutoff_y = map_pt(0.0, pm_report.cardinal.phi_pn_max_kn).y;
+                ui.painter().line_segment(
+                    [egui::Pos2::new(pm_rect.min.x + margin_left, cutoff_y), egui::Pos2::new(pm_rect.min.x + margin_left + plot_w * 0.45, cutoff_y)],
+                    Stroke::new(1.6, Color32::from_rgb(245, 158, 11)),
+                );
+                ui.painter().text(
+                    egui::Pos2::new(pm_rect.min.x + margin_left + 8.0, cutoff_y - 12.0),
+                    egui::Align2::LEFT_BOTTOM,
+                    format!("φPn,max = {:.0} kN", pm_report.cardinal.phi_pn_max_kn),
+                    egui::FontId::proportional(10.0),
+                    Color32::from_rgb(245, 158, 11),
+                );
+
+                // 4. Mark Balanced Point
+                let bal_pt = map_pt(pm_report.cardinal.balanced.phi_mn_knm, pm_report.cardinal.balanced.phi_pn_kn);
+                ui.painter().circle_filled(bal_pt, 4.5, theme.accent_orange);
+                ui.painter().text(
+                    bal_pt + Vec2::new(8.0, -4.0),
+                    egui::Align2::LEFT_BOTTOM,
+                    format!("Balanced ({:.0}, {:.0})", pm_report.cardinal.balanced.phi_mn_knm, pm_report.cardinal.balanced.phi_pn_kn),
+                    egui::FontId::proportional(10.0),
+                    theme.accent_orange,
+                );
+
+                // 5. Mark Pure Moment Point
+                let m0_pt = map_pt(pm_report.cardinal.pure_flexure.phi_mn_knm, 0.0);
+                ui.painter().circle_filled(m0_pt, 4.0, theme.accent_blue);
+                ui.painter().text(
+                    m0_pt + Vec2::new(0.0, 12.0),
+                    egui::Align2::CENTER_TOP,
+                    format!("φM0 = {:.0}", pm_report.cardinal.pure_flexure.phi_mn_knm),
+                    egui::FontId::proportional(9.5),
+                    theme.accent_blue,
+                );
+
+                // 6. Draw Factored Demand Point (Pu, Mu)
+                let demand_pt = map_pt(self.concrete_demand_mu_knm as f64, self.concrete_demand_pu_kn as f64);
+                let pt_color = if is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+
+                // Glowing halo
+                ui.painter().circle_filled(demand_pt, 8.0, pt_color.gamma_multiply(0.25));
+                ui.painter().circle_filled(demand_pt, 4.5, pt_color);
+                ui.painter().circle_stroke(demand_pt, 4.5, Stroke::new(1.5, Color32::WHITE));
+
+                ui.painter().text(
+                    demand_pt + Vec2::new(10.0, -8.0),
+                    egui::Align2::LEFT_BOTTOM,
+                    format!("Demand (Mu: {:.0}, Pu: {:.0})", self.concrete_demand_mu_knm, self.concrete_demand_pu_kn),
+                    egui::FontId::proportional(11.0),
+                    pt_color,
+                );
+
+                // Legend at top-right
+                let leg_x = pm_rect.max.x - 170.0;
+                let leg_y = pm_rect.min.y + 16.0;
+                ui.painter().line_segment([egui::Pos2::new(leg_x, leg_y), egui::Pos2::new(leg_x + 22.0, leg_y)], Stroke::new(1.5, Color32::from_rgb(14, 165, 233)));
+                ui.painter().text(egui::Pos2::new(leg_x + 28.0, leg_y), egui::Align2::LEFT_CENTER, "Nominal Pn-Mn", egui::FontId::proportional(10.0), theme.text_muted);
+
+                ui.painter().line_segment([egui::Pos2::new(leg_x, leg_y + 16.0), egui::Pos2::new(leg_x + 22.0, leg_y + 16.0)], Stroke::new(2.5, theme.accent_green));
+                ui.painter().text(egui::Pos2::new(leg_x + 28.0, leg_y + 16.0), egui::Align2::LEFT_CENTER, "Desain Rencana φPn-φMn", egui::FontId::proportional(10.0), theme.accent_green);
+
+                ui.add_space(16.0);
+
+                // RIGHT CANVAS: Column Cross-Section Visualizer
+                let (sec_rect, _) = ui.allocate_exact_size(Vec2::new(sec_width, canvas_height), egui::Sense::hover());
+                ui.painter().rect_filled(sec_rect, CornerRadius::same(8), theme.bg_canvas);
+                ui.painter().rect_stroke(sec_rect, CornerRadius::same(8), Stroke::new(1.0, theme.border_subtle), egui::StrokeKind::Inside);
+
+                let sec_center = sec_rect.center();
+                let max_dim = self.concrete_col_width_mm.max(self.concrete_col_height_mm);
+                let scale = (sec_width.min(canvas_height) * 0.65) / max_dim;
+
+                let draw_w = self.concrete_col_width_mm * scale;
+                let draw_h = self.concrete_col_height_mm * scale;
+
+                let col_min = sec_center - Vec2::new(draw_w * 0.5, draw_h * 0.5);
+                let col_max = sec_center + Vec2::new(draw_w * 0.5, draw_h * 0.5);
+                let col_box = egui::Rect::from_min_max(col_min, col_max);
+
+                // Concrete outer box
+                ui.painter().rect_filled(col_box, CornerRadius::same(3), Color32::from_rgb(45, 47, 54));
+                ui.painter().rect_stroke(col_box, CornerRadius::same(3), Stroke::new(1.5, Color32::from_rgb(180, 185, 195)), egui::StrokeKind::Inside);
+
+                // Stirrup / Tie box (Cover offset)
+                let cover_px = self.concrete_cover_mm * scale;
+                let tie_box = col_box.shrink(cover_px);
+                ui.painter().rect_stroke(tie_box, CornerRadius::same(2), Stroke::new(1.2, Color32::from_rgb(14, 165, 233)), egui::StrokeKind::Inside);
+
+                // Draw Rebars inside
+                let r_px = (self.concrete_bar_dia_mm * scale * 0.5).max(3.0);
+                for layer in &col_sec.rebar_layers {
+                    let y_px = col_min.y + (layer.depth_d_mm as f32) * scale;
+
+                    if layer.bar_count == 2 {
+                        // Side bars on left and right
+                        let x1 = tie_box.min.x + r_px + 2.0;
+                        let x2 = tie_box.max.x - r_px - 2.0;
+                        for &x in &[x1, x2] {
+                            ui.painter().circle_filled(egui::Pos2::new(x, y_px), r_px, Color32::from_rgb(52, 211, 153));
+                            ui.painter().circle_stroke(egui::Pos2::new(x, y_px), r_px, Stroke::new(1.0, Color32::WHITE));
+                        }
+                    } else if layer.bar_count > 1 {
+                        let x_start = tie_box.min.x + r_px + 2.0;
+                        let x_end = tie_box.max.x - r_px - 2.0;
+                        let dx = (x_end - x_start) / (layer.bar_count - 1) as f32;
+                        for i in 0..layer.bar_count {
+                            let x = x_start + dx * i as f32;
+                            ui.painter().circle_filled(egui::Pos2::new(x, y_px), r_px, Color32::from_rgb(52, 211, 153));
+                            ui.painter().circle_stroke(egui::Pos2::new(x, y_px), r_px, Stroke::new(1.0, Color32::WHITE));
+                        }
+                    }
+                }
+
+                // Section Dimension Callouts
+                ui.painter().text(
+                    egui::Pos2::new(col_box.center().x, col_box.max.y + 12.0),
+                    egui::Align2::CENTER_TOP,
+                    format!("b = {:.0} mm", self.concrete_col_width_mm),
+                    egui::FontId::proportional(11.0),
+                    theme.text_secondary,
+                );
+                ui.painter().text(
+                    egui::Pos2::new(col_box.min.x - 12.0, col_box.center().y),
+                    egui::Align2::RIGHT_CENTER,
+                    format!("h = {:.0} mm", self.concrete_col_height_mm),
+                    egui::FontId::proportional(11.0),
+                    theme.text_secondary,
+                );
+                ui.painter().text(
+                    egui::Pos2::new(sec_rect.center().x, sec_rect.min.y + 12.0),
+                    egui::Align2::CENTER_TOP,
+                    format!("Penampang: {} D{:.0} • Selimut: {:.0}mm", total_bars, self.concrete_bar_dia_mm, self.concrete_cover_mm),
+                    egui::FontId::proportional(10.5),
+                    theme.accent_blue,
+                );
+            });
+        });
+
+        ui.add_space(16.0);
+
+        // 5. Technical Cardinal Values Verification Table per SNI 2847:2019
+        theme.card_frame().show(ui, |ui| {
+            ui.label(RichText::new("📋 Tabel Verifikasi Titik Kardinal Kapasitas Kolom (SNI 2847:2019):").size(12.5).strong().color(theme.text_primary));
+            ui.add_space(8.0);
+
+            let cardinals: [(&str, String, String, String, String); 5] = [
+                ("1. Tekan Murni (Pure Compression P0)", format!("{:.1} kN", pm_report.cardinal.p0_kn), "-".to_string(), "0.65".to_string(), "Batas Mutlak P0 = 0.85 f'c (Ag - Ast) + fy Ast".to_string()),
+                ("2. Batas Aksial Rencana (φPn,max)", format!("{:.1} kN", pm_report.cardinal.pn_max_kn), "-".to_string(), "0.65".to_string(), "φPn,max = 0.65 × 0.80 P0 (Pasal 22.4.2.1)".to_string()),
+                ("3. Titik Seimbang (Balanced Point)", format!("{:.1} kN", pm_report.cardinal.balanced.pn_kn), format!("{:.1} kNm", pm_report.cardinal.balanced.mn_knm), format!("{:.3}", pm_report.cardinal.balanced.phi), format!("εt = {:.4} = εy (Leleh simultan)", pm_report.cardinal.balanced.eps_t)),
+                ("4. Lentur Murni (Pure Flexure Pn = 0)", "0.0 kN".to_string(), format!("{:.1} kNm", pm_report.cardinal.pure_flexure.mn_knm), format!("{:.2}", pm_report.cardinal.pure_flexure.phi), format!("φM0 = {:.1} kNm (Tension-controlled)", pm_report.cardinal.pure_flexure.phi_mn_knm)),
+                ("5. Tarik Murni (Pure Tension Pnt)", format!("{:.1} kN", pm_report.cardinal.pnt_kn), "0.0 kNm".to_string(), "0.90".to_string(), format!("φPnt = 0.90 × (-fy Ast) = {:.1} kN", pm_report.cardinal.phi_pnt_kn)),
+            ];
+
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Kondisi Batas Kardinal").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(140.0);
+                ui.label(RichText::new("Aksial Pn").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(45.0);
+                ui.label(RichText::new("Momen Mn").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(45.0);
+                ui.label(RichText::new("Faktor φ").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(35.0);
+                ui.label(RichText::new("Catatan SNI 2847 / Keterangan Teknis").size(11.0).strong().color(theme.text_secondary));
+            });
+            ui.separator();
+
+            for (kondisi, pn, mn, phi, ket) in cardinals {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(kondisi).size(11.5).strong().color(theme.accent_blue));
+                    ui.add_space(30.0);
+                    ui.label(RichText::new(pn).size(11.5).color(theme.text_primary));
+                    ui.add_space(45.0);
+                    ui.label(RichText::new(mn).size(11.5).color(theme.text_primary));
+                    ui.add_space(45.0);
+                    ui.label(RichText::new(phi).size(11.5).strong().color(theme.accent_green));
+                    ui.add_space(45.0);
+                    ui.label(RichText::new(ket).size(11.0).color(theme.text_muted));
+                });
+                ui.separator();
+            }
+        });
     }
 }
