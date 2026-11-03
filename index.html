@@ -182,23 +182,29 @@
   <!-- ================= INTERACTIVE WEB SANDBOX ================= -->
   <section class="section" id="sandbox">
     <div class="section-header">
-      <span class="section-tag">Interactive Simulation</span>
-      <h2 class="section-title">Test the Analytical Engine in Browser</h2>
+      <span class="section-tag">Interactive Simulation Laboratory</span>
+      <h2 class="section-title">EigenLab — Interactive Playground</h2>
       <p class="section-desc">
-        Experience real client-side mathematical simulations of Sherman-Morrison ARI, Concrete Column P-M interaction, and 1D Cutting Stock Optimization.
+        Pusat laboratorium komputasi interaktif mandiri. Beralih antar modul untuk menguji formulasi redundansi ARI, audit kapasitas beton bertulang SNI 2847, optimasi pemotongan rebar BFD, spektrum gempa Indonesia SNI 1726:2019, hingga dinamika keruntuhan progresif Newmark-β secara langsung di browser.
       </p>
     </div>
 
     <div class="sandbox-card">
-      <div class="sandbox-tabs">
+      <div class="sandbox-tabs" id="eigenlab-tabs">
         <button class="sandbox-tab active" data-target="tab-ari">
-          ⚡ 1. Sherman-Morrison ARI & Gate 1 SVD
+          ⚡ 1. Sherman-Morrison ARI & Gate 1
         </button>
         <button class="sandbox-tab" data-target="tab-pm">
           🧱 2. SNI 2847 Concrete Column P-M
         </button>
         <button class="sandbox-tab" data-target="tab-cso">
           ✂️ 3. 1D Cutting Stock Optimizer (CSO)
+        </button>
+        <button class="sandbox-tab" data-target="tab-seismic">
+          🌋 4. SNI 1726 Seismic Spectrum
+        </button>
+        <button class="sandbox-tab" data-target="tab-daf">
+          💥 5. Transient Dynamic DAF (Newmark-β)
         </button>
       </div>
 
@@ -359,6 +365,147 @@
                   <div class="val" style="color:var(--accent-blue)">1.76 m</div>
                   <div class="lbl">Reusable Offcut</div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: SEISMIC SPECTRUM SNI 1726:2019 -->
+        <div class="sandbox-panel" id="tab-seismic">
+          <div class="sandbox-grid">
+            <div class="canvas-container">
+              <canvas id="seismic-canvas"></canvas>
+            </div>
+            <div class="controls-card">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>🌋 SNI 1726:2019 Spectrum</h3>
+                <span class="suite-tag" style="background:rgba(255,69,58,0.18); color:var(--accent-red); font-weight:700;" id="seismic-kds-badge">KDS D</span>
+              </div>
+              <p style="font-size:0.85rem; color:var(--text-secondary);">
+                Indonesian Earthquake Code design response spectra generator \(S_a(T)\) with site amplification \(F_a, F_v\) and transition periods \(T_0, T_s\).
+              </p>
+
+              <div class="control-group">
+                <label>Wilayah / Kota Indonesia Preset:</label>
+                <select id="seismic-preset">
+                  <option value="jakarta" selected>DKI Jakarta (Ss=0.72g, S1=0.33g)</option>
+                  <option value="padang">Padang, Sumbar (Ss=1.35g, S1=0.60g)</option>
+                  <option value="bandung">Bandung (Ss=1.15g, S1=0.48g)</option>
+                  <option value="surabaya">Surabaya (Ss=0.65g, S1=0.25g)</option>
+                  <option value="yogyakarta">Yogyakarta (Ss=1.05g, S1=0.42g)</option>
+                  <option value="ikn">IKN Nusantara (Ss=0.30g, S1=0.15g)</option>
+                  <option value="custom">-- Custom Parameter --</option>
+                </select>
+              </div>
+
+              <div class="control-group">
+                <label>Kelas Situs Tanah (Site Class):</label>
+                <select id="seismic-site">
+                  <option value="SA">SA — Batuan Keras (vs > 1500 m/s)</option>
+                  <option value="SB">SB — Batuan (750 < vs ≤ 1500 m/s)</option>
+                  <option value="SC">SC — Tanah Keras (350 < vs ≤ 750 m/s)</option>
+                  <option value="SD" selected>SD — Tanah Sedang (175 < vs ≤ 350 m/s)</option>
+                  <option value="SE">SE — Tanah Lunak (vs < 175 m/s)</option>
+                </select>
+              </div>
+
+              <div class="control-group">
+                <label>Short Period \(S_s\) (g): <span id="lbl-ss">0.72 g</span></label>
+                <input type="range" id="seismic-input-ss" min="0.10" max="2.00" step="0.02" value="0.72">
+              </div>
+
+              <div class="control-group">
+                <label>1.0s Period \(S_1\) (g): <span id="lbl-s1">0.33 g</span></label>
+                <input type="range" id="seismic-input-s1" min="0.05" max="1.00" step="0.01" value="0.33">
+              </div>
+
+              <div class="control-group">
+                <label>Fundamental Period \(T_n\) (s): <span id="lbl-tn">0.80 s</span></label>
+                <input type="range" id="seismic-input-tn" min="0.05" max="3.00" step="0.05" value="0.80">
+              </div>
+
+              <div class="metric-grid">
+                <div class="metric-item">
+                  <div class="val" id="seismic-val-sds">0.584 g</div>
+                  <div class="lbl">Design \(S_{DS}\)</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="seismic-val-sd1">0.385 g</div>
+                  <div class="lbl">Design \(S_{D1}\)</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="seismic-val-ts">0.659 s</div>
+                  <div class="lbl">Corner \(T_s\)</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="seismic-val-sa" style="color:var(--accent-blue)">0.481 g</div>
+                  <div class="lbl">Demand \(S_a(T_n)\)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 5: TRANSIENT DYNAMIC DAF -->
+        <div class="sandbox-panel" id="tab-daf">
+          <div class="sandbox-grid">
+            <div class="canvas-container">
+              <canvas id="daf-canvas"></canvas>
+            </div>
+            <div class="controls-card">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>💥 Transient DAF (Newmark-β)</h3>
+                <span class="suite-tag" style="background:rgba(48,209,88,0.18); color:var(--accent-green); font-weight:700;" id="daf-status-badge">UFC SAFE</span>
+              </div>
+              <p style="font-size:0.85rem; color:var(--text-secondary);">
+                Non-linear sudden member removal dynamic amplification factor (DAF) according to DoD UFC 4-023-03 progressive collapse guidelines.
+              </p>
+
+              <div class="control-group">
+                <label>Critical Member Disrupted:</label>
+                <select id="daf-scenario">
+                  <option value="diag4" selected>Diagrid Diagonal Member D-4 (FCM)</option>
+                  <option value="chord3">Warren Bottom Chord B-3 (Mid-Span)</option>
+                  <option value="corner1">Ground Corner Column C-1</option>
+                </select>
+              </div>
+
+              <div class="control-group">
+                <label>Damping Ratio \(\zeta\): <span id="lbl-zeta">5.0%</span></label>
+                <input type="range" id="daf-input-zeta" min="1.0" max="10.0" step="0.5" value="5.0">
+              </div>
+
+              <div class="control-group">
+                <label>Removal Time \(t_r\): <span id="lbl-tr">0 ms (Instantaneous)</span></label>
+                <input type="range" id="daf-input-tr" min="0" max="80" step="5" value="0">
+              </div>
+
+              <div class="metric-grid">
+                <div class="metric-item">
+                  <div class="val" id="daf-val-ustatic">14.2 mm</div>
+                  <div class="lbl">Static Deflection</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="daf-val-upeak">26.8 mm</div>
+                  <div class="lbl">Peak Dynamic Surge</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="daf-val-ratio" style="color:var(--accent-amber)">1.89</div>
+                  <div class="lbl">Dynamic DAF (\(\le 2.0\))</div>
+                </div>
+                <div class="metric-item">
+                  <div class="val" id="daf-val-freq" style="color:var(--accent-blue)">2.35 Hz</div>
+                  <div class="lbl">Damaged Frequency</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button class="btn btn-secondary" id="btn-trigger-daf" style="flex:1;">
+                  🚀 Fire Dynamic Shock
+                </button>
+                <button class="btn btn-outline" id="btn-reset-daf" style="flex:1;">
+                  🔄 Reset
+                </button>
               </div>
             </div>
           </div>
