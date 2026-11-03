@@ -44,9 +44,20 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download
         </a>
+        <button class="mobile-toggle" aria-label="Toggle Navigation">☰</button>
       </div>
     </div>
   </nav>
+
+  <!-- Mobile Drawer Menu -->
+  <div class="mobile-menu">
+    <a href="#suite">Platform Suite</a>
+    <a href="#sandbox">Interactive Sandbox</a>
+    <a href="#pillars">10D BIM Pillars</a>
+    <a href="#benchmarks">Numerical Benchmarks</a>
+    <a href="#download">Downloads</a>
+    <a href="https://github.com/haridsirawan/EigenGraph" target="_blank">GitHub Repository ↗</a>
+  </div>
 
   <!-- ================= HERO SECTION ================= -->
   <header class="hero">
@@ -76,6 +87,12 @@
       </a>
     </div>
 
+    <!-- Terminal Quickstart -->
+    <div class="hero-terminal">
+      <code>git clone https://github.com/haridsirawan/EigenGraph.git && cd EigenGraph && cargo run --release</code>
+      <button class="copy-btn" data-copy="git clone https://github.com/haridsirawan/EigenGraph.git && cd EigenGraph && cargo run --release">📋 Copy</button>
+    </div>
+
     <div class="hero-badges">
       <img src="https://img.shields.io/badge/release-v2.0.0-0A84FF.svg" alt="Release">
       <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-black.svg" alt="Platforms">
@@ -98,7 +115,7 @@
         <canvas id="hero-canvas"></canvas>
         <div class="canvas-overlay-card">
           <h4>🪐 Real-Time 3D Diagrid Lattice</h4>
-          <p>Drag or hover cursor to orbit turntable. Live Euler-Bernoulli beam mechanics with Rayon multithreaded Cholesky factorization.</p>
+          <p>Drag or swipe to rotate turntable. Live Euler-Bernoulli beam mechanics with Rayon multithreaded Cholesky factorization.</p>
         </div>
       </div>
     </div>
@@ -195,7 +212,7 @@
             <div class="controls-card">
               <h3>⚡ Warren Truss 24m APM</h3>
               <p style="font-size:0.85rem; color:var(--text-secondary);">
-                Click on any member in the canvas to simulate sudden fracture (\(\lambda_e = 0\)).
+                Hover and click on any member in the canvas to simulate sudden fracture (\(\lambda_e = 0\)).
                 The engine evaluates spectral leverage \(h_e\) and checks Gate 1 mechanism stability.
               </p>
 
@@ -218,9 +235,14 @@
                 </div>
               </div>
 
-              <button class="btn btn-secondary" id="btn-reset-truss" style="width:100%; margin-top:8px;">
-                🔄 Reset Intact State
-              </button>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button class="btn btn-secondary" id="btn-reset-truss" style="flex:1;">
+                  🔄 Reset Intact
+                </button>
+                <button class="btn btn-outline" id="btn-disrupt-critical" style="flex:1;">
+                  ⚠️ Fail FCM #10
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -245,6 +267,16 @@
               <div class="control-group">
                 <label>Depth \(h\) (mm): <span id="lbl-h">400</span></label>
                 <input type="range" id="pm-input-h" min="250" max="800" step="50" value="400">
+              </div>
+
+              <div class="control-group">
+                <label>Factored Axial \(P_u\) (kN): <span id="lbl-pu">1500 kN</span></label>
+                <input type="range" id="pm-input-pu" min="-500" max="3500" step="50" value="1500">
+              </div>
+
+              <div class="control-group">
+                <label>Factored Moment \(M_u\) (kNm): <span id="lbl-mu">120 kNm</span></label>
+                <input type="range" id="pm-input-mu" min="0" max="400" step="10" value="120">
               </div>
 
               <div class="control-group">
@@ -301,12 +333,12 @@
               </p>
 
               <div class="control-group">
-                <label>Stock Length \(L_{\text{stock}}\): 12.0m</label>
+                <label>Stock Length \(L_{\text{stock}}\): <span id="lbl-stock">12.0m</span></label>
                 <input type="range" id="cso-input-stock" min="6.0" max="14.0" step="0.5" value="12.0">
               </div>
 
               <div class="control-group">
-                <label>Saw Kerf: 5.0 mm</label>
+                <label>Saw Kerf: <span id="lbl-kerf">5.0 mm</span></label>
                 <input type="range" id="cso-input-kerf" min="0" max="10" step="1" value="5">
               </div>
 
@@ -525,6 +557,27 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Academic Citation Card -->
+    <div class="citation-card">
+      <div class="citation-header">
+        <h4>📖 Cite EigenGraph & Adjusted Redundancy Index in Academic Research</h4>
+        <button class="copy-btn" data-copy="@software{irawan2026eigengraph,
+  author = {Irawan, Harids},
+  title = {EigenGraph: High-Performance Computational Framework for Adjusted Redundancy Index and 10D BIM Analytics},
+  year = {2026},
+  url = {https://github.com/haridsirawan/EigenGraph},
+  version = {2.0.0}
+}">📋 Copy BibTeX</button>
+      </div>
+      <div class="citation-code">@software{irawan2026eigengraph,
+  author = {Irawan, Harids},
+  title = {EigenGraph: High-Performance Computational Framework for Adjusted Redundancy Index and 10D BIM Analytics},
+  year = {2026},
+  url = {https://github.com/haridsirawan/EigenGraph},
+  version = {2.0.0}
+}</div>
     </div>
   </section>
 

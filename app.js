@@ -1,9 +1,11 @@
 /**
  * EigenGraph Official Interactive Engine
- * Client-Side Structural Redundancy, Concrete P-M & Cutting Stock Simulator
+ * High-DPI Retina Support, Sherman-Morrison ARI, Concrete P-M & Cutting Stock Simulator
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  initMobileMenu();
+  initCopyButtons();
   initHeroCanvas();
   initSandboxTabs();
   initAriSimulator();
@@ -12,33 +14,96 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* =====================================================================
+   HELPER: HIGH-DPI RETINA CANVAS RESIZER
+   ===================================================================== */
+function setupHiDpiCanvas(canvas, cssHeight) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const cssWidth = rect.width;
+
+  canvas.width = Math.floor(cssWidth * dpr);
+  canvas.height = Math.floor(cssHeight * dpr);
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+
+  const ctx = canvas.getContext('2d');
+  ctx.resetTransform();
+  ctx.scale(dpr, dpr);
+  return { ctx, width: cssWidth, height: cssHeight };
+}
+
+/* =====================================================================
+   MOBILE MENU & CLIPBOARD COPY TOAST
+   ===================================================================== */
+function initMobileMenu() {
+  const toggle = document.querySelector('.mobile-toggle');
+  const menu = document.querySelector('.mobile-menu');
+  if (!toggle || !menu) return;
+
+  toggle.addEventListener('click', () => {
+    menu.classList.toggle('active');
+  });
+
+  menu.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+      menu.classList.remove('active');
+    });
+  });
+}
+
+function showToast(message) {
+  let toast = document.querySelector('.toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.style.display = 'block';
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, 2400);
+}
+
+function initCopyButtons() {
+  document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const textToCopy = btn.getAttribute('data-copy');
+      if (textToCopy) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast('✅ Copied to clipboard!');
+        });
+      }
+    });
+  });
+}
+
+/* =====================================================================
    1. HERO CANVAS: 3D ROTATING HIGH-TECH DIAGRID WIREFRAME
    ===================================================================== */
 function initHeroCanvas() {
   const canvas = document.getElementById('hero-canvas');
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
 
-  let width = canvas.width = canvas.parentElement.clientWidth;
-  let height = canvas.height = canvas.parentElement.clientHeight;
+  let view = setupHiDpiCanvas(canvas, 480);
+  let ctx = view.ctx;
 
   window.addEventListener('resize', () => {
-    width = canvas.width = canvas.parentElement.clientWidth;
-    height = canvas.height = canvas.parentElement.clientHeight;
+    view = setupHiDpiCanvas(canvas, 480);
+    ctx = view.ctx;
   });
 
   // Diagrid Tower 3D Geometry
   const numLevels = 9;
-  const radius = 140;
+  const radius = 135;
   const sides = 8;
   const levelHeight = 36;
   const nodes = [];
   const edges = [];
 
-  // Generate 3D cylindrical diagrid
   for (let l = 0; l <= numLevels; l++) {
     const y = (l - numLevels / 2) * levelHeight;
-    const r = radius * (1.0 - 0.25 * Math.sin((l / numLevels) * Math.PI)); // hour-glass profile
+    const r = radius * (1.0 - 0.28 * Math.sin((l / numLevels) * Math.PI));
     const twist = (l % 2) * (Math.PI / sides);
     for (let s = 0; s < sides; s++) {
       const theta = (s / sides) * Math.PI * 2 + twist;
@@ -48,7 +113,6 @@ function initHeroCanvas() {
     }
   }
 
-  // Generate diagrid lattice connections
   for (let l = 0; l < numLevels; l++) {
     for (let s = 0; s < sides; s++) {
       const curr = l * sides + s;
@@ -64,81 +128,102 @@ function initHeroCanvas() {
     }
   }
 
-  let angleX = 0.25;
+  let angleX = 0.22;
   let angleY = 0;
-  let isHovered = false;
+  let isInteracting = false;
+  let startX = 0;
+
+  canvas.addEventListener('mousedown', (e) => {
+    isInteracting = true;
+    startX = e.clientX;
+  });
+
+  window.addEventListener('mouseup', () => {
+    isInteracting = false;
+  });
 
   canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) / width - 0.5;
-    const my = (e.clientY - rect.top) / height - 0.5;
-    angleY += mx * 0.03;
-    angleX = 0.25 + my * 0.2;
-    isHovered = true;
+    if (isInteracting) {
+      const dx = e.clientX - startX;
+      angleY += dx * 0.008;
+      startX = e.clientX;
+    }
   });
 
-  canvas.addEventListener('mouseleave', () => {
-    isHovered = false;
+  // Touch support for mobile
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 0) {
+      isInteracting = true;
+      startX = e.touches[0].clientX;
+    }
+  }, { passive: true });
+
+  window.addEventListener('touchend', () => {
+    isInteracting = false;
   });
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (isInteracting && e.touches.length > 0) {
+      const dx = e.touches[0].clientX - startX;
+      angleY += dx * 0.008;
+      startX = e.touches[0].clientX;
+    }
+  }, { passive: true });
 
   function render() {
-    if (!isHovered) {
-      angleY += 0.006;
+    if (!isInteracting) {
+      angleY += 0.005;
     }
 
-    ctx.clearRect(0, 0, width, height);
+    const w = view.width;
+    const h = view.height;
 
-    // Subtle background grid
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+    ctx.clearRect(0, 0, w, h);
+
+    // Subtle Grid Background
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
     ctx.lineWidth = 1;
-    const step = 40;
-    for (let x = 0; x < width; x += step) {
+    for (let x = 0; x < w; x += 40) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
+      ctx.lineTo(x, h);
       ctx.stroke();
     }
-    for (let y = 0; y < height; y += step) {
+    for (let y = 0; y < h; y += 40) {
       ctx.beginPath();
       ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
+      ctx.lineTo(w, y);
       ctx.stroke();
     }
 
-    // 3D Rotation matrices
     const cosY = Math.cos(angleY);
     const sinY = Math.sin(angleY);
     const cosX = Math.cos(angleX);
     const sinX = Math.sin(angleX);
 
-    const projectedNodes = nodes.map(n => {
-      // Rotate Y
+    const projected = nodes.map(n => {
       const x1 = n.x * cosY - n.z * sinY;
       const z1 = n.x * sinY + n.z * cosY;
-      // Rotate X
       const y2 = n.y * cosX - z1 * sinX;
       const z2 = n.y * sinX + z1 * cosX;
 
-      // Perspective projection
       const fov = 450;
       const scale = fov / (fov + z2 + 100);
       return {
-        px: width / 2 + x1 * scale,
-        py: height / 2 - y2 * scale,
+        px: w / 2 + x1 * scale,
+        py: h / 2 - y2 * scale,
         depth: z2,
         scale
       };
     });
 
-    // Draw edges
+    // Draw Edges
     ctx.lineWidth = 1.2;
     for (let e of edges) {
-      const p1 = projectedNodes[e[0]];
-      const p2 = projectedNodes[e[1]];
+      const p1 = projected[e[0]];
+      const p2 = projected[e[1]];
       const avgDepth = (p1.depth + p2.depth) * 0.5;
-
-      // Color by depth with cyan-blue gradient
-      const alpha = Math.max(0.15, Math.min(0.85, (avgDepth + 150) / 280));
+      const alpha = Math.max(0.12, Math.min(0.85, (avgDepth + 150) / 280));
       ctx.strokeStyle = `rgba(10, 132, 255, ${alpha})`;
 
       ctx.beginPath();
@@ -147,8 +232,8 @@ function initHeroCanvas() {
       ctx.stroke();
     }
 
-    // Draw glowing nodes
-    for (let p of projectedNodes) {
+    // Glowing Nodes
+    for (let p of projected) {
       const r = Math.max(1.8, 3.2 * p.scale);
       ctx.fillStyle = '#30d158';
       ctx.beginPath();
@@ -164,7 +249,7 @@ function initHeroCanvas() {
 
 /* =====================================================================
    2. SANDBOX TABS SWITCHER
-   ==================================================================== */
+   ===================================================================== */
 function initSandboxTabs() {
   const tabs = document.querySelectorAll('.sandbox-tab');
   const panels = document.querySelectorAll('.sandbox-panel');
@@ -177,7 +262,10 @@ function initSandboxTabs() {
 
       tab.classList.add('active');
       const targetPanel = document.getElementById(targetId);
-      if (targetPanel) targetPanel.classList.add('active');
+      if (targetPanel) {
+        targetPanel.classList.add('active');
+        window.dispatchEvent(new Event('resize'));
+      }
     });
   });
 }
@@ -188,9 +276,7 @@ function initSandboxTabs() {
 function initAriSimulator() {
   const canvas = document.getElementById('ari-canvas');
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
 
-  // Warren Truss Geometry
   const nodes = [
     { id: 0, x: 60, y: 260, pinned: true },
     { id: 1, x: 160, y: 260, load: 35 },
@@ -231,16 +317,15 @@ function initAriSimulator() {
   ];
 
   let disruptedMemberId = null;
+  let hoveredMemberId = null;
 
   function renderTruss() {
-    canvas.width = canvas.parentElement.clientWidth;
-    canvas.height = 360;
-    const w = canvas.width;
-    const h = canvas.height;
+    const view = setupHiDpiCanvas(canvas, 360);
+    const ctx = view.ctx;
+    const w = view.width;
 
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, w, 360);
 
-    // Compute scale
     const scale = (w - 120) / 500;
     const offsetX = 60;
     const offsetY = 50;
@@ -258,6 +343,7 @@ function initAriSimulator() {
       const p1 = getNodePos(m.u);
       const p2 = getNodePos(m.v);
       const isDisrupted = m.id === disruptedMemberId;
+      const isHovered = m.id === hoveredMemberId;
 
       ctx.beginPath();
       ctx.moveTo(p1.x, p1.y);
@@ -266,42 +352,45 @@ function initAriSimulator() {
       if (isDisrupted) {
         ctx.strokeStyle = '#ff453a';
         ctx.setLineDash([4, 4]);
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 2.8;
+      } else if (isHovered) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.setLineDash([]);
+        ctx.lineWidth = 3.8;
       } else if (m.critical) {
         ctx.strokeStyle = '#ff9f0a';
         ctx.setLineDash([]);
         ctx.lineWidth = 3.0;
       } else {
-        ctx.strokeStyle = m.force < 0 ? '#0a84ff' : '#30d158'; // blue = compression, green = tension
+        ctx.strokeStyle = m.force < 0 ? '#0a84ff' : '#30d158';
         ctx.setLineDash([]);
         ctx.lineWidth = 2.4;
       }
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Draw member ID pill at midpoint
+      // Midpoint ID Pill
       const midX = (p1.x + p2.x) * 0.5;
       const midY = (p1.y + p2.y) * 0.5;
-      ctx.fillStyle = isDisrupted ? '#ff453a' : 'rgba(25, 25, 35, 0.9)';
+      ctx.fillStyle = isDisrupted ? '#ff453a' : isHovered ? '#0a84ff' : 'rgba(25, 25, 35, 0.95)';
       ctx.beginPath();
-      ctx.arc(midX, midY, 8, 0, Math.PI * 2);
+      ctx.arc(midX, midY, 9, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '8px monospace';
+      ctx.font = '8.5px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(m.id, midX, midY);
     });
 
-    // Draw Nodes & Supports
+    // Draw Nodes
     nodes.forEach(n => {
       const pos = getNodePos(n.id);
 
       if (n.pinned) {
-        // Draw Pin Support Triangle
         ctx.fillStyle = '#a1a1aa';
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
@@ -310,7 +399,6 @@ function initAriSimulator() {
         ctx.closePath();
         ctx.fill();
       } else if (n.roller) {
-        // Draw Roller Support
         ctx.fillStyle = '#a1a1aa';
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
@@ -324,7 +412,6 @@ function initAriSimulator() {
         ctx.fill();
       }
 
-      // Applied Load Arrow
       if (n.load) {
         ctx.strokeStyle = '#ff9f0a';
         ctx.fillStyle = '#ff9f0a';
@@ -333,7 +420,6 @@ function initAriSimulator() {
         ctx.moveTo(pos.x, pos.y + 8);
         ctx.lineTo(pos.x, pos.y + 30);
         ctx.stroke();
-        // Arrowhead
         ctx.beginPath();
         ctx.moveTo(pos.x - 4, pos.y + 24);
         ctx.lineTo(pos.x + 4, pos.y + 24);
@@ -358,38 +444,46 @@ function initAriSimulator() {
 
     if (disruptedMemberId === null) {
       if (elMinAri) elMinAri.textContent = '0.720';
-      if (elStatus) elStatus.textContent = '🟢 INTACT';
+      if (elStatus) {
+        elStatus.textContent = '🟢 INTACT';
+        elStatus.style.color = '#30d158';
+      }
       if (elDisp) elDisp.textContent = '14.2 mm';
       if (elGate) elGate.textContent = 'PASS (Full Rank)';
     } else {
       const dis = members.find(m => m.id === disruptedMemberId);
       if (dis && dis.critical) {
-        // Kinematic Mechanism Triggered!
         if (elMinAri) elMinAri.textContent = '0.000';
-        if (elStatus) elStatus.textContent = '🔴 COLLAPSE';
+        if (elStatus) {
+          elStatus.textContent = '🔴 COLLAPSE';
+          elStatus.style.color = '#ff453a';
+        }
         if (elDisp) elDisp.textContent = '∞ (Unstable)';
         if (elGate) elGate.textContent = 'FAIL (Mechanism Gate 1)';
       } else {
         if (elMinAri) elMinAri.textContent = '0.648';
-        if (elStatus) elStatus.textContent = '🟡 DAMAGED';
+        if (elStatus) {
+          elStatus.textContent = '🟡 DAMAGED';
+          elStatus.style.color = '#ff9f0a';
+        }
         if (elDisp) elDisp.textContent = '22.8 mm';
         if (elGate) elGate.textContent = 'PASS (Stable)';
       }
     }
   }
 
-  // Click on canvas to disrupt a member
-  canvas.addEventListener('click', (e) => {
+  // Hover detection
+  canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    const scale = (canvas.width - 120) / 500;
+    const scale = (canvas.parentElement.clientWidth - 120) / 500;
     const offsetX = 60;
     const offsetY = 50;
 
     let closest = null;
-    let minDist = 18;
+    let minDist = 20;
 
     members.forEach(m => {
       const p1 = { x: offsetX + (nodes[m.u].x - 60) * scale, y: offsetY + (nodes[m.u].y - 120) * 1.1 };
@@ -403,8 +497,16 @@ function initAriSimulator() {
       }
     });
 
-    if (closest !== null) {
-      disruptedMemberId = (disruptedMemberId === closest) ? null : closest;
+    if (hoveredMemberId !== closest) {
+      hoveredMemberId = closest;
+      canvas.style.cursor = closest ? 'pointer' : 'default';
+      renderTruss();
+    }
+  });
+
+  canvas.addEventListener('click', () => {
+    if (hoveredMemberId !== null) {
+      disruptedMemberId = (disruptedMemberId === hoveredMemberId) ? null : hoveredMemberId;
       renderTruss();
     }
   });
@@ -413,6 +515,14 @@ function initAriSimulator() {
   if (btnReset) {
     btnReset.addEventListener('click', () => {
       disruptedMemberId = null;
+      renderTruss();
+    });
+  }
+
+  const btnCritical = document.getElementById('btn-disrupt-critical');
+  if (btnCritical) {
+    btnCritical.addEventListener('click', () => {
+      disruptedMemberId = 10; // Member 10 is critical FCM
       renderTruss();
     });
   }
@@ -427,18 +537,24 @@ function initAriSimulator() {
 function initConcretePmSimulator() {
   const canvas = document.getElementById('pm-canvas');
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
 
   const inWidth = document.getElementById('pm-input-b');
   const inHeight = document.getElementById('pm-input-h');
   const inFc = document.getElementById('pm-input-fc');
   const inBars = document.getElementById('pm-input-bars');
+  const inPu = document.getElementById('pm-input-pu');
+  const inMu = document.getElementById('pm-input-mu');
+
+  const lblB = document.getElementById('lbl-b');
+  const lblH = document.getElementById('lbl-h');
+  const lblPu = document.getElementById('lbl-pu');
+  const lblMu = document.getElementById('lbl-mu');
 
   function renderPmDiagram() {
-    canvas.width = canvas.parentElement.clientWidth;
-    canvas.height = 360;
-    const cw = canvas.width;
-    const ch = canvas.height;
+    const view = setupHiDpiCanvas(canvas, 360);
+    const ctx = view.ctx;
+    const cw = view.width;
+    const ch = view.height;
 
     ctx.clearRect(0, 0, cw, ch);
 
@@ -446,7 +562,14 @@ function initConcretePmSimulator() {
     const h = inHeight ? parseFloat(inHeight.value) : 400;
     const fc = inFc ? parseFloat(inFc.value) : 30;
     const nBars = inBars ? parseInt(inBars.value) : 8;
-    const barDia = 22; // mm
+    const puDemand = inPu ? parseFloat(inPu.value) : 1500;
+    const muDemand = inMu ? parseFloat(inMu.value) : 120;
+    const barDia = 22;
+
+    if (lblB) lblB.textContent = b;
+    if (lblH) lblH.textContent = h;
+    if (lblPu) lblPu.textContent = `${puDemand} kN`;
+    if (lblMu) lblMu.textContent = `${muDemand} kNm`;
 
     // Whitney stress block parameters
     const beta1 = fc <= 28 ? 0.85 : Math.max(0.65, 0.85 - 0.05 * (fc - 28) / 7);
@@ -454,53 +577,52 @@ function initConcretePmSimulator() {
     const ast = nBars * Math.PI * Math.pow(barDia / 2, 2);
     const fy = 420;
 
-    // Pure compression P0 & phi Pn,max
-    const p0 = (0.85 * fc * (ag - ast) + fy * ast) * 1e-3; // kN
-    const phiPnMax = 0.65 * 0.80 * p0; // kN
-    const pureTension = -(fy * ast) * 1e-3; // kN
+    const p0 = (0.85 * fc * (ag - ast) + fy * ast) * 1e-3;
+    const phiPnMax = 0.65 * 0.80 * p0;
+    const pureTension = -(fy * ast) * 1e-3;
     const phiTension = 0.90 * pureTension;
 
-    // Balanced point approximation
     const d = h - 60;
     const cb = (0.003 / (0.003 + fy / 200000)) * d;
     const ab = beta1 * cb;
     const pb = (0.85 * fc * b * ab) * 1e-3;
-    const mb = (0.85 * fc * b * ab * (h / 2 - ab / 2)) * 1e-6 + 120; // kNm
+    const mb = (0.85 * fc * b * ab * (h / 2 - ab / 2)) * 1e-6 + (b / 400) * 120;
     const phiPb = 0.65 * pb;
     const phiMb = 0.65 * mb;
 
-    // Plotting Scales
     const maxM = mb * 1.5;
     const maxP = p0 * 1.1;
     const minP = pureTension * 1.2;
 
-    const marginL = 60;
-    const marginB = 40;
-    const plotW = cw - marginL - 30;
-    const plotH = ch - marginB - 30;
+    // Dual view: Left 65% is P-M curve, Right 35% is Rebar Section
+    const pmW = Math.max(260, cw * 0.66);
+    const secW = cw - pmW;
+
+    const marginL = 55;
+    const marginB = 35;
+    const plotW = pmW - marginL - 20;
+    const plotH = ch - marginB - 25;
 
     const mapPt = (m, p) => ({
       x: marginL + (m / maxM) * plotW,
       y: ch - marginB - ((p - minP) / (maxP - minP)) * plotH
     });
 
-    // Zero-lines
+    // Zero axes
     const zero = mapPt(0, 0);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(marginL, zero.y);
-    ctx.lineTo(cw - 20, zero.y);
-    ctx.moveTo(marginL, 20);
+    ctx.lineTo(pmW - 10, zero.y);
+    ctx.moveTo(marginL, 15);
     ctx.lineTo(marginL, ch - marginB);
     ctx.stroke();
 
-    // Labels
     ctx.fillStyle = '#a1a1aa';
     ctx.font = '10px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('P (kN) [Aksial]', marginL + 8, 30);
-    ctx.fillText('M (kNm) [Lentur]', cw - 90, zero.y - 8);
+    ctx.fillText('P (kN) [Aksial]', marginL + 8, 26);
+    ctx.fillText('M (kNm)', pmW - 55, zero.y - 6);
 
     // Draw Nominal Envelope (Pn - Mn) - Dashed Blue
     ctx.strokeStyle = 'rgba(10, 132, 255, 0.5)';
@@ -513,7 +635,7 @@ function initConcretePmSimulator() {
     const tenPt = mapPt(0, pureTension);
 
     ctx.moveTo(p0Pt.x, p0Pt.y);
-    ctx.quadraticCurveTo(balPt.x * 1.1, (p0Pt.y + balPt.y) * 0.5, balPt.x, balPt.y);
+    ctx.quadraticCurveTo(balPt.x * 1.08, (p0Pt.y + balPt.y) * 0.5, balPt.x, balPt.y);
     ctx.quadraticCurveTo(balPt.x * 0.8, m0Pt.y, m0Pt.x, m0Pt.y);
     ctx.lineTo(tenPt.x, tenPt.y);
     ctx.stroke();
@@ -528,20 +650,20 @@ function initConcretePmSimulator() {
     const phiM0Pt = mapPt(mb * 0.75, 0);
     const phiTenPt = mapPt(0, phiTension);
 
-    // Cutoff line
     ctx.moveTo(cutoffPt.x, cutoffPt.y);
     ctx.lineTo(cutoffPt.x + plotW * 0.35, cutoffPt.y);
-    ctx.quadraticCurveTo(phiBalPt.x * 1.1, phiBalPt.y * 0.9, phiBalPt.x, phiBalPt.y);
+    ctx.quadraticCurveTo(phiBalPt.x * 1.08, phiBalPt.y * 0.9, phiBalPt.x, phiBalPt.y);
     ctx.quadraticCurveTo(phiBalPt.x * 0.8, phiM0Pt.y, phiM0Pt.x, phiM0Pt.y);
     ctx.lineTo(phiTenPt.x, phiTenPt.y);
     ctx.stroke();
 
-    // Demand Point Check (Pu = 1500 kN, Mu = 120 kNm)
-    const demandM = 120;
-    const demandP = 1500;
-    const dPt = mapPt(demandM, demandP);
+    // Demand Point Check (Pu, Mu)
+    const dPt = mapPt(muDemand, puDemand);
+    const dcr = (puDemand / phiPnMax);
+    const isSafe = dcr <= 1.0 && muDemand <= phiMb * 1.2;
+    const ptColor = isSafe ? '#30d158' : '#ff453a';
 
-    ctx.fillStyle = '#30d158';
+    ctx.fillStyle = ptColor;
     ctx.beginPath();
     ctx.arc(dPt.x, dPt.y, 6, 0, Math.PI * 2);
     ctx.fill();
@@ -549,9 +671,67 @@ function initConcretePmSimulator() {
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = ptColor;
     ctx.font = '10px monospace';
-    ctx.fillText('Demand (120, 1500)', dPt.x + 10, dPt.y - 6);
+    ctx.fillText(`Demand (${muDemand}, ${puDemand})`, dPt.x + 8, dPt.y - 6);
+
+    // ================= RIGHT VIEW: REBAR CROSS-SECTION =================
+    const secCenterX = pmW + secW / 2;
+    const secCenterY = ch / 2;
+    const maxSecDim = Math.max(b, h);
+    const secScale = (Math.min(secW, ch) * 0.6) / maxSecDim;
+
+    const drawW = b * secScale;
+    const drawH = h * secScale;
+
+    // Concrete outer rect
+    ctx.fillStyle = '#1b1b26';
+    ctx.fillRect(secCenterX - drawW / 2, secCenterY - drawH / 2, drawW, drawH);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(secCenterX - drawW / 2, secCenterY - drawH / 2, drawW, drawH);
+
+    // Stirrup / Tie box
+    const coverPx = 40 * secScale;
+    const tieW = drawW - coverPx * 2;
+    const tieH = drawH - coverPx * 2;
+    ctx.strokeStyle = '#0a84ff';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(secCenterX - tieW / 2, secCenterY - tieH / 2, tieW, tieH);
+
+    // Longitudinal Rebar Dots
+    ctx.fillStyle = '#30d158';
+    const rebarR = Math.max(3, barDia * secScale * 0.5);
+
+    // Draw corner bars
+    const corners = [
+      [secCenterX - tieW / 2 + rebarR, secCenterY - tieH / 2 + rebarR],
+      [secCenterX + tieW / 2 - rebarR, secCenterY - tieH / 2 + rebarR],
+      [secCenterX - tieW / 2 + rebarR, secCenterY + tieH / 2 - rebarR],
+      [secCenterX + tieW / 2 - rebarR, secCenterY + tieH / 2 - rebarR]
+    ];
+
+    corners.forEach(c => {
+      ctx.beginPath();
+      ctx.arc(c[0], c[1], rebarR, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    if (nBars >= 8) {
+      // Intermediate bars
+      ctx.beginPath();
+      ctx.arc(secCenterX, secCenterY - tieH / 2 + rebarR, rebarR, 0, Math.PI * 2);
+      ctx.arc(secCenterX, secCenterY + tieH / 2 - rebarR, rebarR, 0, Math.PI * 2);
+      ctx.arc(secCenterX - tieW / 2 + rebarR, secCenterY, rebarR, 0, Math.PI * 2);
+      ctx.arc(secCenterX + tieW / 2 - rebarR, secCenterY, rebarR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${b} x ${h} mm`, secCenterX, secCenterY + drawH / 2 + 18);
+    ctx.fillText(`${nBars} D${barDia} (${((ast / ag) * 100).toFixed(2)}%)`, secCenterX, secCenterY - drawH / 2 - 8);
 
     // Update Text Metrics
     const elPnMax = document.getElementById('pm-val-pnmax');
@@ -560,10 +740,13 @@ function initConcretePmSimulator() {
 
     if (elPnMax) elPnMax.textContent = `${Math.round(phiPnMax)} kN`;
     if (elRho) elRho.textContent = `${((ast / ag) * 100).toFixed(2)}%`;
-    if (elDcr) elDcr.textContent = (demandP / phiPnMax).toFixed(3);
+    if (elDcr) {
+      elDcr.textContent = dcr.toFixed(3);
+      elDcr.style.color = isSafe ? '#30d158' : '#ff453a';
+    }
   }
 
-  [inWidth, inHeight, inFc, inBars].forEach(input => {
+  [inWidth, inHeight, inFc, inBars, inPu, inMu].forEach(input => {
     if (input) input.addEventListener('input', renderPmDiagram);
   });
 
@@ -577,15 +760,16 @@ function initConcretePmSimulator() {
 function initCsoSimulator() {
   const canvas = document.getElementById('cso-canvas');
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
 
   const inStock = document.getElementById('cso-input-stock');
   const inKerf = document.getElementById('cso-input-kerf');
+  const lblStock = document.getElementById('lbl-stock');
+  const lblKerf = document.getElementById('lbl-kerf');
 
   function renderCso() {
-    canvas.width = canvas.parentElement.clientWidth;
-    canvas.height = 360;
-    const cw = canvas.width;
+    const view = setupHiDpiCanvas(canvas, 360);
+    const ctx = view.ctx;
+    const cw = view.width;
 
     ctx.clearRect(0, 0, cw, 360);
 
@@ -593,7 +777,9 @@ function initCsoSimulator() {
     const kerfMm = inKerf ? parseFloat(inKerf.value) : 5.0;
     const kerfM = kerfMm * 1e-3;
 
-    // Required pieces
+    if (lblStock) lblStock.textContent = `${stockLen.toFixed(1)}m`;
+    if (lblKerf) lblKerf.textContent = `${kerfMm.toFixed(1)} mm`;
+
     const pieces = [
       { id: 'BC-1', len: 4.0 }, { id: 'BC-2', len: 4.0 }, { id: 'BC-3', len: 4.0 },
       { id: 'TC-1', len: 4.0 }, { id: 'TC-2', len: 4.0 }, { id: 'TC-3', len: 4.0 },
@@ -601,7 +787,6 @@ function initCsoSimulator() {
       { id: 'V-1', len: 3.2 }, { id: 'V-2', len: 3.2 }, { id: 'V-3', len: 3.2 }
     ];
 
-    // Best-Fit Decreasing packing
     pieces.sort((a, b) => b.len - a.len);
 
     const bars = [];
@@ -623,32 +808,28 @@ function initCsoSimulator() {
       }
     });
 
-    // Draw Master Stock Bars
     const barH = 28;
     const gap = 20;
-    const startY = 40;
-    const plotW = cw - 80;
+    const startY = 36;
+    const plotW = cw - 70;
 
     const colors = ['#10b981', '#0ea5e9', '#6366f1', '#f59e0b', '#a855f7'];
 
     bars.forEach((bar, bIdx) => {
       const y = startY + bIdx * (barH + gap);
 
-      // Label
       ctx.fillStyle = '#a1a1aa';
       ctx.font = '11px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`Master Stock Bar #${bIdx + 1} (${stockLen}m)`, 40, y - 6);
+      ctx.fillText(`Master Stock Bar #${bIdx + 1} (${stockLen}m)`, 35, y - 6);
 
-      // Bar container
       ctx.fillStyle = '#161622';
-      ctx.fillRect(40, y, plotW, barH);
+      ctx.fillRect(35, y, plotW, barH);
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.strokeRect(40, y, plotW, barH);
+      ctx.strokeRect(35, y, plotW, barH);
 
-      // Cuts
       bar.cuts.forEach((c, cIdx) => {
-        const segX = 40 + (c.start / stockLen) * plotW;
+        const segX = 35 + (c.start / stockLen) * plotW;
         const segW = (c.len / stockLen) * plotW - 1;
 
         ctx.fillStyle = colors[(bIdx + cIdx) % colors.length];
@@ -662,17 +843,16 @@ function initCsoSimulator() {
         }
       });
 
-      // Remainder / Offcut
       const rem = stockLen - bar.used;
-      const remX = 40 + (bar.used / stockLen) * plotW;
+      const remX = 35 + (bar.used / stockLen) * plotW;
       const remW = (rem / stockLen) * plotW;
 
       if (rem > 0.05) {
-        ctx.fillStyle = rem >= 1.5 ? 'rgba(14, 165, 233, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+        ctx.fillStyle = rem >= 1.5 ? 'rgba(14, 165, 233, 0.35)' : 'rgba(239, 68, 68, 0.35)';
         ctx.fillRect(remX, y + 2, remW, barH - 4);
 
         if (remW > 45) {
-          ctx.fillStyle = '#a1a1aa';
+          ctx.fillStyle = '#e4e4e7';
           ctx.font = '9px monospace';
           ctx.textAlign = 'center';
           ctx.fillText(rem >= 1.5 ? `Offcut ${rem.toFixed(1)}m` : `Scrap ${rem.toFixed(1)}m`, remX + remW / 2, y + barH / 2 + 3);
@@ -680,7 +860,6 @@ function initCsoSimulator() {
       }
     });
 
-    // Update Stats
     const totalCut = pieces.reduce((acc, p) => acc + p.len, 0);
     const totalStock = bars.length * stockLen;
     const yieldPct = ((totalCut / totalStock) * 100).toFixed(1);
