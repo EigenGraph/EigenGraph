@@ -4,15 +4,15 @@
 
 ### High-Performance Computational Framework for Adjusted Redundancy Index (ARI), SVD Kinematic Mechanism Guards, and 10D BIM Construction Lifecycle Analytics
 
-[![Release](https://img.shields.io/badge/release-v2.0.0-0A84FF.svg)](https://github.com/haridsirawan/EigenGraph/releases/latest)
-[![Website](https://img.shields.io/badge/website-live-0A84FF.svg)](https://haridsirawan.github.io/EigenGraph/)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-black.svg)](https://github.com/haridsirawan/EigenGraph/releases/latest)
+[![Release](https://img.shields.io/badge/release-v2.0.0-0A84FF.svg)](https://github.com/EigenGraph/EigenGraph/releases/latest)
+[![Website](https://img.shields.io/badge/website-live-0A84FF.svg)](https://eigengraph.github.io/)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-black.svg)](https://github.com/EigenGraph/EigenGraph/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-58%20passed%20(100%25)-30D158.svg)](#-canonical-verification--numerical-benchmarks)
 [![Engine](https://img.shields.io/badge/engine-Rust%20Analytical%20%26%20GPU%20Accelerated-purple.svg)](#-core-engineering-features--mathematical-formulations)
 [![Rust](https://img.shields.io/badge/built%20with-Rust%201.80+-DEA584.svg)](https://www.rust-lang.org/)
 
-*Official high-performance Rust analytical engine and desktop application ported directly from the research repository [Adjusted-Redundancy-Index](https://github.com/haridsirawan/Adjusted-Redundancy-Index).*
+*Official high-performance Rust analytical engine and desktop application ported directly from the research repository [Adjusted-Redundancy-Index](https://github.com/EigenGraph/AdjustedRedundancyIndex_Linear).*
 
 </div>
 
@@ -167,6 +167,8 @@ Exact rational arithmetic comparison (Benchmark Closed-Form Solution vs. Rust En
 | **Hybrid Linear Algebra** | [`src/core/linalg.rs`](src/core/linalg.rs) | Direct **Cholesky $\mathbf{L}\mathbf{L}^T$** factorization, **CSR Sparse Matrix** storage with Preconditioned Conjugate Gradient (`solve_pcg`), and SVD rank determination. |
 | **3D FEM & Frame Mechanics** | [`src/core/solver.rs`](src/core/solver.rs) | $12\times 12$ 3D Euler-Bernoulli beam-column formulation, local-to-global orthogonal triad transformations ($\mathbf{K}_g = \mathbf{T}^T \mathbf{K}_l \mathbf{T}$), and **SNI 1727 / ASCE 7-22** LRFD combinations. |
 | **ARI & $N-2$ Woodbury** | [`src/core/ari.rs`](src/core/ari.rs) | **Sherman-Morrison Rank-1**, $K_g(P)$ Euler buckling penalty, and **Woodbury Rank-2** $2\times 2$ determinant screening. |
+| **Concrete Column P-M** | [`src/core/concrete.rs`](src/core/concrete.rs) | Whitney stress block envelope generator ($\beta_1$, $0.85f'_c$), axial-flexural interaction ($P_n$ vs $M_n$), and **SNI 2847:2019 / ACI 318-19** LRFD demand/capacity audit. |
+| **Cutting Stock & BBS** | [`src/core/cso.rs`](src/core/cso.rs) | 1D Cutting Stock Optimization via **Best-Fit Decreasing (BFD)**, kerf blade loss compensation, reusable offcut classification, and automated Bar Bending Schedule (BBS) export. |
 | **2D/3D Geometry & CSG** | [`src/core/geom.rs`](src/core/geom.rs), [`src/core/csg.rs`](src/core/csg.rs) | Half-edge face arrangements, polygon clipping, ear-clipping triangulation, and BSP tree solid Boolean subtractions. |
 | **BIM Entities & 3D Rebar** | [`src/core/bim.rs`](src/core/bim.rs) | Multi-layered walls, columns, beams, automated SNI 2847:2019 reinforcement, transactional command bus, and Sheet A101 vector export. |
 | **Transient Dynamics** | [`src/core/dynamics.rs`](src/core/dynamics.rs) | Unconditionally stable implicit **Newmark-$\beta$** integration for Dynamic Amplification Factor ($\text{DAF}$) under sudden member removal. |
@@ -178,7 +180,7 @@ Exact rational arithmetic comparison (Benchmark Closed-Form Solution vs. Rust En
 ## 📦 Multi-Platform Installation Guide
 
 ### Option 1: Pre-Built Multi-Platform Binaries
-Download the official release packages from **[GitHub Releases](https://github.com/haridsirawan/EigenGraph/releases/latest)**:
+Download the official release packages from **[GitHub Releases](https://github.com/EigenGraph/EigenGraph/releases/latest)**:
 
 | Platform | Installer Package | Instructions |
 | :--- | :--- | :--- |
@@ -191,7 +193,7 @@ Requires the stable Rust toolchain (1.80+):
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/haridsirawan/EigenGraph.git
+git clone https://github.com/EigenGraph/EigenGraph.git
 cd EigenGraph
 
 # 2. Run the complete test suite (58 unit tests)
