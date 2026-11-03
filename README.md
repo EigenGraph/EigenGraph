@@ -14,6 +14,9 @@
 
 </div>
 
+> [!IMPORTANT]
+> **Disclaimer**: *EigenGraph is an experimental computational engineering and BIM platform currently under active development. Features, architecture, and capabilities are subject to change.*
+
 ---
 
 ## 🏛️ Overview

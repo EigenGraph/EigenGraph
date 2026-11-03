@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMobileMenu();
   initCopyButtons();
   initHeroCanvas();
+  initViewSwitcher();
   initSandboxTabs();
   initAriSimulator();
   initConcretePmSimulator();
@@ -250,7 +251,56 @@ function initHeroCanvas() {
 }
 
 /* =====================================================================
-   2. SANDBOX TABS SWITCHER
+   2. VIEW SWITCHER (CHANGELOG-FIRST VS INTERACTIVE LAB VS 10D BIM)
+   ===================================================================== */
+function initViewSwitcher() {
+  const viewBtns = document.querySelectorAll('.view-btn');
+  const viewPanels = document.querySelectorAll('.view-content-panel');
+  const navLinks = document.querySelectorAll('[data-view-target]');
+
+  function activateView(viewId) {
+    viewBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.view === viewId);
+    });
+    viewPanels.forEach(panel => {
+      panel.classList.toggle('active', panel.id === viewId);
+    });
+    if (viewId === 'view-playground') {
+      window.dispatchEvent(new Event('resize'));
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 40);
+    }
+  }
+
+  viewBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      activateView(btn.dataset.view);
+    });
+  });
+
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      const targetView = link.dataset.viewTarget;
+      if (targetView) {
+        activateView(targetView);
+      }
+    });
+  });
+
+  window.switchToView = function(viewId, tabId) {
+    activateView(viewId);
+    if (tabId) {
+      const tabBtn = document.querySelector(`.sandbox-tab[data-target="${tabId}"]`);
+      if (tabBtn) tabBtn.click();
+    }
+    const targetEl = document.getElementById(viewId);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+}
+
+/* =====================================================================
+   3. SANDBOX TABS SWITCHER
    ===================================================================== */
 function initSandboxTabs() {
   const tabs = document.querySelectorAll('.sandbox-tab');
