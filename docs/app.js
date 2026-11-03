@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initAriSimulator();
   initConcretePmSimulator();
   initCsoSimulator();
+  initSeismicSpectrumSimulator();
+  initDafSimulator();
 });
 
 /* =====================================================================
@@ -265,6 +267,7 @@ function initSandboxTabs() {
       if (targetPanel) {
         targetPanel.classList.add('active');
         window.dispatchEvent(new Event('resize'));
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 30);
       }
     });
   });
@@ -879,4 +882,594 @@ function initCsoSimulator() {
 
   window.addEventListener('resize', renderCso);
   renderCso();
+}
+
+/* =====================================================================
+   6. SANDBOX 4: INDONESIAN SEISMIC RESPONSE SPECTRUM (SNI 1726:2019)
+   ===================================================================== */
+function initSeismicSpectrumSimulator() {
+  const canvas = document.getElementById('seismic-canvas');
+  if (!canvas) return;
+
+  const selPreset = document.getElementById('seismic-preset');
+  const selSite = document.getElementById('seismic-site');
+  const inSs = document.getElementById('seismic-input-ss');
+  const inS1 = document.getElementById('seismic-input-s1');
+  const inTn = document.getElementById('seismic-input-tn');
+
+  const lblSs = document.getElementById('lbl-ss');
+  const lblS1 = document.getElementById('lbl-s1');
+  const lblTn = document.getElementById('lbl-tn');
+
+  const elSds = document.getElementById('seismic-val-sds');
+  const elSd1 = document.getElementById('seismic-val-sd1');
+  const elTs = document.getElementById('seismic-val-ts');
+  const elSa = document.getElementById('seismic-val-sa');
+  const badgeKds = document.getElementById('seismic-kds-badge');
+
+  const presets = {
+    jakarta: { ss: 0.72, s1: 0.33, site: 'SD' },
+    padang: { ss: 1.35, s1: 0.60, site: 'SD' },
+    bandung: { ss: 1.15, s1: 0.48, site: 'SD' },
+    surabaya: { ss: 0.65, s1: 0.25, site: 'SD' },
+    yogyakarta: { ss: 1.05, s1: 0.42, site: 'SD' },
+    ikn: { ss: 0.30, s1: 0.15, site: 'SD' },
+  };
+
+  if (selPreset) {
+    selPreset.addEventListener('change', () => {
+      const p = presets[selPreset.value];
+      if (p) {
+        if (inSs) inSs.value = p.ss;
+        if (inS1) inS1.value = p.s1;
+        if (selSite) selSite.value = p.site;
+        renderSpectrum();
+      }
+    });
+  }
+
+  function computeFaFv(site, ss, s1) {
+    let fa = 1.0;
+    let fv = 1.0;
+
+    switch (site) {
+      case 'SA':
+        fa = 0.8;
+        fv = 0.8;
+        break;
+      case 'SB':
+        fa = 1.0;
+        fv = 1.0;
+        break;
+      case 'SC':
+        fa = ss <= 0.5 ? 1.3 : (ss <= 1.0 ? 1.3 - 0.2 * (ss - 0.5) : 1.1);
+        fv = s1 <= 0.2 ? 1.5 : (s1 <= 0.4 ? 1.5 - 0.5 * (s1 - 0.2) : 1.3);
+        break;
+      case 'SD':
+        fa = ss <= 0.25 ? 1.6 : (ss <= 0.5 ? 1.6 - 0.8 * (ss - 0.25) : (ss <= 0.75 ? 1.4 - 0.8 * (ss - 0.5) : (ss <= 1.0 ? 1.2 - 0.4 * (ss - 0.75) : 1.0)));
+        fv = s1 <= 0.1 ? 2.4 : (s1 <= 0.2 ? 2.4 - 4.0 * (s1 - 0.1) : (s1 <= 0.3 ? 2.0 - 2.0 * (s1 - 0.2) : (s1 <= 0.4 ? 1.8 - 2.0 * (s1 - 0.3) : 1.5)));
+        break;
+      case 'SE':
+        fa = ss <= 0.25 ? 2.4 : (ss <= 0.5 ? 2.4 - 2.8 * (ss - 0.25) : (ss <= 0.75 ? 1.7 - 1.6 * (ss - 0.5) : 0.9));
+        fv = s1 <= 0.1 ? 4.2 : (s1 <= 0.2 ? 4.2 - 9.0 * (s1 - 0.1) : (s1 <= 0.3 ? 3.3 - 5.0 * (s1 - 0.2) : (s1 <= 0.4 ? 2.8 - 4.0 * (s1 - 0.3) : 2.4)));
+        break;
+    }
+    return { fa: Math.max(0.6, fa), fv: Math.max(0.6, fv) };
+  }
+
+  function getSa(t, sds, sd1, ts, t0, tl = 4.0) {
+    if (t < t0) {
+      return sds * (0.4 + 0.6 * (t / Math.max(0.01, t0)));
+    } else if (t <= ts) {
+      return sds;
+    } else if (t <= tl) {
+      return sd1 / t;
+    } else {
+      return (sd1 * tl) / (t * t);
+    }
+  }
+
+  function renderSpectrum() {
+    const view = setupHiDpiCanvas(canvas, 380);
+    const ctx = view.ctx;
+    const w = view.width;
+    const h = view.height;
+
+    const ss = parseFloat(inSs ? inSs.value : 0.72);
+    const s1 = parseFloat(inS1 ? inS1.value : 0.33);
+    const tn = parseFloat(inTn ? inTn.value : 0.80);
+    const site = selSite ? selSite.value : 'SD';
+
+    if (lblSs) lblSs.textContent = `${ss.toFixed(2)} g`;
+    if (lblS1) lblS1.textContent = `${s1.toFixed(2)} g`;
+    if (lblTn) lblTn.textContent = `${tn.toFixed(2)} s`;
+
+    const { fa, fv } = computeFaFv(site, ss, s1);
+    const sms = fa * ss;
+    const sm1 = fv * s1;
+    const sds = (2.0 / 3.0) * sms;
+    const sd1 = (2.0 / 3.0) * sm1;
+    const ts = sds > 1e-4 ? sd1 / sds : 0.5;
+    const t0 = 0.2 * ts;
+    const tl = 4.0;
+
+    const saTn = getSa(tn, sds, sd1, ts, t0, tl);
+
+    // KDS Classification (Risk Cat II)
+    let kds = 'KDS D';
+    if (s1 >= 0.75) {
+      kds = 'KDS E';
+    } else if (sds >= 0.50 || sd1 >= 0.20) {
+      kds = 'KDS D';
+    } else if (sds >= 0.33 || sd1 >= 0.133) {
+      kds = 'KDS C';
+    } else if (sds >= 0.167 || sd1 >= 0.067) {
+      kds = 'KDS B';
+    } else {
+      kds = 'KDS A';
+    }
+
+    if (elSds) elSds.textContent = `${sds.toFixed(3)} g`;
+    if (elSd1) elSd1.textContent = `${sd1.toFixed(3)} g`;
+    if (elTs) elTs.textContent = `${ts.toFixed(3)} s`;
+    if (elSa) elSa.textContent = `${saTn.toFixed(3)} g`;
+    if (badgeKds) {
+      badgeKds.textContent = kds;
+      badgeKds.style.background = (kds === 'KDS E' || kds === 'KDS D') ? 'rgba(255, 69, 58, 0.18)' : 'rgba(48, 209, 88, 0.18)';
+      badgeKds.style.color = (kds === 'KDS E' || kds === 'KDS D') ? 'var(--accent-red)' : 'var(--accent-green)';
+    }
+
+    // Canvas coordinate mapping
+    const padL = 55;
+    const padR = 25;
+    const padT = 30;
+    const padB = 45;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+
+    const maxT = 4.0;
+    const maxSa = Math.max(1.1, sds * 1.35);
+
+    function toX(t) { return padL + (t / maxT) * plotW; }
+    function toY(val) { return padT + plotH - (val / maxSa) * plotH; }
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Background Subtle Grid
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 1;
+    for (let t = 0.5; t <= maxT; t += 0.5) {
+      const gx = toX(t);
+      ctx.beginPath();
+      ctx.moveTo(gx, padT);
+      ctx.lineTo(gx, padT + plotH);
+      ctx.stroke();
+    }
+    const saStep = maxSa > 1.4 ? 0.4 : 0.2;
+    for (let s = saStep; s <= maxSa; s += saStep) {
+      const gy = toY(s);
+      ctx.beginPath();
+      ctx.moveTo(padL, gy);
+      ctx.lineTo(padL + plotW, gy);
+      ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT);
+    ctx.lineTo(padL, padT + plotH);
+    ctx.lineTo(padL + plotW, padT + plotH);
+    ctx.stroke();
+
+    // Axis Labels
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    for (let t = 0; t <= maxT; t += 1.0) {
+      ctx.fillText(`${t.toFixed(0)}s`, toX(t), padT + plotH + 18);
+    }
+    ctx.fillText('Periode Alami T (detik)', padL + plotW / 2, padT + plotH + 36);
+
+    ctx.textAlign = 'right';
+    for (let s = 0; s <= maxSa; s += saStep) {
+      ctx.fillText(`${s.toFixed(1)}g`, padL - 8, toY(s) + 4);
+    }
+
+    // Save context for rotated Y title
+    ctx.save();
+    ctx.translate(16, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('Spektrum Respon Sa (g)', 0, 0);
+    ctx.restore();
+
+    // Fill Plateau Zone [T0, Ts]
+    const xT0 = toX(t0);
+    const xTs = toX(ts);
+    ctx.fillStyle = 'rgba(255, 69, 58, 0.08)';
+    ctx.fillRect(xT0, padT, Math.max(2, xTs - xT0), plotH);
+
+    // Spectrum Curve (Gradient Filled)
+    const numPts = 120;
+    const curvePoints = [];
+    for (let i = 0; i <= numPts; i++) {
+      const t = (i / numPts) * maxT;
+      const saVal = getSa(t, sds, sd1, ts, t0, tl);
+      curvePoints.push({ x: toX(t), y: toY(saVal) });
+    }
+
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+    grad.addColorStop(0, 'rgba(255, 69, 58, 0.28)');
+    grad.addColorStop(1, 'rgba(255, 69, 58, 0.02)');
+
+    ctx.beginPath();
+    ctx.moveTo(curvePoints[0].x, padT + plotH);
+    curvePoints.forEach(pt => ctx.lineTo(pt.x, pt.y));
+    ctx.lineTo(curvePoints[curvePoints.length - 1].x, padT + plotH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Stroke Spectrum Curve
+    ctx.beginPath();
+    ctx.strokeStyle = '#ff453a';
+    ctx.lineWidth = 2.5;
+    curvePoints.forEach((pt, idx) => {
+      if (idx === 0) ctx.moveTo(pt.x, pt.y);
+      else ctx.lineTo(pt.x, pt.y);
+    });
+    ctx.stroke();
+
+    // Dashed lines for T0 and Ts
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1;
+
+    // T0 Line
+    ctx.beginPath();
+    ctx.moveTo(xT0, padT + plotH);
+    ctx.lineTo(xT0, toY(sds));
+    ctx.stroke();
+
+    // Ts Line
+    ctx.beginPath();
+    ctx.moveTo(xTs, padT + plotH);
+    ctx.lineTo(xTs, toY(sds));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Badges at T0 & Ts
+    ctx.fillStyle = '#ff9f0a';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`T0=${t0.toFixed(2)}s`, xT0, toY(sds) - 12);
+    ctx.fillText(`Ts=${ts.toFixed(2)}s`, xTs, toY(sds) - 12);
+
+    // Building fundamental period Tn marker
+    const xTn = toX(tn);
+    const yTn = toY(saTn);
+
+    // Crosshair line to Tn
+    ctx.strokeStyle = 'rgba(10, 132, 255, 0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(xTn, padT + plotH);
+    ctx.lineTo(xTn, yTn);
+    ctx.lineTo(padL, yTn);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Glowing marker point at Tn
+    ctx.fillStyle = 'rgba(10, 132, 255, 0.25)';
+    ctx.beginPath();
+    ctx.arc(xTn, yTn, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0a84ff';
+    ctx.beginPath();
+    ctx.arc(xTn, yTn, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Callout pill on demand point
+    const pillText = `Sa(Tn) = ${saTn.toFixed(3)}g`;
+    ctx.font = 'bold 11px sans-serif';
+    const pillW = ctx.measureText(pillText).width + 16;
+    const pillX = Math.min(padL + plotW - pillW - 6, Math.max(padL + 6, xTn - pillW / 2));
+    const pillY = Math.max(padT + 16, yTn - 18);
+
+    ctx.fillStyle = 'rgba(18, 18, 26, 0.88)';
+    ctx.strokeStyle = '#0a84ff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY - 14, pillW, 20, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(pillText, pillX + pillW / 2, pillY);
+  }
+
+  [inSs, inS1, inTn, selSite].forEach(inp => {
+    if (inp) inp.addEventListener('input', renderSpectrum);
+  });
+
+  window.addEventListener('resize', renderSpectrum);
+  renderSpectrum();
+}
+
+/* =====================================================================
+   7. SANDBOX 5: TRANSIENT DYNAMIC DAF (NEWMARK-β SDOF OSCILLATOR)
+   ===================================================================== */
+function initDafSimulator() {
+  const canvas = document.getElementById('daf-canvas');
+  if (!canvas) return;
+
+  const selScenario = document.getElementById('daf-scenario');
+  const inZeta = document.getElementById('daf-input-zeta');
+  const inTr = document.getElementById('daf-input-tr');
+  const btnFire = document.getElementById('btn-trigger-daf');
+  const btnReset = document.getElementById('btn-reset-daf');
+
+  const lblZeta = document.getElementById('lbl-zeta');
+  const lblTr = document.getElementById('lbl-tr');
+
+  const elUstatic = document.getElementById('daf-val-ustatic');
+  const elUpeak = document.getElementById('daf-val-upeak');
+  const elRatio = document.getElementById('daf-val-ratio');
+  const elFreq = document.getElementById('daf-val-freq');
+  const badgeStatus = document.getElementById('daf-status-badge');
+
+  const scenarios = {
+    diag4: { uStatic: 14.2, freq: 2.35 },
+    chord3: { uStatic: 22.5, freq: 1.80 },
+    corner1: { uStatic: 38.0, freq: 1.15 },
+  };
+
+  let animProgress = 1.0;
+  let animId = null;
+
+  function renderDaf() {
+    const view = setupHiDpiCanvas(canvas, 380);
+    const ctx = view.ctx;
+    const w = view.width;
+    const h = view.height;
+
+    const scenKey = selScenario ? selScenario.value : 'diag4';
+    const sc = scenarios[scenKey] || scenarios.diag4;
+    const zeta = parseFloat(inZeta ? inZeta.value : 5.0) / 100.0;
+    const trMs = parseFloat(inTr ? inTr.value : 0.0);
+    const tr = trMs / 1000.0; // convert to seconds
+
+    if (lblZeta) lblZeta.textContent = `${(zeta * 100).toFixed(1)}%`;
+    if (lblTr) lblTr.textContent = trMs === 0 ? '0 ms (Instantaneous)' : `${trMs.toFixed(0)} ms`;
+
+    const uStatic = sc.uStatic;
+    const fn = sc.freq;
+    const wn = 2.0 * Math.PI * fn;
+    const wd = wn * Math.sqrt(Math.max(0.01, 1.0 - zeta * zeta));
+    const Tn = 1.0 / fn;
+
+    // DAF analytical approximation with finite removal time tr
+    const rampFactor = tr < 1e-4 ? 1.0 : Math.abs(Math.sin((Math.PI * tr) / Tn) / ((Math.PI * tr) / Tn));
+    const daf = 1.0 + Math.exp(-zeta * Math.PI) * rampFactor;
+    const uPeak = uStatic * daf;
+
+    if (elUstatic) elUstatic.textContent = `${uStatic.toFixed(1)} mm`;
+    if (elUpeak) elUpeak.textContent = `${uPeak.toFixed(1)} mm`;
+    if (elRatio) elRatio.textContent = daf.toFixed(2);
+    if (elFreq) elFreq.textContent = `${fn.toFixed(2)} Hz`;
+
+    if (badgeStatus) {
+      if (daf <= 2.0) {
+        badgeStatus.textContent = 'UFC SAFE';
+        badgeStatus.style.background = 'rgba(48, 209, 88, 0.18)';
+        badgeStatus.style.color = 'var(--accent-green)';
+      } else {
+        badgeStatus.textContent = 'HIGH SURGE';
+        badgeStatus.style.background = 'rgba(255, 69, 58, 0.18)';
+        badgeStatus.style.color = 'var(--accent-red)';
+      }
+    }
+
+    // Coordinate mapping
+    const padL = 55;
+    const padR = 25;
+    const padT = 30;
+    const padB = 45;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+
+    const maxT = 2.5;
+    const maxU = uPeak * 1.35;
+
+    function toX(t) { return padL + (t / maxT) * plotW; }
+    function toY(val) { return padT + plotH - (val / maxU) * plotH; }
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Background Grid
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 1;
+    for (let t = 0.5; t <= maxT; t += 0.5) {
+      const gx = toX(t);
+      ctx.beginPath();
+      ctx.moveTo(gx, padT);
+      ctx.lineTo(gx, padT + plotH);
+      ctx.stroke();
+    }
+    const uStep = Math.max(5, Math.round(maxU / 4));
+    for (let u = uStep; u <= maxU; u += uStep) {
+      const gy = toY(u);
+      ctx.beginPath();
+      ctx.moveTo(padL, gy);
+      ctx.lineTo(padL + plotW, gy);
+      ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT);
+    ctx.lineTo(padL, padT + plotH);
+    ctx.lineTo(padL + plotW, padT + plotH);
+    ctx.stroke();
+
+    // Axis Labels
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    for (let t = 0; t <= maxT; t += 0.5) {
+      ctx.fillText(`${t.toFixed(1)}s`, toX(t), padT + plotH + 18);
+    }
+    ctx.fillText('Waktu t (detik) Pasca Pelepasan Elemen', padL + plotW / 2, padT + plotH + 36);
+
+    ctx.textAlign = 'right';
+    for (let u = 0; u <= maxU; u += uStep) {
+      ctx.fillText(`${u}mm`, padL - 8, toY(u) + 4);
+    }
+
+    // Y-Axis Title
+    ctx.save();
+    ctx.translate(16, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('Perpindahan Dinamis u(t) (mm)', 0, 0);
+    ctx.restore();
+
+    // Static Deflection Reference Line
+    const yStatic = toY(uStatic);
+    ctx.strokeStyle = 'rgba(255, 159, 10, 0.65)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(padL, yStatic);
+    ctx.lineTo(padL + plotW, yStatic);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#ff9f0a';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`u_static = ${uStatic.toFixed(1)} mm`, padL + plotW - 10, yStatic - 6);
+
+    // Compute Waveform Points
+    const numPts = 200;
+    const wavePoints = [];
+    const limitIdx = Math.floor(numPts * animProgress);
+
+    for (let i = 0; i <= numPts; i++) {
+      const t = (i / numPts) * maxT;
+      let uVal = 0;
+      if (t >= 0) {
+        // Step response with ramp duration tr
+        const ramp = tr < 1e-4 ? 1.0 : Math.min(1.0, t / tr);
+        const osc = 1.0 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta / Math.sqrt(1.0 - zeta * zeta)) * Math.sin(wd * t));
+        uVal = uStatic * osc * ramp;
+      }
+      wavePoints.push({ t, val: uVal, x: toX(t), y: toY(uVal) });
+    }
+
+    // Filled Gradient Wave
+    if (limitIdx > 0) {
+      const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+      grad.addColorStop(0, 'rgba(10, 132, 255, 0.32)');
+      grad.addColorStop(1, 'rgba(10, 132, 255, 0.02)');
+
+      ctx.beginPath();
+      ctx.moveTo(wavePoints[0].x, padT + plotH);
+      for (let i = 0; i <= limitIdx; i++) {
+        ctx.lineTo(wavePoints[i].x, wavePoints[i].y);
+      }
+      ctx.lineTo(wavePoints[limitIdx].x, padT + plotH);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Stroke Waveform
+      ctx.strokeStyle = '#0a84ff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (let i = 0; i <= limitIdx; i++) {
+        if (i === 0) ctx.moveTo(wavePoints[i].x, wavePoints[i].y);
+        else ctx.lineTo(wavePoints[i].x, wavePoints[i].y);
+      }
+      ctx.stroke();
+    }
+
+    // Peak Surge Marker
+    const tPeak = Tn / 2.0;
+    if (tPeak <= maxT && animProgress >= (tPeak / maxT)) {
+      const xPeak = toX(tPeak);
+      const yPeak = toY(uPeak);
+
+      ctx.fillStyle = 'rgba(255, 69, 58, 0.3)';
+      ctx.beginPath();
+      ctx.arc(xPeak, yPeak, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ff453a';
+      ctx.beginPath();
+      ctx.arc(xPeak, yPeak, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Peak Callout Pill
+      const pillText = `u_peak = ${uPeak.toFixed(1)} mm (DAF = ${daf.toFixed(2)})`;
+      ctx.font = 'bold 11px sans-serif';
+      const pillW = ctx.measureText(pillText).width + 16;
+      const pillX = Math.min(padL + plotW - pillW - 6, Math.max(padL + 6, xPeak - pillW / 2));
+      const pillY = Math.max(padT + 16, yPeak - 16);
+
+      ctx.fillStyle = 'rgba(18, 18, 26, 0.9)';
+      ctx.strokeStyle = '#ff453a';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY - 14, pillW, 20, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(pillText, pillX + pillW / 2, pillY);
+    }
+  }
+
+  function triggerShock() {
+    if (animId) cancelAnimationFrame(animId);
+    animProgress = 0.0;
+    const start = performance.now();
+    const duration = 1200; // 1.2s sweep
+
+    function step(now) {
+      const elapsed = now - start;
+      animProgress = Math.min(1.0, elapsed / duration);
+      renderDaf();
+      if (animProgress < 1.0) {
+        animId = requestAnimationFrame(step);
+      }
+    }
+    animId = requestAnimationFrame(step);
+  }
+
+  if (btnFire) btnFire.addEventListener('click', triggerShock);
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      animProgress = 1.0;
+      renderDaf();
+    });
+  }
+
+  [inZeta, inTr, selScenario].forEach(inp => {
+    if (inp) inp.addEventListener('input', () => {
+      animProgress = 1.0;
+      renderDaf();
+    });
+  });
+
+  window.addEventListener('resize', renderDaf);
+  renderDaf();
 }

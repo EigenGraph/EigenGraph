@@ -566,6 +566,21 @@ body {
   border-bottom: 1px solid var(--border-subtle);
   background: rgba(18, 18, 24, 0.85);
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hover) rgba(0, 0, 0, 0.2);
+}
+
+.sandbox-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.sandbox-tabs::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sandbox-tabs::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 4px;
 }
 
 .sandbox-tab {

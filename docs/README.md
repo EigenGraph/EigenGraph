@@ -42,7 +42,16 @@ This repository (`eigengraph.github.io`) hosts the official client-side interact
 - **Kerf & Reusability**: Real-time kerf blade loss compensation ($3\text{ mm}$) and reusable offcut threshold classification ($L \ge 1.0\text{ m}$).
 - **BBS Generation**: Automatic rebar cutting schedule generation and waste percentage audit.
 
-### 4. 🌐 Real-Time 3D Diagrid Lattice Viewport
+### 4. 🌋 SNI 1726:2019 Seismic Design Response Spectrum Generator
+- **Indonesian Earthquake Code**: Computes site coefficients ($F_a, F_v$), spectral accelerations ($S_{MS}, S_{M1}, S_{DS}, S_{D1}$), and corner transition periods ($T_0, T_s, T_L$).
+- **Live Regional Presets**: Instant parameter selection for DKI Jakarta, Padang, Bandung, Surabaya, Yogyakarta, and IKN Nusantara across Site Classes SA through SE.
+- **Seismic Design Category (KDS)**: Real-time KDS classification (KDS A through E) with fundamental building period demand probe ($S_a(T_n)$).
+
+### 5. 💥 Transient Dynamic Amplification Factor (DAF Newmark-β)
+- **Sudden Member Removal**: Evaluates progressive collapse dynamics according to DoD UFC 4-023-03.
+- **Time History Simulation**: Step-by-step SDOF oscillator response showing peak surge overshoot ($u_{\text{peak}} = u_{\text{static}} \times \text{DAF}$), structural damping attenuation ($\zeta$), and finite removal duration ($t_r$).
+
+### 6. 🌐 Real-Time 3D Diagrid Lattice Viewport
 - **Spatial Viewport**: Canvas-based 3D rotating diagrid structural geometry with real-time perspective projection, depth-sorted alpha shading, and interactive orbital controls.
 
 ---
