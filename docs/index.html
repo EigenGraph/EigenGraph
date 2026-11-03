@@ -24,19 +24,19 @@
       <a href="#" class="nav-brand">
         <img src="assets/icon.png" alt="EigenGraph Icon">
         <span>EigenGraph</span>
-        <span class="brand-badge">v2.0.0 Universal</span>
+        <span class="brand-badge">v2.1.0 Active</span>
       </a>
 
       <ul class="nav-links">
-        <li><a href="#suite">Platform Suite</a></li>
-        <li><a href="#sandbox">Interactive Sandbox</a></li>
-        <li><a href="#pillars">10D BIM Pillars</a></li>
-        <li><a href="#benchmarks">Numerical Benchmarks</a></li>
-        <li><a href="#download">Downloads</a></li>
+        <li><a href="#updates" data-view-target="view-changelog">📌 What's New</a></li>
+        <li><a href="#sandbox" data-view-target="view-playground">🧪 Interactive Lab</a></li>
+        <li><a href="#suite" data-view-target="view-pillars">🏛️ 10D BIM Suite</a></li>
+        <li><a href="#benchmarks">⚡ Benchmarks</a></li>
+        <li><a href="#download">📦 Downloads</a></li>
       </ul>
 
       <div class="nav-actions">
-        <a href="https://github.com/haridsirawan/EigenGraph" target="_blank" class="btn btn-secondary">
+        <a href="https://github.com/EigenGraph/EigenGraph" target="_blank" class="btn btn-secondary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           GitHub
         </a>
@@ -51,136 +51,276 @@
 
   <!-- Mobile Drawer Menu -->
   <div class="mobile-menu">
-    <a href="#suite">Platform Suite</a>
-    <a href="#sandbox">Interactive Sandbox</a>
-    <a href="#pillars">10D BIM Pillars</a>
-    <a href="#benchmarks">Numerical Benchmarks</a>
-    <a href="#download">Downloads</a>
-    <a href="https://github.com/haridsirawan/EigenGraph" target="_blank">GitHub Repository ↗</a>
+    <a href="#updates" data-view-target="view-changelog">📌 What's New / Changelog</a>
+    <a href="#sandbox" data-view-target="view-playground">🧪 Interactive Lab (5 Demos)</a>
+    <a href="#suite" data-view-target="view-pillars">🏛️ 10D BIM Suite</a>
+    <a href="#benchmarks">⚡ Numerical Benchmarks</a>
+    <a href="#download">📦 Downloads</a>
+    <a href="https://github.com/EigenGraph/EigenGraph" target="_blank">GitHub Repository ↗</a>
   </div>
 
   <!-- ================= HERO SECTION ================= -->
   <header class="hero">
+    <!-- Official Research Disclaimer Banner -->
+    <div class="disclaimer-banner">
+      <span class="disclaimer-badge">⚠️ Notice</span>
+      <span class="disclaimer-text">EigenGraph is an experimental computational engineering and BIM platform currently under active development. Features, architecture, and capabilities are subject to change.</span>
+    </div>
+
     <div class="hero-pill">
       <span class="pill-dot"></span>
-      <span>Official Release v2.0.0 — Universal 2 (Apple Silicon M1-M4 & Intel x64)</span>
+      <span>Official Release v2.1.0-alpha — Active Changelog Stream</span>
     </div>
 
     <h1 class="hero-title">
-      Structural Redundancy Intelligence<br>
-      meets <span class="gradient-text">10D BIM Lifecycle</span>
+      EigenGraph <span class="gradient-text">Product Updates</span>
     </h1>
 
     <p class="hero-subtitle">
-      A High-Performance Rust Computational Framework for <strong>Adjusted Redundancy Index (ARI)</strong>,
+      A High-Performance Computational Framework for <strong>Adjusted Redundancy Index (ARI)</strong>,
       Sherman-Morrison \(O(N^2)\) Rank-1 Perturbation, SVD Kinematic Mechanism Guards,
-      and Full-Lifecycle OpenBIM Construction Analytics.
+      and 10D BIM Construction Lifecycle Analytics.
     </p>
 
     <div class="hero-cta">
       <a href="#download" class="btn btn-primary btn-lg">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download EigenGraph (macOS Universal)
+        Download EigenGraph (macOS)
       </a>
-      <a href="#sandbox" class="btn btn-secondary btn-lg">
-        ⚡ Try Interactive Sandbox
-      </a>
+      <button class="btn btn-secondary btn-lg" onclick="switchToView('view-playground', 'tab-ari')">
+        🧪 Open Interactive Lab (5 Demos)
+      </button>
     </div>
 
     <!-- Terminal Quickstart -->
     <div class="hero-terminal">
-      <code>git clone https://github.com/haridsirawan/EigenGraph.git && cd EigenGraph && cargo run --release</code>
-      <button class="copy-btn" data-copy="git clone https://github.com/haridsirawan/EigenGraph.git && cd EigenGraph && cargo run --release">📋 Copy</button>
+      <code>git clone https://github.com/EigenGraph/EigenGraph.git && cd EigenGraph && cargo run --release</code>
+      <button class="copy-btn" data-copy="git clone https://github.com/EigenGraph/EigenGraph.git && cd EigenGraph && cargo run --release">📋 Copy</button>
     </div>
 
     <div class="hero-badges">
-      <img src="https://img.shields.io/badge/release-v2.0.0-0A84FF.svg" alt="Release">
+      <img src="https://img.shields.io/badge/release-v2.1.0--alpha-0A84FF.svg" alt="Release">
       <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-black.svg" alt="Platforms">
       <img src="https://img.shields.io/badge/tests-58%20passed%20(100%25)-30D158.svg" alt="Tests">
       <img src="https://img.shields.io/badge/built%20with-Rust%201.80+-DEA584.svg" alt="Rust">
       <img src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue.svg" alt="License">
     </div>
-
-    <!-- Hero Interactive 3D Showcase Window -->
-    <div class="hero-showcase">
-      <div class="window-chrome">
-        <div class="traffic-lights">
-          <div class="traffic-light red"></div>
-          <div class="traffic-light yellow"></div>
-          <div class="traffic-light green"></div>
-        </div>
-        <div class="window-title">EigenGraph 3D Canvas Viewport — High-Rise Diagrid Tower LOD 350</div>
-      </div>
-      <div class="hero-canvas-wrap">
-        <canvas id="hero-canvas"></canvas>
-        <div class="canvas-overlay-card">
-          <h4>🪐 Real-Time 3D Diagrid Lattice</h4>
-          <p>Drag or swipe to rotate turntable. Live Euler-Bernoulli beam mechanics with Rayon multithreaded Cholesky factorization.</p>
-        </div>
-      </div>
-    </div>
   </header>
 
-  <!-- ================= THE EIGEN PLATFORM SUITE ================= -->
-  <section class="section" id="suite">
-    <div class="section-header">
-      <span class="section-tag">Triad Architecture</span>
-      <h2 class="section-title">The Eigen Platform Suite</h2>
-      <p class="section-desc">
-        A unified triad ecosystem engineered to bridge analytical mechanics, kinematic failure prevention, and construction lifecycle dimensions.
-      </p>
+  <!-- ================= PRIMARY VIEW SWITCHER ================= -->
+  <div class="view-switcher-container">
+    <div class="view-switcher">
+      <button class="view-btn active" data-view="view-changelog">
+        📌 Product Updates & Changelog
+      </button>
+      <button class="view-btn" data-view="view-playground">
+        🧪 Interactive Lab (5 Demos)
+      </button>
+      <button class="view-btn" data-view="view-pillars">
+        🏛️ 10D BIM Ecosystem
+      </button>
     </div>
+  </div>
 
-    <div class="suite-grid">
-      <!-- EigenGraph -->
-      <div class="suite-card highlight">
-        <div class="suite-icon">
-          <img src="assets/icon.png" alt="EigenGraph">
-        </div>
-        <h3>EigenGraph</h3>
-        <p>10D BIM Construction Lifecycle Dimensions, CAD/BIM Triad Dock, IFC 4.3 OpenBIM interoperability, and 2D Sheet A101 Vector Blueprints.</p>
-        <div class="suite-tags">
-          <span class="suite-tag">10D BIM</span>
-          <span class="suite-tag">Sheet A101</span>
-          <span class="suite-tag">Solid CSG</span>
-          <span class="suite-tag">IFC 4.3</span>
-        </div>
+  <!-- ================= VIEW 1: CHANGELOG-FIRST TIMELINE ================= -->
+  <div id="view-changelog" class="view-content-panel active">
+    <section class="changelog-section" id="updates">
+      <div class="section-header">
+        <span class="section-tag">Release History & Roadmap</span>
+        <h2 class="section-title">What's New in EigenGraph</h2>
+        <p class="section-desc">
+          Dokumentasi rilis dan catatan pembaruan komprehensif. Ikuti inovasi formulasi numerik, otomasi standar SNI/ASCE, dan penambahan fitur platform 10D BIM secara berkala.
+        </p>
       </div>
 
-      <!-- EigenGate -->
-      <div class="suite-card">
-        <div class="suite-icon">
-          <img src="assets/eigengate.png" alt="EigenGate">
-        </div>
-        <h3>EigenGate</h3>
-        <p>Sherman-Morrison Rank-1 SVD Kinematic Mechanism Guard, Fracture-Critical Member (FCM) screening, and zero false-positive stability certification.</p>
-        <div class="suite-tags">
-          <span class="suite-tag">SVD Guard</span>
-          <span class="suite-tag">Woodbury N-2</span>
-          <span class="suite-tag">Euler Buckling Kg(P)</span>
-          <span class="suite-tag">Rank Drop</span>
-        </div>
-      </div>
+      <div class="changelog-timeline">
+        <!-- RELEASE v2.1.0-alpha -->
+        <article class="changelog-card latest">
+          <div class="changelog-dot"></div>
+          <div class="changelog-header">
+            <div class="changelog-version-wrap">
+              <span class="changelog-version">v2.1.0-alpha</span>
+              <span class="suite-tag" style="background:rgba(10,132,255,0.18); color:var(--accent-blue); font-weight:700;">Latest Release</span>
+              <span class="suite-tag" style="background:rgba(48,209,88,0.18); color:var(--accent-green); font-weight:700;">58 Tests Passing</span>
+            </div>
+            <div class="changelog-date">📅 3 November 2026</div>
+          </div>
 
-      <!-- EigenFlow -->
-      <div class="suite-card">
-        <div class="suite-icon">
-          <img src="assets/eigenflow.png" alt="EigenFlow">
-        </div>
-        <h3>EigenFlow</h3>
-        <p>Non-linear APM progressive collapse simulation (DoD UFC 4-023-03), Critical Path (CPM) 4D scheduling, and 6D embodied carbon LCA pipelines.</p>
-        <div class="suite-tags">
-          <span class="suite-tag">Newmark-β DAF</span>
-          <span class="suite-tag">4D CPM Schedule</span>
-          <span class="suite-tag">6D Carbon LCA</span>
-          <span class="suite-tag">Plastic Hinges</span>
-        </div>
-      </div>
-    </div>
-  </section>
+          <h3 class="changelog-title">
+            🌋 Indonesian Seismic Response Spectra (SNI 1726:2019) & Progressive Collapse Dynamics (DoD UFC 4-023-03)
+          </h3>
 
-  <!-- ================= INTERACTIVE WEB SANDBOX ================= -->
-  <section class="section" id="sandbox">
+          <div class="changelog-tags">
+            <span class="suite-tag">SNI 1726:2019</span>
+            <span class="suite-tag">ASCE 7-16</span>
+            <span class="suite-tag">Newmark-β DAF</span>
+            <span class="suite-tag">EigenLab Playground</span>
+            <span class="suite-tag">macOS App Store Style</span>
+          </div>
+
+          <div class="feature-group">
+            <h4>🌋 1. Indonesian Seismic Response Spectra Engine (<code>src/core/modal.rs</code>)</h4>
+            <ul class="feature-list">
+              <li><strong>Formulasi Spektrum Desain Standar</strong>: Implementasi kurva percepatan respons spektra desain gempa \(S_a(T)\) sesuai SNI 1726:2019 Pasal 6.4 dan ASCE 7-16.</li>
+              <li><strong>Otomasi Faktor Amplifikasi Situs</strong>: Evaluasi eksak faktor \(F_a\) (periode pendek 0.2s) dan \(F_v\) (periode 1.0s) pada seluruh Kelas Situs Tanah (SA, SB, SC, SD, SE) dengan interpolasi linear eksak.</li>
+              <li><strong>Percepatan & Periode Transisi</strong>: Menghitung \(S_{MS} = F_a S_s\), \(S_{M1} = F_v S_1\), \(S_{DS} = \frac{2}{3} S_{MS}\), \(S_{D1} = \frac{2}{3} S_{M1}\), serta periode transisi karakteristik \(T_s = S_{D1}/S_{DS}\), \(T_0 = 0.2 T_s\), dan \(T_L = 4.0\text{ s}\).</li>
+              <li><strong>Klasifikasi KDS Otomatis</strong>: Klasifikasi Kategori Desain Seismik (KDS A s/d E) dan probe respons bangunan pada perioda alami fundamental \(T_n\).</li>
+              <li><strong>Preset Wilayah Indonesia</strong>: Konfigurasi instan parameter gempa kota besar: DKI Jakarta (\(S_s=0.72\text{g}, S_1=0.33\text{g}\)), Padang (\(S_s=1.35\text{g}, S_1=0.60\text{g}\)), Bandung, Surabaya, Yogyakarta, dan IKN Nusantara.</li>
+            </ul>
+          </div>
+
+          <div class="feature-group">
+            <h4>💥 2. Transient Dynamic Amplification Factor (DAF) Engine (<code>src/core/dynamics.rs</code>)</h4>
+            <ul class="feature-list">
+              <li><strong>Integrasi Numerik Newmark-β</strong>: Skema integrasi langkah-demi-langkah unconditionally stable (\(\beta = 1/4, \gamma = 1/2\)) untuk osilator SDOF saat pelepasan elemen seketika.</li>
+              <li><strong>Evaluasi Keruntuhan Progresif</strong>: Simulasi lonjakan gaya dinamis (<em>dynamic surge</em>) pasca-kerusakan (<em>sudden member removal</em>) sesuai pedoman DoD UFC 4-023-03.</li>
+              <li><strong>Audit Batas DAF Kritis</strong>: Evaluasi faktor amplifikasi dinamis terhadap batas keamanan \(\text{DAF} \le 2.00\) dengan pengaruh variasi redaman struktur \(\zeta\) (1%–10%) dan durasi transisi pelepasan \(t_r\).</li>
+            </ul>
+          </div>
+
+          <div class="feature-group">
+            <h4>🧪 3. EigenLab — Interactive Computational Playground</h4>
+            <ul class="feature-list">
+              <li><strong>Multi-Module Tab Switcher</strong>: Penyatuan 5 laboratorium komputasi interaktif ke dalam satu kontainer tab ramah memori (ARI & Gate 1, Kolom Beton SNI 2847, 1D CSO Rebar, Spektrum Gempa SNI 1726, dan Dinamika DAF).</li>
+              <li><strong>Zero-Blur Retina Scaling</strong>: Penerapan <code>setupHiDpiCanvas</code> dengan adaptasi <code>window.devicePixelRatio</code> untuk tampilan grafis tajam pada layar MacBook, 4K, dan mobile.</li>
+            </ul>
+          </div>
+
+          <div class="changelog-actions">
+            <button class="btn btn-primary btn-sm" onclick="switchToView('view-playground', 'tab-seismic')">
+              🌋 Coba Spektrum Gempa di Lab ↗
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="switchToView('view-playground', 'tab-daf')">
+              💥 Coba Simulasi Dinamik DAF ↗
+            </button>
+            <a href="#download" class="btn btn-outline btn-sm">
+              📦 Unduh Installer v2.1.0
+            </a>
+          </div>
+        </article>
+
+        <!-- RELEASE v2.0.0 -->
+        <article class="changelog-card">
+          <div class="changelog-dot"></div>
+          <div class="changelog-header">
+            <div class="changelog-version-wrap">
+              <span class="changelog-version">v2.0.0</span>
+              <span class="suite-tag">Major Release</span>
+            </div>
+            <div class="changelog-date">📅 28 Oktober 2026</div>
+          </div>
+
+          <h3 class="changelog-title">
+            🧱 10D BIM Dimensions, Concrete Column P-M & 1D Cutting Stock Optimizer
+          </h3>
+
+          <div class="changelog-tags">
+            <span class="suite-tag">SNI 2847:2019</span>
+            <span class="suite-tag">Best-Fit Decreasing</span>
+            <span class="suite-tag">IFC 4.3 OpenBIM</span>
+            <span class="suite-tag">CSG Boolean Mesh</span>
+            <span class="suite-tag">6D Carbon LCA</span>
+          </div>
+
+          <div class="feature-group">
+            <h4>🧱 1. SNI 2847 / ACI 318 Concrete Column P-M Interaction (<code>src/core/concrete.rs</code>)</h4>
+            <ul class="feature-list">
+              <li><strong>Blok Tegangan Ekuivalen Whitney</strong>: Perhitungan parameter \(\beta_1\) dan intensitas tegangan tekan beton \(0.85 f'_c\) secara kontinu.</li>
+              <li><strong>Amplop Kapasitas Desain</strong>: Penentuan titik kardinal Tekan Murni (\(\phi P_{n,\max}\)), Titik Balans (\(\phi P_b, \phi M_b\)), dan Lentur Murni (\(\phi M_0\)) dengan faktor reduksi kekuatan \(\phi\) transisi lentur-tekan.</li>
+              <li><strong>Audit LRFD Interaktif</strong>: Kontrol dimensi \(b \times h\), rasio tulangan \(\rho\), mutu beton \(f'_c\), mutu baja \(f_y\), serta evaluasi otomatis Demand/Capacity Ratio (DCR).</li>
+            </ul>
+          </div>
+
+          <div class="feature-group">
+            <h4>✂️ 2. 1D Cutting Stock Optimizer & Bar Bending Schedule (<code>src/core/cso.rs</code>)</h4>
+            <ul class="feature-list">
+              <li><strong>Heuristik Best-Fit Decreasing (BFD)</strong>: Algoritma pengepakan satu dimensi untuk meminimalkan sisa potongan besi beton komersial panjang standar 12 meter.</li>
+              <li><strong>Kompensasi Kerf & Klasifikasi Reusable Offcut</strong>: Pengurangan otomatis ketebalan bilah potong (<em>saw kerf</em>) dan pemisahan otomatis antara sisa potongan yang dapat dipakai kembali (\(L \ge 1.0\text{ m}\)) dengan limbah murni (<em>scrap</em>).</li>
+              <li><strong>Bar Bending Schedule (BBS)</strong>: Pembuatan tabel jadwal penulangan dan rekapitulasi efisiensi bahan (*yield efficiency* mencapai > 96%).</li>
+            </ul>
+          </div>
+
+          <div class="feature-group">
+            <h4>🏗️ 3. OpenBIM IFC 4.3 & CSG Boolean Engine (<code>src/core/csg.rs</code>, <code>src/core/bim.rs</code>)</h4>
+            <ul class="feature-list">
+              <li><strong>Pemodelan Solid Ekstrusi</strong>: Representasi 3D dinding, balok, dan kolom dengan operasi pengurangan boolean solid untuk bukaan pintu dan jendela.</li>
+              <li><strong>BVH Spatial Ray-Picking</strong>: Akselerasi ray-tracing 3D interaktif pada kanvas grafis untuk pemilihan elemen struktur LOD 350.</li>
+            </ul>
+          </div>
+
+          <div class="changelog-actions">
+            <button class="btn btn-primary btn-sm" onclick="switchToView('view-playground', 'tab-pm')">
+              🧱 Coba Diagram Kolom P-M di Lab ↗
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="switchToView('view-playground', 'tab-cso')">
+              ✂️ Coba 1D Cutting Stock di Lab ↗
+            </button>
+          </div>
+        </article>
+
+        <!-- RELEASE v1.0.0 -->
+        <article class="changelog-card">
+          <div class="changelog-dot"></div>
+          <div class="changelog-header">
+            <div class="changelog-version-wrap">
+              <span class="changelog-version">v1.0.0</span>
+              <span class="suite-tag">Foundation Release</span>
+            </div>
+            <div class="changelog-date">📅 15 September 2026</div>
+          </div>
+
+          <h3 class="changelog-title">
+            ⚡ Adjusted Redundancy Index (ARI), SVD Gate 1 Kinematic Guard & Rayon Parallel Engine
+          </h3>
+
+          <div class="changelog-tags">
+            <span class="suite-tag">Sherman-Morrison</span>
+            <span class="suite-tag">Gate 1 SVD Guard</span>
+            <span class="suite-tag">Woodbury N-2</span>
+            <span class="suite-tag">Euler Buckling Kg(P)</span>
+            <span class="suite-tag">Canonical M1</span>
+          </div>
+
+          <div class="feature-group">
+            <h4>⚡ 1. Linear ARI with Sherman-Morrison \(O(N^2)\) Rank-1 Perturbation (<code>src/core/ari.rs</code>)</h4>
+            <ul class="feature-list">
+              <li><strong>Inversi Cepat Pasca-Kerusakan</strong>: Formulasi eksak \((\mathbf{K}_{ff}^{(-e)})^{-1} = \mathbf{K}_{ff}^{-1} + \frac{k_e (\mathbf{K}_{ff}^{-1} \mathbf{a}_e)(\mathbf{a}_e^T \mathbf{K}_{ff}^{-1})}{1 - h_e}\) yang meniadakan kebutuhan refaktorisasi matriks global dari awal.</li>
+              <li><strong>Leverage Spektral \(h_e\)</strong>: Proyeksi fleksibilitas elemen ke kepatuhan global struktur \(h_e = k_e \mathbf{a}_e^T \mathbf{K}_{ff}^{-1} \mathbf{a}_e \in [0.0, 1.0]\).</li>
+            </ul>
+          </div>
+
+          <div class="feature-group">
+            <h4>🛡️ 2. Gate 1: SVD Kinematic Mechanism Guard & Hard Stability Certificate</h4>
+            <ul class="feature-list">
+              <li><strong>Determinasi Kinematik Pasti</strong>: Pemeriksaan batas determinasi spektral \(m_e = 1.0 - h_e\). Jika \(m_e \le \varepsilon_m\) atau terjadi *rank drop*, sistem menyatakan keruntuhan seketika (\(ARI_e = 0.0, CI_e = 1.0\)) dengan jaminan *zero false-positive*.</li>
+              <li><strong>Woodbury Rank-2 Skrining Simultan</strong>: Skrining ribuan kombinasi kegagalan dual-member \(\{i, j\}\) simultan via determinan matriks kapasitansi \(2\times 2\).</li>
+            </ul>
+          </div>
+
+          <div class="feature-group">
+            <h4>📊 3. Canonical Model M1 Verification</h4>
+            <ul class="feature-list">
+              <li><strong>Pembuktian Analitis Eksak</strong>: Verifikasi solusi *closed-form* rasional eksak terhadap 58 unit tests lolos 100% tanpa kompromi toleransi numerik.</li>
+            </ul>
+          </div>
+
+          <div class="changelog-actions">
+            <button class="btn btn-primary btn-sm" onclick="switchToView('view-playground', 'tab-ari')">
+              ⚡ Coba Sherman-Morrison ARI di Lab ↗
+            </button>
+            <a href="#benchmarks" class="btn btn-outline btn-sm">
+              📊 Lihat Tabel Verifikasi Benchmark M1
+            </a>
+          </div>
+        </article>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= VIEW 2: INTERACTIVE PLAYGROUND ================= -->
+  <div id="view-playground" class="view-content-panel">
+    <!-- ================= INTERACTIVE WEB SANDBOX ================= -->
+    <section class="section" id="sandbox">
     <div class="section-header">
       <span class="section-tag">Interactive Simulation Laboratory</span>
       <h2 class="section-title">EigenLab — Interactive Playground</h2>
@@ -512,10 +652,90 @@
         </div>
       </div>
     </div>
-  </section>
+    </section>
+  </div>
 
-  <!-- ================= 13 NAVIGATION PILLARS ================= -->
-  <section class="section" id="pillars">
+  <!-- ================= VIEW 3: 10D BIM ECOSYSTEM & ARCHITECTURE ================= -->
+  <div id="view-pillars" class="view-content-panel">
+    <!-- Hero Interactive 3D Showcase Window -->
+    <div class="hero-showcase" style="max-width:1100px; margin:30px auto 50px;">
+      <div class="window-chrome">
+        <div class="traffic-lights">
+          <div class="traffic-light red"></div>
+          <div class="traffic-light yellow"></div>
+          <div class="traffic-light green"></div>
+        </div>
+        <div class="window-title">EigenGraph 3D Canvas Viewport — High-Rise Diagrid Tower LOD 350</div>
+      </div>
+      <div class="hero-canvas-wrap">
+        <canvas id="hero-canvas"></canvas>
+        <div class="canvas-overlay-card">
+          <h4>🪐 Real-Time 3D Diagrid Lattice</h4>
+          <p>Drag or swipe to rotate turntable. Live Euler-Bernoulli beam mechanics with Rayon multithreaded Cholesky factorization.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- The Eigen Platform Suite -->
+    <section class="section" id="suite" style="padding-top:20px;">
+      <div class="section-header">
+        <span class="section-tag">Triad Architecture</span>
+        <h2 class="section-title">The Eigen Platform Suite</h2>
+        <p class="section-desc">
+          A unified triad ecosystem engineered to bridge analytical mechanics, kinematic failure prevention, and construction lifecycle dimensions.
+        </p>
+      </div>
+
+      <div class="suite-grid">
+        <!-- EigenGraph -->
+        <div class="suite-card highlight">
+          <div class="suite-icon">
+            <img src="assets/icon.png" alt="EigenGraph">
+          </div>
+          <h3>EigenGraph</h3>
+          <p>10D BIM Construction Lifecycle Dimensions, CAD/BIM Triad Dock, IFC 4.3 OpenBIM interoperability, and 2D Sheet A101 Vector Blueprints.</p>
+          <div class="suite-tags">
+            <span class="suite-tag">10D BIM</span>
+            <span class="suite-tag">Sheet A101</span>
+            <span class="suite-tag">Solid CSG</span>
+            <span class="suite-tag">IFC 4.3</span>
+          </div>
+        </div>
+
+        <!-- EigenGate -->
+        <div class="suite-card">
+          <div class="suite-icon">
+            <img src="assets/eigengate.png" alt="EigenGate">
+          </div>
+          <h3>EigenGate</h3>
+          <p>Sherman-Morrison Rank-1 SVD Kinematic Mechanism Guard, Fracture-Critical Member (FCM) screening, and zero false-positive stability certification.</p>
+          <div class="suite-tags">
+            <span class="suite-tag">SVD Guard</span>
+            <span class="suite-tag">Woodbury N-2</span>
+            <span class="suite-tag">Euler Buckling Kg(P)</span>
+            <span class="suite-tag">Rank Drop</span>
+          </div>
+        </div>
+
+        <!-- EigenFlow -->
+        <div class="suite-card">
+          <div class="suite-icon">
+            <img src="assets/eigenflow.png" alt="EigenFlow">
+          </div>
+          <h3>EigenFlow</h3>
+          <p>Non-linear APM progressive collapse simulation (DoD UFC 4-023-03), Critical Path (CPM) 4D scheduling, and 6D embodied carbon LCA pipelines.</p>
+          <div class="suite-tags">
+            <span class="suite-tag">Newmark-β DAF</span>
+            <span class="suite-tag">4D CPM Schedule</span>
+            <span class="suite-tag">6D Carbon LCA</span>
+            <span class="suite-tag">Plastic Hinges</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 13 NAVIGATION PILLARS ================= -->
+    <section class="section" id="pillars">
     <div class="section-header">
       <span class="section-tag">Comprehensive Dimensions</span>
       <h2 class="section-title">13 Core Navigation Pillars</h2>
@@ -630,6 +850,7 @@
       </div>
     </div>
   </section>
+  </div>
 
   <!-- ================= CANONICAL BENCHMARKS ================= -->
   <section class="section" id="benchmarks">
@@ -790,15 +1011,18 @@
           High-Performance Computational Framework for Adjusted Redundancy Index (ARI),
           SVD Kinematic Mechanism Guards, and 10D BIM Construction Lifecycle Analytics.
         </p>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-top:10px; border-left:2px solid #ff9f0a; padding-left:10px;">
+          <em>Disclaimer: EigenGraph is an experimental computational engineering and BIM platform currently under active development. Features, architecture, and capabilities are subject to change.</em>
+        </p>
       </div>
 
       <div class="footer-col">
         <h5>Platform Triad</h5>
         <ul>
-          <li><a href="#suite">EigenGraph</a></li>
-          <li><a href="#suite">EigenGate</a></li>
-          <li><a href="#suite">EigenFlow</a></li>
-          <li><a href="#pillars">13 Lifecycle Pillars</a></li>
+          <li><a href="#suite" data-view-target="view-pillars">EigenGraph</a></li>
+          <li><a href="#suite" data-view-target="view-pillars">EigenGate</a></li>
+          <li><a href="#suite" data-view-target="view-pillars">EigenFlow</a></li>
+          <li><a href="#pillars" data-view-target="view-pillars">13 Lifecycle Pillars</a></li>
         </ul>
       </div>
 
@@ -815,10 +1039,10 @@
       <div class="footer-col">
         <h5>Open Source</h5>
         <ul>
-          <li><a href="https://github.com/haridsirawan/EigenGraph" target="_blank">GitHub Repository</a></li>
-          <li><a href="https://github.com/haridsirawan/EigenGraph/releases" target="_blank">Releases & Changelog</a></li>
-          <li><a href="https://github.com/haridsirawan/Adjusted-Redundancy-Index" target="_blank">Research Parent Repo</a></li>
-          <li><a href="https://github.com/haridsirawan/EigenGraph/blob/main/LICENSE" target="_blank">MIT / Apache 2.0 License</a></li>
+          <li><a href="https://github.com/EigenGraph/EigenGraph" target="_blank">GitHub Repository</a></li>
+          <li><a href="#updates" data-view-target="view-changelog">Releases & Changelog</a></li>
+          <li><a href="https://github.com/EigenGraph/AdjustedRedundancyIndex_Linear" target="_blank">Linear ARI Engine</a></li>
+          <li><a href="https://github.com/EigenGraph/EigenGraph/blob/main/LICENSE" target="_blank">MIT / Apache 2.0 License</a></li>
         </ul>
       </div>
     </div>
