@@ -3,1057 +3,1468 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EigenGraph — High-Performance Computational Framework for Structural Redundancy (ARI) & 10D BIM</title>
-  <meta name="description" content="High-Performance Rust Computational Framework for Adjusted Redundancy Index (ARI), Sherman-Morrison O(N²) Rank-1 Perturbation, SVD Kinematic Mechanism Guards, and 10D BIM Construction Lifecycle Analytics.">
+  <title>EigenGraph Workstation — 10D BIM & Structural Mechanics Platform</title>
+  <meta name="description" content="Official EigenGraph Workstation Web-App: Comprehensive 13 Lifecycle Pillars with Mathematical Formulations, Code Mapping, and Interactive Engineering Laboratories.">
   <link rel="icon" type="image/png" href="assets/icon.png">
 
-  <!-- KaTeX for pristine LaTeX mathematics -->
+  <!-- KaTeX pristine LaTeX mathematics -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"
-          onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\[', right: '\\]', display: true}, {left: '\\(', right: '\\)', display: false}]});"></script>
+          onload="initKaTeX();"></script>
 
-  <!-- Stylesheet -->
+  <!-- Typography & App Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div class="macos-app-wrapper">
+    <div class="macos-window">
+      
+      <!-- ================= MACOS TITLEBAR ================= -->
+      <header class="macos-titlebar">
+        <div class="titlebar-left">
+          <div class="macos-traffic-lights">
+            <span class="traffic-light red" title="Close Window"></span>
+            <span class="traffic-light yellow" title="Minimize Window"></span>
+            <span class="traffic-light green" title="Toggle Fullscreen"></span>
+          </div>
+          <div class="titlebar-title">
+            <img src="assets/icon.png" alt="EigenGraph" width="22" height="22" style="border-radius:4px;">
+            <span>EigenGraph Workstation</span>
+            <span class="dossier-tag blue" style="padding:2px 8px; font-size:0.68rem;">v2.1.0-release</span>
+          </div>
+        </div>
 
-  <!-- ================= NAVIGATION ================= -->
-  <nav class="navbar">
-    <div class="nav-container">
-      <a href="#" class="nav-brand">
-        <img src="assets/icon.png" alt="EigenGraph Icon">
-        <span>EigenGraph</span>
-        <span class="brand-badge">v2.1.0 Active</span>
-      </a>
+        <div class="titlebar-center">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="pillar-search-input" class="titlebar-search" placeholder="Filter 13 pillars, equations, standards (e.g. Woodbury, Bresler, CQC, CPM)..." autocomplete="off">
+        </div>
 
-      <ul class="nav-links">
-        <li><a href="#updates" data-view-target="view-changelog">📌 What's New</a></li>
-        <li><a href="#sandbox" data-view-target="view-playground">🧪 Interactive Lab</a></li>
-        <li><a href="#suite" data-view-target="view-pillars">🏛️ 10D BIM Suite</a></li>
-        <li><a href="#benchmarks">⚡ Benchmarks</a></li>
-        <li><a href="#download">📦 Downloads</a></li>
-      </ul>
+        <div class="titlebar-right">
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v2.1.0" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v2.1.0
+          </a>
+          <a href="https://github.com/EigenGraph/EigenGraph" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            GitHub
+          </a>
+        </div>
+      </header>
 
-      <div class="nav-actions">
-        <a href="https://github.com/EigenGraph/EigenGraph" target="_blank" class="btn btn-secondary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          GitHub
-        </a>
-        <a href="#download" class="btn btn-primary">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download
-        </a>
-        <button class="mobile-toggle" aria-label="Toggle Navigation">☰</button>
+      <!-- ================= MACOS APP BODY (TWO PANES) ================= -->
+      <div class="macos-app-body">
+        
+        <!-- SIDEBAR -->
+        <aside class="macos-sidebar">
+          <div class="sidebar-header">
+            <span class="sidebar-heading">Lifecycle Pillars</span>
+            <span class="sidebar-count-badge">13 Core</span>
+          </div>
+
+          <ul class="sidebar-nav" id="sidebar-pillar-list">
+            <li class="sidebar-item">
+              <button class="sidebar-btn active" data-pillar="pillar-1">
+                <span class="sidebar-icon">📁</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">1. My Library & Vault</span>
+                  <span class="sidebar-sub">0D Merkle Ledger • Vault</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-2">
+                <span class="sidebar-icon">💡</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">2. Research & Concept</span>
+                  <span class="sidebar-sub">1D ARI Redundancy • SVD Gate 1</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-3">
+                <span class="sidebar-icon">📐</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">3. Drafting & Blueprints</span>
+                  <span class="sidebar-sub">2D Vector PDF • Sheet Composer</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-4">
+                <span class="sidebar-icon">🏗️</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">4. Modeling & Geometry</span>
+                  <span class="sidebar-sub">3D CSG B-Rep • Orbit Turntable</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-5">
+                <span class="sidebar-icon">⏱️</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">5. Time & Scheduling</span>
+                  <span class="sidebar-sub">4D Critical Path • S-Curve</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-6">
+                <span class="sidebar-icon">💰</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">6. Cost & Budgeting</span>
+                  <span class="sidebar-sub">5D AHSP PUPR • Pareto Frontier</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-7">
+                <span class="sidebar-icon">🌱</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">7. Sustainability & LCA</span>
+                  <span class="sidebar-sub">6D Embodied Carbon • Green Steel</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-8">
+                <span class="sidebar-icon">🏢</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">8. Facility Management</span>
+                  <span class="sidebar-sub">7D Digital Twin • SHM Telemetry</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-9">
+                <span class="sidebar-icon">🛡️</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">9. Safety & Non-Linear Solver</span>
+                  <span class="sidebar-sub">8D Woodbury • Biaxial P-M • CQC</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-10">
+                <span class="sidebar-icon">♻️</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">10. Lean Construction</span>
+                  <span class="sidebar-sub">9D Cutting Stock CSO • BFD Scrap</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-11">
+                <span class="sidebar-icon">🤖</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">11. Industrialized DfMA</span>
+                  <span class="sidebar-sub">10D Modular Prefab • DSTV NC1</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-12">
+                <span class="sidebar-icon">🔮</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">12. Prediction & Reliability</span>
+                  <span class="sidebar-sub">FOSM Beta • FEMA P-58 Fragility</span>
+                </div>
+              </button>
+            </li>
+            <li class="sidebar-item">
+              <button class="sidebar-btn" data-pillar="pillar-13">
+                <span class="sidebar-icon">📊</span>
+                <div class="sidebar-text">
+                  <span class="sidebar-title">13. Results & Certification</span>
+                  <span class="sidebar-sub">Cryptographic Seal • Compliance</span>
+                </div>
+              </button>
+            </li>
+          </ul>
+
+          <div class="sidebar-footer">
+            <div><strong>Engine:</strong> Rust 1.80+ Core Engine</div>
+            <div><strong>Status:</strong> 58/58 Verified Tests (100%)</div>
+            <div style="color:var(--accent-green);">● Desktop Release v2.1.0 Active</div>
+          </div>
+        </aside>
+
+        <!-- WORKSPACE PANE (13 DOSSIERS) -->
+        <main class="macos-workspace" id="workspace-dossier-container">
+
+          <!-- PILLAR 1: MY LIBRARY & VAULT -->
+          <article class="pillar-dossier active" id="pillar-1">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 1</span>
+                <span class="dossier-tag green">0D Dimension</span>
+                <span class="dossier-tag purple">ISO 19650 Compliant</span>
+                <span class="dossier-tag orange">Cryptographic Ledger</span>
+              </div>
+              <h1 class="dossier-title">📁 My Library & Obsidian Engineering Vault</h1>
+              <p class="dossier-subtitle">
+                Obsidian-compliant hierarchical auto-taxonomy, Merkle-tree state chaining, reactive SHA-256 autosave persistence, and project BIM metadata catalog.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/vault.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/my_project.rs</code></div>
+                <div class="dossier-meta-item"><span>Standard:</span> <code>ISO 19650-1/2, RFC 6234 (SHA-256)</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                The Vault engine serves as the cryptographic backbone and persistent library for all structural models, analysis runs, and BIM project state. Unlike traditional CAD tools that rely on manual user saves and opaque proprietary formats, EigenGraph structures projects as an open Obsidian-compatible knowledge base with immutable SHA-256 state chaining.
+              </p>
+              <ul style="color:var(--text-secondary); margin-left:20px; line-height:1.7;">
+                <li><strong>Obsidian Auto-Taxonomy:</strong> Automatic generation of frontmatter YAML, Markdown project dossiers, and bidirectional wikilinks (<code>[[Element_ID]]</code>).</li>
+                <li><strong>Reactive State Persistence:</strong> Zero data loss debounced write-pipeline (\(\Delta t \ge 250\text{ ms}\)) without modal interruption.</li>
+                <li><strong>Cryptographic Versioning:</strong> Tamper-evident ledger chaining preventing retrospective alteration of structural audit calculations.</li>
+              </ul>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations & Merkle State Chaining</h3>
+              <div class="math-box">
+                <p><strong>1. SHA-256 Merkle Ledger State Chain:</strong></p>
+                $$H_0 = \text{SHA256}(\text{GenesisPayload})$$
+                $$H_k = \text{SHA256}\Big(H_{k-1} \parallel \text{Timestamp}_k \parallel \text{Payload}_k\Big)$$
+                <div class="math-caption">
+                  Every structural modification (e.g. member yield, load case adjustment, section substitution) produces a sequential cryptographic state hash \(H_k\) linked to its predecessor \(H_{k-1}\).
+                </div>
+              </div>
+
+              <div class="math-box">
+                <p><strong>2. Reactive Debounced Persistence Window:</strong></p>
+                $$\tau_{\text{save}} = \inf \{ t > t_0 \mid \dot{\mathcal{S}}(t) = 0 \land (t - t_{\text{last}}) \ge 250\text{ ms} \}$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(B)\)</div>
+                  <div class="complexity-label">SHA-256 Hashing</div>
+                  <div class="complexity-desc">Linear with respect to payload byte size \(B\).</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(1)\)</div>
+                  <div class="complexity-label">Audit Lookup</div>
+                  <div class="complexity-desc">Direct hash-table key access for member revisions.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(\log N)\)</div>
+                  <div class="complexity-label">Merkle Tree Verify</div>
+                  <div class="complexity-desc">Logarithmic verification for project sub-assemblies.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust Core Struct Definition: src/core/vault.rs</span><span>Rust 2021</span></div>
+<pre>pub struct InternalVault {
+    pub root_dir: PathBuf,
+    pub active_project: Option&lt;ProjectMetadata&gt;,
+    pub state_history: Vec&lt;VaultStateRecord&gt;,
+    pub merkle_root: [u8; 32],
+}
+
+impl InternalVault {
+    pub fn commit_state_chain(&amp;mut self, payload: &amp;[u8]) -&gt; [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(&amp;self.merkle_root);
+        hasher.update(payload);
+        let digest = hasher.finalize().into();
+        self.merkle_root = digest;
+        digest
+    }
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: Cryptographic Hash Chaining</h3>
+              <div class="controls-card">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:12px;">
+                  Test the SHA-256 Merkle chain generator. Enter project data or click the button to simulate structural modifications and observe real-time hash state progression.
+                </p>
+                <div style="display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+                  <input type="text" id="vault-input-data" class="titlebar-search" style="flex:1; min-width:260px;" value="Model Warren_24m: Node 4 Deflection = 12.4mm">
+                  <button class="btn btn-primary" onclick="simulateVaultHash();">⚡ Append & Chain Hash</button>
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle);">
+                  <div><strong>Previous State (H_k-1):</strong> <span id="vault-prev-hash" style="color:var(--accent-orange);">0000000000000000000000000000000000000000000000000000000000000000</span></div>
+                  <div style="margin-top:6px;"><strong>Active State Hash (H_k):</strong> <span id="vault-curr-hash" style="color:var(--accent-green);">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</span></div>
+                  <div style="margin-top:6px;"><strong>Chain Block Depth:</strong> <span id="vault-chain-depth" style="color:var(--accent-blue);">1</span> modifications recorded</div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 2: RESEARCH & CONCEPT (ARI REDUNDANCY) -->
+          <article class="pillar-dossier" id="pillar-2">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 2</span>
+                <span class="dossier-tag green">1D Dimension</span>
+                <span class="dossier-tag purple">Sherman-Morrison O(N²)</span>
+                <span class="dossier-tag orange">AISC 360-16 Appendix 8</span>
+              </div>
+              <h1 class="dossier-title">💡 Research & Adjusted Redundancy Index (ARI)</h1>
+              <p class="dossier-subtitle">
+                Spectral hat-matrix leverage \(h_e\), SVD Gate 1 kinematic mechanism guard, Euler geometric stiffness \(K_g(P)\), and alternate load path quantification.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/ari.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/research.rs</code></div>
+                <div class="dossier-meta-item"><span>Standard:</span> <code>AISC 360-16 App. 8, ASCE 7-16 Sec. 1.3</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                Traditional structural design relies on deterministic safety factors per individual member without quantifying system-wide reserve redundancy. If a primary load-bearing element suffers sudden fracture (due to fatigue, blast, impact, or seismic rupture), catastrophic progressive collapse can occur. The ARI engine performs rigorous Alternate Path Method (APM) audits in real-time.
+              </p>
+              <ul style="color:var(--text-secondary); margin-left:20px; line-height:1.7;">
+                <li><strong>Adjusted Redundancy Index (\(\text{ARI}\)):</strong> Normalized system redundancy score between 0.0 (mechanism/collapse) and 1.0 (infinitely redundant).</li>
+                <li><strong>Spectral Leverage \(h_e\):</strong> Diagonal value of the orthogonal projection operator measuring individual member criticality.</li>
+                <li><strong>Gate 1 Kinematic Guard:</strong> SVD singular value audit ensuring the post-fracture stiffness matrix remains positive definite (\(\sigma_{\min} > 10^{-6}\)).</li>
+              </ul>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations & Derivations</h3>
+              <div class="math-box">
+                <p><strong>1. System Adjusted Redundancy Index (ARI):</strong></p>
+                $$\text{ARI} = \frac{1}{M} \sum_{e=1}^M \big(1 - h_e\big) \cdot \mathbb{I}\big(\sigma_{\min}(K(\lambda_e = 0)) > 10^{-6}\big)$$
+                $$\text{CI} = 1 - \text{ARI} \quad \text{(Collapse Index)}$$
+              </div>
+
+              <div class="math-box">
+                <p><strong>2. Sherman-Morrison Fast Rank-1 Perturbation:</strong></p>
+                $$\big(K^0 - \gamma_e \mathbf{u}_e \mathbf{u}_e^T\big)^{-1} = (K^0)^{-1} + \frac{\gamma_e (K^0)^{-1} \mathbf{u}_e \mathbf{u}_e^T (K^0)^{-1}}{1 - \gamma_e \mathbf{u}_e^T (K^0)^{-1} \mathbf{u}_e}$$
+                $$h_e = \mathbf{u}_e^T (K^0)^{-1} \mathbf{u}_e = \sum_{j=1}^N \frac{(\mathbf{v}_j^T \mathbf{u}_e)^2}{\sigma_j}$$
+              </div>
+
+              <div class="math-box">
+                <p><strong>3. Second-Order Geometric Stiffness & \(B_1\) Amplification:</strong></p>
+                $$K_{\text{total}} = K_e + K_g(P), \quad B_1 = \frac{C_m}{1 - P_u / P_{e1}} \ge 1.0, \quad P_{e1} = \frac{\pi^2 E I}{(K L)^2}$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(N^2)\)</div>
+                  <div class="complexity-label">Sherman-Morrison Update</div>
+                  <div class="complexity-desc">Rank-1 post-fracture displacement update per member.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(N^3)\)</div>
+                  <div class="complexity-label">Baseline Factorization</div>
+                  <div class="complexity-desc">Only executed once during baseline pre-computation.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(M)\)</div>
+                  <div class="complexity-label">Global ARI Sweep</div>
+                  <div class="complexity-desc">Full redundancy audit across all \(M\) structural members.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust Core Implementation: src/core/ari.rs</span><span>Rust 2021</span></div>
+<pre>pub struct AriReport {
+    pub system_ari: f64,
+    pub collapse_index_ci: f64,
+    pub leverages: Vec&lt;f64&gt;,
+    pub is_gate1_stable: bool,
+    pub governing_member_id: usize,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: Warren Truss 24m APM Fracture</h3>
+              <div class="controls-card">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:12px;">
+                  Hover and click on any member in the canvas below to simulate sudden member fracture (\(\lambda_e = 0\)). The engine computes spectral leverage \(h_e\) and evaluates Gate 1 kinematic stability.
+                </p>
+                <div style="height:260px; background:#0c1017; border-radius:8px; border:1px solid var(--border-subtle); position:relative; overflow:hidden;">
+                  <canvas id="ari-canvas" style="width:100%; height:100%; display:block;"></canvas>
+                </div>
+                <div class="metric-grid" style="margin-top:14px;">
+                  <div class="metric-item">
+                    <div class="val" id="ari-val-min">0.720</div>
+                    <div class="lbl">System ARI (min)</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="val" id="ari-val-ci" style="color:var(--accent-orange);">0.280</div>
+                    <div class="lbl">Collapse Index (CI)</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="val" id="ari-val-status" style="color:var(--accent-green); font-size:1.1rem;">STABLE (Gate 1 Passed)</div>
+                    <div class="lbl">System Kinematic State</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 3: DRAFTING & BLUEPRINTS -->
+          <article class="pillar-dossier" id="pillar-3">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 3</span>
+                <span class="dossier-tag green">2D Dimension</span>
+                <span class="dossier-tag purple">Vector PDF 1.4</span>
+                <span class="dossier-tag orange">ISO 128 / ISO 5457</span>
+              </div>
+              <h1 class="dossier-title">📐 Drafting & Blueprints (2D Sheet Composer)</h1>
+              <p class="dossier-subtitle">
+                Sheet A101 technical drawing composer with zero-dependency vector PDF 1.4 generation, SVG serialization, and multi-viewport coordinate projections.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/parametric.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/parametric.rs</code></div>
+                <div class="dossier-meta-item"><span>Standard:</span> <code>ISO 128 (Technical Drawings), ISO 5457 (Sizes)</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                Parametric drafting connects 3D mathematical BIM models to official, permit-ready 2D engineering blueprints without third-party printer drivers or heavy external PDF libraries. The engine generates native vector streams directly in memory.
+              </p>
+              <ul style="color:var(--text-secondary); margin-left:20px; line-height:1.7;">
+                <li><strong>Multi-Viewport Composition:</strong> Scaled floor plans, section cuts A-A, Bill of Quantities (BoQ) schedules, and official Title Block (Kop Gambar).</li>
+                <li><strong>Vector Stream Synthesis:</strong> Native low-level PDF 1.4 postscript operators (<code>q</code>, <code>cm</code>, <code>re</code>, <code>m</code>, <code>l</code>, <code>S</code>).</li>
+                <li><strong>Affine Coordinate Transformations:</strong> Precise scale normalization from world meters to paper points (\(1\text{ pt} = 1/72\text{ inch}\)).</li>
+              </ul>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations & Paper Space Mapping</h3>
+              <div class="math-box">
+                <p><strong>1. Affine Model-to-Paper Transformation:</strong></p>
+                $$\begin{bmatrix} x_{\text{paper}} \\ y_{\text{paper}} \end{bmatrix} = s \cdot \begin{bmatrix} \cos\theta & -\sin\theta \\ \sin\theta & \cos\theta \end{bmatrix} \begin{bmatrix} x_{\text{model}} \\ y_{\text{model}} \end{bmatrix} + \begin{bmatrix} t_x \\ t_y \end{bmatrix}$$
+                <div class="math-caption">
+                  Where \(s\) is the sheet drawing scale (e.g. \(1:100 \implies s = 0.01 \times 72 / 0.0254\)), \(\theta\) is viewport rotation, and \(\mathbf{t}\) is viewport paper origin.
+                </div>
+              </div>
+
+              <div class="math-box">
+                <p><strong>2. Cohen-Sutherland Viewport Boundary Clipping:</strong></p>
+                $$\mathbf{p} \in \mathcal{V} \iff x_{\min} \le x_{\text{paper}} \le x_{\max} \;\land\; y_{\min} \le y_{\text{paper}} \le y_{\max}$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(V + E)\)</div>
+                  <div class="complexity-label">Vector PDF Generation</div>
+                  <div class="complexity-desc">Linear with total vertices and edges.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(1)\)</div>
+                  <div class="complexity-label">Viewport Clipping</div>
+                  <div class="complexity-desc">Per-segment Cohen-Sutherland outcode checking.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust Implementation: src/core/parametric.rs</span><span>Rust 2021</span></div>
+<pre>pub struct DrawingSheet {
+    pub sheet_size: SheetSize,
+    pub viewports: Vec&lt;Viewport2D&gt;,
+    pub title_block: TitleBlockData,
+}
+
+impl DrawingSheet {
+    pub fn export_pdf_stream(&amp;self) -&gt; Vec&lt;u8&gt; {
+        let mut pdf = PdfWriter::new();
+        for vp in &amp;self.viewports {
+            vp.render_vector_primitives(&amp;mut pdf);
+        }
+        pdf.finalize()
+    }
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: Viewport Scale Transformer</h3>
+              <div class="controls-card">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:12px;">
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Sheet Scale:</label>
+                    <select id="draft-scale-select" class="titlebar-search" onchange="updateDraftingTransform();">
+                      <option value="50">Scale 1 : 50</option>
+                      <option value="100" selected>Scale 1 : 100</option>
+                      <option value="200">Scale 1 : 200</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Model Span X (m):</label>
+                    <input type="range" id="draft-span-x" min="6" max="48" value="24" step="2" oninput="updateDraftingTransform();" style="width:100%;">
+                  </div>
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle);">
+                  <div><strong>Model Dimension:</strong> <span id="draft-res-model" style="color:var(--accent-blue);">24.0 m</span></div>
+                  <div style="margin-top:6px;"><strong>Paper Length on Sheet:</strong> <span id="draft-res-paper" style="color:var(--accent-green);">240.0 mm (680.3 pt)</span></div>
+                  <div style="margin-top:6px;"><strong>ISO 5457 A1 Margin Fit:</strong> <span id="draft-res-fit" style="color:var(--accent-green);">Passes Within Printable Area (841 x 594 mm)</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 4: MODELING & GEOMETRY -->
+          <article class="pillar-dossier" id="pillar-4">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 4</span>
+                <span class="dossier-tag green">3D Dimension</span>
+                <span class="dossier-tag purple">CSG Solid B-Rep</span>
+                <span class="dossier-tag orange">IFC 4.3 Compliant</span>
+              </div>
+              <h1 class="dossier-title">🏗️ Modeling & Geometry (3D Viewport)</h1>
+              <p class="dossier-subtitle">
+                3D CSG B-Rep solid Boolean subtractions for doors and windows, 360° interactive turntable orbit, solid profile extrusions, and real-time stress gradient contours.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/bim.rs & src/core/csg.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/build.rs</code></div>
+                <div class="dossier-meta-item"><span>Standard:</span> <code>buildingSMART IFC 4.3 (ISO 16739-1)</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                Combines computational solid geometry (CSG) with finite element mesh generation. Rather than representing structural elements as mere 1D stick lines, EigenGraph extrudes genuine 3D B-Rep polygonal solids with flange thicknesses, web cutouts, and physical door/window opening subtractions.
+              </p>
+              <ul style="color:var(--text-secondary); margin-left:20px; line-height:1.7;">
+                <li><strong>CSG Boolean Subtractions:</strong> Analytical geometric boolean operations cutting clean openings into structural walls and floor slabs.</li>
+                <li><strong>360° Turntable Orbit:</strong> Smooth mouse-controlled camera orbit, pan, and perspective zoom.</li>
+                <li><strong>Stress & Force Diagrams (P-M-V):</strong> 3D envelope representations of Normal Force (NFD), Shear Force (SFD), and Bending Moment (BMD).</li>
+              </ul>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations & Solid Boolean Geometry</h3>
+              <div class="math-box">
+                <p><strong>1. CSG Solid Boolean Subtraction:</strong></p>
+                $$\mathcal{V}_{\text{final}} = \mathcal{V}_{\text{wall}} \setminus \bigcup_{j=1}^K \mathcal{V}_{\text{opening}, j} = \big\{ \mathbf{p} \in \mathbb{R}^3 \mid \mathbf{p} \in \mathcal{V}_{\text{wall}} \;\land\; \mathbf{p} \notin \mathcal{V}_{\text{opening}, j} \; \forall j \big\}$$
+              </div>
+
+              <div class="math-box">
+                <p><strong>2. Camera Orbit Transformation & 3D Projection:</strong></p>
+                $$\mathbf{P}_{\text{screen}} = \mathbf{M}_{\text{proj}} \cdot \mathbf{M}_{\text{view}}(\theta_{\text{yaw}}, \theta_{\text{pitch}}, \mathbf{d}_{\text{cam}}) \cdot \mathbf{P}_{\text{world}}$$
+                $$\mathbf{R}(\theta_y, \theta_p) = \begin{bmatrix} \cos\theta_y & 0 & \sin\theta_y \\ 0 & 1 & 0 \\ -\sin\theta_y & 0 & \cos\theta_y \end{bmatrix} \begin{bmatrix} 1 & 0 & 0 \\ 0 & \cos\theta_p & -\sin\theta_p \\ 0 & \sin\theta_p & \cos\theta_p \end{bmatrix}$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(\log T)\)</div>
+                  <div class="complexity-label">Ray-Triangle Picking</div>
+                  <div class="complexity-desc">Sub-millisecond picking via 3D Bounding Volume Hierarchy.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(P \log P)\)</div>
+                  <div class="complexity-label">Depth Sorting</div>
+                  <div class="complexity-desc">Painter's algorithm sorting for shaded rasterization.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust CSG Solid B-Rep: src/core/csg.rs</span><span>Rust 2021</span></div>
+<pre>pub struct CsgSolid {
+    pub vertices: Vec&lt;[f32; 3]&gt;,
+    pub indices: Vec&lt;u32&gt;,
+    pub normals: Vec&lt;[f32; 3]&gt;,
+    pub material_id: u32,
+}
+
+impl CsgSolid {
+    pub fn subtract_opening(&amp;self, opening: &amp;CsgBox) -&gt; CsgSolid {
+        // Boolean subtraction generating boundary polygon triangulation
+        triangulate_boolean_difference(self, opening)
+    }
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: 3D Diagrid Orbit Turntable</h3>
+              <div class="controls-card">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:12px;">
+                  Click and drag inside the canvas below to rotate the 3D Diagrid Skyscraper structural model 360°.
+                </p>
+                <div style="height:280px; background:#0c1017; border-radius:8px; border:1px solid var(--border-subtle); position:relative; overflow:hidden;">
+                  <canvas id="orbit-turntable-canvas" style="width:100%; height:100%; display:block; cursor:grab;"></canvas>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 5: TIME & SCHEDULING (4D BIM) -->
+          <article class="pillar-dossier" id="pillar-5">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 5</span>
+                <span class="dossier-tag green">4D Dimension</span>
+                <span class="dossier-tag purple">Critical Path Method (CPM)</span>
+                <span class="dossier-tag orange">PMBOK / ISO 21500</span>
+              </div>
+              <h1 class="dossier-title">⏱️ Time & Scheduling (4D BIM Construction Sequencing)</h1>
+              <p class="dossier-subtitle">
+                4D Critical Path Method (CPM), forward/backward passes, Total Float and Free Float, dynamic S-Curve earned value metrics, and 4D construction phasing.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/schedule.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/planning.rs</code></div>
+                <div class="dossier-meta-item"><span>Standard:</span> <code>PMBOK 7th Ed, ISO 21500 (Project Management)</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                4D BIM links spatial elements in the structural model with their construction schedule activities. The scheduler runs formal topological graph algorithms to compute the project Critical Path and identify activities with zero float that govern overall building completion.
+              </p>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Forward & Backward Passes</h3>
+              <div class="math-box">
+                <p><strong>1. CPM Forward Pass (Early Dates):</strong></p>
+                $$\text{ES}_j = \max_{i \in \text{Pred}(j)} (\text{EF}_i), \quad \text{EF}_j = \text{ES}_j + D_j$$
+              </div>
+              <div class="math-box">
+                <p><strong>2. CPM Backward Pass (Late Dates) & Floats:</strong></p>
+                $$\text{LF}_i = \min_{j \in \text{Succ}(i)} (\text{LS}_j), \quad \text{LS}_i = \text{LF}_i - D_i$$
+                $$\text{TF}_i = \text{LF}_i - \text{EF}_i = \text{LS}_i - \text{ES}_i, \quad \text{FF}_i = \min_{j \in \text{Succ}(i)} (\text{ES}_j) - \text{EF}_i$$
+                $$\text{Critical Activity} \iff \text{TF}_i = 0$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(V + E)\)</div>
+                  <div class="complexity-label">CPM DAG Traversal</div>
+                  <div class="complexity-desc">Linear topological sort over activities and precedence dependencies.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust Scheduling Struct: src/core/schedule.rs</span><span>Rust 2021</span></div>
+<pre>pub struct ScheduleActivity {
+    pub id: String,
+    pub duration_days: u32,
+    pub early_start: u32,
+    pub early_finish: u32,
+    pub late_start: u32,
+    pub late_finish: u32,
+    pub total_float: u32,
+    pub is_critical: bool,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: 4D CPM Float Calculator</h3>
+              <div class="controls-card">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px;">
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Foundation Duration (days):</label>
+                    <input type="number" id="cpm-dur-1" value="14" min="1" max="90" class="titlebar-search" onchange="runCpmCalc();">
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Steel Erection (days):</label>
+                    <input type="number" id="cpm-dur-2" value="28" min="1" max="180" class="titlebar-search" onchange="runCpmCalc();">
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Secondary Cladding (days):</label>
+                    <input type="number" id="cpm-dur-3" value="18" min="1" max="90" class="titlebar-search" onchange="runCpmCalc();">
+                  </div>
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle);">
+                  <div><strong>Critical Path Total Duration:</strong> <span id="cpm-res-duration" style="color:var(--accent-green);">42 Days</span></div>
+                  <div style="margin-top:6px;"><strong>Secondary Cladding Float (TF):</strong> <span id="cpm-res-float" style="color:var(--accent-blue);">10 Days (Non-Critical)</span></div>
+                  <div style="margin-top:6px;"><strong>Critical Activities:</strong> <span style="color:var(--accent-orange);">Foundation -> Steel Erection</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 6: COST & BUDGETING (5D BIM) -->
+          <article class="pillar-dossier" id="pillar-6">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 6</span>
+                <span class="dossier-tag green">5D Dimension</span>
+                <span class="dossier-tag purple">AHSP PUPR 2024</span>
+                <span class="dossier-tag orange">Pareto Frontier Multi-Objective</span>
+              </div>
+              <h1 class="dossier-title">💰 Cost & Budgeting (5D BIM Cost-ARI Optimization)</h1>
+              <p class="dossier-subtitle">
+                5D Dynamic RAB AHSP PUPR 2023/2024 unit pricing, automated Quantity Take-Off (QTO), and multi-objective Cost-ARI Pareto frontier optimization.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/cost.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/planning.rs</code></div>
+                <div class="dossier-meta-item"><span>Standard:</span> <code>Permen PUPR No. 8/2023, AACE International 18R-97</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                5D BIM links 3D geometric solid volumes with unit cost breakdown databases (Indonesian AHSP PUPR standards). It performs multi-objective optimization: finding the structural design that maximizes safety/redundancy (ARI) while minimizing capital cost (RAB).
+              </p>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Unit Pricing & Pareto Optimization</h3>
+              <div class="math-box">
+                <p><strong>1. Unit Price Analysis (AHSP PUPR):</strong></p>
+                $$\text{HSP}_k = \sum_{i} \alpha_i \cdot U_{\text{labor}, i} + \sum_{j} \beta_j \cdot P_{\text{material}, j} + \sum_{m} \gamma_m \cdot E_{\text{equipment}, m}$$
+                $$\text{RAB} = \sum_{k=1}^K \big(Q_k \times \text{HSP}_k\big) \times (1 + \text{Overhead} + \text{Tax})$$
+              </div>
+              <div class="math-box">
+                <p><strong>2. Bi-Objective Pareto Optimization Formulation:</strong></p>
+                $$\min_{\mathbf{x} \in \mathcal{X}} \Big\{ \mathcal{C}(\mathbf{x}), \; -\text{ARI}(\mathbf{x}) \Big\} \quad \text{s.t.} \quad \sigma_e(\mathbf{x}) \le \phi F_y, \; \Delta_{\max} \le \frac{L}{360}$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(K)\)</div>
+                  <div class="complexity-label">QTO Cost Accumulation</div>
+                  <div class="complexity-desc">Linear across structural bill-of-quantities line items.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(P \log P)\)</div>
+                  <div class="complexity-label">Pareto Sort</div>
+                  <div class="complexity-desc">Non-dominated sorting of design alternatives.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust Cost Engine: src/core/cost.rs</span><span>Rust 2021</span></div>
+<pre>pub struct RabLineItem {
+    pub item_code: String,
+    pub description: String,
+    pub quantity: f64,
+    pub unit: String,
+    pub unit_price: f64,
+    pub total_price: f64,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: 5D Dynamic RAB Estimator</h3>
+              <div class="controls-card">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:12px;">
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Structural Steel Volume (Tons):</label>
+                    <input type="range" id="rab-steel-vol" min="10" max="500" value="120" oninput="updateRabCalc();" style="width:100%;">
+                    <span id="rab-steel-val" style="font-size:0.8rem; color:var(--accent-blue);">120 Tons</span>
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Steel Rate (IDR/kg):</label>
+                    <input type="number" id="rab-steel-rate" value="28500" class="titlebar-search" onchange="updateRabCalc();">
+                  </div>
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle);">
+                  <div><strong>Total Material Cost:</strong> <span id="rab-res-subtotal" style="color:var(--accent-green);">IDR 3,420,000,000</span></div>
+                  <div style="margin-top:6px;"><strong>Estimated RAB (+15% PUPR Overhead):</strong> <span id="rab-res-total" style="color:var(--accent-blue);">IDR 3,933,000,000</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 7: SUSTAINABILITY & LCA (6D BIM) -->
+          <article class="pillar-dossier" id="pillar-7">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 7</span>
+                <span class="dossier-tag green">6D Dimension</span>
+                <span class="dossier-tag purple">EN 15978 / ISO 14040</span>
+                <span class="dossier-tag orange">Green Steel LCA</span>
+              </div>
+              <h1 class="dossier-title">🌱 Sustainability & Embodied Carbon (6D BIM)</h1>
+              <p class="dossier-subtitle">
+                Cradle-to-gate (A1-A3) embodied carbon lifecycle assessment (LCA), green steel route comparisons (BF-BOF, EAF, H2-DRI), and carbon-redundancy trade-off analysis.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/carbon.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/sustainability.rs</code></div>
+                <div class="dossier-meta-item"><span>Standard:</span> <code>EN 15978 (Building LCA), ISO 14040/44</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                Calculates embodied carbon emissions associated with raw material extraction, transport, and manufacturing (Modules A1-A3). Engineers can evaluate the carbon footprint reduction achieved by shifting from coal blast furnace steel (BF-BOF) to scrap electric arc furnace (EAF) or green hydrogen direct reduced iron (H2-DRI).
+              </p>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Embodied Carbon & Production Routes</h3>
+              <div class="math-box">
+                <p><strong>1. A1-A3 Embodied Carbon Accumulation:</strong></p>
+                $$\text{EC}_{\text{total}} = \sum_{m=1}^M \text{Mass}_m \times \text{ECF}_m \quad (\text{kg CO}_2\text{e})$$
+                <div class="math-caption">
+                  Production Route Emission Coefficients: \(\text{ECF}_{\text{BF-BOF}} \approx 2.30\text{ kg CO}_2\text{e/kg}\), \(\text{ECF}_{\text{EAF}} \approx 0.65\text{ kg CO}_2\text{e/kg}\), \(\text{ECF}_{\text{H2-DRI}} \approx 0.15\text{ kg CO}_2\text{e/kg}\).
+                </div>
+              </div>
+              <div class="math-box">
+                <p><strong>2. Decarbonization Efficiency Ratio:</strong></p>
+                $$\Delta_{\text{CO}_2} = \frac{\text{EC}_{\text{BF-BOF}} - \text{EC}_{\text{Green}}}{\text{EC}_{\text{BF-BOF}}} \times 100\%$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(M)\)</div>
+                  <div class="complexity-label">Carbon Accumulation</div>
+                  <div class="complexity-desc">Linear summation over modeled material tonnage.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust Carbon LCA: src/core/carbon.rs</span><span>Rust 2021</span></div>
+<pre>pub struct CarbonLcaReport {
+    pub total_mass_kg: f64,
+    pub bfbof_carbon_kgco2e: f64,
+    pub eaf_carbon_kgco2e: f64,
+    pub h2dri_carbon_kgco2e: f64,
+    pub carbon_saving_pct: f64,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: Green Steel Route Comparator</h3>
+              <div class="controls-card">
+                <div>
+                  <label style="font-size:0.75rem; color:var(--text-muted);">Total Building Steel Tonnage:</label>
+                  <input type="range" id="carbon-tonnage" min="50" max="2000" value="350" step="25" oninput="updateCarbonCalc();" style="width:100%;">
+                  <span id="carbon-tonnage-val" style="font-size:0.8rem; color:var(--accent-blue);">350 Metric Tons</span>
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle); margin-top:12px;">
+                  <div><strong>Standard BF-BOF Route:</strong> <span id="carbon-res-bfbof" style="color:var(--accent-red);">805.0 Tons CO2e</span></div>
+                  <div style="margin-top:6px;"><strong>Scrap-based EAF Route:</strong> <span id="carbon-res-eaf" style="color:var(--accent-orange);">227.5 Tons CO2e (-71.7%)</span></div>
+                  <div style="margin-top:6px;"><strong>Green H2-DRI Route:</strong> <span id="carbon-res-h2" style="color:var(--accent-green);">52.5 Tons CO2e (-93.5% Savings!)</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 8: FACILITY MANAGEMENT (7D BIM) -->
+          <article class="pillar-dossier" id="pillar-8">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 8</span>
+                <span class="dossier-tag green">7D Dimension</span>
+                <span class="dossier-tag purple">COBie 2.4 / ISO 55000</span>
+                <span class="dossier-tag orange">Digital Twin SHM</span>
+              </div>
+              <h1 class="dossier-title">🏢 Facility Management & Digital Twin (7D BIM)</h1>
+              <p class="dossier-subtitle">
+                Structural Health Monitoring (SHM) strain sensor telemetry, COBie asset lifecycle registry, Weibull predictive maintenance, and crack propagation laws.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/facility.rs</code></div>
+                <div class="dossier-meta-item"><span>Standards:</span> <code>COBie 2.4, ISO 19650-3, ISO 55000 (Asset Mgmt)</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                7D BIM connects the operational phase with the structural engineering model. Real-time strain gauge telemetry streamed from physical IoT sensors is matched against the FEM numerical model to detect damage accumulation, fatigue micro-cracking, and schedule proactive maintenance before failure.
+              </p>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Sensor Telemetry & Reliability Hazard</h3>
+              <div class="math-box">
+                <p><strong>1. Real-Time Strain-to-Stress Gauge Conversion:</strong></p>
+                $$\sigma(t) = E \cdot \epsilon(t) \quad \text{(Hooke's Law)}$$
+              </div>
+              <div class="math-box">
+                <p><strong>2. Reliability-Centered Predictive Maintenance (Weibull Hazard):</strong></p>
+                $$h(t) = \frac{\beta}{\eta} \left(\frac{t}{\eta}\right)^{\beta - 1}, \quad F(t) = 1 - \exp\left(-\left(\frac{t}{\eta}\right)^\beta\right)$$
+                <div class="math-caption">
+                  Where \(\beta\) is the shape parameter (\(\beta > 1\) indicates wear-out degradation) and \(\eta\) is characteristic life.
+                </div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(S)\)</div>
+                  <div class="complexity-label">Sensor Ingestion</div>
+                  <div class="complexity-desc">Stream ingestion per telemetry frame across \(S\) sensor channels.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Facility Management Module: src/views/facility.rs</span><span>Rust 2021</span></div>
+<pre>pub struct ShmSensorNode {
+    pub sensor_id: String,
+    pub channel_type: SensorType, // StrainGauge, Accelerometer, Tiltmeter
+    pub raw_microstrain: f64,
+    pub calculated_stress_mpa: f64,
+    pub alert_threshold_mpa: f64,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: Digital Twin Strain Telemetry</h3>
+              <div class="controls-card">
+                <div>
+                  <label style="font-size:0.75rem; color:var(--text-muted);">Measured Live Microstrain (\(\mu\epsilon\)):</label>
+                  <input type="range" id="shm-strain" min="0" max="2000" value="480" oninput="updateShmCalc();" style="width:100%;">
+                  <span id="shm-strain-val" style="font-size:0.8rem; color:var(--accent-blue);">480 με</span>
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle); margin-top:12px;">
+                  <div><strong>Live Member Stress (\(E = 200\text{ GPa}\)):</strong> <span id="shm-res-stress" style="color:var(--accent-green);">96.0 MPa</span></div>
+                  <div style="margin-top:6px;"><strong>Safety Ratio vs Yield (\(F_y = 345\text{ MPa}\)):</strong> <span id="shm-res-dcr" style="color:var(--accent-blue);">DCR = 0.278 (72.2% Capacity Reserve)</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 9: SAFETY & NON-LINEAR SOLVER (8D BIM) -->
+          <article class="pillar-dossier" id="pillar-9">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 9</span>
+                <span class="dossier-tag green">8D Dimension</span>
+                <span class="dossier-tag purple">Non-Linear Solver</span>
+                <span class="dossier-tag orange">SNI 2847 / SNI 1726 / AISC 360</span>
+              </div>
+              <h1 class="dossier-title">🛡️ Safety & Non-Linear Mechanics Solver (8D BIM)</h1>
+              <p class="dossier-subtitle">
+                Sherman-Morrison / Woodbury post-yield redistribution, 3D Biaxial \(P-M_x-M_y\) concrete column interaction surface, and dynamic response spectrum modal combinations (CQC & SRSS).
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Core Engines:</span> <code>src/core/nonlinear.rs, concrete.rs, modal.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/analyze.rs</code></div>
+                <div class="dossier-meta-item"><span>Standards:</span> <code>SNI 2847:2019, SNI 1726:2019, ACI 318-19, ASCE 7-16</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                Pillar 9 is the computational crown jewel of EigenGraph. Upgraded in <strong>v2.1.0</strong>, it unifies non-linear matrix perturbation with international design code checks across reinforced concrete columns, structural steel members, and earthquake dynamic modal responses.
+              </p>
+              <ul style="color:var(--text-secondary); margin-left:20px; line-height:1.7;">
+                <li><strong>Woodbury Non-Linear Redistribution:</strong> Exact force shedding \(\Delta N_i\) from plastified members into secondary load paths without full stiffness refactorization.</li>
+                <li><strong>3D Biaxial \(P-M_x-M_y\) Interaction Surface:</strong> Bresler reciprocal load method and PCA load contour exponent \(\alpha\) per SNI 2847:2019 / ACI 318-19.</li>
+                <li><strong>Dynamic Modal Combinations:</strong> Der Kiureghian CQC and SRSS modal combinations with 85% static base shear code scaling per SNI 1726:2019 Pasal 7.9.4.1.</li>
+              </ul>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations & Derivations</h3>
+              
+              <div class="math-box">
+                <p><strong>1. Sherman-Morrison / Woodbury Non-Linear Post-Yield Matrix Redistribution:</strong></p>
+                $$(K^0 + U C V^T)^{-1} = (K^0)^{-1} - (K^0)^{-1} U \big(C^{-1} + V^T (K^0)^{-1} U\big)^{-1} V^T (K^0)^{-1}$$
+                $$\Delta N_i = \lambda N_i^0 - N_i, \quad \text{RRR}(\lambda) = \frac{N_i(\lambda)}{N_i^0}, \quad \mu = \frac{\Delta_{\text{plastic}}}{\Delta_{\text{yield}}}$$
+                <div class="math-caption">
+                  Enables rapid \(O(N^2)\) post-yield recalculations, tracking redistributed load shedding into alternate paths while evaluating plastic ductility demand \(\mu\).
+                </div>
+              </div>
+
+              <div class="math-box">
+                <p><strong>2. 3D Biaxial \(P-M_x-M_y\) Concrete Interaction Surface (SNI 2847 / ACI 318):</strong></p>
+                $$\frac{1}{\phi P_n} = \frac{1}{\phi P_{nx}} + \frac{1}{\phi P_{ny}} - \frac{1}{\phi P_0} \quad \text{(Bresler Reciprocal Formula)}$$
+                $$\left(\frac{M_{ux}}{\phi M_{nx}}\right)^\alpha + \left(\frac{M_{uy}}{\phi M_{ny}}\right)^\alpha \le 1.0 \quad \text{(PCA Load Contour Envelope)}$$
+                $$\alpha = 1.0 + \left(\frac{P_u}{\phi P_{n0}} - 0.10\right) \frac{0.50}{0.70}, \quad 1.0 \le \alpha \le 1.55$$
+              </div>
+
+              <div class="math-box">
+                <p><strong>3. Dynamic Response Spectrum Modal Combinations (SNI 1726:2019 Pasal 7.9.3):</strong></p>
+                $$V_{\text{CQC}} = \sqrt{\sum_{i=1}^n \sum_{j=1}^n V_i \, \rho_{ij} \, V_j}, \quad \rho_{ij} = \frac{8 \xi^2 (1 + r) r^{3/2}}{(1 - r^2)^2 + 4 \xi^2 r (1 + r)^2}, \quad r = \frac{\omega_j}{\omega_i}$$
+                $$V_{\text{SRSS}} = \sqrt{\sum_{i=1}^n V_i^2}, \quad \eta = \max\left(1.0, \; \frac{0.85 V_{\text{static}}}{V_{\text{dynamic}}}\right)$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(N^2)\)</div>
+                  <div class="complexity-label">Woodbury Rank-1 Update</div>
+                  <div class="complexity-desc">Non-linear load shedding without global stiffness inversion.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(K \log K)\)</div>
+                  <div class="complexity-label">Modal Eigensolver</div>
+                  <div class="complexity-desc">Lanczos extraction of governing natural vibration modes.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(24)\)</div>
+                  <div class="complexity-label">PCA Contour Slice</div>
+                  <div class="complexity-desc">Radial evaluation of \(M_x - M_y\) boundary points.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust Solver Implementations: src/core/</span><span>Rust 2021</span></div>
+<pre>// 1. Nonlinear Woodbury Report (src/core/nonlinear.rs)
+pub struct WoodburyDisruptionReport {
+    pub disrupted_element_id: usize,
+    pub lambda_val: f64,
+    pub stability_margin_ms: f64,
+    pub redistributed_force_delta_n_kn: f64,
+    pub residual_reserve_ratio_rrr: f64,
+    pub ductility_demand_mu: f64,
+    pub non_linear_ari: f64,
+    pub is_mechanism: bool,
+}
+
+// 2. Concrete Biaxial P-M-M Report (src/core/concrete.rs)
+pub struct BiaxialPmReport {
+    pub pu_kn: f64,
+    pub mux_knm: f64,
+    pub muy_knm: f64,
+    pub phi_mnx_knm: f64,
+    pub phi_mny_knm: f64,
+    pub bresler_phi_pn_kn: f64,
+    pub alpha_exponent: f64,
+    pub biaxial_dcr: f64,
+    pub is_safe: bool,
+    pub contour_envelope: Vec&lt;(f64, f64)&gt;,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: Non-Linear & Biaxial Mechanics</h3>
+              
+              <!-- TABBED SIMULATOR FOR PILLAR 9 -->
+              <div class="controls-card">
+                <div style="display:flex; gap:10px; margin-bottom:14px; border-bottom:1px solid var(--border-subtle); padding-bottom:8px;">
+                  <button class="btn btn-secondary active" id="btn-sub-woodbury" onclick="switchPillar9Sub('woodbury');">🔬 1. Woodbury Redistribution</button>
+                  <button class="btn btn-secondary" id="btn-sub-concrete" onclick="switchPillar9Sub('concrete');">🏛️ 2. Biaxial P-Mx-My Contour</button>
+                  <button class="btn btn-secondary" id="btn-sub-modal" onclick="switchPillar9Sub('modal');">🌊 3. CQC Modal Dynamics</button>
+                </div>
+
+                <!-- SUB 1: WOODBURY -->
+                <div id="sub-panel-woodbury">
+                  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:12px;">
+                    <div>
+                      <label style="font-size:0.75rem; color:var(--text-muted);">Residual Capacity \(\lambda\):</label>
+                      <input type="range" id="wdb-lambda" min="0" max="1" value="0.2" step="0.05" oninput="updateWoodburySim();" style="width:100%;">
+                      <span id="wdb-lambda-val" style="font-size:0.8rem; color:var(--accent-blue);">λ = 0.20</span>
+                    </div>
+                    <div>
+                      <label style="font-size:0.75rem; color:var(--text-muted);">Baseline Member Force \(N_i^0\) (kN):</label>
+                      <input type="number" id="wdb-n0" value="450" class="titlebar-search" onchange="updateWoodburySim();">
+                    </div>
+                  </div>
+                  <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle);">
+                    <div><strong>Redistributed Load Shedding (ΔN):</strong> <span id="wdb-res-dn" style="color:var(--accent-orange);">360.00 kN Shed to Alternate Path</span></div>
+                    <div style="margin-top:6px;"><strong>Residual Reserve Ratio (RRR):</strong> <span id="wdb-res-rrr" style="color:var(--accent-blue);">0.200</span></div>
+                    <div style="margin-top:6px;"><strong>Plastic Ductility Demand (μ):</strong> <span id="wdb-res-mu" style="color:var(--accent-green);">1.85 (Ductile Redistribution)</span></div>
+                  </div>
+                </div>
+
+                <!-- SUB 2: BIAXIAL CONCRETE -->
+                <div id="sub-panel-concrete" style="display:none;">
+                  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-bottom:12px;">
+                    <div>
+                      <label style="font-size:0.75rem; color:var(--text-muted);">Axial Load Pu (kN):</label>
+                      <input type="number" id="biax-pu" value="1200" class="titlebar-search" onchange="updateBiaxialSim();">
+                    </div>
+                    <div>
+                      <label style="font-size:0.75rem; color:var(--text-muted);">Moment Mux (kNm):</label>
+                      <input type="number" id="biax-mux" value="160" class="titlebar-search" onchange="updateBiaxialSim();">
+                    </div>
+                    <div>
+                      <label style="font-size:0.75rem; color:var(--text-muted);">Moment Muy (kNm):</label>
+                      <input type="number" id="biax-muy" value="110" class="titlebar-search" onchange="updateBiaxialSim();">
+                    </div>
+                  </div>
+                  <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle);">
+                    <div><strong>PCA Exponent (α):</strong> <span id="biax-res-alpha" style="color:var(--accent-blue);">1.24</span></div>
+                    <div><strong>Bresler Reciprocal Capacity (φPn):</strong> <span id="biax-res-pn" style="color:var(--accent-green);">1842.5 kN</span></div>
+                    <div style="margin-top:6px;"><strong>Biaxial DCR:</strong> <span id="biax-res-dcr" style="color:var(--accent-green);">0.785 (SAFE ≤ 1.00)</span></div>
+                  </div>
+                </div>
+
+                <!-- SUB 3: CQC MODAL -->
+                <div id="sub-panel-modal" style="display:none;">
+                  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px;">
+                    <div>
+                      <label style="font-size:0.75rem; color:var(--text-muted);">Damping Ratio \(\xi\):</label>
+                      <input type="range" id="cqc-damp" min="0.01" max="0.10" value="0.05" step="0.01" oninput="updateModalSim();" style="width:100%;">
+                      <span id="cqc-damp-val" style="font-size:0.8rem; color:var(--accent-blue);">ξ = 0.05 (5% RC)</span>
+                    </div>
+                  </div>
+                  <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle);">
+                    <div><strong>CQC Base Shear:</strong> <span id="cqc-res-cqc" style="color:var(--accent-blue);">412.8 kN</span></div>
+                    <div><strong>SRSS Base Shear:</strong> <span id="cqc-res-srss" style="color:var(--text-secondary);">398.2 kN</span></div>
+                    <div style="margin-top:6px;"><strong>SNI 1726 85% Static Base Shear Check:</strong> <span id="cqc-res-check" style="color:var(--accent-green);">Vt ≥ 0.85 Vs (Satisfied, Scale Factor = 1.000)</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 10: LEAN CONSTRUCTION & CSO -->
+          <article class="pillar-dossier" id="pillar-10">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 10</span>
+                <span class="dossier-tag green">9D Dimension</span>
+                <span class="dossier-tag purple">Gilmore-Gomory ILP</span>
+                <span class="dossier-tag orange">Best-Fit Decreasing (BFD)</span>
+              </div>
+              <h1 class="dossier-title">♻️ Lean Construction & Cutting Stock Optimizer (CSO)</h1>
+              <p class="dossier-subtitle">
+                1D Cutting Stock Optimization, heuristic Best-Fit Decreasing rebar packing, residual scrap minimization (\(\le 2.5\%\)), and automated Bar Bending Schedules (BBS).
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/cso.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/lean.rs</code></div>
+                <div class="dossier-meta-item"><span>Standard:</span> <code>Lean Construction Last Planner, SNI 2847 BBS Detailing</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                On typical construction projects, rebar off-cut scrap waste exceeds 8% to 15% due to manual cutting habits. The CSO engine optimizes cutting patterns across standard 12.0m commercial stock lengths to minimize offcut waste below 2.5%, generating precise shop-floor Bar Bending Schedules (BBS).
+              </p>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Integer Linear Programming</h3>
+              <div class="math-box">
+                <p><strong>1. Gilmore-Gomory 1D Cutting Stock Problem Formulation:</strong></p>
+                $$\min \sum_{j=1}^P c_j x_j \quad \text{s.t.} \quad \sum_{j=1}^P a_{ij} x_j \ge d_i, \quad x_j \ge 0, \; x_j \in \mathbb{Z}$$
+                $$\text{Scrap Waste Ratio} = \frac{\sum_{j=1}^P x_j L_{\text{stock}} - \sum_{i=1}^m d_i l_i}{\sum_{j=1}^P x_j L_{\text{stock}}} \times 100\% \le 2.5\%$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(N \log N)\)</div>
+                  <div class="complexity-label">BFD Heuristic Sort</div>
+                  <div class="complexity-desc">Descending sort of rebar piece demand lengths.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(N \cdot B)\)</div>
+                  <div class="complexity-label">Bin Allocation</div>
+                  <div class="complexity-desc">Greedy bin search across active commercial stock bars.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust CSO Engine: src/core/cso.rs</span><span>Rust 2021</span></div>
+<pre>pub struct CsoReport {
+    pub stock_length_m: f64,
+    pub total_stock_bars_needed: usize,
+    pub total_scrap_waste_m: f64,
+    pub waste_percentage: f64,
+    pub cutting_patterns: Vec&lt;CuttingPattern&gt;,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: 1D CSO Rebar Cutter</h3>
+              <div class="controls-card">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px;">
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Stock Length L_stock (m):</label>
+                    <input type="number" id="cso-stock-len" value="12.0" step="0.5" class="titlebar-search" onchange="updateCsoCalc();">
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Cut Length 1 (m):</label>
+                    <input type="number" id="cso-c1" value="4.8" step="0.1" class="titlebar-search" onchange="updateCsoCalc();">
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Cut Length 2 (m):</label>
+                    <input type="number" id="cso-c2" value="3.5" step="0.1" class="titlebar-search" onchange="updateCsoCalc();">
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Cut Length 3 (m):</label>
+                    <input type="number" id="cso-c3" value="3.5" step="0.1" class="titlebar-search" onchange="updateCsoCalc();">
+                  </div>
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle);">
+                  <div><strong>Total Used per Stock Bar:</strong> <span id="cso-res-used" style="color:var(--accent-blue);">11.80 m / 12.00 m</span></div>
+                  <div style="margin-top:6px;"><strong>Residual Off-Cut Scrap:</strong> <span id="cso-res-scrap" style="color:var(--accent-green);">0.20 m (1.67% Waste — Meets &le; 2.5% Target)</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 11: INDUSTRIALIZED DFMA -->
+          <article class="pillar-dossier" id="pillar-11">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 11</span>
+                <span class="dossier-tag green">10D Dimension</span>
+                <span class="dossier-tag purple">DSTV NC1 Export</span>
+                <span class="dossier-tag orange">DfMA Modular Automation</span>
+              </div>
+              <h1 class="dossier-title">🤖 Industrialized Construction & DfMA (10D BIM)</h1>
+              <p class="dossier-subtitle">
+                Design for Manufacture & Assembly (DfMA) metric scoring, robotic welding trajectory planning, tolerance stack-up analysis, and automated CNC DSTV NC1 piece file generation.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/industrialized.rs</code></div>
+                <div class="dossier-meta-item"><span>Standards:</span> <code>DSTV NC1, AWS D1.1 (Welding), ISO 12100</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                Converts digital BIM structural members into physical manufacturing machine instructions (DSTV NC1 format). Tracks tolerance accumulation across modular pod assemblies to eliminate on-site clash reworks.
+              </p>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: DfMA Scoring & Tolerance Stack</h3>
+              <div class="math-box">
+                <p><strong>1. DfMA Standardization Metric Score:</strong></p>
+                $$\text{Index}_{\text{DfMA}} = \frac{\sum_{k=1}^K w_k \cdot N_{\text{modular}, k}}{N_{\text{total}}} \times 100$$
+              </div>
+              <div class="math-box">
+                <p><strong>2. Statistical Tolerance Stack-Up (Root-Sum-Squares):</strong></p>
+                $$\sigma_{\text{stack}} = \pm \sqrt{\sum_{i=1}^n \sigma_i^2}$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(P)\)</div>
+                  <div class="complexity-label">DSTV NC1 Parser</div>
+                  <div class="complexity-desc">Piece geometry serialization to NC1 blocks.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Industrialized Module: src/views/industrialized.rs</span><span>Rust 2021</span></div>
+<pre>pub struct DfmaAssemblyReport {
+    pub total_pieces: usize,
+    pub modular_fraction_pct: f64,
+    pub tolerance_rss_mm: f64,
+    pub dstv_nc1_stream: Vec&lt;u8&gt;,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: Tolerance Stack-Up Analyzer</h3>
+              <div class="controls-card">
+                <div>
+                  <label style="font-size:0.75rem; color:var(--text-muted);">Number of Stacked Sub-Assemblies:</label>
+                  <input type="range" id="dfma-count" min="2" max="16" value="6" oninput="updateDfmaCalc();" style="width:100%;">
+                  <span id="dfma-count-val" style="font-size:0.8rem; color:var(--accent-blue);">6 Assemblies</span>
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle); margin-top:12px;">
+                  <div><strong>Linear Worst-Case Tolerance (\(\pm 2.0\text{ mm}\)):</strong> <span id="dfma-res-linear" style="color:var(--accent-red);">&plusmn; 12.00 mm</span></div>
+                  <div style="margin-top:6px;"><strong>Statistical RSS Tolerance (\(\sigma_{\text{stack}}\)):</strong> <span id="dfma-res-rss" style="color:var(--accent-green);">&plusmn; 4.90 mm (60.8% Tighter Fit)</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 12: PREDICTION & RELIABILITY -->
+          <article class="pillar-dossier" id="pillar-12">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 12</span>
+                <span class="dossier-tag green">Prediction Dimension</span>
+                <span class="dossier-tag purple">FOSM Hasofer-Lind Beta</span>
+                <span class="dossier-tag orange">FEMA P-58 Fragility</span>
+              </div>
+              <h1 class="dossier-title">🔮 Prediction, Reliability & Fragility Curves</h1>
+              <p class="dossier-subtitle">
+                First-Order Second-Moment (FOSM) Hasofer-Lind reliability index \(\beta\), FEMA P-58 seismic fragility lognormal distribution curves, and 3D spatial clash detection.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/reliability.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/prediction.rs</code></div>
+                <div class="dossier-meta-item"><span>Standards:</span> <code>FEMA P-58, ISO 2394 (Reliability)</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                Probabilistic structural reliability analysis models material strengths and applied environmental loads as stochastic random variables. It computes the structural reliability index \(\beta\) and probability of failure \(P_f\), alongside FEMA P-58 post-earthquake damage fragility functions.
+              </p>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: FOSM & Fragility</h3>
+              <div class="math-box">
+                <p><strong>1. First-Order Second-Moment (FOSM) Reliability Index:</strong></p>
+                $$\beta = \frac{\mu_R - \mu_S}{\sqrt{\sigma_R^2 + \sigma_S^2}}, \quad P_f = \Phi(-\beta) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{-\beta} e^{-u^2/2} du$$
+                <div class="math-caption">
+                  Where \(\mu_R, \sigma_R\) are resistance mean and std deviation, and \(\mu_S, \sigma_S\) are load effect mean and std deviation.
+                </div>
+              </div>
+              <div class="math-box">
+                <p><strong>2. FEMA P-58 Lognormal Seismic Fragility Curve:</strong></p>
+                $$P(\text{DS} \ge \text{ds}_i \mid \text{IM}) = \Phi\left(\frac{\ln(\text{IM} / \theta_i)}{\beta_i}\right)$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(1)\)</div>
+                  <div class="complexity-label">FOSM Reliability</div>
+                  <div class="complexity-desc">Closed-form algebraic evaluation.</div>
+                </div>
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(N \log N)\)</div>
+                  <div class="complexity-label">Sweep & Prune Clash</div>
+                  <div class="complexity-desc">AABB 3D spatial collision detection.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Rust Reliability Engine: src/core/reliability.rs</span><span>Rust 2021</span></div>
+<pre>pub struct ReliabilityReport {
+    pub beta_index: f64,
+    pub failure_probability_pf: f64,
+    pub target_beta: f64,
+    pub meets_code_reliability: bool,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: FOSM Hasofer-Lind Beta Calculator</h3>
+              <div class="controls-card">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px;">
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Mean Capacity \(\mu_R\) (kN):</label>
+                    <input type="number" id="fosm-mr" value="850" class="titlebar-search" onchange="updateFosmCalc();">
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Mean Load Demand \(\mu_S\) (kN):</label>
+                    <input type="number" id="fosm-ms" value="480" class="titlebar-search" onchange="updateFosmCalc();">
+                  </div>
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle);">
+                  <div><strong>Reliability Index (β):</strong> <span id="fosm-res-beta" style="color:var(--accent-green);">3.84 (High Reliability)</span></div>
+                  <div style="margin-top:6px;"><strong>Failure Probability (Pf):</strong> <span id="fosm-res-pf" style="color:var(--accent-blue);">6.18 &times; 10⁻⁵</span></div>
+                  <div style="margin-top:6px;"><strong>AISC / ASCE Benchmark:</strong> <span style="color:var(--accent-green);">Passes Target (β &ge; 3.0 for Dead+Live)</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <!-- PILLAR 13: RESULTS & CERTIFICATION -->
+          <article class="pillar-dossier" id="pillar-13">
+            <div class="dossier-hero">
+              <div class="dossier-tag-row">
+                <span class="dossier-tag blue">Pillar 13</span>
+                <span class="dossier-tag green">Certification Dimension</span>
+                <span class="dossier-tag purple">HMAC-SHA256 Seal</span>
+                <span class="dossier-tag orange">Multi-Code Matrix</span>
+              </div>
+              <h1 class="dossier-title">📊 Results, Certification & Audit Dossier</h1>
+              <p class="dossier-subtitle">
+                Official structural health audit dossier, cryptographic HMAC-SHA256 audit seal, comprehensive SNI/AISC code compliance matrix, and IFC 4.3 structural report export.
+              </p>
+              <div class="dossier-meta-bar">
+                <div class="dossier-meta-item"><span>Source File:</span> <code>src/core/interop.rs</code></div>
+                <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/results.rs</code></div>
+                <div class="dossier-meta-item"><span>Standards:</span> <code>ISO/IEC 27001, buildingSMART IFC 4.3, SNI 2847/1726, AISC 360</code></div>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
+              <p style="color:var(--text-secondary); margin-bottom:12px;">
+                The Results pillar synthesizes all 12 preceding dimensions into an immutable, legally certifiable Structural Audit Certificate. It produces tamper-evident calculation reports stamped with an HMAC-SHA256 signature that verifies no post-audit tampering occurred.
+              </p>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Cryptographic Certification Seal</h3>
+              <div class="math-box">
+                <p><strong>1. Cryptographic HMAC-SHA256 Structural Audit Seal:</strong></p>
+                $$\text{AuditSeal} = \text{HMAC-SHA256}\Big(\text{ProjID} \parallel \text{ARI}_{\min} \parallel \text{MaxDCR} \parallel \text{CodeChecks}, \; \mathcal{K}_{\text{secret}}\Big)$$
+              </div>
+              <div class="math-box">
+                <p><strong>2. Multi-Code Structural Compliance Ratio:</strong></p>
+                $$\text{ComplianceRatio} = \min_{c \in \mathcal{C}} \left(\frac{\text{Capacity}_c}{\text{Demand}_c}\right) \ge 1.00$$
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">⚡ Computational Complexity & Codebase Mapping</h3>
+              <div class="complexity-grid">
+                <div class="complexity-card">
+                  <div class="complexity-val">\(\mathcal{O}(C)\)</div>
+                  <div class="complexity-label">Multi-Code Audit</div>
+                  <div class="complexity-desc">Aggregation across \(C\) structural limit states.</div>
+                </div>
+              </div>
+
+              <div class="code-box">
+                <div class="code-box-header"><span>Certification Seal: src/core/interop.rs</span><span>Rust 2021</span></div>
+<pre>pub struct StructuralCertificationRecord {
+    pub project_name: String,
+    pub governing_ari: f64,
+    pub governing_dcr: f64,
+    pub hmac_sha256_seal: String,
+    pub is_certified: bool,
+}</pre>
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <h3 class="dossier-card-title">🧪 Interactive Verification Lab: Live Audit Seal Stamping</h3>
+              <div class="controls-card">
+                <div>
+                  <label style="font-size:0.75rem; color:var(--text-muted);">Project Certification Name:</label>
+                  <input type="text" id="cert-proj-name" value="Jakarta Skyscraper Tower-A" class="titlebar-search" oninput="updateAuditSeal();">
+                </div>
+                <div style="background:#090b10; padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:0.8rem; border:1px solid var(--border-subtle); margin-top:12px;">
+                  <div><strong>Governing ARI:</strong> <span style="color:var(--accent-blue);">0.842 (Redundant)</span></div>
+                  <div><strong>Peak Biaxial DCR:</strong> <span style="color:var(--accent-green);">0.785 (Safe &le; 1.00)</span></div>
+                  <div style="margin-top:6px;"><strong>HMAC-SHA256 Cryptographic Audit Seal:</strong></div>
+                  <div id="cert-res-seal" style="color:var(--accent-green); word-break:break-all; font-size:0.75rem; margin-top:4px;">
+                    e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </main>
       </div>
     </div>
-  </nav>
-
-  <!-- Mobile Drawer Menu -->
-  <div class="mobile-menu">
-    <a href="#updates" data-view-target="view-changelog">📌 What's New / Changelog</a>
-    <a href="#sandbox" data-view-target="view-playground">🧪 Interactive Lab (5 Demos)</a>
-    <a href="#suite" data-view-target="view-pillars">🏛️ 10D BIM Suite</a>
-    <a href="#benchmarks">⚡ Numerical Benchmarks</a>
-    <a href="#download">📦 Downloads</a>
-    <a href="https://github.com/EigenGraph/EigenGraph" target="_blank">GitHub Repository ↗</a>
   </div>
 
-  <!-- ================= HERO SECTION ================= -->
-  <header class="hero">
-    <!-- Official Research Disclaimer Banner -->
-    <div class="disclaimer-banner">
-      <span class="disclaimer-badge">⚠️ Notice</span>
-      <span class="disclaimer-text">EigenGraph is an experimental computational engineering and BIM platform currently under active development. Features, architecture, and capabilities are subject to change.</span>
-    </div>
-
-    <div class="hero-pill">
-      <span class="pill-dot"></span>
-      <span>Official Release v2.1.0-alpha — Active Changelog Stream</span>
-    </div>
-
-    <h1 class="hero-title">
-      EigenGraph <span class="gradient-text">Product Updates</span>
-    </h1>
-
-    <p class="hero-subtitle">
-      A High-Performance Computational Framework for <strong>Adjusted Redundancy Index (ARI)</strong>,
-      Sherman-Morrison \(O(N^2)\) Rank-1 Perturbation, SVD Kinematic Mechanism Guards,
-      and 10D BIM Construction Lifecycle Analytics.
-    </p>
-
-    <div class="hero-cta">
-      <a href="#download" class="btn btn-primary btn-lg">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download EigenGraph (macOS)
-      </a>
-      <button class="btn btn-secondary btn-lg" onclick="switchToView('view-playground', 'tab-ari')">
-        🧪 Open Interactive Lab (5 Demos)
-      </button>
-    </div>
-
-    <!-- Terminal Quickstart -->
-    <div class="hero-terminal">
-      <code>git clone https://github.com/EigenGraph/EigenGraph.git && cd EigenGraph && cargo run --release</code>
-      <button class="copy-btn" data-copy="git clone https://github.com/EigenGraph/EigenGraph.git && cd EigenGraph && cargo run --release">📋 Copy</button>
-    </div>
-
-    <div class="hero-badges">
-      <img src="https://img.shields.io/badge/release-v2.1.0--alpha-0A84FF.svg" alt="Release">
-      <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-black.svg" alt="Platforms">
-      <img src="https://img.shields.io/badge/tests-58%20passed%20(100%25)-30D158.svg" alt="Tests">
-      <img src="https://img.shields.io/badge/built%20with-Rust%201.80+-DEA584.svg" alt="Rust">
-      <img src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue.svg" alt="License">
-    </div>
-  </header>
-
-  <!-- ================= PRIMARY VIEW SWITCHER ================= -->
-  <div class="view-switcher-container">
-    <div class="view-switcher">
-      <button class="view-btn active" data-view="view-changelog">
-        📌 Product Updates & Changelog
-      </button>
-      <button class="view-btn" data-view="view-playground">
-        🧪 Interactive Lab (5 Demos)
-      </button>
-      <button class="view-btn" data-view="view-pillars">
-        🏛️ 10D BIM Ecosystem
-      </button>
-    </div>
-  </div>
-
-  <!-- ================= VIEW 1: CHANGELOG-FIRST TIMELINE ================= -->
-  <div id="view-changelog" class="view-content-panel active">
-    <section class="changelog-section" id="updates">
-      <div class="section-header">
-        <span class="section-tag">Release History & Roadmap</span>
-        <h2 class="section-title">What's New in EigenGraph</h2>
-        <p class="section-desc">
-          Comprehensive release documentation and update notes. Track numerical formulation innovations, SNI/ASCE code automation, and 10D BIM platform enhancements.
-        </p>
-      </div>
-
-      <div class="changelog-timeline">
-        <!-- RELEASE v2.1.0-alpha -->
-        <article class="changelog-card latest">
-          <div class="changelog-dot"></div>
-          <div class="changelog-header">
-            <div class="changelog-version-wrap">
-              <span class="changelog-version">v2.1.0-alpha</span>
-              <span class="suite-tag" style="background:rgba(10,132,255,0.18); color:var(--accent-blue); font-weight:700;">Latest Release</span>
-              <span class="suite-tag" style="background:rgba(48,209,88,0.18); color:var(--accent-green); font-weight:700;">58 Tests Passing</span>
-            </div>
-            <div class="changelog-date">📅 November 3, 2026</div>
-          </div>
-
-          <h3 class="changelog-title">
-            🌋 Indonesian Seismic Response Spectra (SNI 1726:2019) & Progressive Collapse Dynamics (DoD UFC 4-023-03)
-          </h3>
-
-          <div class="changelog-tags">
-            <span class="suite-tag">SNI 1726:2019</span>
-            <span class="suite-tag">ASCE 7-16</span>
-            <span class="suite-tag">Newmark-β DAF</span>
-            <span class="suite-tag">EigenLab Playground</span>
-            <span class="suite-tag">macOS App Store Style</span>
-          </div>
-
-          <div class="feature-group">
-            <h4>🌋 1. Indonesian Seismic Response Spectra Engine (<code>src/core/modal.rs</code>)</h4>
-            <ul class="feature-list">
-              <li><strong>Standard Design Spectrum Formulation</strong>: Implementation of design earthquake response spectral acceleration curve \(S_a(T)\) per SNI 1726:2019 Section 6.4 and ASCE 7-16.</li>
-              <li><strong>Site Amplification Factor Automation</strong>: Exact evaluation of \(F_a\) (short-period 0.2s) and \(F_v\) (1.0s period) across all Soil Site Classes (SA, SB, SC, SD, SE) using exact linear interpolation.</li>
-              <li><strong>Accelerations & Transition Periods</strong>: Computes \(S_{MS} = F_a S_s\), \(S_{M1} = F_v S_1\), \(S_{DS} = \frac{2}{3} S_{MS}\), \(S_{D1} = \frac{2}{3} S_{M1}\), and characteristic transition periods \(T_s = S_{D1}/S_{DS}\), \(T_0 = 0.2 T_s\), and \(T_L = 4.0\text{ s}\).</li>
-              <li><strong>Automated SDC Classification</strong>: Real-time Seismic Design Category (SDC A through E) classification and building response probe at fundamental natural period \(T_n\).</li>
-              <li><strong>Indonesian Regional Presets</strong>: Instant seismic parameter presets for major cities: DKI Jakarta (\(S_s=0.72\text{g}, S_1=0.33\text{g}\)), Padang (\(S_s=1.35\text{g}, S_1=0.60\text{g}\)), Bandung, Surabaya, Yogyakarta, and IKN Nusantara.</li>
-            </ul>
-          </div>
-
-          <div class="feature-group">
-            <h4>💥 2. Transient Dynamic Amplification Factor (DAF) Engine (<code>src/core/dynamics.rs</code>)</h4>
-            <ul class="feature-list">
-              <li><strong>Newmark-β Numerical Integration</strong>: Unconditionally stable step-by-step integration scheme (\(\beta = 1/4, \gamma = 1/2\)) for SDOF oscillators under sudden member removal.</li>
-              <li><strong>Progressive Collapse Evaluation</strong>: Simulation of post-damage dynamic force surge (<em>sudden member removal</em>) per DoD UFC 4-023-03 guidelines.</li>
-              <li><strong>Critical DAF Limit Audit</strong>: Evaluation of dynamic amplification factor against the safety limit \(\text{DAF} \le 2.00\) considering structural damping variation \(\zeta\) (1%–10%) and removal duration \(t_r\).</li>
-            </ul>
-          </div>
-
-          <div class="feature-group">
-            <h4>🧪 3. EigenLab — Interactive Computational Playground</h4>
-            <ul class="feature-list">
-              <li><strong>Multi-Module Tab Switcher</strong>: Consolidation of 5 interactive computational laboratories into a single memory-efficient tab container (ARI & Gate 1, SNI 2847 Concrete Column, 1D CSO Rebar, SNI 1726 Seismic Spectrum, and DAF Dynamics).</li>
-              <li><strong>Zero-Blur Retina Scaling</strong>: Application of <code>setupHiDpiCanvas</code> with <code>window.devicePixelRatio</code> adaptation for crisp graphics on MacBook, 4K, and mobile screens.</li>
-            </ul>
-          </div>
-
-          <div class="changelog-actions">
-            <button class="btn btn-primary btn-sm" onclick="switchToView('view-playground', 'tab-seismic')">
-              🌋 Try Seismic Spectrum in Lab ↗
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="switchToView('view-playground', 'tab-daf')">
-              💥 Try Dynamic DAF in Lab ↗
-            </button>
-            <a href="#download" class="btn btn-outline btn-sm">
-              📦 Download Installer v2.1.0
-            </a>
-          </div>
-        </article>
-
-        <!-- RELEASE v2.0.0 -->
-        <article class="changelog-card">
-          <div class="changelog-dot"></div>
-          <div class="changelog-header">
-            <div class="changelog-version-wrap">
-              <span class="changelog-version">v2.0.0</span>
-              <span class="suite-tag">Major Release</span>
-            </div>
-            <div class="changelog-date">📅 October 28, 2026</div>
-          </div>
-
-          <h3 class="changelog-title">
-            🧱 10D BIM Dimensions, Concrete Column P-M & 1D Cutting Stock Optimizer
-          </h3>
-
-          <div class="changelog-tags">
-            <span class="suite-tag">SNI 2847:2019</span>
-            <span class="suite-tag">Best-Fit Decreasing</span>
-            <span class="suite-tag">IFC 4.3 OpenBIM</span>
-            <span class="suite-tag">CSG Boolean Mesh</span>
-            <span class="suite-tag">6D Carbon LCA</span>
-          </div>
-
-          <div class="feature-group">
-            <h4>🧱 1. SNI 2847 / ACI 318 Concrete Column P-M Interaction (<code>src/core/concrete.rs</code>)</h4>
-            <ul class="feature-list">
-              <li><strong>Whitney Equivalent Stress Block</strong>: Continuous computation of \(\beta_1\) parameter and concrete compressive stress intensity \(0.85 f'_c\).</li>
-              <li><strong>Design Capacity Envelope</strong>: Determination of cardinal points for Pure Compression (\(\phi P_{n,\max}\)), Balanced Point (\(\phi P_b, \phi M_b\)), and Pure Flexure (\(\phi M_0\)) with transition strength reduction factor \(\phi\).</li>
-              <li><strong>Interactive LRFD Audit</strong>: Control over dimensions \(b \times h\), rebar ratio \(\rho\), concrete strength \(f'_c\), steel yield strength \(f_y\), and automated Demand/Capacity Ratio (DCR) evaluation.</li>
-            </ul>
-          </div>
-
-          <div class="feature-group">
-            <h4>✂️ 2. 1D Cutting Stock Optimizer & Bar Bending Schedule (<code>src/core/cso.rs</code>)</h4>
-            <ul class="feature-list">
-              <li><strong>Best-Fit Decreasing (BFD) Heuristic</strong>: One-dimensional packing algorithm minimizing offcut waste from standard 12-meter commercial rebar lengths.</li>
-              <li><strong>Kerf Compensation & Reusable Offcut Classification</strong>: Automated saw blade thickness reduction (<em>saw kerf</em>) and segregation of reusable offcuts (\(L \ge 1.0\text{ m}\)) from net scrap.</li>
-              <li><strong>Bar Bending Schedule (BBS)</strong>: Automatic generation of rebar bending schedules and material yield efficiency auditing (yield efficiency > 96%).</li>
-            </ul>
-          </div>
-
-          <div class="feature-group">
-            <h4>🏗️ 3. OpenBIM IFC 4.3 & CSG Boolean Engine (<code>src/core/csg.rs</code>, <code>src/core/bim.rs</code>)</h4>
-            <ul class="feature-list">
-              <li><strong>Solid Extrusion Modeling</strong>: 3D solid representation of walls, beams, and columns with Boolean subtraction operations for door and window openings.</li>
-              <li><strong>BVH Spatial Ray-Picking</strong>: Accelerated interactive 3D ray-tracing on graphic canvas for LOD 350 structural element selection.</li>
-            </ul>
-          </div>
-
-          <div class="changelog-actions">
-            <button class="btn btn-primary btn-sm" onclick="switchToView('view-playground', 'tab-pm')">
-              🧱 Try Column P-M Diagram in Lab ↗
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="switchToView('view-playground', 'tab-cso')">
-              ✂️ Try 1D Cutting Stock in Lab ↗
-            </button>
-          </div>
-        </article>
-
-        <!-- RELEASE v1.0.0 -->
-        <article class="changelog-card">
-          <div class="changelog-dot"></div>
-          <div class="changelog-header">
-            <div class="changelog-version-wrap">
-              <span class="changelog-version">v1.0.0</span>
-              <span class="suite-tag">Foundation Release</span>
-            </div>
-            <div class="changelog-date">📅 September 15, 2026</div>
-          </div>
-
-          <h3 class="changelog-title">
-            ⚡ Adjusted Redundancy Index (ARI), SVD Gate 1 Kinematic Guard & Rayon Parallel Engine
-          </h3>
-
-          <div class="changelog-tags">
-            <span class="suite-tag">Sherman-Morrison</span>
-            <span class="suite-tag">Gate 1 SVD Guard</span>
-            <span class="suite-tag">Woodbury N-2</span>
-            <span class="suite-tag">Euler Buckling Kg(P)</span>
-            <span class="suite-tag">Canonical M1</span>
-          </div>
-
-          <div class="feature-group">
-            <h4>⚡ 1. Linear ARI with Sherman-Morrison \(O(N^2)\) Rank-1 Perturbation (<code>src/core/ari.rs</code>)</h4>
-            <ul class="feature-list">
-              <li><strong>Fast Post-Damage Inverse</strong>: Exact formulation \((\mathbf{K}_{ff}^{(-e)})^{-1} = \mathbf{K}_{ff}^{-1} + \frac{k_e (\mathbf{K}_{ff}^{-1} \mathbf{a}_e)(\mathbf{a}_e^T \mathbf{K}_{ff}^{-1})}{1 - h_e}\) eliminating the need for full global stiffness matrix refactorization.</li>
-              <li><strong>Spectral Leverage \(h_e\)</strong>: Projection of element flexibility onto global structural compliance \(h_e = k_e \mathbf{a}_e^T \mathbf{K}_{ff}^{-1} \mathbf{a}_e \in [0.0, 1.0]\).</li>
-            </ul>
-          </div>
-
-          <div class="feature-group">
-            <h4>🛡️ 2. Gate 1: SVD Kinematic Mechanism Guard & Hard Stability Certificate</h4>
-            <ul class="feature-list">
-              <li><strong>Definitive Kinematic Determination</strong>: Spectral determinacy boundary check \(m_e = 1.0 - h_e\). If \(m_e \le \varepsilon_m\) or a rank drop occurs, the system certifies immediate collapse (\(ARI_e = 0.0, CI_e = 1.0\)) with zero false-positives.</li>
-              <li><strong>Woodbury Rank-2 Simultaneous Screening</strong>: Screening thousands of simultaneous dual-member failure combinations \(\{i, j\}\) via the determinant of a \(2\times 2\) capacitance matrix.</li>
-            </ul>
-          </div>
-
-          <div class="feature-group">
-            <h4>📊 3. Canonical Model M1 Verification</h4>
-            <ul class="feature-list">
-              <li><strong>Exact Analytical Proof</strong>: Verification of exact rational closed-form solutions with 58 unit tests passing 100% without numerical tolerance compromise.</li>
-            </ul>
-          </div>
-
-          <div class="changelog-actions">
-            <button class="btn btn-primary btn-sm" onclick="switchToView('view-playground', 'tab-ari')">
-              ⚡ Try Sherman-Morrison ARI in Lab ↗
-            </button>
-            <a href="#benchmarks" class="btn btn-outline btn-sm">
-              📊 View Benchmark M1 Verification Table
-            </a>
-          </div>
-        </article>
-      </div>
-    </section>
-  </div>
-
-  <!-- ================= VIEW 2: INTERACTIVE PLAYGROUND ================= -->
-  <div id="view-playground" class="view-content-panel">
-    <!-- ================= INTERACTIVE WEB SANDBOX ================= -->
-    <section class="section" id="sandbox">
-    <div class="section-header">
-      <span class="section-tag">Interactive Simulation Laboratory</span>
-      <h2 class="section-title">EigenLab — Interactive Playground</h2>
-      <p class="section-desc">
-        A self-contained interactive computational laboratory. Switch between modules to test ARI redundancy formulations, SNI 2847 reinforced concrete capacity audits, BFD rebar cutting optimization, Indonesian SNI 1726:2019 seismic spectra, and Newmark-β progressive collapse dynamics directly in your browser.
-      </p>
-    </div>
-
-    <div class="sandbox-card">
-      <div class="sandbox-tabs" id="eigenlab-tabs">
-        <button class="sandbox-tab active" data-target="tab-ari">
-          ⚡ 1. Sherman-Morrison ARI & Gate 1
-        </button>
-        <button class="sandbox-tab" data-target="tab-pm">
-          🧱 2. SNI 2847 Concrete Column P-M
-        </button>
-        <button class="sandbox-tab" data-target="tab-cso">
-          ✂️ 3. 1D Cutting Stock Optimizer (CSO)
-        </button>
-        <button class="sandbox-tab" data-target="tab-seismic">
-          🌋 4. SNI 1726 Seismic Spectrum
-        </button>
-        <button class="sandbox-tab" data-target="tab-daf">
-          💥 5. Transient Dynamic DAF (Newmark-β)
-        </button>
-      </div>
-
-      <div class="sandbox-body">
-        <!-- TAB 1: ARI & SVD SIMULATOR -->
-        <div class="sandbox-panel active" id="tab-ari">
-          <div class="sandbox-grid">
-            <div class="canvas-container">
-              <canvas id="ari-canvas"></canvas>
-            </div>
-            <div class="controls-card">
-              <h3>⚡ Warren Truss 24m APM</h3>
-              <p style="font-size:0.85rem; color:var(--text-secondary);">
-                Hover and click on any member in the canvas to simulate sudden fracture (\(\lambda_e = 0\)).
-                The engine evaluates spectral leverage \(h_e\) and checks Gate 1 mechanism stability.
-              </p>
-
-              <div class="metric-grid">
-                <div class="metric-item">
-                  <div class="val" id="ari-val-min">0.720</div>
-                  <div class="lbl">System ARI (min)</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="ari-val-status">🟢 INTACT</div>
-                  <div class="lbl">Stability State</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="ari-val-disp">14.2 mm</div>
-                  <div class="lbl">Mid-Span Deflection</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="ari-val-gate">PASS</div>
-                  <div class="lbl">SVD Gate 1 Guard</div>
-                </div>
-              </div>
-
-              <div style="display:flex; gap:8px; margin-top:8px;">
-                <button class="btn btn-secondary" id="btn-reset-truss" style="flex:1;">
-                  🔄 Reset Intact
-                </button>
-                <button class="btn btn-outline" id="btn-disrupt-critical" style="flex:1;">
-                  ⚠️ Fail FCM #10
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 2: CONCRETE P-M SIMULATOR -->
-        <div class="sandbox-panel" id="tab-pm">
-          <div class="sandbox-grid">
-            <div class="canvas-container">
-              <canvas id="pm-canvas"></canvas>
-            </div>
-            <div class="controls-card">
-              <h3>🧱 SNI 2847 Column P-M</h3>
-              <p style="font-size:0.85rem; color:var(--text-secondary);">
-                Evaluates Whitney rectangular stress block, strain compatibility, and factored design capacity \(\phi P_n - \phi M_n\).
-              </p>
-
-              <div class="control-group">
-                <label>Width \(b\) (mm): <span id="lbl-b">400</span></label>
-                <input type="range" id="pm-input-b" min="250" max="800" step="50" value="400">
-              </div>
-
-              <div class="control-group">
-                <label>Depth \(h\) (mm): <span id="lbl-h">400</span></label>
-                <input type="range" id="pm-input-h" min="250" max="800" step="50" value="400">
-              </div>
-
-              <div class="control-group">
-                <label>Factored Axial \(P_u\) (kN): <span id="lbl-pu">1500 kN</span></label>
-                <input type="range" id="pm-input-pu" min="-500" max="3500" step="50" value="1500">
-              </div>
-
-              <div class="control-group">
-                <label>Factored Moment \(M_u\) (kNm): <span id="lbl-mu">120 kNm</span></label>
-                <input type="range" id="pm-input-mu" min="0" max="400" step="10" value="120">
-              </div>
-
-              <div class="control-group">
-                <label>Concrete \(f'_c\) (MPa):</label>
-                <select id="pm-input-fc">
-                  <option value="25">25 MPa</option>
-                  <option value="30" selected>30 MPa</option>
-                  <option value="35">35 MPa</option>
-                  <option value="40">40 MPa</option>
-                </select>
-              </div>
-
-              <div class="control-group">
-                <label>Longitudinal Rebar Bars:</label>
-                <select id="pm-input-bars">
-                  <option value="6">6 D22 (1.43%)</option>
-                  <option value="8" selected>8 D22 (1.90%)</option>
-                  <option value="12">12 D25 (3.68%)</option>
-                </select>
-              </div>
-
-              <div class="metric-grid">
-                <div class="metric-item">
-                  <div class="val" id="pm-val-pnmax">2745 kN</div>
-                  <div class="lbl">\(\phi P_{n,\max}\) Limit</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="pm-val-rho">1.90%</div>
-                  <div class="lbl">Rebar Ratio \(\rho\)</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="pm-val-dcr">0.546</div>
-                  <div class="lbl">Demand DCR (Safe)</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" style="color:var(--accent-blue)">\(\beta_1 = 0.836\)</div>
-                  <div class="lbl">Whitney \(\beta_1\)</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 3: CUTTING STOCK OPTIMIZER -->
-        <div class="sandbox-panel" id="tab-cso">
-          <div class="sandbox-grid">
-            <div class="canvas-container">
-              <canvas id="cso-canvas"></canvas>
-            </div>
-            <div class="controls-card">
-              <h3>✂️ 1D Cutting Stock Optimizer</h3>
-              <p style="font-size:0.85rem; color:var(--text-secondary);">
-                Best-Fit Decreasing (BFD) packing with kerf compensation to minimize scrap waste across standard commercial raw bars.
-              </p>
-
-              <div class="control-group">
-                <label>Stock Length \(L_{\text{stock}}\): <span id="lbl-stock">12.0m</span></label>
-                <input type="range" id="cso-input-stock" min="6.0" max="14.0" step="0.5" value="12.0">
-              </div>
-
-              <div class="control-group">
-                <label>Saw Kerf: <span id="lbl-kerf">5.0 mm</span></label>
-                <input type="range" id="cso-input-kerf" min="0" max="10" step="1" value="5">
-              </div>
-
-              <div class="metric-grid">
-                <div class="metric-item">
-                  <div class="val" id="cso-val-yield">97.6%</div>
-                  <div class="lbl">Yield Efficiency</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="cso-val-bars">4 Bars</div>
-                  <div class="lbl">Raw Bars Needed</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="cso-val-scrap" style="color:var(--accent-amber)">2.4%</div>
-                  <div class="lbl">Net Scrap Waste</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" style="color:var(--accent-blue)">1.76 m</div>
-                  <div class="lbl">Reusable Offcut</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 4: SEISMIC SPECTRUM SNI 1726:2019 -->
-        <div class="sandbox-panel" id="tab-seismic">
-          <div class="sandbox-grid">
-            <div class="canvas-container">
-              <canvas id="seismic-canvas"></canvas>
-            </div>
-            <div class="controls-card">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>🌋 SNI 1726:2019 Spectrum</h3>
-                <span class="suite-tag" style="background:rgba(255,69,58,0.18); color:var(--accent-red); font-weight:700;" id="seismic-kds-badge">KDS D</span>
-              </div>
-              <p style="font-size:0.85rem; color:var(--text-secondary);">
-                Indonesian Earthquake Code design response spectra generator \(S_a(T)\) with site amplification \(F_a, F_v\) and transition periods \(T_0, T_s\).
-              </p>
-
-              <div class="control-group">
-                <label>Indonesian Regional / City Preset:</label>
-                <select id="seismic-preset">
-                  <option value="jakarta" selected>DKI Jakarta (Ss=0.72g, S1=0.33g)</option>
-                  <option value="padang">Padang, West Sumatra (Ss=1.35g, S1=0.60g)</option>
-                  <option value="bandung">Bandung (Ss=1.15g, S1=0.48g)</option>
-                  <option value="surabaya">Surabaya (Ss=0.65g, S1=0.25g)</option>
-                  <option value="yogyakarta">Yogyakarta (Ss=1.05g, S1=0.42g)</option>
-                  <option value="ikn">IKN Nusantara (Ss=0.30g, S1=0.15g)</option>
-                  <option value="custom">-- Custom Parameter --</option>
-                </select>
-              </div>
-
-              <div class="control-group">
-                <label>Soil Site Class (Site Class):</label>
-                <select id="seismic-site">
-                  <option value="SA">SA — Hard Rock (vs > 1500 m/s)</option>
-                  <option value="SB">SB — Rock (750 < vs ≤ 1500 m/s)</option>
-                  <option value="SC">SC — Hard Soil / Dense (350 < vs ≤ 750 m/s)</option>
-                  <option value="SD" selected>SD — Stiff / Medium Soil (175 < vs ≤ 350 m/s)</option>
-                  <option value="SE">SE — Soft Soil (vs < 175 m/s)</option>
-                </select>
-              </div>
-
-              <div class="control-group">
-                <label>Short Period \(S_s\) (g): <span id="lbl-ss">0.72 g</span></label>
-                <input type="range" id="seismic-input-ss" min="0.10" max="2.00" step="0.02" value="0.72">
-              </div>
-
-              <div class="control-group">
-                <label>1.0s Period \(S_1\) (g): <span id="lbl-s1">0.33 g</span></label>
-                <input type="range" id="seismic-input-s1" min="0.05" max="1.00" step="0.01" value="0.33">
-              </div>
-
-              <div class="control-group">
-                <label>Fundamental Period \(T_n\) (s): <span id="lbl-tn">0.80 s</span></label>
-                <input type="range" id="seismic-input-tn" min="0.05" max="3.00" step="0.05" value="0.80">
-              </div>
-
-              <div class="metric-grid">
-                <div class="metric-item">
-                  <div class="val" id="seismic-val-sds">0.584 g</div>
-                  <div class="lbl">Design \(S_{DS}\)</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="seismic-val-sd1">0.385 g</div>
-                  <div class="lbl">Design \(S_{D1}\)</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="seismic-val-ts">0.659 s</div>
-                  <div class="lbl">Corner \(T_s\)</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="seismic-val-sa" style="color:var(--accent-blue)">0.481 g</div>
-                  <div class="lbl">Demand \(S_a(T_n)\)</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 5: TRANSIENT DYNAMIC DAF -->
-        <div class="sandbox-panel" id="tab-daf">
-          <div class="sandbox-grid">
-            <div class="canvas-container">
-              <canvas id="daf-canvas"></canvas>
-            </div>
-            <div class="controls-card">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>💥 Transient DAF (Newmark-β)</h3>
-                <span class="suite-tag" style="background:rgba(48,209,88,0.18); color:var(--accent-green); font-weight:700;" id="daf-status-badge">UFC SAFE</span>
-              </div>
-              <p style="font-size:0.85rem; color:var(--text-secondary);">
-                Non-linear sudden member removal dynamic amplification factor (DAF) according to DoD UFC 4-023-03 progressive collapse guidelines.
-              </p>
-
-              <div class="control-group">
-                <label>Critical Member Disrupted:</label>
-                <select id="daf-scenario">
-                  <option value="diag4" selected>Diagrid Diagonal Member D-4 (FCM)</option>
-                  <option value="chord3">Warren Bottom Chord B-3 (Mid-Span)</option>
-                  <option value="corner1">Ground Corner Column C-1</option>
-                </select>
-              </div>
-
-              <div class="control-group">
-                <label>Damping Ratio \(\zeta\): <span id="lbl-zeta">5.0%</span></label>
-                <input type="range" id="daf-input-zeta" min="1.0" max="10.0" step="0.5" value="5.0">
-              </div>
-
-              <div class="control-group">
-                <label>Removal Time \(t_r\): <span id="lbl-tr">0 ms (Instantaneous)</span></label>
-                <input type="range" id="daf-input-tr" min="0" max="80" step="5" value="0">
-              </div>
-
-              <div class="metric-grid">
-                <div class="metric-item">
-                  <div class="val" id="daf-val-ustatic">14.2 mm</div>
-                  <div class="lbl">Static Deflection</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="daf-val-upeak">26.8 mm</div>
-                  <div class="lbl">Peak Dynamic Surge</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="daf-val-ratio" style="color:var(--accent-amber)">1.89</div>
-                  <div class="lbl">Dynamic DAF (\(\le 2.0\))</div>
-                </div>
-                <div class="metric-item">
-                  <div class="val" id="daf-val-freq" style="color:var(--accent-blue)">2.35 Hz</div>
-                  <div class="lbl">Damaged Frequency</div>
-                </div>
-              </div>
-
-              <div style="display:flex; gap:8px; margin-top:8px;">
-                <button class="btn btn-secondary" id="btn-trigger-daf" style="flex:1;">
-                  🚀 Fire Dynamic Shock
-                </button>
-                <button class="btn btn-outline" id="btn-reset-daf" style="flex:1;">
-                  🔄 Reset
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    </section>
-  </div>
-
-  <!-- ================= VIEW 3: 10D BIM ECOSYSTEM & ARCHITECTURE ================= -->
-  <div id="view-pillars" class="view-content-panel">
-    <!-- Hero Interactive 3D Showcase Window -->
-    <div class="hero-showcase" style="max-width:1100px; margin:30px auto 50px;">
-      <div class="window-chrome">
-        <div class="traffic-lights">
-          <div class="traffic-light red"></div>
-          <div class="traffic-light yellow"></div>
-          <div class="traffic-light green"></div>
-        </div>
-        <div class="window-title">EigenGraph 3D Canvas Viewport — High-Rise Diagrid Tower LOD 350</div>
-      </div>
-      <div class="hero-canvas-wrap">
-        <canvas id="hero-canvas"></canvas>
-        <div class="canvas-overlay-card">
-          <h4>🪐 Real-Time 3D Diagrid Lattice</h4>
-          <p>Drag or swipe to rotate turntable. Live Euler-Bernoulli beam mechanics with Rayon multithreaded Cholesky factorization.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- The Eigen Platform Suite -->
-    <section class="section" id="suite" style="padding-top:20px;">
-      <div class="section-header">
-        <span class="section-tag">Triad Architecture</span>
-        <h2 class="section-title">The Eigen Platform Suite</h2>
-        <p class="section-desc">
-          A unified triad ecosystem engineered to bridge analytical mechanics, kinematic failure prevention, and construction lifecycle dimensions.
-        </p>
-      </div>
-
-      <div class="suite-grid">
-        <!-- EigenGraph -->
-        <div class="suite-card highlight">
-          <div class="suite-icon">
-            <img src="assets/icon.png" alt="EigenGraph">
-          </div>
-          <h3>EigenGraph</h3>
-          <p>10D BIM Construction Lifecycle Dimensions, CAD/BIM Triad Dock, IFC 4.3 OpenBIM interoperability, and 2D Sheet A101 Vector Blueprints.</p>
-          <div class="suite-tags">
-            <span class="suite-tag">10D BIM</span>
-            <span class="suite-tag">Sheet A101</span>
-            <span class="suite-tag">Solid CSG</span>
-            <span class="suite-tag">IFC 4.3</span>
-          </div>
-        </div>
-
-        <!-- EigenGate -->
-        <div class="suite-card">
-          <div class="suite-icon">
-            <img src="assets/eigengate.png" alt="EigenGate">
-          </div>
-          <h3>EigenGate</h3>
-          <p>Sherman-Morrison Rank-1 SVD Kinematic Mechanism Guard, Fracture-Critical Member (FCM) screening, and zero false-positive stability certification.</p>
-          <div class="suite-tags">
-            <span class="suite-tag">SVD Guard</span>
-            <span class="suite-tag">Woodbury N-2</span>
-            <span class="suite-tag">Euler Buckling Kg(P)</span>
-            <span class="suite-tag">Rank Drop</span>
-          </div>
-        </div>
-
-        <!-- EigenFlow -->
-        <div class="suite-card">
-          <div class="suite-icon">
-            <img src="assets/eigenflow.png" alt="EigenFlow">
-          </div>
-          <h3>EigenFlow</h3>
-          <p>Non-linear APM progressive collapse simulation (DoD UFC 4-023-03), Critical Path (CPM) 4D scheduling, and 6D embodied carbon LCA pipelines.</p>
-          <div class="suite-tags">
-            <span class="suite-tag">Newmark-β DAF</span>
-            <span class="suite-tag">4D CPM Schedule</span>
-            <span class="suite-tag">6D Carbon LCA</span>
-            <span class="suite-tag">Plastic Hinges</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ================= 13 NAVIGATION PILLARS ================= -->
-    <section class="section" id="pillars">
-    <div class="section-header">
-      <span class="section-tag">Comprehensive Dimensions</span>
-      <h2 class="section-title">13 Core Navigation Pillars</h2>
-      <p class="section-desc">
-        Engineered with a locked macOS App Store layout and modern vertical slide workspace cards covering the entire 10D BIM lifecycle.
-      </p>
-    </div>
-
-    <div class="pillars-grid">
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">📁</span>
-          <h4>1. My Library</h4>
-        </div>
-        <p>Obsidian-compliant engineering vault, project catalog, and reactive SHA-256 autosave persistence.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">💡</span>
-          <h4>2. Research & Concept</h4>
-        </div>
-        <p>Canonical ARI formulations, mathematical derivations, and initial feasibility structural checks.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">📐</span>
-          <h4>3. Drafting & Drawings</h4>
-        </div>
-        <p>Sheet A101 technical drawing composer with pure vector zero-dependency PDF 1.4 & SVG exports.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">🏗️</span>
-          <h4>4. Modeling & Geometry</h4>
-        </div>
-        <p>3D CSG B-Rep solid Boolean subtractions for doors, windows, and automated 3D rebar cages.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">⏱️</span>
-          <h4>5. Time & Scheduling</h4>
-        </div>
-        <p>4D Critical Path Method (CPM), Early/Late dates, float calculation, and dynamic S-Curve progress.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">💰</span>
-          <h4>6. Cost & Budgeting</h4>
-        </div>
-        <p>5D Dynamic RAB AHSP PUPR 2023/2024, material take-off (QTO), and Cost-ARI Pareto optimization.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">🌱</span>
-          <h4>7. Sustainability & Energy</h4>
-        </div>
-        <p>6D Embodied carbon LCA pipelines across EAF, BF-BOF, and H2-DRI green steel production routes.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">🏢</span>
-          <h4>8. Facility Management</h4>
-        </div>
-        <p>7D Digital twin SHM sensor telemetry, COBie asset registry, and predictive maintenance scheduling.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">🛡️</span>
-          <h4>9. Safety & Health</h4>
-        </div>
-        <p>AISC 360 LRFD steel verification, SNI 2847 column P-M interaction, and SNI 1726 seismic spectrum.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">♻️</span>
-          <h4>10. Lean Construction</h4>
-        </div>
-        <p>9D Dynamic 1D Cutting Stock Optimizer (CSO), Last Planner System, and Bar Bending Schedule (BBS).</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">🤖</span>
-          <h4>11. Industrialized Construction</h4>
-        </div>
-        <p>10D Modular DfMA prefabrication, robotic welding automation, and CNC DSTV NC1 piece export.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">🔮</span>
-          <h4>12. Prediction</h4>
-        </div>
-        <p>First-Order Second-Moment (FOSM) reliability index \(\beta\), FEMA P-58 fragility curves, and clash detection.</p>
-      </div>
-
-      <div class="pillar-card">
-        <div class="pillar-header">
-          <span class="pillar-icon">📊</span>
-          <h4>13. Results</h4>
-        </div>
-        <p>Executive structural health audit, SNI/AISC code compliance matrix, and official certification export.</p>
-      </div>
-    </div>
-  </section>
-  </div>
-
-  <!-- ================= CANONICAL BENCHMARKS ================= -->
-  <section class="section" id="benchmarks">
-    <div class="section-header">
-      <span class="section-tag">Mathematical Exactness</span>
-      <h2 class="section-title">Canonical Model M1 Verification</h2>
-      <p class="section-desc">
-        Rigorous exact rational arithmetic comparison between theoretical closed-form derivations and the Rust analytical engine.
-      </p>
-    </div>
-
-    <div class="benchmark-card">
-      <table class="benchmark-table">
-        <thead>
-          <tr>
-            <th>Parameter / Metric</th>
-            <th>Closed-Form Rational</th>
-            <th>Theoretical Decimal</th>
-            <th>EigenGraph Engine Output</th>
-            <th>Verification Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Member 1 Weight (\(w_1^M\))</strong></td>
-            <td>\(\frac{4}{7}\)</td>
-            <td>0.571429</td>
-            <td>0.571429</td>
-            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
-          </tr>
-          <tr>
-            <td><strong>Member 2 Weight (\(w_2^M\))</strong></td>
-            <td>\(\frac{2}{5}\)</td>
-            <td>0.400000</td>
-            <td>0.400000</td>
-            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
-          </tr>
-          <tr>
-            <td><strong>Intact Graph Score (\(S(\mathcal{G}^M)\))</strong></td>
-            <td>\(\frac{17}{35}\)</td>
-            <td>0.485714</td>
-            <td>0.485714</td>
-            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
-          </tr>
-          <tr>
-            <td><strong>Member 1 Redundancy Ratio (\(RR_1\))</strong></td>
-            <td>\(\frac{7}{17}\)</td>
-            <td>0.411765</td>
-            <td>0.411765</td>
-            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
-          </tr>
-          <tr>
-            <td><strong>Member 1 Pre-Utilization (\(U_1^*\))</strong></td>
-            <td>\(\frac{1}{2}\)</td>
-            <td>0.500000</td>
-            <td>0.500000</td>
-            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
-          </tr>
-          <tr>
-            <td><strong>Adjusted Redundancy Index (\(ARI_1\))</strong></td>
-            <td><strong>\(\frac{21}{68}\)</strong></td>
-            <td><strong>0.308824</strong></td>
-            <td><strong>0.308824</strong></td>
-            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
-          </tr>
-          <tr>
-            <td><strong>Criticality Index (\(CI_1\))</strong></td>
-            <td><strong>\(\frac{47}{68}\)</strong></td>
-            <td><strong>0.691176</strong></td>
-            <td><strong>0.691176</strong></td>
-            <td><span class="badge-match">✅ MATCH (&lt; 1e-6)</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Academic Citation Card -->
-    <div class="citation-card">
-      <div class="citation-header">
-        <h4>📖 Cite EigenGraph & Adjusted Redundancy Index in Academic Research</h4>
-        <button class="copy-btn" data-copy="@software{irawan2026eigengraph,
-  author = {Irawan, Harids},
-  title = {EigenGraph: High-Performance Computational Framework for Adjusted Redundancy Index and 10D BIM Analytics},
-  year = {2026},
-  url = {https://github.com/haridsirawan/EigenGraph},
-  version = {2.0.0}
-}">📋 Copy BibTeX</button>
-      </div>
-      <div class="citation-code">@software{irawan2026eigengraph,
-  author = {Irawan, Harids},
-  title = {EigenGraph: High-Performance Computational Framework for Adjusted Redundancy Index and 10D BIM Analytics},
-  year = {2026},
-  url = {https://github.com/haridsirawan/EigenGraph},
-  version = {2.0.0}
-}</div>
-    </div>
-  </section>
-
-  <!-- ================= DOWNLOAD MATRIX ================= -->
-  <section class="section" id="download">
-    <div class="section-header">
-      <span class="section-tag">Multi-Platform Packages</span>
-      <h2 class="section-title">Get EigenGraph v2.0.0</h2>
-      <p class="section-desc">
-        Pre-compiled standalone native binaries with zero external runtime dependencies.
-      </p>
-    </div>
-
-    <div class="download-grid">
-      <!-- macOS -->
-      <div class="download-card">
-        <div class="download-icon">🍎</div>
-        <h3>macOS Universal</h3>
-        <p class="sub">Apple Silicon (M1-M4) & Intel x64</p>
-        <a href="https://github.com/haridsirawan/EigenGraph/releases/latest" class="btn btn-primary">
-          Download .DMG (macOS)
-        </a>
-      </div>
-
-      <!-- Windows -->
-      <div class="download-card">
-        <div class="download-icon">🪟</div>
-        <h3>Windows x64</h3>
-        <p class="sub">Windows 10 / 11 64-bit</p>
-        <a href="https://github.com/haridsirawan/EigenGraph/releases/latest" class="btn btn-secondary">
-          Download .ZIP (Windows)
-        </a>
-      </div>
-
-      <!-- Linux -->
-      <div class="download-card">
-        <div class="download-icon">🐧</div>
-        <h3>Linux x86_64</h3>
-        <p class="sub">Ubuntu, Debian, Fedora, Arch</p>
-        <a href="https://github.com/haridsirawan/EigenGraph/releases/latest" class="btn btn-secondary">
-          Download .TAR.GZ (Linux)
-        </a>
-      </div>
-
-      <!-- Source Code -->
-      <div class="download-card">
-        <div class="download-icon">🦀</div>
-        <h3>Compile from Source</h3>
-        <p class="sub">Requires Rust 1.80+ (cargo build)</p>
-        <a href="https://github.com/haridsirawan/EigenGraph" target="_blank" class="btn btn-outline">
-          Browse GitHub Repo ↗
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= FOOTER ================= -->
-  <footer class="footer">
-    <div class="footer-container">
-      <div class="footer-brand">
-        <h4>EigenGraph</h4>
-        <p>
-          High-Performance Computational Framework for Adjusted Redundancy Index (ARI),
-          SVD Kinematic Mechanism Guards, and 10D BIM Construction Lifecycle Analytics.
-        </p>
-        <p style="font-size:0.75rem; color:var(--text-muted); margin-top:10px; border-left:2px solid #ff9f0a; padding-left:10px;">
-          <em>Disclaimer: EigenGraph is an experimental computational engineering and BIM platform currently under active development. Features, architecture, and capabilities are subject to change.</em>
-        </p>
-      </div>
-
-      <div class="footer-col">
-        <h5>Platform Triad</h5>
-        <ul>
-          <li><a href="#suite" data-view-target="view-pillars">EigenGraph</a></li>
-          <li><a href="#suite" data-view-target="view-pillars">EigenGate</a></li>
-          <li><a href="#suite" data-view-target="view-pillars">EigenFlow</a></li>
-          <li><a href="#pillars" data-view-target="view-pillars">13 Lifecycle Pillars</a></li>
-        </ul>
-      </div>
-
-      <div class="footer-col">
-        <h5>Mathematics</h5>
-        <ul>
-          <li><a href="#benchmarks">Sherman-Morrison \(O(N^2)\)</a></li>
-          <li><a href="#benchmarks">Woodbury Rank-2</a></li>
-          <li><a href="#benchmarks">Gate 1 SVD Guard</a></li>
-          <li><a href="#benchmarks">Model M1 Verification</a></li>
-        </ul>
-      </div>
-
-      <div class="footer-col">
-        <h5>Open Source</h5>
-        <ul>
-          <li><a href="https://github.com/EigenGraph/EigenGraph" target="_blank">GitHub Repository</a></li>
-          <li><a href="#updates" data-view-target="view-changelog">Releases & Changelog</a></li>
-          <li><a href="https://github.com/EigenGraph/AdjustedRedundancyIndex_Linear" target="_blank">Linear ARI Engine</a></li>
-          <li><a href="https://github.com/EigenGraph/EigenGraph/blob/main/LICENSE" target="_blank">MIT / Apache 2.0 License</a></li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="footer-bottom">
-      <div>Copyright © 2026 <strong>Harids Irawan</strong>. Distributed under dual MIT & Apache-2.0 License.</div>
-      <div>Designed with macOS Pro Dark Aesthetic & 100% Rust Engine.</div>
-    </div>
-  </footer>
-
-  <!-- App Script -->
   <script src="app.js"></script>
 </body>
 </html>
