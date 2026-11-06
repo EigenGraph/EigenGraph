@@ -27,6 +27,7 @@ pub mod cso;
 pub mod concrete;
 pub mod pushover;
 pub mod geotech;
+pub mod wind;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -106,4 +107,8 @@ pub use cso::{
 pub use concrete::{
     CardinalPoints, ConcreteEngine, ConcretePmReport, ConcreteSection, DemandAudit,
     InteractionPoint, RebarLayer,
+};
+pub use wind::{
+    EnclosureClassification, ExposureCategory, RiskCategory, StoryWindLevel, WindAnalysisReport,
+    WindComfortAudit, WindEngine,
 };

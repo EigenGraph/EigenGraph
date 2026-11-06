@@ -7,6 +7,40 @@ The project strictly adheres to sequential versioning:
 
 ---
 
+## [v0.0.7] - 2026-11-06 — Phase 6: Wind Engineering & Computational Aero-Dynamics per ASCE 7-22 / SNI 1727:2020
+
+### Added
+- **ASCE 7-22 & SNI 1727:2020 Computational Wind Engineering Engine (`src/core/wind.rs`)**:
+  - **Exposure Categories & Terrain Profiles**: Implemented Exposure B (urban/suburban), Exposure C (open terrain), and Exposure D (unobstructed coastal) with terrain power-law constants ($\alpha$, $z_g$, $c_{\text{turb}}$) per Table 26.11-1.
+  - **Velocity Pressure Exposure Coefficient ($K_z$) & Mean Roof Pressure ($q_h$)**:
+    $$K_z = 2.01 \left( \frac{\max(z, 4.5)}{z_g} \right)^{2/\alpha}, \quad q_z = 0.613 K_z K_{zt} K_d K_e V^2 \; (\text{Pa})$$
+    Formulated velocity pressure profiles factoring ground elevation $K_e$, wind directionality $K_d = 0.85$, and topographic factor $K_{zt}$.
+  - **Dynamic Gust Effect Factor ($G_f$) for Flexible Structures**:
+    - Formulated background factor $Q$ and resonant factor $R$ accounting for turbulent integral length scale $L_{\bar{z}}$, damping $\beta$, and aerodynamic admittance $R_h, R_b$.
+    - Unified rigid ($G = 0.85$ for $f_1 \ge 1\text{ Hz}$) and flexible structure formulation ($f_1 < 1\text{ Hz}$) per ASCE 7-22 Section 26.11.
+  - **Directional MWFRS Design Lateral Pressures & Story Shear Envelopes**:
+    - Windward pressure: $p_{\text{windward}} = q_z G C_p$ ($C_p = 0.80$).
+    - Leeward pressure: $p_{\text{leeward}} = q_h G C_p$ ($C_p = -0.50$ to $-0.30$ based on $L/B$).
+    - Internal pressure variations with $GC_{pi} = \pm 0.18$ (Enclosed) and $\pm 0.55$ (Partially Enclosed).
+    - Multi-story tributary shear aggregation $V_w(z) = \sum p_{\text{net}} A_{\text{trib}}$ and base overturning moment $M_{\text{OTM}} = \sum F_i z_i$.
+  - **Dynamic Occupant Comfort & Vortex Shedding Acceleration (ISO 10137 / ASCE 7-22 CC)**:
+    - Peak along-wind dynamic acceleration: $a_{\text{along}} = g \cdot \frac{3 \sigma_x \cdot (2 \ln(3600 f_1))^{1/2}}{M_{\text{gen}}}$ (milli-g).
+    - Cross-wind vortex shedding acceleration incorporating reduced velocity $V_r = \frac{V}{f_1 B}$.
+    - Resultant acceleration vs. standard occupant comfort limit ($20\text{ mg}$ for 10-year MRI wind per ISO 10137).
+  - **Lateral Governing Demand Comparison**: Automated comparison of total wind base shear $V_w$ against seismic base shear $V_s$ to identify governing lateral resistance mechanism.
+- **Interactive ASCE 7 Wind Engineering Dashboard in Analyze View (`src/views/analyze.rs`)**:
+  - Added new sub-tab `AnalyzeSubTab::WindEngineering` (`🌪️ ASCE 7 Wind`).
+  - 4 Executive Metric Cards: Basic Wind Speed ($V$), Mean Roof Pressure ($q_h$), Wind Base Shear ($V_w$ and $M_{\text{OTM}}$), and Occupant Comfort Acceleration ($a_{\text{res}}$ vs. ISO 10137 limit).
+  - Control Toolbar: Real-time adjustments for wind speed (m/s), exposure category, building enclosure, building dimensions ($H \times B \times L$), number of stories, and fundamental period $T_1$.
+  - Dual Vector Visualizer:
+    1. *Left*: Elevation Velocity Pressure Profile $q_z(z)$ with CAD building silhouette and windward pressure arrows scaled by height.
+    2. *Right*: Occupant Acceleration Bar Chart (Along-wind, Cross-wind, Resultant vs ISO 10137 limit) and Wind ($V_w$) vs. Seismic ($V_s$) base shear envelope comparison.
+  - Story-by-story wind force schedule table displaying $K_z$, $q_z$, windward/leeward pressures, tributary story forces, and cumulative shear $V_x(z)$.
+- **Official Wind Engineering Dossier Export (`generate_markdown_dossier`)**:
+  - Added one-click export button `🌪️ ASCE 7 Wind Dossier (.md)` in Results View generating `ASCE7_Wind_Engineering_Dossier.md`.
+
+---
+
 ## [v0.0.6] - 2026-11-06 — Phase 5: Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine
 
 ### Added

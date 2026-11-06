@@ -7,6 +7,44 @@ Per Section 6 of `AGENTS.md`, versioning strictly follows:
 
 ---
 
+## 🚀 EigenGraph v0.0.7 — Phase 6: Wind Engineering & Computational Aero-Dynamics per ASCE 7-22 / SNI 1727:2020
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.7`  
+**Target:** Production Engine
+
+EigenGraph v0.0.7 introduces comprehensive **Wind Engineering & Computational Aero-Dynamics**, delivering an automated code-compliance and aero-elastic engine per ASCE 7-22 Chapters 26–31 and SNI 1727:2020 for Main Wind Force Resisting Systems (MWFRS), dynamic gust effect factors ($G_f$), along-wind / cross-wind vortex shedding acceleration for human comfort (ISO 10137), and wind vs. seismic governing envelope audits.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Terrain Profiles & Velocity Pressure Profiles ($q_z$)
+- **Terrain Exposure Categories**: Implemented Exposure B (urban/suburban $z_g = 365.76\text{ m}, \alpha = 7.0$), Exposure C (open grassland $z_g = 274.32\text{ m}, \alpha = 9.5$), and Exposure D (unobstructed coastal $z_g = 213.36\text{ m}, \alpha = 11.5$).
+- **Exposure Coefficient $K_z$ & Velocity Pressure $q_z$**:
+  $$K_z = 2.01 \left( \frac{\max(z, 4.5)}{z_g} \right)^{2/\alpha}, \quad q_z = 0.613 K_z K_{zt} K_d K_e V^2 \; (\text{Pa})$$
+- Evaluates directional wind pressure factoring wind directionality $K_d = 0.85$, topographic factor $K_{zt}$, and ground elevation factor $K_e$.
+
+#### 2. Dynamic Gust Effect Factor ($G_f$) for Flexible High-Rise Structures
+- **Background Response Factor ($Q$) & Resonant Factor ($R$)**:
+  $$Q = \sqrt{ \frac{1}{1 + 0.63 \left( \frac{B + h}{L_{\bar{z}}} \right)^{0.63}} }, \quad R = \sqrt{ \frac{1}{\beta} R_n R_h R_b (0.53 + 0.47 R_L) }$$
+- Unified formulation automatically switching between rigid structures ($G = 0.85$ for $f_1 \ge 1\text{ Hz}$) and flexible resonant high-rises ($f_1 < 1\text{ Hz}$) per ASCE 7-22 Section 26.11.
+
+#### 3. MWFRS Directional Procedure & Multi-Story Shear Aggregation
+- **Windward & Leeward Pressures**:
+  $$p_{\text{windward}} = q_z G C_p \; (C_p = 0.80), \quad p_{\text{leeward}} = q_h G C_p \; (C_p = -0.50 \text{ to } -0.30)$$
+- **Enclosure Internal Pressure**: Incorporates $GC_{pi} = \pm 0.18$ (Enclosed) and $\pm 0.55$ (Partially Enclosed).
+- **Story Force & Overturning Moment**:
+  $$F_i = p_{\text{net}, i} \cdot A_{\text{trib}, i}, \quad V_w(z) = \sum_{j=i}^{N} F_j, \quad M_{\text{OTM}} = \sum_{i=1}^{N} F_i z_i$$
+
+#### 4. Human Occupant Dynamic Comfort (ISO 10137 / ASCE 7-22 CC)
+- **Along-Wind Acceleration**: Peak acceleration $a_{\text{along}}$ formulated from background and resonant energy under 10-year MRI wind.
+- **Cross-Wind Vortex Shedding**: Evaluates vortex shedding dynamic acceleration based on reduced velocity $V_r = \frac{V}{f_1 B}$.
+- **Comfort Verification**: Compares resultant building top acceleration $a_{\text{res}} = \sqrt{a_{\text{along}}^2 + a_{\text{cross}}^2}$ against the ISO 10137 residential/commercial comfort threshold of $20\text{ milli-g}$.
+
+#### 5. Interactive Desktop UI & Official Dossier Export
+- **Sub-Tab `🌪️ ASCE 7 Wind`**: Dual-vector visualizer rendering elevation velocity pressure profiles, building silhouette, and dynamic comfort acceleration gauges.
+- **Wind Engineering Dossier**: One-click generation of `ASCE7_Wind_Engineering_Dossier.md` via Results View export suite.
+
+---
+
 ## 🚀 EigenGraph v0.0.6 — Phase 5: Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.6`  

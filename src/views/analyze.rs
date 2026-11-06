@@ -16,6 +16,7 @@ pub enum AnalyzeSubTab {
     ModalDynamics,
     GeotechSsi,
     SteelConnection,
+    WindEngineering,
 }
 
 pub struct AnalyzeView {
@@ -60,6 +61,17 @@ pub struct AnalyzeView {
     pub conn_plate_thick_mm: f32,
     pub conn_demand_vu_kn: f32,
     pub conn_demand_mu_knm: f32,
+    // Wind Engineering Parameters (ASCE 7-22 / SNI 1727:2020)
+    pub wind_v_ms: f32,
+    pub wind_exposure: crate::core::ExposureCategory,
+    pub wind_risk: crate::core::RiskCategory,
+    pub wind_enclosure: crate::core::EnclosureClassification,
+    pub wind_building_height_m: f32,
+    pub wind_building_width_m: f32,
+    pub wind_building_length_m: f32,
+    pub wind_num_stories: usize,
+    pub wind_t1_s: f32,
+    pub wind_damping: f32,
 }
 
 impl Default for AnalyzeView {
@@ -104,6 +116,16 @@ impl Default for AnalyzeView {
             conn_plate_thick_mm: 20.0,
             conn_demand_vu_kn: 120.0,
             conn_demand_mu_knm: 240.0,
+            wind_v_ms: 38.0,
+            wind_exposure: crate::core::ExposureCategory::ExposureB,
+            wind_risk: crate::core::RiskCategory::CategoryII,
+            wind_enclosure: crate::core::EnclosureClassification::Enclosed,
+            wind_building_height_m: 48.0,
+            wind_building_width_m: 24.0,
+            wind_building_length_m: 36.0,
+            wind_num_stories: 12,
+            wind_t1_s: 1.20,
+            wind_damping: 0.02,
         }
     }
 }
@@ -160,6 +182,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::ModalDynamics => self.render_modal_dynamics(ui, theme),
                     AnalyzeSubTab::GeotechSsi => self.render_geotech_ssi(ui, theme),
                     AnalyzeSubTab::SteelConnection => self.render_steel_connection(ui, theme),
+                    AnalyzeSubTab::WindEngineering => self.render_wind_engineering(ui, theme),
                 }
 
                 ui.add_space(24.0);
@@ -180,6 +203,7 @@ impl AnalyzeView {
                 (AnalyzeSubTab::ModalDynamics, "🌊 SNI 1726 Modal"),
                 (AnalyzeSubTab::GeotechSsi, "🌱 Geotech & SSI"),
                 (AnalyzeSubTab::SteelConnection, "🔩 Steel Connections"),
+                (AnalyzeSubTab::WindEngineering, "🌪️ ASCE 7 Wind"),
             ];
 
             for (tab, label) in tabs {
@@ -2727,6 +2751,333 @@ impl AnalyzeView {
                     });
                 });
         }
+    }
+
+    fn render_wind_engineering(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let rep = crate::core::WindEngine::run_wind_analysis(
+            "EigenGraph Aerodynamic MWFRS Assessment",
+            self.wind_v_ms as f64,
+            self.wind_exposure,
+            self.wind_risk,
+            self.wind_enclosure,
+            self.wind_building_height_m as f64,
+            self.wind_building_width_m as f64,
+            self.wind_building_length_m as f64,
+            self.wind_num_stories,
+            self.wind_t1_s as f64,
+            450.0, // Reference seismic base shear
+        );
+
+        // 1. Metric Cards Header
+        ui.columns(4, |cols| {
+            self.metric_card(
+                &mut cols[0],
+                theme,
+                "BASIC WIND SPEED (V)",
+                &format!("{:.1} m/s", rep.basic_wind_speed_v_ms),
+                &format!("{:.0} mph • ASCE 7-22", rep.basic_wind_speed_mph),
+                theme.accent_blue,
+            );
+            self.metric_card(
+                &mut cols[1],
+                theme,
+                "MEAN ROOF PRESSURE (qh)",
+                &format!("{:.0} Pa", rep.qh_mean_roof_velocity_pressure_pa),
+                &format!("{:.2} kPa • qz(h)", rep.qh_mean_roof_velocity_pressure_pa / 1000.0),
+                theme.accent_orange,
+            );
+            self.metric_card(
+                &mut cols[2],
+                theme,
+                "WIND BASE SHEAR (Vw)",
+                &format!("{:.1} kN", rep.total_base_shear_wind_kn),
+                &format!("OTM: {:.0} kN·m", rep.total_overturning_moment_wind_knm),
+                theme.accent_green,
+            );
+            let comfort_col = if rep.comfort_audit.is_comfort_acceptable {
+                theme.accent_green
+            } else {
+                Color32::from_rgb(239, 68, 68)
+            };
+            let comfort_tag = if rep.comfort_audit.is_comfort_acceptable {
+                "ISO 10137 OK (≤ 20 mg)"
+            } else {
+                "EXCEEDS LIMIT (> 20 mg)"
+            };
+            self.metric_card(
+                &mut cols[3],
+                theme,
+                "HUMAN COMFORT ACCEL",
+                &format!("{:.2} mg", rep.comfort_audit.resultant_acceleration_mg),
+                comfort_tag,
+                comfort_col,
+            );
+        });
+
+        ui.add_space(12.0);
+
+        // 2. Control Toolbar
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::same(10))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Wind Speed (V):").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.wind_v_ms).speed(0.5).range(20.0..=85.0).suffix(" m/s"));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Exposure:").size(11.0).strong().color(theme.text_secondary));
+                    let exposures = [
+                        (crate::core::ExposureCategory::ExposureB, "Exposure B (Suburban)"),
+                        (crate::core::ExposureCategory::ExposureC, "Exposure C (Open)"),
+                        (crate::core::ExposureCategory::ExposureD, "Exposure D (Coastal)"),
+                    ];
+                    for (exp, lbl) in exposures {
+                        let is_sel = self.wind_exposure == exp;
+                        let btn = egui::Button::new(RichText::new(lbl).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_secondary }))
+                            .fill(if is_sel { theme.accent_blue } else { theme.bg_canvas });
+                        if ui.add(btn).clicked() {
+                            self.wind_exposure = exp;
+                        }
+                    }
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Enclosure:").size(11.0).strong().color(theme.text_secondary));
+                    let enclosures = [
+                        (crate::core::EnclosureClassification::Enclosed, "Enclosed"),
+                        (crate::core::EnclosureClassification::PartiallyEnclosed, "Partially Enclosed"),
+                        (crate::core::EnclosureClassification::Open, "Open"),
+                    ];
+                    for (enc, lbl) in enclosures {
+                        let is_sel = self.wind_enclosure == enc;
+                        let btn = egui::Button::new(RichText::new(lbl).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_secondary }))
+                            .fill(if is_sel { theme.accent_blue } else { theme.bg_canvas });
+                        if ui.add(btn).clicked() {
+                            self.wind_enclosure = enc;
+                        }
+                    }
+                });
+
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Dimensions (H x B x L):").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.wind_building_height_m).speed(1.0).range(6.0..=250.0).suffix(" m H"));
+                    ui.add(egui::DragValue::new(&mut self.wind_building_width_m).speed(1.0).range(6.0..=120.0).suffix(" m B"));
+                    ui.add(egui::DragValue::new(&mut self.wind_building_length_m).speed(1.0).range(6.0..=120.0).suffix(" m L"));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Stories:").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.wind_num_stories).speed(1.0).range(2..=80));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Period T1:").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.wind_t1_s).speed(0.05).range(0.1..=8.0).suffix(" s"));
+                });
+            });
+
+        ui.add_space(12.0);
+
+        // 3. DUAL VECTOR VISUALIZER
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::same(16))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("🌪️ ASCE 7-22 Directional MWFRS Pressure Elevation & Dynamic Comfort Analysis").size(13.5).strong().color(theme.text_primary));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let gov_text = if rep.wind_governs_lateral_system {
+                            "⚠️ WIND GOVERNS LATERAL SYSTEM (Vw > Vs)"
+                        } else {
+                            "🟢 SEISMIC GOVERNS LATERAL SYSTEM (Vs > Vw)"
+                        };
+                        let gov_col = if rep.wind_governs_lateral_system {
+                            Color32::from_rgb(245, 158, 11)
+                        } else {
+                            theme.accent_green
+                        };
+                        ui.label(RichText::new(gov_text).size(11.5).strong().color(gov_col));
+                    });
+                });
+
+                ui.add_space(10.0);
+
+                ui.columns(2, |cols| {
+                    // LEFT: Elevation Velocity Pressure Profile
+                    cols[0].label(RichText::new("1. Elevation Velocity Pressure & Windward Net Vector Profile qz(z)").size(11.0).strong().color(theme.text_secondary));
+                    let desired_left = Vec2::new(cols[0].available_width(), 220.0);
+                    let (rect_l, _) = cols[0].allocate_exact_size(desired_left, Sense::hover());
+                    let painter_l = cols[0].painter_at(rect_l);
+                    painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+                    // Building silhouette
+                    let b_width_px = 75.0;
+                    let b_height_px = rect_l.height() * 0.82;
+                    let b_left = rect_l.left() + 110.0;
+                    let b_bottom = rect_l.bottom() - 15.0;
+                    let b_top = b_bottom - b_height_px;
+                    let b_rect = egui::Rect::from_min_max(Pos2::new(b_left, b_top), Pos2::new(b_left + b_width_px, b_bottom));
+
+                    // Draw building
+                    painter_l.rect_filled(b_rect, CornerRadius::same(3), Color32::from_rgb(30, 41, 59));
+                    painter_l.rect_stroke(b_rect, CornerRadius::same(3), Stroke::new(1.2, Color32::from_rgb(100, 116, 139)), egui::StrokeKind::Inside);
+
+                    // Ground line
+                    painter_l.line_segment(
+                        [Pos2::new(rect_l.left() + 10.0, b_bottom), Pos2::new(rect_l.right() - 10.0, b_bottom)],
+                        Stroke::new(2.0, Color32::from_rgb(71, 85, 105)),
+                    );
+                    painter_l.text(Pos2::new(rect_l.left() + 15.0, b_bottom + 8.0), egui::Align2::LEFT_TOP, "Ground El. ±0.00", egui::FontId::proportional(9.0), Color32::from_rgb(148, 163, 184));
+
+                    // Floor lines & pressure arrows
+                    let n_vis = rep.story_levels.len().min(12);
+                    let max_p = rep.story_levels.iter().map(|s| s.net_mwfrs_pressure_pa).fold(1.0f64, |a, b| a.max(b));
+                    for (idx, story) in rep.story_levels.iter().enumerate().take(n_vis) {
+                        let frac = (idx + 1) as f32 / n_vis as f32;
+                        let floor_y = b_bottom - frac * b_height_px;
+
+                        // Floor separator in building
+                        painter_l.line_segment(
+                            [Pos2::new(b_left, floor_y), Pos2::new(b_left + b_width_px, floor_y)],
+                            Stroke::new(0.8, Color32::from_rgb(51, 65, 85)),
+                        );
+
+                        // Windward arrow coming from left
+                        let arrow_len = ((story.net_mwfrs_pressure_pa / max_p) * 75.0).clamp(12.0, 85.0) as f32;
+                        let arrow_start = Pos2::new(b_left - arrow_len, floor_y);
+                        let arrow_end = Pos2::new(b_left - 2.0, floor_y);
+
+                        painter_l.line_segment([arrow_start, arrow_end], Stroke::new(1.5, Color32::from_rgb(56, 189, 248)));
+                        // Arrow head
+                        painter_l.line_segment([Pos2::new(arrow_end.x - 4.0, arrow_end.y - 3.0), arrow_end], Stroke::new(1.5, Color32::from_rgb(56, 189, 248)));
+                        painter_l.line_segment([Pos2::new(arrow_end.x - 4.0, arrow_end.y + 3.0), arrow_end], Stroke::new(1.5, Color32::from_rgb(56, 189, 248)));
+                    }
+
+                    // Height and Roof label
+                    painter_l.text(Pos2::new(b_left + b_width_px * 0.5, b_top - 8.0), egui::Align2::CENTER_BOTTOM, format!("Roof H = {:.0}m (qh = {:.0} Pa)", rep.building_height_h_m, rep.qh_mean_roof_velocity_pressure_pa), egui::FontId::proportional(9.5), Color32::from_rgb(226, 232, 240));
+
+                    // RIGHT: Dynamic Comfort Acceleration & Shear Envelope Comparison
+                    cols[1].label(RichText::new("2. Human Comfort Dynamic Acceleration & Wind vs Seismic Envelope").size(11.0).strong().color(theme.text_secondary));
+                    let desired_right = Vec2::new(cols[1].available_width(), 220.0);
+                    let (rect_r, _) = cols[1].allocate_exact_size(desired_right, Sense::hover());
+                    let painter_r = cols[1].painter_at(rect_r);
+                    painter_r.rect_filled(rect_r, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+                    // Draw ISO 10137 Acceleration Bar Chart
+                    let chart_left = rect_r.left() + 16.0;
+                    let chart_top = rect_r.top() + 24.0;
+                    let bar_w = rect_r.width() - 32.0;
+
+                    let acc = &rep.comfort_audit;
+                    let max_acc_scale = 35.0f32; // mg scale
+
+                    // Along-wind Bar
+                    let y1 = chart_top + 10.0;
+                    painter_r.text(Pos2::new(chart_left, y1 - 2.0), egui::Align2::LEFT_BOTTOM, format!("Along-Wind Acceleration: {:.2} mg", acc.peak_acceleration_along_wind_mg), egui::FontId::proportional(10.0), Color32::from_rgb(148, 163, 184));
+                    let w1 = ((acc.peak_acceleration_along_wind_mg as f32 / max_acc_scale) * bar_w).clamp(4.0, bar_w);
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y1), Vec2::new(bar_w, 12.0)), CornerRadius::same(3), Color32::from_rgb(30, 41, 59));
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y1), Vec2::new(w1, 12.0)), CornerRadius::same(3), Color32::from_rgb(59, 130, 246));
+
+                    // Cross-wind Vortex Shedding Bar
+                    let y2 = y1 + 32.0;
+                    painter_r.text(Pos2::new(chart_left, y2 - 2.0), egui::Align2::LEFT_BOTTOM, format!("Cross-Wind (Vortex Shedding): {:.2} mg", acc.peak_acceleration_cross_wind_mg), egui::FontId::proportional(10.0), Color32::from_rgb(148, 163, 184));
+                    let w2 = ((acc.peak_acceleration_cross_wind_mg as f32 / max_acc_scale) * bar_w).clamp(4.0, bar_w);
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y2), Vec2::new(bar_w, 12.0)), CornerRadius::same(3), Color32::from_rgb(30, 41, 59));
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y2), Vec2::new(w2, 12.0)), CornerRadius::same(3), Color32::from_rgb(168, 85, 247));
+
+                    // Resultant Bar vs Limit Line
+                    let y3 = y2 + 32.0;
+                    let res_color = if acc.is_comfort_acceptable { Color32::from_rgb(34, 197, 94) } else { Color32::from_rgb(239, 68, 68) };
+                    painter_r.text(Pos2::new(chart_left, y3 - 2.0), egui::Align2::LEFT_BOTTOM, format!("Resultant Accel: {:.2} mg (ISO 10137 limit: {:.1} mg)", acc.resultant_acceleration_mg, acc.occupant_comfort_threshold_mg), egui::FontId::proportional(10.0), res_color);
+                    let w3 = ((acc.resultant_acceleration_mg as f32 / max_acc_scale) * bar_w).clamp(4.0, bar_w);
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y3), Vec2::new(bar_w, 12.0)), CornerRadius::same(3), Color32::from_rgb(30, 41, 59));
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y3), Vec2::new(w3, 12.0)), CornerRadius::same(3), res_color);
+
+                    // Limit threshold vertical dotted line
+                    let x_lim = chart_left + (acc.occupant_comfort_threshold_mg as f32 / max_acc_scale) * bar_w;
+                    painter_r.line_segment([Pos2::new(x_lim, chart_top), Pos2::new(x_lim, y3 + 14.0)], Stroke::new(1.5, Color32::from_rgb(245, 158, 11)));
+
+                    // Base Shear Comparison: Wind vs Seismic
+                    let y4 = y3 + 42.0;
+                    painter_r.text(Pos2::new(chart_left, y4 - 2.0), egui::Align2::LEFT_BOTTOM, format!("Base Shear Comparison: Wind Vw = {:.0} kN vs Seismic Vs = {:.0} kN", rep.total_base_shear_wind_kn, rep.seismic_base_shear_ref_kn), egui::FontId::proportional(10.0), Color32::from_rgb(226, 232, 240));
+
+                    let max_v = (rep.total_base_shear_wind_kn.max(rep.seismic_base_shear_ref_kn) * 1.25) as f32;
+                    let w_wind = ((rep.total_base_shear_wind_kn as f32 / max_v) * bar_w).clamp(4.0, bar_w);
+                    let w_seis = ((rep.seismic_base_shear_ref_kn as f32 / max_v) * bar_w).clamp(4.0, bar_w);
+
+                    // Dual bar
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y4), Vec2::new(w_wind, 9.0)), CornerRadius::same(2), Color32::from_rgb(56, 189, 248));
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y4 + 11.0), Vec2::new(w_seis, 9.0)), CornerRadius::same(2), Color32::from_rgb(249, 115, 22));
+
+                    painter_r.text(Pos2::new(chart_left + w_wind + 6.0, y4 + 4.0), egui::Align2::LEFT_CENTER, "Wind (Vw)", egui::FontId::proportional(8.5), Color32::from_rgb(56, 189, 248));
+                    painter_r.text(Pos2::new(chart_left + w_seis + 6.0, y4 + 15.0), egui::Align2::LEFT_CENTER, "Seismic (Vs)", egui::FontId::proportional(8.5), Color32::from_rgb(249, 115, 22));
+                });
+            });
+
+        ui.add_space(14.0);
+
+        // 4. Story Wind Loading Schedule Table
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::same(12))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("📊 Story-by-Story ASCE 7-22 Directional MWFRS Wind Force Schedule").size(12.5).strong().color(theme.text_primary));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(RichText::new(format!("Total Overturning Moment: {:.0} kN·m", rep.total_overturning_moment_wind_knm)).size(11.0).strong().color(theme.accent_orange));
+                    });
+                });
+
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Story #").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(30.0);
+                    ui.label(RichText::new("Elev z (m)").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Kz Coef").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(40.0);
+                    ui.label(RichText::new("qz (Pa)").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(45.0);
+                    ui.label(RichText::new("Windward p (Pa)").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Leeward p (Pa)").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Net MWFRS (Pa)").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Story Force (kN)").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Shear Vx (kN)").size(11.0).strong().color(theme.text_secondary));
+                });
+                ui.separator();
+
+                for story in rep.story_levels.iter().rev() {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(format!("Level {:02}", story.story_num)).size(11.0).strong().color(theme.accent_blue));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new(format!("{:5.1}", story.height_z_m)).size(11.0).color(theme.text_primary));
+                        ui.add_space(55.0);
+                        ui.label(RichText::new(format!("{:.3}", story.kz_exposure_coef)).size(11.0).color(theme.text_secondary));
+                        ui.add_space(50.0);
+                        ui.label(RichText::new(format!("{:6.0}", story.qz_velocity_pressure_pa)).size(11.0).color(theme.text_primary));
+                        ui.add_space(50.0);
+                        ui.label(RichText::new(format!("{:6.0}", story.windward_pressure_pa)).size(11.0).color(theme.accent_blue));
+                        ui.add_space(60.0);
+                        ui.label(RichText::new(format!("{:6.0}", story.leeward_pressure_pa)).size(11.0).color(theme.text_muted));
+                        ui.add_space(65.0);
+                        ui.label(RichText::new(format!("{:6.0}", story.net_mwfrs_pressure_pa)).size(11.0).strong().color(theme.text_primary));
+                        ui.add_space(65.0);
+                        ui.label(RichText::new(format!("{:6.1}", story.tributary_force_fx_kn)).size(11.0).strong().color(theme.accent_orange));
+                        ui.add_space(60.0);
+                        ui.label(RichText::new(format!("{:6.1}", story.cumulative_shear_vx_kn)).size(11.0).strong().color(theme.accent_green));
+                    });
+                    ui.separator();
+                }
+            });
     }
 }
 

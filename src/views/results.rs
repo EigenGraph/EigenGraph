@@ -499,6 +499,28 @@ impl ResultsView {
                                     self.export_status = Some(format!("AISC 360 Steel Connection Audit Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🌪️ ASCE 7 Wind Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(2, 132, 199))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let rep = crate::core::WindEngine::run_wind_analysis(
+                                    "High-Rise MWFRS & Dynamic Comfort Assessment",
+                                    38.0,
+                                    crate::core::ExposureCategory::ExposureB,
+                                    crate::core::RiskCategory::CategoryII,
+                                    crate::core::EnclosureClassification::Enclosed,
+                                    48.0,
+                                    24.0,
+                                    36.0,
+                                    12,
+                                    1.20,
+                                    450.0,
+                                );
+                                let md = crate::core::WindEngine::generate_markdown_dossier(&rep);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("ASCE7_Wind_Engineering_Dossier.md", &md) {
+                                    self.export_status = Some(format!("ASCE 7-22 Wind Engineering Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });
