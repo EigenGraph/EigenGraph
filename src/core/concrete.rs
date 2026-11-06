@@ -116,6 +116,23 @@ pub struct DemandAudit {
     pub phi_mn_cap_knm: f64,
 }
 
+/// Comprehensive report for 3D Biaxial P-Mx-My interaction analysis (SNI 2847 / ACI 318)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BiaxialPmReport {
+    pub pu_kn: f64,
+    pub mux_knm: f64,
+    pub muy_knm: f64,
+    pub phi_mnx_knm: f64,
+    pub phi_mny_knm: f64,
+    pub phi_pn_max_kn: f64,
+    pub bresler_phi_pn_kn: f64,
+    pub alpha_exponent: f64,
+    pub biaxial_dcr: f64,
+    pub is_safe: bool,
+    /// Radial boundary points on the Mx - My plane at the current Pu level (kNm, kNm)
+    pub contour_envelope: Vec<(f64, f64)>,
+}
+
 pub struct ConcreteEngine;
 
 impl ConcreteEngine {
@@ -471,6 +488,85 @@ impl ConcreteEngine {
             demand_check,
         }
     }
+
+    /// Evaluates 3D Biaxial P-Mx-My interaction using the PCA load contour method
+    /// and Bresler reciprocal load method per SNI 2847:2019 / ACI 318-19.
+    pub fn evaluate_biaxial_pm(
+        sec: &ConcreteSection,
+        pu_kn: f64,
+        mux_knm: f64,
+        muy_knm: f64,
+    ) -> BiaxialPmReport {
+        // 1. Uniaxial evaluation about X-axis (bending about depth h)
+        let report_x = Self::evaluate_pm_diagram(sec, Some(pu_kn), Some(mux_knm));
+        let phi_mnx_cap = report_x.demand_check.as_ref().map(|d| d.phi_mn_cap_knm.max(10.0)).unwrap_or(150.0);
+
+        // 2. Uniaxial evaluation about Y-axis (rotate section 90 deg: width is h, height is b)
+        let bars_x = sec.rebar_layers.first().map(|l| l.bar_count).unwrap_or(3);
+        let bars_inter = sec.rebar_layers.len().saturating_sub(2);
+        let bar_dia = sec.rebar_layers.first().map(|l| l.bar_dia_mm).unwrap_or(22.0);
+        let sec_y_rot = Self::create_rectangular_column(
+            &format!("{}_rotY", sec.name),
+            sec.height_mm,
+            sec.width_mm,
+            sec.fc_mpa,
+            sec.fy_mpa,
+            sec.cover_mm,
+            bars_inter + 2,
+            bars_x.saturating_sub(2),
+            bar_dia,
+        );
+        let report_y = Self::evaluate_pm_diagram(&sec_y_rot, Some(pu_kn), Some(muy_knm));
+        let phi_mny_cap = report_y.demand_check.as_ref().map(|d| d.phi_mn_cap_knm.max(10.0)).unwrap_or(150.0);
+
+        // 3. Exponent alpha per PCA Load Contour Method (Bresler load contour)
+        let phi_pn0 = report_x.cardinal.phi_pn_max_kn.max(1.0);
+        let p_ratio = (pu_kn / phi_pn0).clamp(0.0, 1.0);
+        let alpha = if p_ratio <= 0.10 {
+            1.0
+        } else {
+            1.0 + (p_ratio - 0.10) * (0.50 / 0.70)
+        }.clamp(1.0, 1.55);
+
+        // 4. Biaxial DCR calculation
+        let term_x = (mux_knm.abs() / phi_mnx_cap).powf(alpha);
+        let term_y = (muy_knm.abs() / phi_mny_cap).powf(alpha);
+        let biaxial_dcr = (term_x + term_y).powf(1.0 / alpha);
+        let is_safe = biaxial_dcr <= 1.0 && pu_kn <= report_x.cardinal.phi_pn_max_kn;
+
+        // 5. Bresler reciprocal load capacity
+        let p0 = report_x.cardinal.p0_kn.max(100.0);
+        let pnx0 = report_x.cardinal.phi_pn_max_kn;
+        let pny0 = report_y.cardinal.phi_pn_max_kn;
+        let bresler_inv = (1.0 / pnx0) + (1.0 / pny0) - (1.0 / p0);
+        let bresler_phi_pn = if bresler_inv > 0.0 { 1.0 / bresler_inv } else { pnx0 };
+
+        // 6. Generate 24 radial points on the Mx - My contour slice at this Pu level
+        let mut contour_envelope = Vec::with_capacity(25);
+        for i in 0..=24 {
+            let theta = (i as f64 / 24.0) * 2.0 * std::f64::consts::PI;
+            let cos_t = theta.cos();
+            let sin_t = theta.sin();
+            let denom = (cos_t.abs().powf(alpha) + (sin_t.abs() * (phi_mnx_cap / phi_mny_cap)).powf(alpha)).powf(1.0 / alpha);
+            let mx = if denom > 1e-6 { (phi_mnx_cap * cos_t) / denom } else { 0.0 };
+            let my = if denom > 1e-6 { (phi_mny_cap * sin_t) / denom } else { 0.0 };
+            contour_envelope.push((mx, my));
+        }
+
+        BiaxialPmReport {
+            pu_kn,
+            mux_knm,
+            muy_knm,
+            phi_mnx_knm: phi_mnx_cap,
+            phi_mny_knm: phi_mny_cap,
+            phi_pn_max_kn: report_x.cardinal.phi_pn_max_kn,
+            bresler_phi_pn_kn: bresler_phi_pn,
+            alpha_exponent: alpha,
+            biaxial_dcr,
+            is_safe,
+            contour_envelope,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -551,5 +647,28 @@ mod tests {
         let audit = report.demand_check.unwrap();
         assert!(audit.dcr > 1.0);
         assert!(!audit.is_safe);
+    }
+
+    #[test]
+    fn test_biaxial_pm_evaluation() {
+        let col = ConcreteEngine::create_rectangular_column(
+            "Col-500x500",
+            500.0,
+            500.0,
+            30.0,
+            420.0,
+            40.0,
+            4,
+            2,
+            25.0,
+        );
+
+        let biaxial = ConcreteEngine::evaluate_biaxial_pm(&col, 1200.0, 100.0, 80.0);
+        assert!(biaxial.phi_mnx_knm > 0.0);
+        assert!(biaxial.phi_mny_knm > 0.0);
+        assert!(biaxial.biaxial_dcr > 0.0);
+        assert!(biaxial.biaxial_dcr < 1.0);
+        assert!(biaxial.is_safe);
+        assert_eq!(biaxial.contour_envelope.len(), 25);
     }
 }

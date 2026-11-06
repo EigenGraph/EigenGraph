@@ -184,6 +184,21 @@ pub struct ModalAnalysisReport {
     pub seismic_base_shear_kn: f64,
 }
 
+/// Modal Response Combination Report (CQC vs SRSS) per SNI 1726:2019 Pasal 7.9.3 & ASCE 7-16
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModalCombinationReport {
+    pub num_modes: usize,
+    pub damping_ratio: f64,
+    pub correlation_matrix_rho: Vec<Vec<f64>>,
+    pub modal_base_shears_kn: Vec<f64>,
+    pub srss_base_shear_kn: f64,
+    pub cqc_base_shear_kn: f64,
+    pub static_base_shear_kn: f64,
+    pub min_85pct_threshold_kn: f64,
+    pub scale_factor_85pct: f64,
+    pub governing_design_base_shear_kn: f64,
+}
+
 pub struct ModalEngine;
 
 impl ModalEngine {
@@ -425,6 +440,79 @@ impl ModalEngine {
             seismic_base_shear_kn: base_shear_kn,
         })
     }
+
+    /// Evaluates CQC (Complete Quadratic Combination) and SRSS (Square Root of Sum of Squares)
+    /// modal response combinations per SNI 1726:2019 Pasal 7.9.3 & ASCE 7-16 Section 12.9.1.
+    pub fn evaluate_modal_combinations(
+        report: &ModalAnalysisReport,
+        damping_ratio: f64,
+    ) -> ModalCombinationReport {
+        let n = report.modes.len();
+        let xi = damping_ratio.clamp(0.01, 0.20); // 5% default
+
+        // 1. Cross-modal correlation matrix rho_ij using Der Kiureghian formulation
+        let mut rho = vec![vec![1.0; n]; n];
+        for i in 0..n {
+            let wi = report.modes[i].omega_rad_s.max(1e-4);
+            for j in 0..n {
+                if i != j {
+                    let wj = report.modes[j].omega_rad_s.max(1e-4);
+                    let r = wj / wi;
+                    let num = 8.0 * xi * xi * (1.0 + r) * r.powf(1.5);
+                    let denom = (1.0 - r * r).powi(2) + 4.0 * xi * xi * r * (1.0 + r).powi(2);
+                    let coeff = if denom > 1e-9 { (num / denom).clamp(0.0, 1.0) } else { 1.0 };
+                    rho[i][j] = coeff;
+                }
+            }
+        }
+
+        // 2. Modal base shears per mode: V_i = M_eff_i * Sa(Ti) * g
+        let mut modal_v = Vec::with_capacity(n);
+        for m in &report.modes {
+            let sa_g = report.spectrum.spectral_acceleration(m.period_s);
+            let eff_mass_tonne = (m.effective_mass_kg_x.max(m.effective_mass_kg_y)) / 1000.0;
+            let vi_kn = eff_mass_tonne * 9.81 * (sa_g / report.spectrum.r_factor.max(1.0));
+            modal_v.push(vi_kn);
+        }
+
+        // 3. SRSS combination: V_srss = sqrt(sum(Vi^2))
+        let srss_sum: f64 = modal_v.iter().map(|v| v * v).sum();
+        let v_srss = srss_sum.sqrt();
+
+        // 4. CQC combination: V_cqc = sqrt(sum_i sum_j Vi * rho_ij * Vj)
+        let mut cqc_sum = 0.0_f64;
+        for i in 0..n {
+            for j in 0..n {
+                cqc_sum += modal_v[i] * rho[i][j] * modal_v[j];
+            }
+        }
+        let v_cqc = cqc_sum.max(0.0).sqrt();
+
+        // 5. SNI 1726 Pasal 7.9.4.1 / ASCE 7-16 Section 12.9.1.4.1:
+        // Combined response must not be less than 85% of static equivalent base shear V_static
+        let v_static = report.seismic_base_shear_kn;
+        let v_min_85 = 0.85 * v_static;
+        let governing_comb = v_cqc.max(v_srss);
+        let scale_factor = if governing_comb < v_min_85 && governing_comb > 1e-4 {
+            v_min_85 / governing_comb
+        } else {
+            1.0
+        };
+        let governing_design = governing_comb * scale_factor;
+
+        ModalCombinationReport {
+            num_modes: n,
+            damping_ratio: xi,
+            correlation_matrix_rho: rho,
+            modal_base_shears_kn: modal_v,
+            srss_base_shear_kn: v_srss,
+            cqc_base_shear_kn: v_cqc,
+            static_base_shear_kn: v_static,
+            min_85pct_threshold_kn: v_min_85,
+            scale_factor_85pct: scale_factor,
+            governing_design_base_shear_kn: governing_design,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -465,5 +553,13 @@ mod tests {
         for i in 1..report.modes.len() {
             assert!(report.modes[i - 1].period_s >= report.modes[i].period_s - 1e-4);
         }
+
+        let comb = ModalEngine::evaluate_modal_combinations(&report, 0.05);
+        assert_eq!(comb.num_modes, 4);
+        assert!(comb.srss_base_shear_kn > 0.0);
+        assert!(comb.cqc_base_shear_kn > 0.0);
+        assert!(comb.governing_design_base_shear_kn > 0.0);
+        assert_eq!(comb.correlation_matrix_rho.len(), 4);
+        assert_eq!(comb.correlation_matrix_rho[0][0], 1.0);
     }
 }

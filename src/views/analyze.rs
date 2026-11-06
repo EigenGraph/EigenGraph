@@ -39,7 +39,11 @@ pub struct AnalyzeView {
     pub concrete_bar_dia_mm: f32,
     pub concrete_demand_pu_kn: f32,
     pub concrete_demand_mu_knm: f32,
+    pub concrete_demand_muy_knm: f32,
     pub concrete_is_spiral: bool,
+    pub woodbury_disrupt_elem_id: usize,
+    pub woodbury_lambda_val: f32,
+    pub modal_damping_ratio: f32,
 }
 
 impl Default for AnalyzeView {
@@ -66,7 +70,11 @@ impl Default for AnalyzeView {
             concrete_bar_dia_mm: 22.0,
             concrete_demand_pu_kn: 1500.0,
             concrete_demand_mu_knm: 120.0,
+            concrete_demand_muy_knm: 80.0,
             concrete_is_spiral: false,
+            woodbury_disrupt_elem_id: 1,
+            woodbury_lambda_val: 0.0,
+            modal_damping_ratio: 0.05,
         }
     }
 }
@@ -907,6 +915,51 @@ impl AnalyzeView {
                     });
                     ui.separator();
                 }
+
+                ui.add_space(14.0);
+
+                // Sherman-Morrison / Woodbury Non-Linear Post-Yield Redistribution & AI Advisor
+                let woodbury_rep = crate::core::NonlinearEngine::evaluate_woodbury_disruption(
+                    &model,
+                    self.woodbury_disrupt_elem_id,
+                    self.woodbury_lambda_val as f64,
+                );
+
+                Frame::new()
+                    .fill(Color32::from_rgb(17, 24, 39))
+                    .corner_radius(CornerRadius::same(8))
+                    .inner_margin(Margin::same(12))
+                    .stroke(Stroke::new(1.0, Color32::from_rgb(37, 99, 235)))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("🔬 Sherman-Morrison / Woodbury Non-Linear Redistribution & AI Advisor (Eqs. 4.13d–4.13g):").size(12.5).strong().color(Color32::WHITE));
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                let badge_txt = if woodbury_rep.is_mechanism { "🚨 KINEMATIC MECHANISM" } else if woodbury_rep.non_linear_ci >= 0.35 { "⚠️ CRITICAL POST-YIELD" } else { "🟢 REDUNDANT PATH CLEAR" };
+                                let badge_c = if woodbury_rep.is_mechanism { Color32::from_rgb(239, 68, 68) } else if woodbury_rep.non_linear_ci >= 0.35 { Color32::from_rgb(245, 158, 11) } else { theme.accent_green };
+                                ui.label(RichText::new(badge_txt).size(11.0).strong().color(badge_c));
+                            });
+                        });
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Target Element ID:").size(11.0).color(theme.text_secondary));
+                            ui.add(egui::Slider::new(&mut self.woodbury_disrupt_elem_id, 1..=model.elements.len().max(4)).step_by(1.0));
+                            ui.add_space(12.0);
+                            ui.label(RichText::new("Residual Capacity λ:").size(11.0).color(theme.text_secondary));
+                            ui.add(egui::Slider::new(&mut self.woodbury_lambda_val, 0.0..=1.0).step_by(0.1));
+                        });
+                        ui.add_space(6.0);
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(RichText::new(format!("Stability Margin ms: {:.3}", woodbury_rep.stability_margin_ms)).size(11.0).strong().color(theme.accent_blue));
+                            ui.label(RichText::new("•").size(11.0).color(theme.text_muted));
+                            ui.label(RichText::new(format!("Redistributed Force ΔN: {:.2} kN", woodbury_rep.redistributed_force_delta_n_kn)).size(11.0).strong().color(theme.accent_orange));
+                            ui.label(RichText::new("•").size(11.0).color(theme.text_muted));
+                            ui.label(RichText::new(format!("Ductility Demand μ: {:.2}", woodbury_rep.ductility_demand_mu)).size(11.0).strong().color(Color32::from_rgb(168, 85, 247)));
+                            ui.label(RichText::new("•").size(11.0).color(theme.text_muted));
+                            ui.label(RichText::new(format!("Non-Linear ARI: {:.4} (CI: {:.4})", woodbury_rep.non_linear_ari, woodbury_rep.non_linear_ci)).size(11.0).strong().color(theme.accent_green));
+                        });
+                        ui.add_space(6.0);
+                        ui.label(RichText::new(&woodbury_rep.prescriptive_recommendation).size(11.5).strong().color(Color32::from_rgb(253, 224, 71)));
+                    });
             });
     }
 
@@ -1063,6 +1116,56 @@ impl AnalyzeView {
                         });
                         ui.separator();
                     }
+
+                    // CQC vs. SRSS Modal Combination Comparison Card (SNI 1726:2019 Pasal 7.9.3 & ASCE 7-16 Section 12.9.1)
+                    let modal_comb = crate::core::modal::ModalEngine::evaluate_modal_combinations(
+                        report,
+                        self.modal_damping_ratio as f64,
+                    );
+
+                    ui.add_space(14.0);
+                    Frame::new()
+                        .fill(Color32::from_rgb(17, 24, 39))
+                        .corner_radius(CornerRadius::same(8))
+                        .inner_margin(Margin::same(12))
+                        .stroke(Stroke::new(1.0, Color32::from_rgb(14, 165, 233)))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new("📊 Dynamic Modal Combinations & 85% Static Scaling (SNI 1726:2019 Pasal 7.9.3 & ASCE 7-16):").size(12.5).strong().color(Color32::WHITE));
+                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                    let scale_badge = if modal_comb.scale_factor_85pct > 1.0 { "⚠️ SCALED TO 85% V_STATIC" } else { "🟢 DYNAMIC Vt ≥ 0.85 Vs" };
+                                    let badge_color = if modal_comb.scale_factor_85pct > 1.0 { Color32::from_rgb(245, 158, 11) } else { theme.accent_green };
+                                    ui.label(RichText::new(scale_badge).size(11.0).strong().color(badge_color));
+                                });
+                            });
+                            ui.add_space(6.0);
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new("Damping Ratio ξ:").size(11.0).color(theme.text_secondary));
+                                ui.add(egui::Slider::new(&mut self.modal_damping_ratio, 0.01..=0.10).step_by(0.01).suffix(" (5% RC)"));
+                                ui.add_space(16.0);
+                                ui.label(RichText::new(format!("SRSS Base Shear: {:.1} kN", modal_comb.srss_base_shear_kn)).size(11.0).color(theme.text_secondary));
+                                ui.add_space(10.0);
+                                ui.label(RichText::new(format!("CQC Base Shear: {:.1} kN", modal_comb.cqc_base_shear_kn)).size(11.0).strong().color(theme.accent_blue));
+                                ui.add_space(10.0);
+                                ui.label(RichText::new(format!("Static Base Shear Vs: {:.1} kN", modal_comb.static_base_shear_kn)).size(11.0).color(theme.text_secondary));
+                                ui.add_space(10.0);
+                                ui.label(RichText::new(format!("Governing Design V: {:.1} kN (Scale: {:.3}x)", modal_comb.governing_design_base_shear_kn, modal_comb.scale_factor_85pct)).size(11.0).strong().color(theme.accent_green));
+                            });
+                            if !modal_comb.correlation_matrix_rho.is_empty() {
+                                ui.add_space(6.0);
+                                ui.horizontal(|ui| {
+                                    ui.label(RichText::new("Der Kiureghian Correlation ρ₁₂:").size(10.5).color(theme.text_muted));
+                                    let rho12 = modal_comb.correlation_matrix_rho.get(0).and_then(|r| r.get(1)).copied().unwrap_or(0.0);
+                                    let rho13 = modal_comb.correlation_matrix_rho.get(0).and_then(|r| r.get(2)).copied().unwrap_or(0.0);
+                                    ui.label(RichText::new(format!("{:.4}", rho12)).size(10.5).strong().color(theme.accent_blue));
+                                    ui.add_space(10.0);
+                                    ui.label(RichText::new("ρ₁₃:").size(10.5).color(theme.text_muted));
+                                    ui.label(RichText::new(format!("{:.4}", rho13)).size(10.5).strong().color(theme.accent_blue));
+                                    ui.add_space(10.0);
+                                    ui.label(RichText::new(format!("Code Min. 0.85*Vs: {:.1} kN", modal_comb.min_85pct_threshold_kn)).size(10.5).color(theme.text_muted));
+                                });
+                            }
+                        });
                 }
             });
     }
@@ -1093,8 +1196,15 @@ impl AnalyzeView {
             Some(self.concrete_demand_mu_knm as f64),
         );
 
+        let biaxial_rep = ConcreteEngine::evaluate_biaxial_pm(
+            &col_sec,
+            self.concrete_demand_pu_kn as f64,
+            self.concrete_demand_mu_knm as f64,
+            self.concrete_demand_muy_knm as f64,
+        );
+
         let dcr = pm_report.demand_check.as_ref().map(|d| d.dcr).unwrap_or(0.0);
-        let is_safe = pm_report.demand_check.as_ref().map(|d| d.is_safe).unwrap_or(true);
+        let is_safe = biaxial_rep.is_safe;
 
         // 2. Top Metric Cards
         ui.columns(4, |cols| {
@@ -1125,9 +1235,9 @@ impl AnalyzeView {
             self.metric_card(
                 &mut cols[3],
                 theme,
-                "DEMAND AUDIT (DCR)",
-                &format!("{:.3}", dcr),
-                if is_safe { "🟢 SAFE (Adequate Capacity)" } else { "🔴 OVERSTRESSED (Capacity Exceeded)" },
+                "BIAXIAL AUDIT (DCR)",
+                &format!("{:.3} (Biax)", biaxial_rep.biaxial_dcr),
+                if is_safe { "🟢 SAFE (Biaxial Adequate)" } else { "🔴 OVERSTRESSED (Exceeds Envelope)" },
                 if is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) },
             );
         });
@@ -1242,13 +1352,17 @@ impl AnalyzeView {
                         ui.add(egui::Slider::new(&mut self.concrete_demand_pu_kn, -500.0..=5000.0).suffix(" kN").step_by(50.0));
                     });
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Bending Moment Mu:").size(11.0));
+                        ui.label(RichText::new("Moment Mux:").size(11.0));
                         ui.add(egui::Slider::new(&mut self.concrete_demand_mu_knm, 0.0..=800.0).suffix(" kNm").step_by(10.0));
                     });
                     ui.horizontal(|ui| {
-                        let status_label = if is_safe { "🟢 SAFE (Adequate Capacity)" } else { "🔴 UNSAFE" };
+                        ui.label(RichText::new("Moment Muy:").size(11.0));
+                        ui.add(egui::Slider::new(&mut self.concrete_demand_muy_knm, 0.0..=800.0).suffix(" kNm").step_by(10.0));
+                    });
+                    ui.horizontal(|ui| {
+                        let status_label = if is_safe { "🟢 SAFE" } else { "🔴 UNSAFE" };
                         let status_col = if is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                        ui.label(RichText::new(format!("DCR: {:.3} • {}", dcr, status_label)).size(11.0).strong().color(status_col));
+                        ui.label(RichText::new(format!("Biax DCR: {:.3} (α={:.2}) • {}", biaxial_rep.biaxial_dcr, biaxial_rep.alpha_exponent, status_label)).size(11.0).strong().color(status_col));
                     });
                 });
             });
@@ -1519,6 +1633,98 @@ impl AnalyzeView {
                 });
                 ui.separator();
             }
+        });
+
+        ui.add_space(16.0);
+
+        // 6. 3D Biaxial P-Mx-My Interaction Surface & PCA Load Contour (SNI 2847:2019 / Bresler)
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📐 3D Biaxial P-Mx-My Interaction Surface & PCA Load Contour Envelope (SNI 2847:2019 / ACI 318-19):").size(12.5).strong().color(theme.text_primary));
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let bresler_lbl = format!("Bresler Reciprocal φPn: {:.1} kN • α = {:.3}", biaxial_rep.bresler_phi_pn_kn, biaxial_rep.alpha_exponent);
+                    ui.label(RichText::new(bresler_lbl).size(11.0).color(theme.accent_blue));
+                });
+            });
+            ui.add_space(8.0);
+
+            // Live vector slice of Mx - My contour at design axial Pu
+            let desired = Vec2::new(ui.available_width(), 160.0);
+            let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+            let painter = ui.painter_at(rect);
+            painter.rect_filled(rect, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+            let center_x = rect.center().x;
+            let center_y = rect.center().y;
+            let max_m = (biaxial_rep.phi_mnx_knm.max(biaxial_rep.phi_mny_knm) * 1.25).max(50.0);
+            let radius_px = (rect.height() * 0.42).min(rect.width() * 0.28);
+
+            // Draw axis lines
+            painter.line_segment(
+                [Pos2::new(center_x - radius_px * 1.15, center_y), Pos2::new(center_x + radius_px * 1.15, center_y)],
+                Stroke::new(1.0, Color32::from_rgb(60, 65, 75)),
+            );
+            painter.line_segment(
+                [Pos2::new(center_x, center_y - radius_px * 1.15), Pos2::new(center_x, center_y + radius_px * 1.15)],
+                Stroke::new(1.0, Color32::from_rgb(60, 65, 75)),
+            );
+
+            // Draw PCA Contour Polygon
+            let mut contour_pts = Vec::with_capacity(biaxial_rep.contour_envelope.len());
+            for &(mx, my) in &biaxial_rep.contour_envelope {
+                let px = center_x + (mx as f32 / max_m as f32) * radius_px;
+                let py = center_y - (my as f32 / max_m as f32) * radius_px;
+                contour_pts.push(Pos2::new(px, py));
+            }
+            if contour_pts.len() > 2 {
+                for w in contour_pts.windows(2) {
+                    painter.line_segment([w[0], w[1]], Stroke::new(2.0, theme.accent_blue));
+                }
+            }
+
+            // Draw Demand Point (Mux, Muy)
+            let dem_x = center_x + (self.concrete_demand_mu_knm / max_m as f32) * radius_px;
+            let dem_y = center_y - (self.concrete_demand_muy_knm / max_m as f32) * radius_px;
+            let dem_pos = Pos2::new(dem_x, dem_y);
+            let dem_col = if biaxial_rep.is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+
+            painter.circle_filled(dem_pos, 7.0, dem_col.gamma_multiply(0.3));
+            painter.circle_filled(dem_pos, 4.0, dem_col);
+            painter.circle_stroke(dem_pos, 4.0, Stroke::new(1.5, Color32::WHITE));
+
+            painter.text(
+                dem_pos + Vec2::new(8.0, -8.0),
+                Align2::LEFT_BOTTOM,
+                format!("Demand (Mux: {:.0}, Muy: {:.0})", self.concrete_demand_mu_knm, self.concrete_demand_muy_knm),
+                egui::FontId::proportional(10.5),
+                dem_col,
+            );
+
+            // Labels for φMnx and φMny
+            painter.text(
+                Pos2::new(center_x + (biaxial_rep.phi_mnx_knm as f32 / max_m as f32) * radius_px + 6.0, center_y),
+                Align2::LEFT_CENTER,
+                format!("φMnx = {:.1} kNm", biaxial_rep.phi_mnx_knm),
+                egui::FontId::proportional(9.5),
+                theme.text_secondary,
+            );
+            painter.text(
+                Pos2::new(center_x, center_y - (biaxial_rep.phi_mny_knm as f32 / max_m as f32) * radius_px - 8.0),
+                Align2::CENTER_BOTTOM,
+                format!("φMny = {:.1} kNm", biaxial_rep.phi_mny_knm),
+                egui::FontId::proportional(9.5),
+                theme.text_secondary,
+            );
+
+            // Information summary footer
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(format!("Biaxial Demand-Capacity Ratio (DCR): {:.3}", biaxial_rep.biaxial_dcr)).size(11.5).strong().color(dem_col));
+                ui.label(RichText::new("•").size(11.0).color(theme.text_muted));
+                ui.label(RichText::new(format!("PCA Load Contour Formula: (Mux/φMnx)^{{α}} + (Muy/φMny)^{{α}} ≤ 1.0 (α = {:.2})", biaxial_rep.alpha_exponent)).size(11.0).color(theme.text_secondary));
+                ui.label(RichText::new("•").size(11.0).color(theme.text_muted));
+                ui.label(RichText::new(format!("Bresler Reciprocal φPn = {:.1} kN (Pu = {:.1} kN)", biaxial_rep.bresler_phi_pn_kn, biaxial_rep.pu_kn)).size(11.0).color(theme.accent_blue));
+            });
         });
     }
 }
