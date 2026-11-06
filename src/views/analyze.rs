@@ -15,6 +15,7 @@ pub enum AnalyzeSubTab {
     NonlinearPushover,
     ModalDynamics,
     GeotechSsi,
+    SteelConnection,
 }
 
 pub struct AnalyzeView {
@@ -51,6 +52,14 @@ pub struct AnalyzeView {
     pub geotech_footing_l: f32,
     pub geotech_piles_x: usize,
     pub geotech_piles_y: usize,
+    // Steel Connection Parameters (AISC 360-16 / SNI 1729:2020)
+    pub conn_type: crate::core::ConnectionType,
+    pub conn_bolt_grade: crate::core::BoltGrade,
+    pub conn_bolt_dia_mm: f32,
+    pub conn_bolt_rows: usize,
+    pub conn_plate_thick_mm: f32,
+    pub conn_demand_vu_kn: f32,
+    pub conn_demand_mu_knm: f32,
 }
 
 impl Default for AnalyzeView {
@@ -88,6 +97,13 @@ impl Default for AnalyzeView {
             geotech_footing_l: 3.5,
             geotech_piles_x: 3,
             geotech_piles_y: 3,
+            conn_type: crate::core::ConnectionType::ExtendedEndPlate4E,
+            conn_bolt_grade: crate::core::BoltGrade::A325X,
+            conn_bolt_dia_mm: 22.0,
+            conn_bolt_rows: 4,
+            conn_plate_thick_mm: 20.0,
+            conn_demand_vu_kn: 120.0,
+            conn_demand_mu_knm: 240.0,
         }
     }
 }
@@ -143,6 +159,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::NonlinearPushover => self.render_nonlinear_pushover(ui, theme),
                     AnalyzeSubTab::ModalDynamics => self.render_modal_dynamics(ui, theme),
                     AnalyzeSubTab::GeotechSsi => self.render_geotech_ssi(ui, theme),
+                    AnalyzeSubTab::SteelConnection => self.render_steel_connection(ui, theme),
                 }
 
                 ui.add_space(24.0);
@@ -162,6 +179,7 @@ impl AnalyzeView {
                 (AnalyzeSubTab::NonlinearPushover, "📉 Pushover P-Δ"),
                 (AnalyzeSubTab::ModalDynamics, "🌊 SNI 1726 Modal"),
                 (AnalyzeSubTab::GeotechSsi, "🌱 Geotech & SSI"),
+                (AnalyzeSubTab::SteelConnection, "🔩 Steel Connections"),
             ];
 
             for (tab, label) in tabs {
@@ -2300,5 +2318,416 @@ impl AnalyzeView {
                 });
             });
     }
+
+    // -------------------------------------------------------------
+    // SUB-TAB 10: Steel Connection Design & AISC 360-16 / SNI 1729
+    // -------------------------------------------------------------
+    fn render_steel_connection(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let rep = match self.conn_type {
+            crate::core::ConnectionType::ShearTabSinglePlate => {
+                crate::core::ConnectionEngine::evaluate_shear_tab(
+                    "Beam-to-Girder Shear Tab Connection",
+                    self.conn_bolt_grade,
+                    self.conn_bolt_dia_mm as f64,
+                    self.conn_bolt_rows,
+                    self.conn_plate_thick_mm as f64,
+                    110.0,
+                    250.0,
+                    400.0,
+                    8.0,
+                    self.conn_demand_vu_kn as f64,
+                    0.0,
+                )
+            }
+            _ => {
+                crate::core::ConnectionEngine::evaluate_extended_end_plate(
+                    "Beam-to-Column 4E Extended End-Plate Moment Connection",
+                    self.conn_bolt_grade,
+                    self.conn_bolt_dia_mm as f64,
+                    self.conn_plate_thick_mm as f64,
+                    220.0,
+                    345.0,
+                    450.0,
+                    550.0,
+                    200.0,
+                    16.0,
+                    10.0,
+                    350.0,
+                    19.0,
+                    12.0,
+                    self.conn_demand_mu_knm as f64,
+                    self.conn_demand_vu_kn as f64,
+                )
+            }
+        };
+
+        // 1. Top Summary Metric Cards (4 Columns)
+        ui.columns(4, |cols| {
+            let status_color = if rep.is_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            self.metric_card(
+                &mut cols[0],
+                theme,
+                "GOVERNING DCR",
+                &format!("{:.3}", rep.governing_dcr),
+                if rep.is_compliant { "AISC 360-16 Compliant" } else { "Overstress Detected" },
+                status_color,
+            );
+            self.metric_card(
+                &mut cols[1],
+                theme,
+                "CRITICAL LIMIT STATE",
+                &rep.governing_limit_state,
+                &format!("Applied Vu: {:.0} kN • Mu: {:.0} kNm", rep.applied_shear_vu_kn, rep.applied_moment_mu_knm),
+                theme.accent_blue,
+            );
+            self.metric_card(
+                &mut cols[2],
+                theme,
+                "FASTENER CONFIGURATION",
+                &format!("{}x D{:.0}mm", rep.bolt_count_n, rep.bolt_diameter_mm),
+                rep.bolt_grade.label(),
+                theme.accent_orange,
+            );
+            let pz_summary = if let Some(ref pz) = rep.panel_zone {
+                if pz.doubler_plate_required {
+                    format!("Doubler Req (t = {:.0}mm)", pz.recommended_doubler_thickness_mm)
+                } else {
+                    format!("Panel Zone DCR: {:.3} (OK)", pz.panel_zone_dcr)
+                }
+            } else {
+                format!("Plate t = {:.0} mm (Fy = {:.0})", rep.plate_thickness_mm, rep.plate_fy_mpa)
+            };
+            self.metric_card(
+                &mut cols[3],
+                theme,
+                "PANEL ZONE / PLATE",
+                &pz_summary,
+                "AISC 360-16 Section J10.6",
+                theme.accent_green,
+            );
+        });
+
+        ui.add_space(12.0);
+
+        // 2. Control Toolbar
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::same(10))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Typology:").size(11.0).strong().color(theme.text_secondary));
+                    let types = [
+                        (crate::core::ConnectionType::ExtendedEndPlate4E, "4E Moment End-Plate"),
+                        (crate::core::ConnectionType::ShearTabSinglePlate, "Shear Tab (Pinned)"),
+                    ];
+                    for (ct, lbl) in types {
+                        let is_sel = self.conn_type == ct;
+                        let btn = egui::Button::new(RichText::new(lbl).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_secondary }))
+                            .fill(if is_sel { theme.accent_blue } else { theme.bg_canvas });
+                        if ui.add(btn).clicked() {
+                            self.conn_type = ct;
+                        }
+                    }
+
+                    ui.add_space(12.0);
+                    ui.label(RichText::new("Bolt Grade:").size(11.0).strong().color(theme.text_secondary));
+                    let grades = [
+                        (crate::core::BoltGrade::A325N, "A325-N"),
+                        (crate::core::BoltGrade::A325X, "A325-X"),
+                        (crate::core::BoltGrade::A490X, "A490-X"),
+                        (crate::core::BoltGrade::Grade10_9, "Gr 10.9"),
+                    ];
+                    for (bg, lbl) in grades {
+                        let is_sel = self.conn_bolt_grade == bg;
+                        let btn = egui::Button::new(RichText::new(lbl).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_secondary }))
+                            .fill(if is_sel { theme.accent_blue } else { theme.bg_canvas });
+                        if ui.add(btn).clicked() {
+                            self.conn_bolt_grade = bg;
+                        }
+                    }
+
+                    ui.add_space(12.0);
+                    ui.label(RichText::new("Bolt Dia (mm):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.conn_bolt_dia_mm).speed(2.0).range(16.0..=36.0));
+
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Plate t (mm):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.conn_plate_thick_mm).speed(1.0).range(6.0..=45.0));
+
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Vu (kN):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.conn_demand_vu_kn).speed(5.0).range(10.0..=800.0));
+
+                    if self.conn_type != crate::core::ConnectionType::ShearTabSinglePlate {
+                        ui.add_space(8.0);
+                        ui.label(RichText::new("Mu (kNm):").size(11.0).color(theme.text_secondary));
+                        ui.add(egui::DragValue::new(&mut self.conn_demand_mu_knm).speed(10.0).range(10.0..=1200.0));
+                    }
+                });
+            });
+
+        ui.add_space(12.0);
+
+        // 3. DUAL VECTOR VISUALIZER: Left = 2D Connection Detailing Blueprint; Right = Limit States DCR Breakdown
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::same(16))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("📐 Connection 2D Detailing Blueprint & AISC 360-16 Limit State Breakdown").size(13.5).strong().color(theme.text_primary));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let verdict_tag = if rep.is_compliant { "✅ Connection Approved (All DCR ≤ 1.00)" } else { "⚠️ Reinforcement / Plate Upgrade Required" };
+                        let verdict_col = if rep.is_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                        ui.label(RichText::new(verdict_tag).size(11.5).strong().color(verdict_col));
+                    });
+                });
+
+                ui.add_space(10.0);
+
+                ui.columns(2, |cols| {
+                    // LEFT: 2D Elevation Detailing
+                    cols[0].label(RichText::new("1. Elevation Detailing Blueprint (CAD Vector Projection)").size(11.0).strong().color(theme.text_secondary));
+                    let desired_left = Vec2::new(cols[0].available_width(), 220.0);
+                    let (rect_l, _) = cols[0].allocate_exact_size(desired_left, Sense::hover());
+                    let painter_l = cols[0].painter_at(rect_l);
+                    painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+                    let center_l = rect_l.center();
+
+                    if rep.connection_type == crate::core::ConnectionType::ExtendedEndPlate4E {
+                        // Extended End-Plate Drawing
+                        let col_w_px = 65.0;
+                        let col_h_px = rect_l.height() * 0.88;
+                        let col_x = rect_l.left() + 50.0;
+                        let col_rect = egui::Rect::from_min_size(Pos2::new(col_x, center_l.y - col_h_px * 0.5), Vec2::new(col_w_px, col_h_px));
+                        painter_l.rect_filled(col_rect, CornerRadius::same(2), Color32::from_rgb(45, 55, 72));
+                        painter_l.rect_stroke(col_rect, CornerRadius::same(2), Stroke::new(1.2, Color32::from_rgb(148, 163, 184)), egui::StrokeKind::Inside);
+                        painter_l.text(col_rect.center(), egui::Align2::CENTER_CENTER, "Column W14", egui::FontId::proportional(9.0), Color32::from_rgb(203, 213, 225));
+
+                        // End Plate
+                        let plate_w_px = (self.conn_plate_thick_mm * 1.5).clamp(12.0, 30.0);
+                        let plate_h_px = col_h_px * 0.78;
+                        let plate_x = col_rect.right();
+                        let plate_rect = egui::Rect::from_min_size(Pos2::new(plate_x, center_l.y - plate_h_px * 0.5), Vec2::new(plate_w_px, plate_h_px));
+                        painter_l.rect_filled(plate_rect, CornerRadius::same(2), Color32::from_rgb(30, 41, 59));
+                        painter_l.rect_stroke(plate_rect, CornerRadius::same(2), Stroke::new(1.5, theme.accent_blue), egui::StrokeKind::Inside);
+
+                        // Beam Profile
+                        let beam_h_px = plate_h_px * 0.72;
+                        let beam_w_px = rect_l.right() - plate_rect.right() - 20.0;
+                        let beam_top = center_l.y - beam_h_px * 0.5;
+                        let tf_px = 9.0;
+
+                        // Top Flange
+                        painter_l.rect_filled(egui::Rect::from_min_size(Pos2::new(plate_rect.right(), beam_top), Vec2::new(beam_w_px, tf_px)), CornerRadius::same(1), Color32::from_rgb(51, 65, 85));
+                        // Bottom Flange
+                        painter_l.rect_filled(egui::Rect::from_min_size(Pos2::new(plate_rect.right(), beam_top + beam_h_px - tf_px), Vec2::new(beam_w_px, tf_px)), CornerRadius::same(1), Color32::from_rgb(51, 65, 85));
+                        // Web
+                        painter_l.rect_filled(egui::Rect::from_min_size(Pos2::new(plate_rect.right(), beam_top + tf_px), Vec2::new(beam_w_px, beam_h_px - tf_px * 2.0)), CornerRadius::same(0), Color32::from_rgb(30, 41, 59));
+                        painter_l.text(Pos2::new(plate_rect.right() + beam_w_px * 0.45, center_l.y), egui::Align2::CENTER_CENTER, "Beam W24", egui::FontId::proportional(9.5), Color32::from_rgb(226, 232, 240));
+
+                        // 8 Bolts: 4 Tension (top), 4 Compression (bottom)
+                        let r_bolt = (self.conn_bolt_dia_mm * 0.22).clamp(3.5, 6.5);
+                        let bolt_x = col_rect.right() + plate_w_px * 0.5;
+
+                        let tension_y = [beam_top - 18.0, beam_top + tf_px + 14.0];
+                        for &by in &tension_y {
+                            painter_l.circle_filled(Pos2::new(bolt_x, by), r_bolt, Color32::from_rgb(239, 68, 68));
+                            painter_l.circle_stroke(Pos2::new(bolt_x, by), r_bolt, Stroke::new(1.0, Color32::WHITE));
+                        }
+                        painter_l.text(Pos2::new(bolt_x + 12.0, beam_top - 18.0), egui::Align2::LEFT_CENTER, "Tension Bolts", egui::FontId::proportional(8.5), Color32::from_rgb(239, 68, 68));
+
+                        let comp_y = [beam_top + beam_h_px - tf_px - 14.0, beam_top + beam_h_px + 18.0];
+                        for &by in &comp_y {
+                            painter_l.circle_filled(Pos2::new(bolt_x, by), r_bolt, theme.accent_blue);
+                            painter_l.circle_stroke(Pos2::new(bolt_x, by), r_bolt, Stroke::new(1.0, Color32::WHITE));
+                        }
+                        painter_l.text(Pos2::new(bolt_x + 12.0, beam_top + beam_h_px + 18.0), egui::Align2::LEFT_CENTER, "Shear Bolts", egui::FontId::proportional(8.5), theme.accent_blue);
+
+                        // Welds (Beads)
+                        painter_l.line_segment([Pos2::new(plate_rect.right(), beam_top - 2.0), Pos2::new(plate_rect.right() + 14.0, beam_top - 2.0)], Stroke::new(2.5, Color32::from_rgb(245, 158, 11)));
+                        painter_l.line_segment([Pos2::new(plate_rect.right(), beam_top + beam_h_px + 2.0), Pos2::new(plate_rect.right() + 14.0, beam_top + beam_h_px + 2.0)], Stroke::new(2.5, Color32::from_rgb(245, 158, 11)));
+                    } else {
+                        // Single-Plate Shear Tab Drawing
+                        let sup_w_px = 60.0;
+                        let sup_rect = egui::Rect::from_min_size(Pos2::new(rect_l.left() + 45.0, rect_l.top() + 20.0), Vec2::new(sup_w_px, rect_l.height() - 40.0));
+                        painter_l.rect_filled(sup_rect, CornerRadius::same(2), Color32::from_rgb(45, 55, 72));
+                        painter_l.rect_stroke(sup_rect, CornerRadius::same(2), Stroke::new(1.2, Color32::from_rgb(148, 163, 184)), egui::StrokeKind::Inside);
+                        painter_l.text(sup_rect.center(), egui::Align2::CENTER_CENTER, "Support", egui::FontId::proportional(9.0), Color32::from_rgb(203, 213, 225));
+
+                        // Shear Tab Plate
+                        let tab_w = 65.0;
+                        let tab_h = ((rep.bolt_count_n as f32 - 1.0) * 35.0 + 50.0).clamp(70.0, rect_l.height() - 50.0);
+                        let tab_rect = egui::Rect::from_center_size(Pos2::new(sup_rect.right() + tab_w * 0.5, center_l.y), Vec2::new(tab_w, tab_h));
+                        painter_l.rect_filled(tab_rect, CornerRadius::same(2), Color32::from_rgb(30, 41, 59));
+                        painter_l.rect_stroke(tab_rect, CornerRadius::same(2), Stroke::new(1.4, theme.accent_blue), egui::StrokeKind::Inside);
+
+                        // Beam Web
+                        let beam_w = rect_l.right() - tab_rect.left() - 25.0;
+                        let beam_h = tab_h + 40.0;
+                        let beam_rect = egui::Rect::from_min_size(Pos2::new(tab_rect.left() + 15.0, center_l.y - beam_h * 0.5), Vec2::new(beam_w, beam_h));
+                        painter_l.rect_stroke(beam_rect, CornerRadius::same(2), Stroke::new(1.0, Color32::from_rgb(100, 116, 139)), egui::StrokeKind::Inside);
+
+                        // Double Fillet Welds along tab left
+                        painter_l.line_segment([Pos2::new(sup_rect.right(), tab_rect.top()), Pos2::new(sup_rect.right(), tab_rect.bottom())], Stroke::new(3.0, Color32::from_rgb(245, 158, 11)));
+
+                        // Vertical Bolt Line
+                        let r_b = (self.conn_bolt_dia_mm * 0.22).clamp(4.0, 7.0);
+                        let bx = tab_rect.left() + tab_w * 0.65;
+                        let pitch = if rep.bolt_count_n > 1 { (tab_h - 40.0) / (rep.bolt_count_n as f32 - 1.0) } else { 0.0 };
+                        for i in 0..rep.bolt_count_n {
+                            let by = tab_rect.top() + 20.0 + (i as f32) * pitch;
+                            painter_l.circle_filled(Pos2::new(bx, by), r_b, Color32::from_rgb(52, 211, 153));
+                            painter_l.circle_stroke(Pos2::new(bx, by), r_b, Stroke::new(1.0, Color32::WHITE));
+                        }
+                    }
+
+                    // RIGHT: Limit State DCR Breakdown Bar Chart
+                    cols[1].label(RichText::new("2. AISC 360-16 Limit State DCR Utilization Bars").size(11.0).strong().color(theme.text_secondary));
+                    let desired_right = Vec2::new(cols[1].available_width(), 220.0);
+                    let (rect_r, _) = cols[1].allocate_exact_size(desired_right, Sense::hover());
+                    let painter_r = cols[1].painter_at(rect_r);
+                    painter_r.rect_filled(rect_r, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+                    let bar_h = 16.0;
+                    let bar_gap = 6.0;
+                    let max_plot_w = (rect_r.width() - 175.0).max(80.0);
+
+                    for (idx, ls) in rep.limit_states.iter().enumerate().take(7) {
+                        let y_pos = rect_r.top() + 12.0 + (idx as f32) * (bar_h + bar_gap);
+                        
+                        // Limit state name
+                        let short_name = if ls.limit_state_name.len() > 22 {
+                            format!("{}...", &ls.limit_state_name[..20])
+                        } else {
+                            ls.limit_state_name.clone()
+                        };
+                        painter_r.text(Pos2::new(rect_r.left() + 8.0, y_pos + bar_h * 0.5), egui::Align2::LEFT_CENTER, short_name, egui::FontId::proportional(9.0), Color32::from_rgb(203, 213, 225));
+
+                        // Bar background
+                        let bar_x = rect_r.left() + 130.0;
+                        let bar_bg = egui::Rect::from_min_size(Pos2::new(bar_x, y_pos), Vec2::new(max_plot_w, bar_h));
+                        painter_r.rect_filled(bar_bg, CornerRadius::same(3), Color32::from_rgb(30, 41, 59));
+
+                        // Active fill bar
+                        let fill_w = ((ls.demand_capacity_ratio as f32 / 1.0) * max_plot_w).clamp(2.0, max_plot_w * 1.15);
+                        let bar_color = if ls.demand_capacity_ratio <= 0.75 {
+                            Color32::from_rgb(16, 185, 129)
+                        } else if ls.demand_capacity_ratio <= 1.00 {
+                            Color32::from_rgb(245, 158, 11)
+                        } else {
+                            Color32::from_rgb(239, 68, 68)
+                        };
+                        let fill_rect = egui::Rect::from_min_size(Pos2::new(bar_x, y_pos), Vec2::new(fill_w, bar_h));
+                        painter_r.rect_filled(fill_rect, CornerRadius::same(3), bar_color);
+
+                        // DCR label
+                        painter_r.text(Pos2::new(bar_x + fill_w + 6.0, y_pos + bar_h * 0.5), egui::Align2::LEFT_CENTER, format!("{:.3}", ls.demand_capacity_ratio), egui::FontId::proportional(9.0), bar_color);
+                    }
+                });
+            });
+
+        ui.add_space(14.0);
+
+        // 4. Limit States Verification Matrix Table
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::same(14))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("📋 AISC 360-16 / SNI 1729:2020 Connection Limit States Verification Table:").size(12.5).strong().color(theme.text_primary));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(RichText::new("Standard: ANSI/AISC 360-16 Specification for Structural Steel Buildings").size(11.0).color(theme.text_muted));
+                    });
+                });
+                ui.add_space(8.0);
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Limit State Description").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(130.0);
+                    ui.label(RichText::new("Code Ref").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(50.0);
+                    ui.label(RichText::new("Nominal Rn").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(45.0);
+                    ui.label(RichText::new("Factor φ").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(40.0);
+                    ui.label(RichText::new("Design φRn").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(45.0);
+                    ui.label(RichText::new("Demand").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(45.0);
+                    ui.label(RichText::new("DCR").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(45.0);
+                    ui.label(RichText::new("Status").size(11.0).strong().color(theme.text_secondary));
+                });
+                ui.separator();
+
+                for ls in &rep.limit_states {
+                    let dcr_col = if ls.demand_capacity_ratio <= 0.75 {
+                        theme.accent_green
+                    } else if ls.demand_capacity_ratio <= 1.00 {
+                        theme.accent_orange
+                    } else {
+                        Color32::from_rgb(239, 68, 68)
+                    };
+
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(&ls.limit_state_name).size(11.0).strong().color(theme.accent_blue));
+                        ui.add_space(20.0);
+                        ui.label(RichText::new(&ls.standard_code_ref).size(10.5).color(theme.text_muted));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new(format!("{:7.1}", ls.nominal_capacity)).size(11.0).color(theme.text_primary));
+                        ui.add_space(45.0);
+                        ui.label(RichText::new(format!("{:.2}", ls.phi_factor)).size(11.0).color(theme.text_secondary));
+                        ui.add_space(45.0);
+                        ui.label(RichText::new(format!("{:7.1}", ls.design_capacity)).size(11.0).color(theme.accent_green));
+                        ui.add_space(40.0);
+                        ui.label(RichText::new(format!("{:7.1}", ls.factored_demand)).size(11.0).color(theme.text_primary));
+                        ui.add_space(40.0);
+                        ui.label(RichText::new(format!("{:.3}", ls.demand_capacity_ratio)).size(11.0).strong().color(dcr_col));
+                        ui.add_space(45.0);
+                        ui.label(RichText::new(if ls.is_safe { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(dcr_col));
+                    });
+                    ui.separator();
+                }
+            });
+
+        if let Some(ref pz) = rep.panel_zone {
+            ui.add_space(14.0);
+            Frame::new()
+                .fill(Color32::from_rgb(17, 24, 39))
+                .corner_radius(CornerRadius::same(8))
+                .inner_margin(Margin::same(12))
+                .stroke(Stroke::new(1.0, Color32::from_rgb(59, 130, 246)))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("🔬 Column Panel Zone Shear & Stiffener Audit (AISC 360-16 Section J10):").size(12.5).strong().color(Color32::WHITE));
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            let badge = if pz.doubler_plate_required { "⚠️ DOUBLER PLATE REQUIRED" } else { "🟢 WEB THICKNESS ADEQUATE" };
+                            let b_color = if pz.doubler_plate_required { Color32::from_rgb(245, 158, 11) } else { theme.accent_green };
+                            ui.label(RichText::new(badge).size(11.0).strong().color(b_color));
+                        });
+                    });
+                    ui.add_space(6.0);
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(RichText::new(format!("Panel Zone Shear Vpz: {:.1} kN", pz.applied_shear_vpz_kn)).size(11.0).color(theme.text_secondary));
+                        ui.add_space(14.0);
+                        ui.label(RichText::new(format!("Shear Capacity φVn: {:.1} kN", pz.design_shear_capacity_phi_vn_kn)).size(11.0).strong().color(theme.accent_blue));
+                        ui.add_space(14.0);
+                        ui.label(RichText::new(format!("Web Yielding φRn: {:.1} kN", pz.web_local_yielding_phi_rn_kn)).size(11.0).color(theme.text_secondary));
+                        ui.add_space(14.0);
+                        ui.label(RichText::new(format!("Web Crippling φRn: {:.1} kN", pz.web_crippling_phi_rn_kn)).size(11.0).color(theme.text_secondary));
+                        ui.add_space(14.0);
+                        ui.label(RichText::new(if pz.continuity_plates_required { "Continuity Plates: REQUIRED" } else { "Continuity Plates: None" }).size(11.0).strong().color(if pz.continuity_plates_required { Color32::from_rgb(245, 158, 11) } else { theme.accent_green }));
+                    });
+                });
+        }
+    }
 }
+
 

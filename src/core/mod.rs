@@ -74,7 +74,8 @@ pub use reliability::{
     SpatialClash, standard_normal_cdf,
 };
 pub use connection::{
-    BoltGrade, ConnectionAuditReport, ConnectionEngine, MemberConnectionDesign,
+    BoltGrade, ConnectionAuditReport, ConnectionEngine, ConnectionReport, ConnectionType,
+    LimitStateCheck, MemberConnectionDesign, PanelZoneAudit,
 };
 pub use dynamics::{
     DynamicsEngine, SuddenRemovalTransientReport, TimeHistoryStep,

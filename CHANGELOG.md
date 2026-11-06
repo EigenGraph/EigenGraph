@@ -7,6 +7,39 @@ The project strictly adheres to sequential versioning:
 
 ---
 
+## [v0.0.6] - 2026-11-06 — Phase 5: Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine
+
+### Added
+- **AISC 360-16 & SNI 1729:2020 Steel Connection Limit States Engine (`src/core/connection.rs`)**:
+  - **Bolt Group Shear Rupture**: Formulated nominal bolt shear capacities ($F_{nv} A_b$) for ASTM A325-N/X, A490-N/X, and ISO Class 8.8 / 10.9 fasteners per AISC 360-16 Table J3.2.
+  - **Bolt Bearing and Tearout**: Evaluated clear distance $l_c$ across edge and interior pitch spaces, calculating governing bearing resistance $R_n = \min(1.2 l_c t F_u, 2.4 d_b t F_u)$ per Section J3.10.
+  - **Block Shear Rupture (AISC 360 Section J4.3 / SNI 1729 Section J4.3)**:
+    $$R_n = \min \left( 0.60 F_u A_{nv} + U_{bs} F_u A_{nt}, \; 0.60 F_y A_{gv} + U_{bs} F_u A_{nt} \right) \quad (\phi = 0.75, \; U_{bs} = 1.0)$$
+  - **Plate Gross Shear Yielding & Net Shear Rupture**: Sized connection plates for shear yield ($0.60 F_y A_g$) and net shear fracture ($0.60 F_u A_{nv}$).
+  - **Double Fillet Weld Shear Resistance**: Formulated E70XX/E80XX weld metal shear capacity across effective throat $t_e = 0.707 w$ ($R_n = 0.60 F_{EXX} A_{we}$).
+- **AISC 358-16 / SNI 7860:2020 4E Extended End-Plate Moment Connection (`evaluate_extended_end_plate`)**:
+  - Implemented yield-line mechanism parameter $Y_p$ for 4E unstiffened extended end-plates:
+    $$Y_p = \frac{b_p}{2} \left[ h_1 \left(\frac{1}{p_{fi}} + \frac{1}{s}\right) + h_0 \left(\frac{1}{p_{fo}}\right) \right] + \frac{2}{g} \left[ h_1 (p_{fi} + s) + h_0 p_{fo} \right]$$
+  - Flexural design moment capacity: $\phi M_n = \phi_b F_{yp} t_p^2 Y_p$ ($\phi_b = 0.90$).
+  - Evaluated bolt tension demands in tension flange group and gravity shear in compression zone bolts.
+- **Column Panel Zone Shear & Web Stiffener Audit (AISC 360 Section J10)**:
+  - Formulated column panel zone shear strength:
+    $$R_n = 0.60 F_y d_c t_w \left[ 1 + \frac{3 b_{cf} t_{cf}^2}{d_b d_c t_w} \right] \quad (\phi = 0.90)$$
+  - Automated calculation of required column web doubler plate thickness ($t_{\text{doubler}} = \frac{V_{pz} - \phi R_n}{0.60 \phi F_y d_c}$).
+  - Evaluated Column Web Local Yielding ($\phi R_n = 1.0 F_{yw} t_w (5k + l_b)$) and Web Local Crippling, automatically assessing transverse continuity plate requirements.
+- **Interactive Steel Connection CAD Blueprint & DCR Dashboard in Analyze View (`src/views/analyze.rs`)**:
+  - Added new sub-tab `AnalyzeSubTab::SteelConnection` (`🔩 Steel Connections`).
+  - Integrated 4 executive summary cards: Governing DCR, Critical Limit State, Fastener Configuration, and Panel Zone Audit.
+  - Controls toolbar for connection typology, bolt grades, bolt diameter, plate thickness, and factored forces ($V_u, M_u$).
+  - Dual Vector Visualizer:
+    1. *Left*: 2D Elevation Blueprint showing column profile, beam flanges/web, end-plate/shear tab, tension/compression bolts, and weld beads.
+    2. *Right*: Limit States DCR Utilization horizontal bar chart with color-coded utilization thresholds.
+  - Detailed Limit States Verification Table displaying nominal capacity, $\phi$, design capacity, and safety status.
+- **Official Steel Connection Dossier Export (`generate_markdown_dossier`)**:
+  - Added one-click export button `🔩 AISC 360 Connection Dossier (.md)` in Results View generating `AISC360_Steel_Connection_Audit.md`.
+
+---
+
 ## [v0.0.5] - 2026-11-06 — Phase 4: Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI)
 
 ### Added

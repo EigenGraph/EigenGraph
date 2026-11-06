@@ -7,6 +7,41 @@ Per Section 6 of `AGENTS.md`, versioning strictly follows:
 
 ---
 
+## 🚀 EigenGraph v0.0.6 — Phase 5: Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.6`  
+**Target:** Production Engine
+
+EigenGraph v0.0.6 introduces comprehensive **Structural Steel Connection Design & Limit States Verification**, providing automated code compliance checks per AISC 360-16 / AISC 360-22, SNI 1729:2020, and AISC 358-16 / SNI 7860:2020 for moment and shear connections.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. AISC 360-16 & SNI 1729:2020 Limit States Suite
+- **High-Strength Bolt Shear Rupture**: Sizing for ASTM A325-N/X, ASTM A490-N/X, and ISO Class 8.8 / 10.9 fasteners per Table J3.2 ($\phi R_n = \phi \cdot n_b \cdot F_{nv} A_b$).
+- **Bolt Bearing & Tearout (Section J3.10)**: Clear edge distance $l_c$ tracking with governing limit $R_n = \min(1.2 l_c t F_u, 2.4 d_b t F_u)$ ($\phi = 0.75$).
+- **Block Shear Rupture (Section J4.3 / SNI 1729 Section J4.3)**:
+  $$R_n = \min \left( 0.60 F_u A_{nv} + U_{bs} F_u A_{nt}, \; 0.60 F_y A_{gv} + U_{bs} F_u A_{nt} \right) \quad (\phi = 0.75, \; U_{bs} = 1.0)$$
+- **Plate Gross Shear Yielding & Net Shear Rupture**: Gross yield ($\phi R_n = 1.0 \cdot 0.60 F_y A_g$) and net fracture ($\phi R_n = 0.75 \cdot 0.60 F_u A_{nv}$).
+- **Double Fillet Weld Shear Resistance**: Weld throat $t_e = 0.707 w$ with E70XX filler metal ($R_n = 0.60 F_{EXX} A_{we}$).
+
+#### 2. AISC 358-16 4E Extended End-Plate Moment Connection
+- **Yield-Line Mechanism**:
+  $$Y_p = \frac{b_p}{2} \left[ h_1 \left(\frac{1}{p_{fi}} + \frac{1}{s}\right) + h_0 \left(\frac{1}{p_{fo}}\right) \right] + \frac{2}{g} \left[ h_1 (p_{fi} + s) + h_0 p_{fo} \right]$$
+- **Flexural Moment Capacity**: $\phi M_n = \phi_b F_{yp} t_p^2 Y_p$ ($\phi_b = 0.90$).
+- **Flange Tension Bolt Group**: Evaluates tension demands across 4 critical bolts with prying action checks.
+
+#### 3. Column Panel Zone & Stiffener Audit (AISC 360 Section J10)
+- **Panel Zone Shear Capacity**:
+  $$R_n = 0.60 F_y d_c t_w \left[ 1 + \frac{3 b_{cf} t_{cf}^2}{d_b d_c t_w} \right] \quad (\phi = 0.90)$$
+- **Web Doubler Plate Sizing**: Automatically computes required doubler plate thickness $t_{\text{doubler}} = \frac{V_{pz} - \phi R_n}{0.60 \phi F_y d_c}$.
+- **Web Local Yielding & Crippling**: Sizes column web against concentrated flange forces, triggering transverse continuity plate warnings when required.
+
+#### 4. Interactive Desktop UI & Official Dossier Export
+- **Sub-Tab `🔩 Steel Connections`**: Features interactive 2D CAD elevation blueprint with column, beam, end-plate, weld beads, and bolt group circles, alongside an AISC limit state DCR bar chart.
+- **Audit Dossier Export**: One-click generation of `AISC360_Steel_Connection_Audit.md` via the Results View export suite.
+
+---
+
 ## 🚀 EigenGraph v0.0.5 — Phase 4: Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI)
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.5`  

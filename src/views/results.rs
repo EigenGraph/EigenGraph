@@ -472,6 +472,33 @@ impl ResultsView {
                                     }
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🔩 AISC 360 Connection Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(234, 88, 12))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let rep = crate::core::ConnectionEngine::evaluate_extended_end_plate(
+                                    "Beam-to-Column 4E Extended End-Plate Moment Connection",
+                                    crate::core::BoltGrade::A325X,
+                                    22.0,
+                                    20.0,
+                                    220.0,
+                                    345.0,
+                                    450.0,
+                                    550.0,
+                                    200.0,
+                                    16.0,
+                                    10.0,
+                                    350.0,
+                                    19.0,
+                                    12.0,
+                                    240.0,
+                                    120.0,
+                                );
+                                let md = crate::core::ConnectionEngine::generate_markdown_dossier(&rep);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("AISC360_Steel_Connection_Audit.md", &md) {
+                                    self.export_status = Some(format!("AISC 360 Steel Connection Audit Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });
