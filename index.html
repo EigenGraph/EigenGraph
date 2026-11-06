@@ -44,6 +44,9 @@
           <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.0.3" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
             📥 Download v0.0.3
           </a>
+          <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
+            🏷️ Releases
+          </a>
           <a href="https://github.com/EigenGraph/EigenGraph" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
             GitHub
@@ -1495,6 +1498,78 @@ pub struct BiaxialPmReport {
                   <div id="cert-res-seal" style="color:var(--accent-green); word-break:break-all; font-size:0.75rem; margin-top:4px;">
                     e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dossier-card" style="border:1px solid rgba(59, 130, 246, 0.3); background:rgba(15, 23, 42, 0.65);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 class="dossier-card-title" style="margin:0;">🏷️ Official Release Packages & Tracking Ledger</h3>
+                <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px;">
+                  View All on GitHub ↗
+                </a>
+              </div>
+              <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:16px;">
+                Per project engineering guidelines, EigenGraph strictly enforces sequential semantic versioning:
+                <code>v0.0.1 ➔ v0.0.2 ➔ v0.0.3 ... ➔ v0.0.9 ➔ v0.1.0 ... ➔ v0.9.9 ➔ v1.0.0</code>. Track official production releases below:
+              </p>
+              
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <!-- v0.0.3 -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16, 185, 129, 0.3); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                      <span class="dossier-tag green" style="font-size:0.7rem; font-weight:700;">LATEST PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.0.3</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 2: Core Upgrade)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.0.3" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Assets ↗
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>2D Mindlin-Reissner Shell Elements:</strong> 4-node quad shell (\(u,v,w,\theta_x,\theta_y,\theta_z\)) for concrete shear walls and diaphragms.</li>
+                    <li><strong>Second-Order Geometric Non-Linearity:</strong> Geometric stiffness matrix \(\mathbf{K}_g(\mathbf{P})\), tangent stiffness \(\mathbf{K}_t\), Euler buckling \(P_{\text{cr}}\), AISC \(B_1\), and ASCE 7-22 \(\theta\).</li>
+                    <li><strong>OpenBIM IFC4 / IFC4.3 SAM:</strong> Direct export of certified <code>IFCSTRUCTURALANALYSISMODEL</code> text definitions.</li>
+                  </ul>
+                </div>
+
+                <!-- v0.0.2 -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(59, 130, 246, 0.3); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                      <span class="dossier-tag blue" style="font-size:0.7rem; font-weight:700;">PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.0.2</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 1: Quick Wins)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.0.2" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Assets ↗
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>CSI ETABS .e2k Interop:</strong> Native bidirectional importer and exporter for ETABS v18–v21 models.</li>
+                    <li><strong>Indonesian PUPR PBG/SIMBG Compliance:</strong> Automated structural calculation dossier generator per PP 16/2021, SNI 1726:2019, and SNI 2847:2019.</li>
+                    <li><strong>Automated Bar Bending Schedule (BBS):</strong> Rebar cutting schedules, seismic hooks, and tonnage estimation per SNI 2847:2019 Pasal 25.3.</li>
+                  </ul>
+                </div>
+
+                <!-- v0.0.1 -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                      <span class="dossier-tag purple" style="font-size:0.7rem; font-weight:700;">INITIAL RELEASE</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.0.1</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Structural Core Engine)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.0.1" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Assets ↗
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>Non-Linear Redistribution:</strong> Sherman-Morrison & Woodbury rank-1 plastic perturbation \(\mathcal{O}(N^2)\).</li>
+                    <li><strong>Biaxial P-M-M Concrete Envelope:</strong> Bresler reciprocal method and PCA load contour per SNI 2847:2019 / ACI 318-19.</li>
+                    <li><strong>Dynamic Modal Analysis:</strong> CQC and SRSS response combinations with Der Kiureghian cross-modal correlation.</li>
+                  </ul>
                 </div>
               </div>
             </div>
