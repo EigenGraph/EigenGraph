@@ -57,3 +57,17 @@ For the **Workspace (Main Canvas Area)** across all navigation pillars:
   - Operations involving external network / remote GitHub (such as `git push`, monitoring CI/CD builds, or publishing releases) **ONLY** execute when the user explicitly gives written instructions (e.g., *"push to github"*, *"create a release"*, *"check build status"*).
 - **Token Conservation**:
   - Agents must focus directly on target files without unnecessary directory scanning or consuming context tokens outside the scope of the task.
+
+---
+
+### 5. 🌐 Mandatory English Consistency for All GitHub Inputs & Contributions:
+- **Strict English-Only Policy**:
+  - All content committed or pushed to GitHub across all repositories (`EigenGraph`, `Website`, `EigenFlow`, `EigenGate`) **MUST BE EXCLUSIVELY WRITTEN IN PROFESSIONAL CIVIL & STRUCTURAL ENGINEERING ENGLISH**.
+- **Automatic Language Conversion**:
+  - If a user prompt, issue, task description, or feedback is submitted in Indonesian (or any language other than English), agents **must automatically translate and adapt** all resulting code, comments, documentation, UI labels, and commit messages into standard English before staging, committing, or pushing to GitHub.
+- **Enforced Scope**:
+  1. *Git Metadata*: Commit messages, branch names, pull request titles/descriptions, and release notes.
+  2. *User Interfaces & Web*: All buttons, ribbons, HUD inspectors, dialog modals, tooltips, cards, and web pages.
+  3. *Source Code & Architecture*: All code comments, docstrings (`///` or `"""`), runtime error messages, log statements, and test assertions.
+  4. *Technical Artifacts*: All calculation dossiers, structural redundancy reports, BoQ divisions, BBS schedules, and exported BIM/IFC models.
+
