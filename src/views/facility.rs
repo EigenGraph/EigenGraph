@@ -90,10 +90,10 @@ impl FacilityView {
     fn render_digital_twin_shm(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember]) {
         // Top Real-time Sensor Status Row
         ui.columns(4, |cols| {
-            self.render_sensor_card(&mut cols[0], theme, "STRAIN GAUGE SG-01", &format!("{:.0} µε", self.simulated_strain_micro), "Tegangan Batang E1 (Aman < 1200 µε)", theme.accent_green);
-            self.render_sensor_card(&mut cols[1], theme, "FREKUENSI ALAMI (ACC-01)", &format!("{:.2} Hz", self.simulated_freq_hz), "Mode 1 Transversal (Bebas Resonansi)", theme.accent_blue);
-            self.render_sensor_card(&mut cols[2], theme, "LIVE ARI DEGRADATION", "0.938", "ARI(t) Degradasi Realtime (-0.4%)", theme.accent_green);
-            self.render_sensor_card(&mut cols[3], theme, "STATUS KESEHATAN (SHM)", "🟢 NORMAL", "16 Sensor IoT Aktif Beroperasi", theme.accent_green);
+            self.render_sensor_card(&mut cols[0], theme, "STRAIN GAUGE SG-01", &format!("{:.0} µε", self.simulated_strain_micro), "Member E1 Strain (Safe < 1200 µε)", theme.accent_green);
+            self.render_sensor_card(&mut cols[1], theme, "NATURAL FREQUENCY (ACC-01)", &format!("{:.2} Hz", self.simulated_freq_hz), "Mode 1 Transverse (Resonance Free)", theme.accent_blue);
+            self.render_sensor_card(&mut cols[2], theme, "LIVE ARI DEGRADATION", "0.938", "Real-Time ARI(t) Degradation (-0.4%)", theme.accent_green);
+            self.render_sensor_card(&mut cols[3], theme, "HEALTH STATUS (SHM)", "🟢 NORMAL", "16 IoT Sensors Operating Active", theme.accent_green);
         });
 
         ui.add_space(16.0);
@@ -106,19 +106,19 @@ impl FacilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📡 Telemetri Sensor Digital Twin & Pemetaan ARI Dinamis").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📡 Digital Twin Sensor Telemetry & Dynamic ARI Mapping").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Sampling: 100 Hz • Protokol MQTT/TLS").size(11.0).color(theme.accent_blue));
+                        ui.label(RichText::new("Sampling: 100 Hz • MQTT/TLS Protocol").size(11.0).color(theme.accent_blue));
                     });
                 });
                 ui.add_space(12.0);
 
                 let sensors = [
-                    ("SG-01 (Bottom Chord Tengah)", "Strain Gauge Serat Optik", "342 µε", "68.4 MPa", "ARI: 0.94", "🟢 Normal Operasional"),
-                    ("SG-02 (Top Chord Tengah)", "Strain Gauge Tahanan Listrik", "-285 µε", "-57.0 MPa", "ARI: 0.94", "🟢 Tekan Elastis Aman"),
-                    ("ACC-01 (Gelagar Tengah)", "Akselerometer Piezoelektrik Triaksial", "0.042 g", "3.48 Hz", "Kondisi: Kokoh", "🟢 Vibrasi Dinamis Terkendali"),
-                    ("TILT-01 (Tumpuan Rol Kanan)", "Inklinometer Digital Dual-Axis", "0.018°", "Defleksi 1.4 mm", "Rotasi Aman", "🟢 Tumpuan Bergerak Bebas"),
-                    ("UT-01 (Pelat Buhul Kritis)", "Sensor Ketebalan Korosi Ultrasonik", "15.94 mm", "Laju Korosi: 0.01 mm/th", "Sisa Umur: 94 Th", "🟢 Proteksi Cat Masih Prima"),
+                    ("SG-01 (Mid-Span Bottom Chord)", "Fiber Optic Strain Gauge", "342 µε", "68.4 MPa", "ARI: 0.94", "🟢 Operational Normal"),
+                    ("SG-02 (Mid-Span Top Chord)", "Electrical Resistance Strain Gauge", "-285 µε", "-57.0 MPa", "ARI: 0.94", "🟢 Elastic Compression Safe"),
+                    ("ACC-01 (Mid-Span Girder)", "Triaxial Piezoelectric Accelerometer", "0.042 g", "3.48 Hz", "Condition: Rigid", "🟢 Controlled Dynamic Vibration"),
+                    ("TILT-01 (Right Roller Support)", "Dual-Axis Digital Inclinometer", "0.018°", "Deflection 1.4 mm", "Rotation Safe", "🟢 Free Roller Expansion"),
+                    ("UT-01 (Critical Gusset Plate)", "Ultrasonic Thickness Sensor", "15.94 mm", "Corrosion Rate: 0.01 mm/yr", "Remaining Life: 94 Yrs", "🟢 Paint Protective Coating Intact"),
                 ];
 
                 for (id, stype, val, derived, ari_info, status) in sensors {
@@ -150,26 +150,26 @@ impl FacilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📑 Registri Aset Fasilitas (Standar COBie / IFC 4.3)").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📑 Facility Asset Registry (COBie / IFC 4.3 Standard)").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Total Aset: 48 Komponen Terindeks").size(11.5).color(theme.text_muted));
+                        ui.label(RichText::new("Total Assets: 48 Indexed Components").size(11.5).color(theme.text_muted));
                     });
                 });
                 ui.add_space(12.0);
 
                 let assets = [
-                    ("AST-CH-001", "Bottom Chord W14x90", "Struktur Baja", "ASTM A992", "2026-10-15", "100 Tahun", "Tiap 2 Tahun", "🟢 Grade 1 (Baru)"),
-                    ("AST-CH-002", "Top Chord W14x90", "Struktur Baja", "ASTM A992", "2026-10-15", "100 Tahun", "Tiap 2 Tahun", "🟢 Grade 1 (Baru)"),
-                    ("AST-DG-003", "Diagonal Web HSS8x8x1/2", "Bracing Sekunder", "ASTM A500 Gr.B", "2026-10-15", "100 Tahun", "Tiap 3 Tahun", "🟢 Grade 1 (Baru)"),
-                    ("AST-BRG-01", "Elastomeric Pot Bearing 150T", "Bantalan Jembatan", "Neoprene/Baja", "2026-10-15", "25 Tahun", "Tiap 1 Tahun", "🟢 Grade 1 (Prima)"),
-                    ("AST-EXP-01", "Modular Expansion Joint 80mm", "Dilatasi Lantai", "Baja Galvanis", "2026-10-15", "20 Tahun", "Tiap 6 Bulan", "🟢 Grade 1 (Bebas Celah)"),
+                    ("AST-CH-001", "Bottom Chord W14x90", "Structural Steel", "ASTM A992", "2026-10-15", "100 Years", "Every 2 Years", "🟢 Grade 1 (New)"),
+                    ("AST-CH-002", "Top Chord W14x90", "Structural Steel", "ASTM A992", "2026-10-15", "100 Years", "Every 2 Years", "🟢 Grade 1 (New)"),
+                    ("AST-DG-003", "Diagonal Web HSS8x8x1/2", "Secondary Bracing", "ASTM A500 Gr.B", "2026-10-15", "100 Years", "Every 3 Years", "🟢 Grade 1 (New)"),
+                    ("AST-BRG-01", "Elastomeric Pot Bearing 150T", "Bridge Bearing", "Neoprene/Steel", "2026-10-15", "25 Years", "Every Year", "🟢 Grade 1 (Prime)"),
+                    ("AST-EXP-01", "Modular Expansion Joint 80mm", "Floor Expansion Joint", "Galvanized Steel", "2026-10-15", "20 Years", "Every 6 Months", "🟢 Grade 1 (Gap-Free)"),
                 ];
 
                 for (tag, name, cat, spec, comm, life, interval, cond) in assets {
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
                             ui.label(RichText::new(format!("{} • {}", tag, name)).size(12.0).strong().color(theme.text_primary));
-                            ui.label(RichText::new(format!("{} | {} | Masa Desain: {}", cat, spec, life)).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("{} | {} | Design Life: {}", cat, spec, life)).size(11.0).color(theme.text_secondary));
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(RichText::new(cond).size(11.5).color(theme.accent_green));
@@ -191,15 +191,15 @@ impl FacilityView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("🛠️ Protokol Pemeliharaan Prediktif Berbasis Indeks Redundansi (ARI Alert)").size(13.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("🛠️ Predictive Maintenance Protocols via Redundancy Alerts (ARI Alert)").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(6.0);
-                ui.label(RichText::new("Sistem otomatis menerbitkan Surat Perintah Kerja (SPK) saat indikator degradasi material atau kelelahan (fatigue) mendekati ambang batas kritis.").size(11.5).color(theme.text_secondary));
+                ui.label(RichText::new("Automated Work Orders (WO) issued when material degradation or fatigue metrics approach critical resilience thresholds.").size(11.5).color(theme.text_secondary));
                 ui.add_space(14.0);
 
                 let work_orders = [
-                    ("SPK-2026-088", "Inspeksi Visual & Pengukuran Torsi Baut Gusset Joint J-04", "Rutin 6-Bulanan", "Dijadwalkan: 15 Apr 2027", "🟢 Terencana", theme.accent_blue),
-                    ("SPK-2026-089", "Pengujian Ultrasonik NDT Batang Tarik Kritis E1 (Bottom Chord)", "Berdasarkan Sensitivitas ARI (CI=0.42)", "Dijadwalkan: 10 Okt 2027", "🟢 Siap Dilaksanakan", theme.accent_green),
-                    ("SPK-2026-090", "Pembersihan Saluran Drainase & Celah Bearing Tumpuan", "Cegah Korosi Air Garam", "Dijadwalkan: 01 Des 2026", "🟡 Mendatang", theme.text_secondary),
+                    ("WO-2026-088", "Visual Inspection & Torque Verification of Gusset Joint J-04 Bolts", "Bi-annual Routine", "Scheduled: Apr 15, 2027", "🟢 Planned", theme.accent_blue),
+                    ("WO-2026-089", "NDT Ultrasonic Testing of Critical Tension Member E1 (Bottom Chord)", "Based on ARI Sensitivity (CI=0.42)", "Scheduled: Oct 10, 2027", "🟢 Ready to Execute", theme.accent_green),
+                    ("WO-2026-090", "Drainage Channel Cleaning & Bearing Expansion Clearing", "Prevent Chloride/Moisture Corrosion", "Scheduled: Dec 01, 2026", "🟡 Upcoming", theme.text_secondary),
                 ];
 
                 for (code, task, reason, sched, status, col) in work_orders {
@@ -212,7 +212,7 @@ impl FacilityView {
                             ui.horizontal(|ui| {
                                 ui.vertical(|ui| {
                                     ui.label(RichText::new(format!("{} — {}", code, task)).size(12.5).strong().color(theme.text_primary));
-                                    ui.label(RichText::new(format!("Alasan: {} | {}", reason, sched)).size(11.0).color(theme.text_secondary));
+                                    ui.label(RichText::new(format!("Rationale: {} | {}", reason, sched)).size(11.0).color(theme.text_secondary));
                                 });
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                     ui.label(RichText::new(status).size(12.0).strong().color(col));
@@ -231,13 +231,13 @@ impl FacilityView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("💵 Analisis Biaya Siklus Hidup 30 Tahun (Life Cycle Costing - LCC)").size(13.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("💵 30-Year Life Cycle Costing (LCC) Analysis").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(10.0);
 
                 ui.columns(3, |cols| {
-                    self.render_sensor_card(&mut cols[0], theme, "BIAYA AWAL (CAPEX)", "Rp 3.84 M", "Konstruksi Awal Terverifikasi RAB 5D", theme.text_primary);
-                    self.render_sensor_card(&mut cols[1], theme, "ESTIMASI OPEX (30 TH)", "Rp 645 Jt", "Pemeliharaan Rutin & Sensor SHM", theme.accent_blue);
-                    self.render_sensor_card(&mut cols[2], theme, "PENGHEMATAN DINI ARI", "Rp 1.45 M", "Pencegahan Kerusakan Fatal Katastropik", theme.accent_green);
+                    self.render_sensor_card(&mut cols[0], theme, "INITIAL CAPITAL (CAPEX)", "$3.84 M", "Initial Construction Verified via 5D BoQ", theme.text_primary);
+                    self.render_sensor_card(&mut cols[1], theme, "ESTIMATED OPEX (30 YRS)", "$645 K", "Routine Maintenance & SHM Sensors", theme.accent_blue);
+                    self.render_sensor_card(&mut cols[2], theme, "EARLY ARI SAVINGS", "$1.45 M", "Catastrophic Failure Avoidance", theme.accent_green);
                 });
             });
     }

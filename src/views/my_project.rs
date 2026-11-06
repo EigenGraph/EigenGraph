@@ -128,7 +128,7 @@ impl MyProjectView {
                             if let Ok(mut model) = engine.generate_warren_truss() {
                                 model.name = "NVW_DCR-LOD300_Eng-CON".to_string();
                                 if let Ok(path) = crate::core::InternalVault::autosave_project_model("NVW_DCR-LOD300_Eng-CON.eigen", &model) {
-                                    self.export_success_msg = Some(format!("Tersimpan otomatis di Package Contents: {}", path));
+                                    self.export_success_msg = Some(format!("Saved automatically to Package Contents: {}", path));
                                 }
                             }
                         }
@@ -201,15 +201,15 @@ impl MyProjectView {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("⚛️ EIGENGRAPH ENGINEERING VAULT & KNOWLEDGE MEMORY").size(13.0).strong().color(theme.accent_blue));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new(RichText::new("🔄 Sinkronisasi & Latih Memori ARI").size(11.5).strong().color(Color32::WHITE))
+                    if ui.add(egui::Button::new(RichText::new("🔄 Sync & Train ARI Memory").size(11.5).strong().color(Color32::WHITE))
                         .fill(theme.accent_green)
                         .corner_radius(CornerRadius::same(6))).clicked() {
                         let mut engine = crate::core::ParametricEngine::new();
                         if let Ok(mut model) = engine.generate_warren_truss() {
-                            model.name = "Proyek_Aktif_Warren".to_string();
-                            if let Ok(path) = crate::core::InternalVault::autosave_project_model("Proyek_Aktif_Warren.eigen", &model) {
+                            model.name = "Active_Warren_Project".to_string();
+                            if let Ok(path) = crate::core::InternalVault::autosave_project_model("Active_Warren_Project.eigen", &model) {
                                 self.export_success_msg = Some(format!(
-                                    "Memori AI & Arsip Proyek diperbarui di Vault: {}",
+                                    "AI Memory & Project Archive updated in Vault: {}",
                                     path
                                 ));
                             }
@@ -222,7 +222,7 @@ impl MyProjectView {
             ui.horizontal(|ui| {
                 ui.label(
                     RichText::new(format!(
-                        "📂 Lokasi Aktif Vault: {}",
+                        "📂 Active Vault Location: {}",
                         vault_root.display()
                     ))
                     .size(11.5)
@@ -234,39 +234,39 @@ impl MyProjectView {
             ui.add_space(8.0);
             ui.columns(4, |cols| {
                 cols[0].vertical(|ui| {
-                    ui.label(RichText::new("KATEGORI TERORGANISIR").size(10.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new(format!("{} Folder Kategori", categories.len())).size(15.0).strong().color(theme.accent_blue));
+                    ui.label(RichText::new("ORGANIZED CATEGORIES").size(10.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new(format!("{} Category Folders", categories.len())).size(15.0).strong().color(theme.accent_blue));
                     ui.label(RichText::new("Auto-Taxonomy Routing").size(10.5).color(theme.text_secondary));
                 });
                 cols[1].vertical(|ui| {
-                    ui.label(RichText::new("SIKLUS PEMBELAJARAN AI").size(10.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new(format!("{} Evaluasi", mem.total_ari_evaluations)).size(15.0).strong().color(theme.accent_green));
+                    ui.label(RichText::new("AI LEARNING CYCLES").size(10.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new(format!("{} Evaluations", mem.total_ari_evaluations)).size(15.0).strong().color(theme.accent_green));
                     ui.label(RichText::new(format!("Best ARI: {:.3}", mem.best_recorded_system_ari)).size(10.5).color(theme.text_secondary));
                 });
                 cols[2].vertical(|ui| {
                     ui.label(RichText::new("SEAMLESS AUTOSAVE").size(10.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new(format!("{}x Tersimpan", mem.total_autosaves_count)).size(15.0).strong().color(theme.accent_orange));
-                    ui.label(RichText::new(format!("{} Komponen Parametrik", mem.total_parametric_mutations)).size(10.5).color(theme.text_secondary));
+                    ui.label(RichText::new(format!("{}x Saved", mem.total_autosaves_count)).size(15.0).strong().color(theme.accent_orange));
+                    ui.label(RichText::new(format!("{} Parametric Components", mem.total_parametric_mutations)).size(10.5).color(theme.text_secondary));
                 });
                 cols[3].vertical(|ui| {
                     let best_sec = mem.learned_optimal_sections.first().map(|s| s.as_str()).unwrap_or("RC Column 500x500");
-                    ui.label(RichText::new("PROFIL TEROPTIMASI").size(10.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new("OPTIMIZED SECTIONS").size(10.0).strong().color(theme.text_muted));
                     ui.label(RichText::new(best_sec).size(13.0).strong().color(Color32::WHITE));
-                    ui.label(RichText::new("Rekomendasi Memori Historis").size(10.5).color(theme.text_secondary));
+                    ui.label(RichText::new("Historical Memory Recommendation").size(10.5).color(theme.text_secondary));
                 });
             });
 
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                ui.label(RichText::new("🎯 Ganti Target Folder Vault:").size(11.0).color(theme.text_muted));
+                ui.label(RichText::new("🎯 Switch Target Vault Directory:").size(11.0).color(theme.text_muted));
                 let resp = ui.add(egui::TextEdit::singleline(&mut self.custom_vault_override)
-                    .hint_text("Ketik path folder kustom (misal: /Users/nama/Documents/MyVault)...")
+                    .hint_text("Enter custom folder path (e.g. /Users/name/Documents/MyVault)...")
                     .desired_width(320.0));
                 if resp.lost_focus() && !self.custom_vault_override.trim().is_empty() {
                     let path = std::path::PathBuf::from(self.custom_vault_override.trim());
                     let _ = crate::core::InternalVault::set_custom_vault_dir(path);
                 }
-                if ui.button(RichText::new("Terapkan").size(11.0)).clicked() && !self.custom_vault_override.trim().is_empty() {
+                if ui.button(RichText::new("Apply").size(11.0)).clicked() && !self.custom_vault_override.trim().is_empty() {
                     let path = std::path::PathBuf::from(self.custom_vault_override.trim());
                     let _ = crate::core::InternalVault::set_custom_vault_dir(path);
                 }
@@ -289,11 +289,11 @@ impl MyProjectView {
                 .striped(true)
                 .min_col_width(95.0)
                 .show(ui, |ui| {
-                    ui.label(RichText::new("Tahap LOD").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Berkas IFC").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Nodes / Elemen").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Indeterminasi (DSI)").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Kondisi κ(K)").size(10.5).strong().color(theme.text_muted));
+                    ui.label(RichText::new("LOD Stage").size(10.5).strong().color(theme.text_muted));
+                    ui.label(RichText::new("IFC File").size(10.5).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Nodes / Elements").size(10.5).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Indeterminacy (DSI)").size(10.5).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Condition κ(K)").size(10.5).strong().color(theme.text_muted));
                     ui.label(RichText::new("Avg ARI").size(10.5).strong().color(theme.text_muted));
                     ui.label(RichText::new("Min ARI").size(10.5).strong().color(theme.text_muted));
                     ui.end_row();
@@ -457,25 +457,25 @@ impl MyProjectView {
                             ui.label(RichText::new("ADVANCED STRUCTURAL INTEGRITY & RESILIENCE ENGINE").size(11.0).color(theme.text_secondary));
                             ui.add_space(4.0);
                             ui.heading(RichText::new("SURAT HASIL AUDIT REDUNDANSI STRUKTURAL & KETAHANAN RUNTUH PROGRESIF").size(14.0).strong().color(Color32::WHITE));
-                            ui.label(RichText::new("Verifikasi Berbasis Adjusted Redundancy Index (ARI) & SVD Kinematic Mechanism Guard").size(11.0).color(theme.accent_green));
+                            ui.label(RichText::new("Verification based on Adjusted Redundancy Index (ARI) & SVD Kinematic Mechanism Guard").size(11.0).color(theme.accent_green));
                             ui.add_space(10.0);
                             ui.separator();
                             ui.add_space(10.0);
                         });
 
-                        ui.label(RichText::new("INFORMASI OTORITAS & AUDITOR:").size(11.5).strong().color(theme.text_secondary));
+                        ui.label(RichText::new("AUTHORITY & AUDITOR INFORMATION:").size(11.5).strong().color(theme.text_secondary));
                         ui.label(RichText::new("• Lead Engineer / Auditor: Harids Irawan, S.T., M.T. (EigenGraph Systems)").size(11.5).color(theme.text_primary));
-                        ui.label(RichText::new("• Kerangka Analisis: Pengembangan dan Validasi Adjusted Redundancy Index untuk Penapisan Pra-Analisis Skenario Gangguan Elemen").size(11.0).color(theme.text_secondary));
-                        ui.label(RichText::new("• Tahun Terbit / Verifikasi: 2026").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("• Analysis Framework: Development and Validation of Adjusted Redundancy Index for Pre-Analysis Screening of Element Disruption Scenarios").size(11.0).color(theme.text_secondary));
+                        ui.label(RichText::new("• Publication / Verification Year: 2026").size(11.0).color(theme.text_muted));
 
                         ui.add_space(8.0);
                         ui.separator();
                         ui.add_space(8.0);
 
-                        ui.label(RichText::new("HASIL AUDIT METRIK RESMI MODEL AKTIF:").size(11.5).strong().color(theme.text_secondary));
+                        ui.label(RichText::new("OFFICIAL AUDIT METRICS FOR ACTIVE MODEL:").size(11.5).strong().color(theme.text_secondary));
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("• Minimum System ARI:").size(11.5).color(theme.text_secondary));
-                            ui.label(RichText::new("0.942 [GRADE A: AMAN MULTI-PATH]").size(11.5).strong().color(theme.accent_green));
+                            ui.label(RichText::new("0.942 [GRADE A: SAFE MULTI-PATH]").size(11.5).strong().color(theme.accent_green));
                         });
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("• SVD Kinematic Mechanism Guard:").size(11.5).color(theme.text_secondary));
@@ -483,11 +483,11 @@ impl MyProjectView {
                         });
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("• Maximum Member Criticality (CI_max):").size(11.5).color(theme.text_secondary));
-                            ui.label(RichText::new("0.4200 (Bebas Titik Rawan Runtuh Katastropik)").size(11.5).strong().color(theme.accent_orange));
+                            ui.label(RichText::new("0.4200 (Free of Catastrophic Collapse Vulnerabilities)").size(11.5).strong().color(theme.accent_orange));
                         });
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("• Formulasi Acuan Matematis:").size(11.5).color(theme.text_secondary));
-                            ui.label(RichText::new("Persamaan (2.5a)–(2.19), (4.1)–(4.4), (4.13b)–(4.13c)").size(11.5).color(theme.text_muted));
+                            ui.label(RichText::new("• Mathematical Reference Formulations:").size(11.5).color(theme.text_secondary));
+                            ui.label(RichText::new("Equations (2.5a)–(2.19), (4.1)–(4.4), (4.13b)–(4.13c)").size(11.5).color(theme.text_muted));
                         });
 
                         ui.add_space(8.0);
@@ -503,7 +503,7 @@ impl MyProjectView {
                             .inner_margin(Margin::same(10))
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.label(RichText::new("🔐 SEGEL KRIPTOGRAFIS AUDIT (SHA-256):").size(11.0).strong().color(theme.accent_blue));
+                                    ui.label(RichText::new("🔐 CRYPTOGRAPHIC AUDIT SEAL (SHA-256):").size(11.0).strong().color(theme.accent_blue));
                                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                         ui.label(RichText::new("✅ Tamper-Proof Authentic").size(10.5).color(theme.accent_green));
                                     });
@@ -517,9 +517,9 @@ impl MyProjectView {
                         ui.add_space(10.0);
 
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("Status Sertifikasi: RESMI TERVALIDASI (EIGENGRAPH 2026)").size(11.5).strong().color(theme.accent_green));
+                            ui.label(RichText::new("Certification Status: OFFICIALLY VALIDATED (EIGENGRAPH 2026)").size(11.5).strong().color(theme.accent_green));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.add(egui::Button::new(RichText::new("✕ Tutup").size(12.0).color(theme.text_secondary))
+                                if ui.add(egui::Button::new(RichText::new("✕ Close").size(12.0).color(theme.text_secondary))
                                     .fill(theme.bg_card)
                                     .corner_radius(CornerRadius::same(6))).clicked() {
                                     self.show_dossier_modal = false;
@@ -529,7 +529,7 @@ impl MyProjectView {
                                     ui.label(RichText::new(format!("✅ {}", msg)).size(11.0).color(theme.accent_green));
                                 }
 
-                                if ui.add(egui::Button::new(RichText::new("🌐 Unduh Viewer 3D Interaktif (.html)").size(12.0).strong().color(Color32::WHITE))
+                                if ui.add(egui::Button::new(RichText::new("🌐 Download Interactive 3D Viewer (.html)").size(12.0).strong().color(Color32::WHITE))
                                     .fill(Color32::from_rgb(147, 51, 234))
                                     .corner_radius(CornerRadius::same(6))).clicked() {
                                     let mut engine = crate::core::ParametricEngine::new();
@@ -537,11 +537,11 @@ impl MyProjectView {
                                         let assessment = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                                         let html = crate::core::HtmlViewerExporter::export_standalone_html(&model, assessment.as_ref());
                                         let _ = std::fs::write("/tmp/EigenGraph_Interactive_3D_Viewer.html", &html);
-                                        self.export_success_msg = Some("Viewer 3D Interaktif HTML5 tersimpan di /tmp/EigenGraph_Interactive_3D_Viewer.html".to_string());
+                                        self.export_success_msg = Some("Interactive HTML5 3D Viewer saved to /tmp/EigenGraph_Interactive_3D_Viewer.html".to_string());
                                     }
                                 }
 
-                                if ui.add(egui::Button::new(RichText::new("📄 Unduh Naskah Dossier Lengkap (.md)").size(12.0).strong().color(Color32::WHITE))
+                                if ui.add(egui::Button::new(RichText::new("📄 Download Comprehensive Dossier (.md)").size(12.0).strong().color(Color32::WHITE))
                                     .fill(theme.accent_green)
                                     .corner_radius(CornerRadius::same(6))).clicked() {
                                     let mut engine = crate::core::ParametricEngine::new();
@@ -556,15 +556,15 @@ impl MyProjectView {
 
                                             let full_md = crate::core::DossierExporter::export_comprehensive_dossier(&model, &assessment, modal.as_ref(), Some(&pushover), Some(&boq), Some(&lca));
                                             let _ = std::fs::write("/tmp/EigenGraph_Comprehensive_Dossier_2026.md", &full_md);
-                                            self.export_success_msg = Some("Dossier lengkap 30+ halaman tersimpan di /tmp/EigenGraph_Comprehensive_Dossier_2026.md".to_string());
+                                            self.export_success_msg = Some("Comprehensive 30+ page dossier saved to /tmp/EigenGraph_Comprehensive_Dossier_2026.md".to_string());
                                         }
                                     }
                                 }
 
-                                if ui.add(egui::Button::new(RichText::new("💾 Simpan PDF Dossier").size(12.0).strong().color(Color32::WHITE))
+                                if ui.add(egui::Button::new(RichText::new("💾 Save PDF Dossier").size(12.0).strong().color(Color32::WHITE))
                                     .fill(theme.accent_blue)
                                     .corner_radius(CornerRadius::same(6))).clicked() {
-                                    self.export_success_msg = Some("Dokumen siap cetak ke format PDF melalui viewer sistem".to_string());
+                                    self.export_success_msg = Some("Document ready to print to PDF format via system viewer".to_string());
                                 }
                             });
                         });

@@ -122,7 +122,7 @@ impl AppUpdater {
 
                             let is_newer = is_version_newer(clean_tag, clean_current);
                             let title = json.get("name").and_then(|v| v.as_str()).unwrap_or(tag_name).to_string();
-                            let body = json.get("body").and_then(|v| v.as_str()).unwrap_or("Pembaruan dan penyempurnaan sistem EigenGraph.").to_string();
+                            let body = json.get("body").and_then(|v| v.as_str()).unwrap_or("EigenGraph system improvements and enhancements.").to_string();
                             let published_at = json.get("published_at").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
                             let mut dmg_download_url = String::new();
@@ -181,38 +181,38 @@ impl AppUpdater {
                             });
 
                             if is_newer {
-                                state.status_message = Some(format!("Versi baru {} tersedia untuk pembaruan langsung!", tag_name));
+                                state.status_message = Some(format!("New version {} available for direct update!", tag_name));
                             } else {
-                                state.status_message = Some(format!("EigenGraph sudah menggunakan versi terbaru (v{}).", clean_current));
+                                state.status_message = Some(format!("EigenGraph is already running the latest version (v{}).", clean_current));
                             }
                         } else if let Some(msg) = json.get("message").and_then(|v| v.as_str()) {
                             let mut state = shared.lock().unwrap();
                             state.is_checking = false;
                             if msg.eq_ignore_ascii_case("Not Found") {
-                                state.error = Some("Rilis belum ditemukan atau repositori berstatus Privat. Masukkan GitHub Token jika repositori privat.".to_string());
+                                state.error = Some("Release not found or repository is Private. Enter a GitHub Token if the repository is private.".to_string());
                             } else {
                                 state.error = Some(format!("GitHub API: {}", msg));
                             }
                         } else {
                             let mut state = shared.lock().unwrap();
                             state.is_checking = false;
-                            state.status_message = Some(format!("EigenGraph v{} adalah versi terkini.", current_ver));
+                            state.status_message = Some(format!("EigenGraph v{} is the latest version.", current_ver));
                         }
                     } else {
                         let mut state = shared.lock().unwrap();
                         state.is_checking = false;
-                        state.error = Some("Respon rilis GitHub tidak valid.".to_string());
+                        state.error = Some("Invalid GitHub release response.".to_string());
                     }
                 }
                 Ok(out) => {
                     let mut state = shared.lock().unwrap();
                     state.is_checking = false;
-                    state.error = Some(format!("Gagal menghubungkan ke GitHub (Exit code {}).", out.status.code().unwrap_or(-1)));
+                    state.error = Some(format!("Failed to connect to GitHub (Exit code {}).", out.status.code().unwrap_or(-1)));
                 }
                 Err(e) => {
                     let mut state = shared.lock().unwrap();
                     state.is_checking = false;
-                    state.error = Some(format!("Koneksi jaringan error: {}", e));
+                    state.error = Some(format!("Network connection error: {}", e));
                 }
             }
         });
@@ -244,7 +244,7 @@ impl AppUpdater {
                 state.is_downloading = true;
                 state.is_installing = false;
                 state.download_progress = 0.15;
-                state.status_message = Some("Mengunduh rilis DMG dari GitHub...".to_string());
+                state.status_message = Some("Downloading DMG release from GitHub...".to_string());
             }
 
             thread::spawn(move || {
@@ -283,7 +283,7 @@ impl AppUpdater {
                             state.is_downloading = false;
                             state.download_progress = 1.0;
                             state.downloaded_path = Some(download_target);
-                            state.status_message = Some("File DMG berhasil diunduh dan dibuka di Finder.".to_string());
+                            state.status_message = Some("DMG file successfully downloaded and opened in Finder.".to_string());
                             return;
                         }
 
@@ -292,7 +292,7 @@ impl AppUpdater {
                             state.is_downloading = false;
                             state.is_installing = true;
                             state.download_progress = 0.80;
-                            state.status_message = Some("Unduhan berhasil! Memasang pembaruan aplikasi...".to_string());
+                            state.status_message = Some("Download successful! Installing application update...".to_string());
                         }
 
                         // Execute 1-Click Silent In-Place App Replacement on macOS
@@ -354,7 +354,7 @@ impl AppUpdater {
                                 state.is_installing = false;
                                 state.download_progress = 1.0;
                                 state.downloaded_path = Some(target_app_path.clone());
-                                state.status_message = Some("Pembaruan berhasil dipasang! Membuka kembali aplikasi...".to_string());
+                                state.status_message = Some("Update successfully installed! Reopening application...".to_string());
                             }
 
                             // 4. Relaunch new version and exit current process
@@ -367,7 +367,7 @@ impl AppUpdater {
                             let mut state = shared.lock().unwrap();
                             state.is_installing = false;
                             state.downloaded_path = Some(download_target);
-                            state.status_message = Some("Installer DMG telah dibuka di Finder untuk pemasangan manual.".to_string());
+                            state.status_message = Some("DMG installer opened in Finder for manual installation.".to_string());
                         }
                     }
                     Ok(out) => {
@@ -375,13 +375,13 @@ impl AppUpdater {
                         let mut state = shared.lock().unwrap();
                         state.is_downloading = false;
                         state.is_installing = false;
-                        state.error = Some(format!("Gagal mengunduh file DMG: {}. Pastikan repositori Publik atau masukkan Token.", err_msg.trim()));
+                        state.error = Some(format!("Failed to download DMG file: {}. Ensure repository is Public or provide a Token.", err_msg.trim()));
                     }
                     Err(e) => {
                         let mut state = shared.lock().unwrap();
                         state.is_downloading = false;
                         state.is_installing = false;
-                        state.error = Some(format!("Koneksi jaringan error: {}", e));
+                        state.error = Some(format!("Network connection error: {}", e));
                     }
                 }
             });
@@ -404,7 +404,7 @@ impl AppUpdater {
             s.clone()
         };
 
-        egui::Window::new("Pembaruan Perangkat Lunak EigenGraph")
+        egui::Window::new("EigenGraph Software Update")
             .collapsible(false)
             .resizable(false)
             .anchor(Align2::CENTER_CENTER, Vec2::new(0.0, 0.0))
@@ -421,7 +421,7 @@ impl AppUpdater {
                         ui.add_space(8.0);
                         ui.vertical(|ui| {
                             ui.label(RichText::new("EigenGraph Auto-Updater").size(16.0).strong().color(theme.text_primary));
-                            ui.label(RichText::new(format!("Versi Terpasang Saat Ini: v{}", self.current_version)).size(12.0).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("Current Installed Version: v{}", self.current_version)).size(12.0).color(theme.text_secondary));
                         });
                     });
 
@@ -433,13 +433,13 @@ impl AppUpdater {
                         ui.horizontal(|ui| {
                             ui.spinner();
                             ui.add_space(6.0);
-                            ui.label(RichText::new("Sedang memeriksa server rilis GitHub...").size(12.5).color(theme.text_secondary));
+                            ui.label(RichText::new("Checking GitHub release servers...").size(12.5).color(theme.text_secondary));
                         });
                     } else if state.is_downloading || state.is_installing {
                         let header_text = if state.is_installing {
-                            "Memasang pembaruan langsung (in-place replacement)..."
+                            "Installing in-place application update..."
                         } else {
-                            "Mengunduh paket rilis terbaru dari GitHub..."
+                            "Downloading latest release package from GitHub..."
                         };
                         ui.label(RichText::new(header_text).size(12.5).strong().color(theme.accent_blue));
                         ui.add_space(6.0);
@@ -449,9 +449,9 @@ impl AppUpdater {
                         ui.add(progress_bar);
                         ui.add_space(4.0);
                         let note_text = if state.is_installing {
-                            "Aplikasi akan me-restart secara otomatis setelah pemasangan selesai."
+                            "The application will restart automatically once installation is complete."
                         } else {
-                            "Mengunduh disk image DMG di latar belakang..."
+                            "Downloading DMG disk image in background..."
                         };
                         ui.label(RichText::new(note_text).size(11.0).color(theme.text_muted));
                     } else if let Some(ref release) = state.release {
@@ -465,14 +465,14 @@ impl AppUpdater {
                                     ui.horizontal(|ui| {
                                         ui.label(RichText::new("✨").size(16.0));
                                         ui.vertical(|ui| {
-                                            ui.label(RichText::new(format!("Versi Baru Tersedia: {}", release.tag_name)).size(13.5).strong().color(theme.accent_green));
-                                            ui.label(RichText::new(format!("Ukuran: {:.1} MB • Rilis: {}", release.dmg_size_mb, release.published_at.chars().take(10).collect::<String>())).size(11.0).color(theme.text_secondary));
+                                            ui.label(RichText::new(format!("New Version Available: {}", release.tag_name)).size(13.5).strong().color(theme.accent_green));
+                                            ui.label(RichText::new(format!("Size: {:.1} MB • Released: {}", release.dmg_size_mb, release.published_at.chars().take(10).collect::<String>())).size(11.0).color(theme.text_secondary));
                                         });
                                     });
                                 });
 
                             ui.add_space(8.0);
-                            ui.label(RichText::new("Catatan Rilis / Changelog:").size(11.5).strong().color(theme.text_secondary));
+                            ui.label(RichText::new("Release Notes / Changelog:").size(11.5).strong().color(theme.text_secondary));
                             egui::ScrollArea::vertical().max_height(80.0).show(ui, |ui| {
                                 ui.label(RichText::new(&release.body).size(11.0).color(theme.text_muted));
                             });
@@ -486,8 +486,8 @@ impl AppUpdater {
                                     ui.horizontal(|ui| {
                                         ui.label(RichText::new("✅").size(20.0));
                                         ui.vertical(|ui| {
-                                            ui.label(RichText::new("EigenGraph Sudah Versi Terbaru!").size(13.0).strong().color(theme.accent_green));
-                                            ui.label(RichText::new(format!("Anda sudah menjalankan rilis resmi terbaru (v{}). Tidak ada pembaruan yang diperlukan.", self.current_version)).size(11.5).color(theme.text_secondary));
+                                            ui.label(RichText::new("EigenGraph is Up to Date!").size(13.0).strong().color(theme.accent_green));
+                                            ui.label(RichText::new(format!("You are running the latest official release (v{}). No updates required.", self.current_version)).size(11.5).color(theme.text_secondary));
                                         });
                                     });
                                 });
@@ -500,13 +500,13 @@ impl AppUpdater {
 
                     if let Some(ref path) = state.downloaded_path {
                         ui.add_space(6.0);
-                        ui.label(RichText::new(format!("✅ File tersimpan: {}", path)).size(10.5).color(theme.accent_green));
+                        ui.label(RichText::new(format!("✅ File saved: {}", path)).size(10.5).color(theme.accent_green));
                     }
 
                     // Optional GitHub Token row for private repositories
                     ui.add_space(10.0);
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("🔑 GitHub Token (opsional jika repo privat):").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("🔑 GitHub Token (optional for private repo):").size(11.0).color(theme.text_muted));
                         ui.add(egui::TextEdit::singleline(&mut self.github_token).password(true).desired_width(170.0));
                     });
 
@@ -520,12 +520,12 @@ impl AppUpdater {
                             if ui.add(egui::Button::new(RichText::new("⚡ 1-Click Update & Restart").size(12.0).strong().color(Color32::WHITE))
                                 .fill(theme.accent_blue)
                                 .corner_radius(CornerRadius::same(6))
-                                .min_size(Vec2::new(175.0, 30.0))).on_hover_text("Otomatis mengunduh, mengganti file aplikasi, dan me-relaunch").clicked() {
+                                .min_size(Vec2::new(175.0, 30.0))).on_hover_text("Automatically download, replace application bundle, and relaunch").clicked() {
                                 trigger_silent_update = true;
                             }
                             ui.add_space(6.0);
 
-                            if ui.add(egui::Button::new(RichText::new("💾 Unduh DMG Saja").size(11.5).color(theme.text_secondary))
+                            if ui.add(egui::Button::new(RichText::new("💾 Download DMG Only").size(11.5).color(theme.text_secondary))
                                 .fill(theme.bg_card)
                                 .corner_radius(CornerRadius::same(6))
                                 .min_size(Vec2::new(115.0, 30.0))).clicked() {
@@ -534,7 +534,7 @@ impl AppUpdater {
                             ui.add_space(8.0);
                         }
 
-                        if ui.add(egui::Button::new(RichText::new("Tutup").size(12.0).color(theme.text_secondary))
+                        if ui.add(egui::Button::new(RichText::new("Close").size(12.0).color(theme.text_secondary))
                             .fill(theme.bg_canvas)
                             .corner_radius(CornerRadius::same(6))
                             .min_size(Vec2::new(70.0, 30.0))).clicked() {
@@ -543,7 +543,7 @@ impl AppUpdater {
 
                         if !state.is_checking && !state.is_downloading && !state.is_installing {
                             ui.add_space(8.0);
-                            if ui.add(egui::Button::new(RichText::new("🔄 Periksa Ulang").size(11.5).color(theme.text_primary))
+                            if ui.add(egui::Button::new(RichText::new("🔄 Check Again").size(11.5).color(theme.text_primary))
                                 .fill(theme.bg_card)
                                 .corner_radius(CornerRadius::same(6))
                                 .min_size(Vec2::new(100.0, 30.0))).clicked() {

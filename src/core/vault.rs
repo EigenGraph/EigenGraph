@@ -59,12 +59,12 @@ impl Default for AriKnowledgeMemory {
                 "RC Column 500x500 (fc' 30 MPa)".to_string(),
                 "ASTM A36 WF 400x200 Girder".to_string(),
                 "Reinforced Concrete Shear Wall 300mm".to_string(),
-                "BJTS 420 D10 Seismic Stirrup (135 deg)".to_string(),
+                "Grade 420 D10 Seismic Stirrup (135 deg)".to_string(),
             ],
             recent_audit_log: vec![
-                "Inisialisasi EigenGraph Engineering Knowledge Vault".to_string(),
-                "Katalog Pustaka Parametrik Kolom, Balok, dan Rebar siap digunakan".to_string(),
-                "Memori Evaluasi SVD & ARI aktif untuk pemantauan integritas struktur".to_string(),
+                "Initialized EigenGraph Engineering Knowledge Vault".to_string(),
+                "Parametric library catalog for Columns, Beams, and Rebar ready".to_string(),
+                "SVD & ARI evaluation memory active for structural integrity monitoring".to_string(),
             ],
             custom_export_dir: None,
         }
@@ -289,23 +289,22 @@ impl InternalVault {
         tmp_vault
     }
 
-    /// Writes `BACA_SAYA_JANGAN_HAPUS.txt` at the root of the Vault to prevent accidental deletion.
+    /// Writes `README_DO_NOT_DELETE.txt` at the root of the Vault to prevent accidental deletion.
     pub fn ensure_vault_notice(root: &Path) {
-        let notice_file = root.join("BACA_SAYA_JANGAN_HAPUS.txt");
-        if !notice_file.exists() {
+        let notice_file = root.join("README_DO_NOT_DELETE.txt");
+        if !notice_file.exists() && !root.join("BACA_SAYA_JANGAN_HAPUS.txt").exists() {
             let text = r#"======================================================================
 ⚛️ EIGENGRAPH ASSET & ENGINEERING KNOWLEDGE VAULT
 ======================================================================
-Folder ini adalah Basis Data Pustaka Parametrik & Hasil Riset Anda.
-Seluruh kolom, balok, pelat, dinding, tulangan (rebar), material,
-struktur air (hidrolika), dan analisis Adjusted Redundancy Index (ARI)
-yang Anda buat di EigenGraph tersimpan secara otomatis dan terorganisir di sini.
+This folder is your Parametric Library Database & Engineering Research Vault.
+All columns, beams, slabs, walls, rebars, materials, hydraulic structures,
+and Adjusted Redundancy Index (ARI) analyses created in EigenGraph are
+automatically stored and organized here.
 
-PERINGATAN:
-JANGAN MENGHAPUS FOLDER INI agar seluruh data permodelan dan
-aset proyek Anda tidak hilang.
+WARNING:
+DO NOT DELETE THIS FOLDER to prevent loss of your model data and project assets.
 
-Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
+This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
 ======================================================================
 "#;
             let _ = std::fs::write(&notice_file, text);
@@ -414,7 +413,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
                 let p = entry.path();
                 if p.is_file() {
                     if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-                        if !name.starts_with('.') && name != "BACA_SAYA_JANGAN_HAPUS.txt" {
+                        if !name.starts_with('.') && name != "BACA_SAYA_JANGAN_HAPUS.txt" && name != "README_DO_NOT_DELETE.txt" {
                             items.push(name.to_string());
                         }
                     }
@@ -641,7 +640,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
             + project.footings.len();
 
         let ai_summary = format!(
-            "Model '{}' sedang aktif: {} kolom, {} balok/run, {} dinding, {} pelat, {} pondasi, {} tulangan. Aksi terakhir: '{}'.",
+            "Model '{}' is active: {} columns, {} beams/runs, {} walls, {} slabs, {} footings, {} rebars. Last action: '{}'.",
             project.project_name,
             project.columns.len(),
             project.runs.len(),
@@ -716,25 +715,25 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
         let mem = Self::load_knowledge_memory();
 
         let mut summary = String::new();
-        summary.push_str("📁 [EigenAI Copilot — Audit & Inspeksi Vault Penuh]:\n");
-        summary.push_str(&format!("• Lokasi Direktori Vault: {}\n", root.display()));
-        summary.push_str(&format!("• Status Proteksi Anti-Junk: {}\n", if root.join("BACA_SAYA_JANGAN_HAPUS.txt").exists() { "✅ Aktif (BACA_SAYA_JANGAN_HAPUS.txt)" } else { "⚠️ Perlu Ditulis" }));
-        summary.push_str(&format!("• Total Folder Kategori: {} kategori terorganisir\n", categories.len()));
+        summary.push_str("📁 [EigenAI Copilot — Full Vault Audit & Inspection]:\n");
+        summary.push_str(&format!("• Vault Directory Location: {}\n", root.display()));
+        summary.push_str(&format!("• Anti-Junk Protection Status: {}\n", if root.join("README_DO_NOT_DELETE.txt").exists() || root.join("BACA_SAYA_JANGAN_HAPUS.txt").exists() { "✅ Active (README_DO_NOT_DELETE.txt)" } else { "⚠️ Needs Setup" }));
+        summary.push_str(&format!("• Total Category Folders: {} organized categories\n", categories.len()));
 
-        summary.push_str("• Rincian Berkas per Kategori:\n");
+        summary.push_str("• Files Breakdown by Category:\n");
         for (cat, count) in &categories {
-            summary.push_str(&format!("   - 📂 {}/: {} berkas aktif\n", cat, count));
+            summary.push_str(&format!("   - 📂 {}/: {} active files\n", cat, count));
         }
 
         if let Some(ctx) = ai_context {
             summary.push_str(&format!(
-                "• Status Desain Aktif (Live Work): {} ({} elemen aktif, {} kolom, {} balok, {} dinding, {} pelat)\n• Aksi Terakhir Insinyur: {}\n",
+                "• Active Design Status (Live Work): {} ({} active elements, {} columns, {} beams, {} walls, {} slabs)\n• Last Engineer Action: {}\n",
                 ctx.live_status, ctx.total_elements_count, ctx.columns_count, ctx.beams_count, ctx.walls_count, ctx.slabs_count, ctx.last_action
             ));
         }
 
         summary.push_str(&format!(
-            "• Akumulasi Pembelajaran AI: {} evaluasi ARI, {} mutasi parametrik (Best System ARI: {:.4})\n• Profil Rekomendasi AI: {}",
+            "• Accumulated AI Learning: {} ARI evaluations, {} parametric mutations (Best System ARI: {:.4})\n• AI Recommended Profiles: {}",
             mem.total_ari_evaluations, mem.total_parametric_mutations, mem.best_recorded_system_ari,
             mem.learned_optimal_sections.join(", ")
         ));
@@ -755,7 +754,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
         let mut stale_cleaned = 0;
         let mut log = Vec::new();
 
-        log.push(format!("Memulai pemindaian & restrukturisasi di {}", root.display()));
+        log.push(format!("Starting scan & reorganization in {}", root.display()));
 
         // Scan root directory for any stray files that should be organized
         if let Ok(entries) = std::fs::read_dir(&root) {
@@ -764,7 +763,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
                 if path.is_file() {
                     total_scanned += 1;
                     if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                        if name == "BACA_SAYA_JANGAN_HAPUS.txt" || name.starts_with('.') {
+                        if name == "BACA_SAYA_JANGAN_HAPUS.txt" || name == "README_DO_NOT_DELETE.txt" || name.starts_with('.') {
                             continue;
                         }
                         // Detect and route stray files into categories
@@ -788,7 +787,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
                         let target_file = target_dir.join(name);
                         if std::fs::rename(&path, &target_file).is_ok() {
                             files_reorganized += 1;
-                            log.push(format!("Menata berkas nyasar '{}' ➔ {}/", name, target_cat));
+                            log.push(format!("Organizing misplaced file '{}' ➔ {}/", name, target_cat));
                         }
                     }
                 }
@@ -808,7 +807,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
                             if meta.len() == 0 {
                                 let _ = std::fs::remove_file(&path);
                                 stale_cleaned += 1;
-                                log.push(format!("Menghapus berkas rusak 0-byte: {}", path.display()));
+                                log.push(format!("Removed corrupted 0-byte file: {}", path.display()));
                             }
                         }
                     }
@@ -819,13 +818,13 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
         // Record audit entry in KnowledgeBase
         let mut mem = Self::load_knowledge_memory();
         mem.recent_audit_log.push(format!(
-            "[AI Vault Restructure] Discan: {} berkas, Ditata: {}, Dibersihkan: {}",
+            "[AI Vault Restructure] Scanned: {} files, Organized: {}, Cleaned: {}",
             total_scanned, files_reorganized, stale_cleaned
         ));
         let _ = Self::save_knowledge_memory(&mem);
 
         let verified_cats: Vec<String> = categories.into_iter().map(|(c, _)| c).collect();
-        log.push("Restrukturisasi Vault selesai dengan integritas data 100% aman.".to_string());
+        log.push("Vault reorganization completed with 100% data integrity verified.".to_string());
 
         Ok(VaultOrganizeReport {
             vault_root: root.display().to_string(),
@@ -833,7 +832,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
             files_reorganized,
             categories_verified: verified_cats,
             stale_cleaned_count: stale_cleaned,
-            integrity_status: "100% Valid & Terorganisir".to_string(),
+            integrity_status: "100% Valid & Organized".to_string(),
             log,
         })
     }
@@ -845,10 +844,10 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
     pub fn ai_autocomplete_active_structure() -> Result<String, String> {
         let proj_path = Self::auto_route_category("Projects").join("active_live_project.json");
         let content = std::fs::read_to_string(&proj_path)
-            .map_err(|_| "Belum ada sesi pemodelan aktif di Vault. Buat atau buka elemen di Pilar 4 terlebih dahulu.".to_string())?;
+            .map_err(|_| "No active modeling session found in Vault. Create or open elements in Pillar 4 first.".to_string())?;
 
         let mut project: crate::core::bim::BimProject = serde_json::from_str(&content)
-            .map_err(|e| format!("Gagal mem-parse model aktif: {e}"))?;
+            .map_err(|e| format!("Failed to parse active model: {e}"))?;
 
         let prev_runs = project.runs.len();
         let prev_rebars = project.rebars.len();
@@ -905,10 +904,10 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
         let new_rebars = project.rebars.len() - prev_rebars;
 
         // 3. Immediately re-sync model and AI context into Vault
-        Self::sync_live_bim_state(&project, "EigenAI Copilot: Autocomplete Balok & Tulangan");
+        Self::sync_live_bim_state(&project, "EigenAI Copilot: Autocomplete Beams & Reinforcement");
 
         Ok(format!(
-            "🤖 [EigenAI Copilot — Autocomplete Struktur Selesai]:\n• Berhasil menambahkan {} balok penghubung (WF 400x200).\n• Berhasil men-generate {} batang tulangan seismik (Rebar).\n• Seluruh perubahan telah langsung disinkronkan ke folder Beams/ dan Rebar/ di Vault.\n• Model proyek diperbarui di Projects/active_live_project.json.",
+            "🤖 [EigenAI Copilot — Structural Autocomplete Complete]:\n• Successfully added {} connecting beams (WF 400x200).\n• Successfully generated {} seismic rebar elements.\n• All changes immediately synced to Beams/ and Rebar/ Vault categories.\n• Project model updated in Projects/active_live_project.json.",
             new_runs, new_rebars
         ))
     }
@@ -917,14 +916,14 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
     pub fn ai_read_vault_file(category: &str, filename: &str) -> Result<String, String> {
         let dir = Self::auto_route_category(category);
         let path = dir.join(filename);
-        std::fs::read_to_string(&path).map_err(|e| format!("Gagal membaca berkas {}: {e}", path.display()))
+        std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file {}: {e}", path.display()))
     }
 
     /// Allows AI Copilot to modify or create any file inside any Vault category.
     pub fn ai_write_vault_file(category: &str, filename: &str, content: &str) -> Result<PathBuf, String> {
         let dir = Self::auto_route_category(category);
         let path = dir.join(filename);
-        std::fs::write(&path, content).map_err(|e| format!("Gagal menulis berkas {}: {e}", path.display()))?;
+        std::fs::write(&path, content).map_err(|e| format!("Failed to write file {}: {e}", path.display()))?;
         Ok(path)
     }
 
@@ -933,7 +932,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
         let dir = Self::auto_route_category(category);
         let path = dir.join(filename);
         if path.exists() {
-            std::fs::remove_file(&path).map_err(|e| format!("Gagal menghapus berkas {}: {e}", path.display()))?;
+            std::fs::remove_file(&path).map_err(|e| format!("Failed to delete file {}: {e}", path.display()))?;
         }
         Ok(())
     }
@@ -1020,7 +1019,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
                                 min_ari: 0.942,
                                 max_deflection_mm: 3.5,
                                 status: ProjectStatus::Safe,
-                                last_modified: "Tersimpan di Vault".to_string(),
+                                last_modified: "Saved in Vault".to_string(),
                                 is_favorite: true,
                                 is_featured: false,
                                 tag: "Vault Project".to_string(),
@@ -1039,15 +1038,15 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
         // Clean authentic starter project
         vec![ProjectItem {
             id: "starter_vault_project".to_string(),
-            title: "Proyek Perdana — Struktur Rangka Ruang 3D (EigenGraph Vault)".to_string(),
-            category: "Rangka Baja & Beton (Vault Ready)".to_string(),
-            description: "Model struktur rangka ruang 3D bawaan dengan verifikasi matriks kekakuan, penapisan redundansi ARI otomatis, dan kesiapan ekspor BIM.".to_string(),
+            title: "Primary Project — 3D Space Truss Structure (EigenGraph Vault)".to_string(),
+            category: "Steel & Concrete Frame (Vault Ready)".to_string(),
+            description: "Default 3D space truss structural model with stiffness matrix verification, automated ARI redundancy screening, and BIM export readiness.".to_string(),
             elements_count: 25,
             nodes_count: 14,
             min_ari: 0.942,
             max_deflection_mm: 4.20,
             status: ProjectStatus::Safe,
-            last_modified: "Vault Inisialisasi".to_string(),
+            last_modified: "Vault Initialized".to_string(),
             is_favorite: true,
             is_featured: true,
             tag: "Starter Project".to_string(),
@@ -1069,9 +1068,9 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
         let defaults = vec![
             DatabaseComponent {
                 id: "comp_rc_col_500".to_string(),
-                name: "Kolom Beton Bertulang 500x500 (fc' 30 MPa)".to_string(),
+                name: "Reinforced Concrete Column 500x500 (fc' 30 MPa)".to_string(),
                 category: "Columns".to_string(),
-                description: "Kolom struktur utama gedung bertingkat tahan gempa standar SNI 2847:2019 / ACI 318.".to_string(),
+                description: "Primary structural column for multi-story buildings per SNI 2847:2019 / ACI 318 seismic standards.".to_string(),
                 span_m: 4.0,
                 height_m: 4.0,
                 divisions: 1,
@@ -1090,9 +1089,9 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
             },
             DatabaseComponent {
                 id: "comp_wf_beam_400".to_string(),
-                name: "Balok Induk Baja WF 400x200 (BJ 41 / A36)".to_string(),
+                name: "Structural Steel WF 400x200 Girder (ASTM A36)".to_string(),
                 category: "Beams".to_string(),
-                description: "Profil balok baja struktural canai panas bentang 8.0 meter standar AISC 360.".to_string(),
+                description: "Hot-rolled structural steel beam profile with 8.0m span per AISC 360 standards.".to_string(),
                 span_m: 8.0,
                 height_m: 4.0,
                 divisions: 4,
@@ -1111,9 +1110,9 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
             },
             DatabaseComponent {
                 id: "comp_rc_tbeam_300x600".to_string(),
-                name: "Balok T-Beam Beton Bertulang 300x600 (fc' 30 MPa)".to_string(),
+                name: "Reinforced Concrete T-Beam 300x600 (fc' 30 MPa)".to_string(),
                 category: "Beams".to_string(),
-                description: "Balok penumpu pelat lantai monolit bentang 6.0 meter.".to_string(),
+                description: "Supporting beam for monolithic floor slab with 6.0m span.".to_string(),
                 span_m: 6.0,
                 height_m: 3.5,
                 divisions: 3,
@@ -1131,9 +1130,9 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
             },
             DatabaseComponent {
                 id: "comp_rebar_stirrup_d10".to_string(),
-                name: "Sengkang Gempa 135° Kait Standar D10 (BJTS 420)".to_string(),
+                name: "Seismic Stirrup 135° Standard Hook D10 (Grade 420)".to_string(),
                 category: "Rebar".to_string(),
-                description: "Detail sengkang pengekang kolom dan balok dengan pengait seismik 135 derajat.".to_string(),
+                description: "Confinement stirrup detail for columns and beams with 135-degree seismic hooks.".to_string(),
                 span_m: 0.5,
                 height_m: 0.5,
                 divisions: 1,
@@ -1393,7 +1392,7 @@ Folder ini aman untuk disinkronkan ke Google Drive, Dropbox, atau GitHub.
             stages,
             ari_gain_lod100_to_lod300_pct: ari_gain_pct,
             kappa_reduction_ratio: kappa_ratio,
-            convergence_verdict: "KONVERGEN STABIL: Integrasi penulangan seismik dan kontinuitas balok pada LOD 300 meningkatkan ARI_min sebesar +52.7% dan mereduksi rasio kondisi spektral.".to_string(),
+            convergence_verdict: "STABLE CONVERGENCE: Integration of seismic reinforcement and beam continuity at LOD 300 increases ARI_min by +52.7% and reduces spectral condition ratio.".to_string(),
         }
     }
 
@@ -1417,7 +1416,7 @@ mod tests {
 
         let projects = InternalVault::default_nvw_dcr_lod_projects();
         assert!(!projects.is_empty());
-        assert!(projects[0].title.contains("EigenGraph Vault") || projects[0].title.contains("Proyek Perdana"));
+        assert!(projects[0].title.contains("EigenGraph Vault") || projects[0].title.contains("Primary Project") || projects[0].title.contains("Proyek Perdana"));
 
         let comps = InternalVault::load_or_init_parametric_components();
         assert!(!comps.is_empty());
@@ -1460,12 +1459,16 @@ mod tests {
             .expect("Setting custom vault dir should succeed");
         assert_eq!(root, temp_vault);
 
-        // 1. Verify that BACA_SAYA_JANGAN_HAPUS.txt is automatically generated
-        let notice_file = temp_vault.join("BACA_SAYA_JANGAN_HAPUS.txt");
+        // 1. Verify that README_DO_NOT_DELETE.txt or BACA_SAYA_JANGAN_HAPUS.txt is automatically generated
+        let notice_file = if temp_vault.join("README_DO_NOT_DELETE.txt").exists() {
+            temp_vault.join("README_DO_NOT_DELETE.txt")
+        } else {
+            temp_vault.join("BACA_SAYA_JANGAN_HAPUS.txt")
+        };
         assert!(notice_file.exists(), "Protection notice file must exist at vault root");
         let notice_content = std::fs::read_to_string(&notice_file).unwrap();
         assert!(notice_content.contains("EIGENGRAPH ASSET & ENGINEERING KNOWLEDGE VAULT"));
-        assert!(notice_content.contains("JANGAN MENGHAPUS FOLDER INI"));
+        assert!(notice_content.contains("DO NOT DELETE THIS FOLDER") || notice_content.contains("JANGAN MENGHAPUS FOLDER INI"));
 
         // 2. Test saving and dynamic auto-routing for a Column component
         #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1577,7 +1580,7 @@ mod tests {
             .expect("AI context manifest should be auto-created");
         assert!(ai_context.columns_count >= 1);
         assert!(ai_context.last_action.contains("Column") || ai_context.last_action.contains("Added"));
-        assert!(ai_context.ai_context_summary.contains("kolom"));
+        assert!(ai_context.ai_context_summary.contains("column") || ai_context.ai_context_summary.contains("kolom"));
 
         // 5. Test AI Prompt helper
         let ai_prompt = InternalVault::get_live_ai_prompt_context();

@@ -53,7 +53,7 @@ impl PredictionView {
                     ui.add_space(10.0);
                     theme.card_frame().show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("🔮 PREDIKSI TUNTAS:").size(11.5).strong().color(theme.accent_blue));
+                            ui.label(RichText::new("🔮 PREDICTION COMPLETE:").size(11.5).strong().color(theme.accent_blue));
                             ui.label(RichText::new(status_msg).size(11.5).color(theme.text_primary));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 if ui.add(egui::Button::new(RichText::new("✕").size(11.0).color(theme.text_muted))
@@ -124,7 +124,7 @@ impl PredictionView {
                 });
             });
             ui.add_space(4.0);
-            ui.label(RichText::new("Model prediksi probabilistik mengevaluasi kerapuhan elemen (vulnerability index) dan anomali konsentrasi tegangan sebelum analisis nonlinear penuh dijalankan.")
+            ui.label(RichText::new("Probabilistic prediction models evaluate member vulnerability indices and stress concentration anomalies prior to full nonlinear analysis.")
                 .size(11.5).color(theme.text_secondary));
 
             ui.add_space(12.0);
@@ -132,7 +132,7 @@ impl PredictionView {
                 ui.label(RichText::new("Target Reliability Index (β):").size(11.5).color(theme.text_primary));
                 ui.add(egui::Slider::new(&mut self.target_reliability_beta, 2.5..=5.0).step_by(0.1));
                 ui.add_space(16.0);
-                if ui.add(egui::Button::new(RichText::new("⚡ Evaluasi FOSM β & Kurva Fragilitas FEMA P-58").size(11.0).color(Color32::WHITE))
+                if ui.add(egui::Button::new(RichText::new("⚡ Evaluate FOSM β & FEMA P-58 Fragility Curves").size(11.0).color(Color32::WHITE))
                     .fill(theme.accent_blue)
                     .corner_radius(CornerRadius::same(6))).clicked() {
                     let mut engine = crate::core::ParametricEngine::new();
@@ -146,7 +146,7 @@ impl PredictionView {
                             min_ari,
                         ) {
                             self.simulation_status = Some(format!(
-                                "Evaluasi FOSM & FEMA P-58 Selesai: Sistem β_min = {:.2} (Pf = {:.2e}), Clash Spasial = {}.",
+                                "FOSM & FEMA P-58 Evaluation Complete: System β_min = {:.2} (Pf = {:.2e}), Spatial Clashes = {}.",
                                 rep.min_beta_index, rep.max_failure_probability, rep.detected_clashes.len()
                             ));
                             self.reliability_report = Some(rep);
@@ -172,7 +172,7 @@ impl PredictionView {
                 cols[0].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Probabilitas Kegagalan (Pf)").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("Failure Probability (Pf)").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new(pf_str).size(18.0).strong().color(theme.accent_green));
                         ui.label(RichText::new(beta_str).size(10.0).color(theme.text_muted));
                     });
@@ -182,7 +182,7 @@ impl PredictionView {
                         ui.set_width(ui.available_width());
                         ui.label(RichText::new("Median Collapse PGA (θ_collapse)").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new(med_pga_str).size(18.0).strong().color(theme.accent_blue));
-                        ui.label(RichText::new("Kapasitas fragilitas seismik FEMA P-58").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("FEMA P-58 Seismic Fragility Capacity").size(10.0).color(theme.text_muted));
                     });
                 });
                 cols[2].vertical(|ui| {
@@ -190,7 +190,7 @@ impl PredictionView {
                         ui.set_width(ui.available_width());
                         ui.label(RichText::new("Predicted Failure Mechanism").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new("Ductile Mid-span Yield").size(16.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("Non-brittle (Aman dari buckling tiba-tiba)").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("Non-brittle (Safe from sudden buckling)").size(10.0).color(theme.text_muted));
                     });
                 });
             });
@@ -201,12 +201,12 @@ impl PredictionView {
             self.render_fragility_curve_canvas(ui, theme);
 
             ui.add_space(16.0);
-            ui.label(RichText::new("RANKING KERENTANAN ELEMEN STRUKTUR (AI VULNERABILITY SCORE)").size(12.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("STRUCTURAL ELEMENT VULNERABILITY RANKING (AI VULNERABILITY SCORE)").size(12.0).strong().color(theme.text_primary));
             ui.add_space(6.0);
 
             egui::Grid::new("failure_risk_grid").striped(true).min_col_width(90.0).spacing(Vec2::new(12.0, 6.0)).show(ui, |ui| {
-                ui.label(RichText::new("Batang ID").size(11.0).strong().color(theme.text_muted));
-                ui.label(RichText::new("Tipe").size(11.0).strong().color(theme.text_muted));
+                ui.label(RichText::new("Member ID").size(11.0).strong().color(theme.text_muted));
+                ui.label(RichText::new("Type").size(11.0).strong().color(theme.text_muted));
                 ui.label(RichText::new("Stress Demand").size(11.0).strong().color(theme.text_muted));
                 ui.label(RichText::new("Vulnerability").size(11.0).strong().color(theme.text_muted));
                 ui.label(RichText::new("Predicted Mechanism").size(11.0).strong().color(theme.text_muted));
@@ -235,13 +235,13 @@ impl PredictionView {
     fn render_progressive_collapse(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("⚡ SIMULASI KERUNTUHAN BERANTAI NONLINIER (APM)").size(14.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("⚡ NONLINEAR PROGRESSIVE COLLAPSE SIMULATION (APM)").size(14.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("Standar: DoD UFC 4-023-03 / ASCE 7-22").size(11.0).color(theme.accent_blue));
+                    ui.label(RichText::new("Standard: DoD UFC 4-023-03 / ASCE 7-22").size(11.0).color(theme.accent_blue));
                 });
             });
             ui.add_space(4.0);
-            ui.label(RichText::new("Metode Jalur Alternatif (Alternate Path Method) memprediksi apakah pelepasan mendadak salah satu kolom/batang penopang utama akan memicu keruntuhan berantai kaskade.")
+            ui.label(RichText::new("The Alternate Path Method (APM) forecasts whether the sudden removal of a critical column or support member will trigger a cascading progressive collapse.")
                 .size(11.5).color(theme.text_secondary));
 
             ui.add_space(12.0);
@@ -249,11 +249,11 @@ impl PredictionView {
                 ui.label(RichText::new("Dynamic Amplification Factor (DAF):").size(11.5).color(theme.text_primary));
                 ui.add(egui::Slider::new(&mut self.daf_multiplier, 1.0..=2.0).step_by(0.05));
                 ui.add_space(12.0);
-                ui.label(RichText::new("Batang Awal Dieliminasi:").size(11.5).color(theme.text_primary));
+                ui.label(RichText::new("Initial Removed Member:").size(11.5).color(theme.text_primary));
                 let max_id = members.len().max(1);
                 ui.add(egui::DragValue::new(&mut self.initial_disrupt_member_id).range(1..=max_id));
                 ui.add_space(12.0);
-                if ui.add(egui::Button::new(RichText::new("💥 Simulasikan Keruntuhan (Newmark-β Transient)").size(11.0).color(Color32::WHITE))
+                if ui.add(egui::Button::new(RichText::new("💥 Simulate Collapse (Newmark-β Transient)").size(11.0).color(Color32::WHITE))
                     .fill(theme.accent_orange)
                     .corner_radius(CornerRadius::same(6))).clicked() {
                     let mut engine = crate::core::ParametricEngine::new();
@@ -267,7 +267,7 @@ impl PredictionView {
                         ) {
                             self.daf_multiplier = rep.computed_daf as f32;
                             self.simulation_status = Some(format!(
-                                "Integrasi Transien Newmark-β Batang #{} Selesai: u_stat = {:.2} mm, u_dyn,peak = {:.2} mm (t = {:.3}s) -> DAF Fisik = {:.3}x.",
+                                "Newmark-β Transient Integration for Member #{} Complete: u_stat = {:.2} mm, u_dyn,peak = {:.2} mm (t = {:.3}s) -> Physical DAF = {:.3}x.",
                                 self.initial_disrupt_member_id,
                                 rep.damaged_static_disp_mm,
                                 rep.peak_dynamic_disp_mm,
@@ -284,14 +284,14 @@ impl PredictionView {
             self.render_transient_oscillation_canvas(ui, theme);
 
             ui.add_space(16.0);
-            ui.label(RichText::new("TAHAPAN PREDIKSI REDISTRIBUSI BEBAN (PROGRESSIVE TIMELINE)").size(12.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("PROGRESSIVE LOAD REDISTRIBUTION TIMELINE").size(12.0).strong().color(theme.text_primary));
             ui.add_space(8.0);
 
             let stages = [
-                ("Tahap 0: Kondisi Beban Gravitasi Penuh", "Struktur utuh pada kondisi elastis nominal. DCR maksimum 0.58 pada chord tengah.", "NORMAL", theme.accent_green),
-                ("Tahap 1: Pelepasan Seketika Batang Penopang", format!("Batang #{} hilang. Terjadi lonjakan dinamis DAF {:.2}x pada simpul sekitar.", self.initial_disrupt_member_id, self.daf_multiplier).leak(), "DISRUPTED", theme.accent_orange),
-                ("Tahap 2: Pembentukan Jalur Beban Alternatif", "Gaya gravitasi dialihkan ke batang diagonal penyangga samping melalui mekanisme vierendeel/truss.", "REDISTRIBUTE", theme.accent_blue),
-                ("Tahap 3: Keseimbangan Statis Baru (Equilibrium)", "Deformasi stabil pada 28.4 mm (< batas keruntuhan 150 mm). Sistem terbukti redundan (ARI > 0.70).", "STABLE SAFE", theme.accent_green),
+                ("Stage 0: Full Gravity Load State", "Intact structure under nominal elastic condition. Maximum DCR 0.58 at mid-span chord.", "NORMAL", theme.accent_green),
+                ("Stage 1: Sudden Member Removal", format!("Member #{} removed. Dynamic spike DAF {:.2}x occurs at adjacent nodes.", self.initial_disrupt_member_id, self.daf_multiplier).leak(), "DISRUPTED", theme.accent_orange),
+                ("Stage 2: Alternative Load Path Formation", "Gravity loads transferred to flanking diagonal members via Vierendeel/truss mechanism.", "REDISTRIBUTE", theme.accent_blue),
+                ("Stage 3: New Static Equilibrium", "Deformation stabilized at 28.4 mm (< 150 mm collapse limit). System proven redundant (ARI > 0.70).", "STABLE SAFE", theme.accent_green),
             ];
 
             for (title, desc, badge, color) in stages {
@@ -316,7 +316,7 @@ impl PredictionView {
                 });
             });
             ui.add_space(4.0);
-            ui.label(RichText::new("Memprediksi tahapan ereksi di lapangan yang rentan mengalami instabilitas struktur sementara, keterbatasan kapasitas derek (*crane margin*), atau risiko penundaan cuaca.")
+            ui.label(RichText::new("Predicts field erection stages vulnerable to temporary structural instability, crane margin limits, or weather delay risks.")
                 .size(11.5).color(theme.text_secondary));
 
             ui.add_space(14.0);
@@ -326,7 +326,7 @@ impl PredictionView {
                         ui.set_width(ui.available_width());
                         ui.label(RichText::new("Critical Erection Stage").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new("Stage 3: Cantilever").size(16.0).strong().color(theme.accent_orange));
-                        ui.label(RichText::new("Perlu perancah sementara (shoring)").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("Temporary shoring required").size(10.0).color(theme.text_muted));
                     });
                 });
                 cols[1].vertical(|ui| {
@@ -334,15 +334,15 @@ impl PredictionView {
                         ui.set_width(ui.available_width());
                         ui.label(RichText::new("Crane Utilization Margin").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new("76.4% Safe").size(16.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("Radius angkat 18m, beban 12.8 Ton").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("18m lift radius, 12.8 Ton load").size(10.0).color(theme.text_muted));
                     });
                 });
                 cols[2].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
                         ui.label(RichText::new("Predicted Erection Duration").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new("18 Hari Kerja").size(16.0).strong().color(theme.accent_blue));
-                        ui.label(RichText::new("Tingkat keyakinan Monte Carlo 92%").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("18 Work Days").size(16.0).strong().color(theme.accent_blue));
+                        ui.label(RichText::new("Monte Carlo 92% confidence level").size(10.0).color(theme.text_muted));
                     });
                 });
             });
@@ -352,22 +352,22 @@ impl PredictionView {
     fn render_lifetime_degradation(&mut self, ui: &mut Ui, theme: &MacTheme) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📉 PREDIKSI PENUAAN & KELELAHAN 50 TAHUN (LIFE-CYCLE DEGRADATION)").size(14.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("📉 50-YEAR SERVICEABILITY & FATIGUE PREDICTION (LIFE-CYCLE DEGRADATION)").size(14.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("Model Korosi ISO 9223 & Miner's Rule").size(11.0).color(theme.accent_blue));
+                    ui.label(RichText::new("ISO 9223 Corrosion Model & Miner's Rule").size(11.0).color(theme.accent_blue));
                 });
             });
             ui.add_space(4.0);
-            ui.label(RichText::new("Simulasi evolusi kapasitas struktur selama siklus masa layan 50 tahun dengan memperhitungkan laju korosi atmosferik dan akumulasi kerusakan lelah siklik.")
+            ui.label(RichText::new("Simulates structural capacity evolution across a 50-year service life accounting for atmospheric corrosion rates and cyclic fatigue accumulation.")
                 .size(11.5).color(theme.text_secondary));
 
             ui.add_space(12.0);
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Target Umur Rencana:").size(11.5).color(theme.text_primary));
-                ui.add(egui::Slider::new(&mut self.service_years, 10..=100).suffix(" Tahun"));
+                ui.label(RichText::new("Target Design Life:").size(11.5).color(theme.text_primary));
+                ui.add(egui::Slider::new(&mut self.service_years, 10..=100).suffix(" Years"));
                 ui.add_space(16.0);
-                ui.label(RichText::new("Laju Korosi Atmosferik:").size(11.5).color(theme.text_primary));
-                ui.add(egui::Slider::new(&mut self.corrosion_rate_mm_yr, 0.01..=0.15).suffix(" mm/tahun"));
+                ui.label(RichText::new("Atmospheric Corrosion Rate:").size(11.5).color(theme.text_primary));
+                ui.add(egui::Slider::new(&mut self.corrosion_rate_mm_yr, 0.01..=0.15).suffix(" mm/year"));
             });
 
             ui.add_space(14.0);
@@ -380,25 +380,25 @@ impl PredictionView {
                 cols[0].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Total Pengurangan Tebal Plat").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("Total Plate Thickness Reduction").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new(format!("{:.2} mm", total_loss_mm)).size(18.0).strong().color(theme.accent_orange));
-                        ui.label(RichText::new("Estimasi kehilangan penampang efektif").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("Estimated effective section loss").size(10.0).color(theme.text_muted));
                     });
                 });
                 cols[1].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Sisa Kapasitas Struktural").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("Residual Structural Capacity").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new(format!("{:.1}%", remaining_capacity_pct)).size(18.0).strong().color(theme.accent_blue));
-                        ui.label(RichText::new("Cukup untuk beban nominal SNI").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("Adequate for nominal design loads").size(10.0).color(theme.text_muted));
                     });
                 });
                 cols[2].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Prediksi Adjusted Redundancy Index").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("Predicted Adjusted Redundancy Index").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new(format!("{:.4}", degraded_ari)).size(18.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("Tetap di atas ambang batas kritis 0.70").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("Remains above critical threshold of 0.70").size(10.0).color(theme.text_muted));
                     });
                 });
             });
@@ -416,7 +416,7 @@ impl PredictionView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📈 KURVA FRAGILITAS SEISMIK LOG-NORMAL (FEMA P-58 / HAZUS)").size(11.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📈 LOG-NORMAL SEISMIC FRAGILITY CURVES (FEMA P-58 / HAZUS)").size(11.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new("■ Complete (Collapse)   ■ Extensive   ■ Moderate   ■ Slight").size(10.0).color(theme.text_secondary));
                     });
@@ -488,9 +488,9 @@ impl PredictionView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🌊 RIWAYAT WAKTU OSILASI TRANSIEN NEWMARK-β AKIBAT PELEPASAN BATANG MENDADAK").size(11.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("🌊 NEWMARK-β TRANSIENT OSCILLATION TIME HISTORY POST SUDDEN MEMBER REMOVAL").size(11.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new(format!("DAF Aktif = {:.2}x", self.daf_multiplier)).size(10.5).strong().color(theme.accent_orange));
+                        ui.label(RichText::new(format!("Active DAF = {:.2}x", self.daf_multiplier)).size(10.5).strong().color(theme.accent_orange));
                     });
                 });
                 ui.add_space(6.0);
@@ -559,9 +559,9 @@ impl PredictionView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📉 KURVA EVOLUSI DEGRADASI ARI(t) SELAMA UMUR LAYAN (ISO 9223)").size(11.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📉 ARI(t) DEGRADATION EVOLUTION CURVE OVER SERVICE LIFE (ISO 9223)").size(11.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("■ Kurva ARI(t)   --- Ambang Batas Aman ARI = 0.70").size(10.0).color(theme.text_secondary));
+                        ui.label(RichText::new("■ ARI(t) Curve   --- Safe Redundancy Threshold ARI = 0.70").size(10.0).color(theme.text_secondary));
                     });
                 });
                 ui.add_space(6.0);

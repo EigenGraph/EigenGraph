@@ -231,81 +231,81 @@ impl AiAssistantView {
     pub fn get_chips_for_pillar(pillar: NavigationPillar) -> &'static [(&'static str, &'static str)] {
         match pillar {
             NavigationPillar::MyLibrary => &[
-                ("📁 Inspeksi Vault Penuh", "Inspeksi seluruh isi, direktori kategori, dan berkas di Vault aktif saat ini."),
-                ("🧹 Rapikan & Strukturkan Vault", "Merapikan seluruh isi Vault, validasi JSON, dan sinkronkan metadata kategori."),
-                ("📑 Ringkasan Portofolio", "Summarize all projects and compare redundancy indices across the portfolio."),
-                ("📜 Sertifikat Audit EigenGraph", "Buka dan cetak Surat Hasil Audit Redundansi Struktural EigenGraph 2026."),
+                ("📁 Full Vault Inspection", "Inspect full contents, category directories, and files in the active Vault."),
+                ("🧹 Clean & Organize Vault", "Organize all Vault contents, validate JSON schemas, and sync category metadata."),
+                ("📑 Portfolio Summary", "Summarize all projects and compare redundancy indices across the portfolio."),
+                ("📜 EigenGraph Audit Certificate", "Open and print official EigenGraph 2026 Structural Redundancy Audit Certificate."),
                 ("📊 Rank by Safety", "Sort projects by minimum ARI score and deflection criteria."),
-                ("📦 Pustaka Komponen DB", "Tampilkan seluruh modul rangka parametrik yang tersimpan di database proyek."),
+                ("📦 DB Component Library", "Display all parametric truss modules stored in the project database."),
             ],
             NavigationPillar::ResearchConcept => &[
-                ("💡 Evaluasi Feasibility Proyek", "Cek studi kelayakan teknis dan batasan bentang bebas jembatan."),
-                ("📜 Standar SNI 1729 / AISC", "Periksa kepatuhan terhadap faktor ketahanan LRFD dan batas DCR leleh."),
-                ("🔬 Tampilkan Formulasi ARI", "Tinjau persamaan resmi formulasi EigenGraph (Michaelis-Menten dan SVD Guard)."),
+                ("💡 Project Feasibility Review", "Check technical feasibility study and bridge clear span limits."),
+                ("📜 SNI 1729 / AISC Standards", "Verify compliance with LRFD resistance factors and yield DCR limits."),
+                ("🔬 View ARI Formulation", "Review official EigenGraph formulation equations (Michaelis-Menten and SVD Guard)."),
             ],
             NavigationPillar::DraftingDrawings => &[
-                ("🤖 Selesaikan Struktur Aktif", "Bantu selesaikan elemen balok penghubung dan pembesian otomatis pada struktur yang sedang dikerjakan."),
-                ("📁 Status Live Vault", "Tinjau status penyimpanan autosave dan riwayat perubahan model di Vault."),
-                ("🪄 Rekomendasi Bracing ARI", "Jalankan AI-ARI Topology Suggestion untuk eliminasi titik rawan runtuh."),
+                ("🤖 Autocomplete Active Structure", "Help complete connecting beam elements and automated rebar detailing on active structure."),
+                ("📁 Live Vault Status", "Review autosave storage status and model mutation history in Vault."),
+                ("🪄 ARI Bracing Recommendation", "Run AI-ARI Topology Suggestion to eliminate fracture-critical collapse points."),
                 ("📐 Warren Truss 24m", "Generate parametric Warren truss with L=24m, H=3.2m, n=6."),
                 ("🔗 Bind H = L / 7.5", "Apply driving formula constraint between height and span."),
                 ("💾 Save to DB", "Save drawn parametric component into project database."),
             ],
             NavigationPillar::ModelingGeometry => &[
-                ("🤖 Selesaikan Struktur Aktif", "Bantu selesaikan elemen balok penghubung dan pembesian otomatis pada struktur yang sedang dikerjakan."),
-                ("📁 Inspeksi Vault Penuh", "Inspeksi seluruh isi, direktori kategori, dan berkas di Vault aktif saat ini."),
-                ("💥 Uji Disrupsi Jamak (N-2)", "Simulasikan pelepasan 2 batang sekaligus dan deteksi efek domino runtuh."),
+                ("🤖 Autocomplete Active Structure", "Help complete connecting beam elements and automated rebar detailing on active structure."),
+                ("📁 Full Vault Inspection", "Inspect full contents, category directories, and files in the active Vault."),
+                ("💥 Multi-Disruption Test (N-2)", "Simulate simultaneous removal of 2 members and detect progressive domino collapse."),
                 ("⚡ Check SVD Mechanism", "Run full singular value decomposition rank verification on the current structure."),
                 ("🎯 Screen Critical ARI", "Screen all members to find the lowest Adjusted Redundancy Index contributions."),
                 ("📐 Warren Truss 24m", "Instantiate a 24m span Warren truss with 6 panels into workspace."),
             ],
             NavigationPillar::TimeScheduling => &[
-                ("🏗️ Cek Keamanan Ereksi 4D", "Simulasikan kestabilan dan nilai ARI pada setiap tahapan perakitan di lapangan."),
-                ("📊 Ekspor Kurva S 4D", "Generate 4D erection schedule, CPM critical path, and weekly cashflow S-Curve."),
-                ("⏱️ Tahap Kritis Cantilever", "Verifikasi ketiadaan singularitas SVD pada tahap ereksi kantilever."),
+                ("🏗️ Check 4D Erection Safety", "Simulate staged erection stability and ARI scores during field assembly stages."),
+                ("📊 Export 4D S-Curve", "Generate 4D erection schedule, CPM critical path, and weekly cashflow S-Curve."),
+                ("⏱️ Critical Cantilever Stage", "Verify absence of SVD singularities during cantilever erection stage."),
             ],
             NavigationPillar::CostBudgeting => &[
-                ("💰 Hitung Otomatis RAB 5D", "Calculate full 5D construction estimate based on active parametric variables."),
-                ("📈 Trade-Off Cost vs ARI", "Evaluate budget impact to increase system Adjusted Redundancy Index."),
-                ("📑 Rincian AHSP Baja", "Tampilkan analisa harga satuan pekerjaan fabrikasi dan ereksi baja."),
+                ("💰 Automated 5D BoQ Estimate", "Calculate full 5D construction estimate based on active parametric variables."),
+                ("📈 Cost vs ARI Trade-Off", "Evaluate budget impact to increase system Adjusted Redundancy Index."),
+                ("📑 Steel AHSP Unit Rates", "Display unit price analysis for structural steel fabrication and erection."),
             ],
             NavigationPillar::SustainabilityEnergy => &[
-                ("🌱 Hitung Jejak Karbon CO₂e", "Hitung total emisi karbon embodied material baja dan beton bertulang."),
-                ("📈 Trade-Off Karbon vs ARI", "Tampilkan kurva optimasi keseimbangan redundansi terhadap jejak emisi."),
-                ("🏅 Prediksi Skor GBCI/LEED", "Simulasikan perolehan sertifikasi bangunan hijau untuk proyek ini."),
+                ("🌱 Calculate Embodied CO₂e", "Calculate total embodied carbon emissions of steel and reinforced concrete materials."),
+                ("📈 Carbon vs ARI Trade-Off", "Display optimization curve balancing structural redundancy against embodied emissions."),
+                ("🏅 Predict GBCI/LEED Rating", "Simulate green building certification tier for this project."),
             ],
             NavigationPillar::FacilityManagement => &[
-                ("📡 Baca Sensor SHM Realtime", "Tampilkan telemetri strain gauge dan frekuensi alami jembatan."),
-                ("📉 Evaluasi Degradasi ARI(t)", "Monitor laju degradasi redundansi akibat penuaan dan kelelahan siklik."),
-                ("🛠️ Terbitkan SPK Pemeliharaan", "Terbitkan perintah kerja inspeksi jika ARI turun di bawah ambang aman."),
+                ("📡 Realtime SHM Sensors", "Display telemetry from strain gauges and bridge natural frequencies."),
+                ("📉 Evaluate ARI(t) Degradation", "Monitor redundancy degradation rate due to aging and cyclic fatigue."),
+                ("🛠️ Issue Maintenance Work Order", "Issue inspection work order if ARI falls below safety threshold."),
             ],
             NavigationPillar::SafetyHealth => &[
-                ("📐 Evaluasi Interaksi P-M-V", "Hitung kapasitas gabungan aksial, momen lentur, dan geser LRFD."),
-                ("💥 Matriks Disrupsi Ganda (N-2)", "Evaluasi kestabilan dan efek cascading jika 2 batang hilang sekaligus."),
-                ("🚨 Top 5 Batang Paling Kritis", "Tampilkan peringkat 5 elemen penopang paling rawan memicu keruntuhan."),
-                ("🛡️ Rencana Mitigasi Keruntuhan", "Tampilkan protokol keselamatan pencegahan keruntuhan progresif."),
+                ("📐 Evaluate P-M-V Interaction", "Calculate combined axial, bending moment, and shear LRFD capacity."),
+                ("💥 Dual Disruption Matrix (N-2)", "Evaluate stability and cascading effects if 2 members fail simultaneously."),
+                ("🚨 Top 5 Critical Members", "Display top 5 critical load-bearing elements most prone to triggering collapse."),
+                ("🛡️ Progressive Collapse Mitigation", "Display safety protocol for progressive collapse prevention."),
             ],
             NavigationPillar::LeanConstruction => &[
-                ("✂️ Optimasi Potong Baja 12m", "Jalankan 1D Cutting Stock Optimizer untuk menekan sisa limbah scrap."),
-                ("📋 Last Planner System PPC", "Cek persentase kepatuhan komitmen mingguan dan sound lookahead."),
-                ("🌊 Eliminasi 7 Pemborosan", "Identifikasi aktivitas non-value-added pada rantai pasok ereksi."),
+                ("✂️ 12m Steel Cutting Optimizer", "Run 1D Cutting Stock Optimizer to minimize scrap waste."),
+                ("📋 Last Planner System PPC", "Check weekly commitment reliability percentage and sound lookahead."),
+                ("🌊 Eliminate 7 Wastes", "Identify non-value-added activities across the erection supply chain."),
             ],
             NavigationPillar::IndustrializedAutomation => &[
-                ("🏭 Verifikasi Modul DfMA", "Periksa batas dimensi transportasi jalan raya trailer untuk modul 12m."),
-                ("🦾 Toolpath Pengelasan Robotik", "Simulasikan jalur las otomatis robot 6-axis pada pelat buhul."),
-                ("🌐 Ekspor OpenBIM IFC 4.3", "Ekspor topologi struktur dan metadata ARI ke standar IFC buildingSMART."),
+                ("🏭 Verify DfMA Modules", "Check highway trailer transport clearance dimensions for 12m modules."),
+                ("🦾 Robotic Welding Toolpath", "Simulate 6-axis robotic automated weld seam toolpath on gusset plates."),
+                ("🌐 Export OpenBIM IFC 4.3", "Export structural topology and ARI metadata to buildingSMART IFC standard."),
             ],
             NavigationPillar::Prediction => &[
-                ("🔮 Simulasi Rantai Runtuh APM", "Simulasikan perambatan keruntuhan berantai nonlinier Alternate Path Method sesuai DoD UFC 4-023-03."),
-                ("⚡ Deteksi Instabilitas Kinematis SVD", "Prediksi singularitas matriks kekakuan dan mekanisme goyang sebelum keruntuhan terjadi."),
-                ("📉 Prediksi Penuaan & Kelelahan 50 Thn", "Simulasikan kurva degradasi kapasitas struktur dan redundansi akibat korosi dan beban siklik."),
-                ("🚨 AI Anomaly & Critical Stress", "Screening elemen struktur dengan probabilitas tertinggi melampaui batas leleh fy."),
+                ("🔮 APM Domino Collapse Simulation", "Simulate nonlinear Alternate Path Method progressive collapse propagation per DoD UFC 4-023-03."),
+                ("⚡ SVD Kinematic Instability Detection", "Predict stiffness matrix singularity and sway mechanism before collapse occurs."),
+                ("📉 50-Year Aging & Fatigue Prediction", "Simulate structural capacity and redundancy degradation curve due to corrosion and cyclic loads."),
+                ("🚨 AI Anomaly & Critical Stress", "Screen structural elements with highest probability of exceeding yield stress fy."),
             ],
             NavigationPillar::Results => &[
-                ("📊 Executive Summary Dashboard", "Tampilkan skor global Min ARI, jumlah batang kritis, D/C ratio maksimum, dan predikat kelayakan."),
-                ("📋 Matriks Verifikasi SNI / AISC", "Buka tabel lengkap seluruh batang dengan gaya aksial, lentur, geser, ARI, dan rasio kapasitas."),
-                ("📈 Cek Lendutan & Simpangan Antartingkat", "Verifikasi simpangan antartingkat (interstory drift) terhadap limit izin H/400 SNI 1726."),
-                ("📜 Ekspor Dossier Audit Lengkap", "Terbitkan laporan komprehensif PDF/HTML dan ekspor data topologi IFC 4.3."),
+                ("📊 Executive Summary Dashboard", "Display global Min ARI score, critical members count, maximum D/C ratio, and compliance verdict."),
+                ("📋 SNI / AISC Verification Matrix", "Open full verification table of all members with axial, bending, shear forces, ARI, and capacity ratios."),
+                ("📈 Drift & Interstory Deflection Check", "Verify interstory drift against SNI 1726 allowable limit H/400."),
+                ("📜 Export Full Audit Dossier", "Generate comprehensive PDF/HTML calculation sheet and export IFC 4.3 topology data."),
             ],
         }
     }
@@ -325,12 +325,12 @@ impl AiAssistantView {
         });
 
         let p_lower = prompt.to_lowercase();
-        let response_msg = if p_lower.contains("inspeksi vault") || p_lower.contains("lihat vault") || p_lower.contains("buka vault") || p_lower.contains("isi vault") || p_lower.contains("status vault") || p_lower.contains("daftar vault") || p_lower.contains("list vault") {
+        let response_msg = if p_lower.contains("inspect vault") || p_lower.contains("inspeksi vault") || p_lower.contains("view vault") || p_lower.contains("lihat vault") || p_lower.contains("open vault") || p_lower.contains("buka vault") || p_lower.contains("isi vault") || p_lower.contains("status vault") || p_lower.contains("vault contents") || p_lower.contains("daftar vault") || p_lower.contains("list vault") {
             crate::core::InternalVault::inspect_vault_summary()
-        } else if p_lower.contains("status live") || p_lower.contains("live context") || p_lower.contains("live state") {
+        } else if p_lower.contains("status live") || p_lower.contains("live context") || p_lower.contains("live state") || p_lower.contains("live vault") {
             let ctx = crate::core::InternalVault::get_live_ai_prompt_context();
             format!("🧠 [EigenAI Live Vault Context]:\n{}", ctx)
-        } else if p_lower.contains("rapikan vault") || p_lower.contains("strukturkan vault") || p_lower.contains("bersihkan vault") || p_lower.contains("organisir vault") || p_lower.contains("restruktur vault") || p_lower.contains("organize vault") {
+        } else if p_lower.contains("clean vault") || p_lower.contains("organize vault") || p_lower.contains("restructure vault") || p_lower.contains("rapikan vault") || p_lower.contains("strukturkan vault") || p_lower.contains("bersihkan vault") || p_lower.contains("organisir vault") || p_lower.contains("restruktur vault") {
             match crate::core::InternalVault::restructure_and_organize_vault() {
                 Ok(rep) => {
                     let log_preview = if rep.log.len() > 6 {
@@ -339,7 +339,7 @@ impl AiAssistantView {
                         rep.log.join("\n  • ")
                     };
                     format!(
-                        "🧹 [EigenAI Copilot — Restrukturisasi & Pembersihan Vault Berhasil]:\n• Direktori Root: {}\n• Total Berkas Dipindai: {}\n• Berkas Nyasar Ditata Ulang: {}\n• Berkas Rusak 0-Byte Dibersihkan: {}\n• Status Integritas: {}\n• Kategori Terverifikasi ({}): {}\n• Log Aktivitas:\n  • {}",
+                        "🧹 [EigenAI Copilot — Vault Restructuring & Cleanup Complete]:\n• Root Directory: {}\n• Total Files Scanned: {}\n• Reorganized Files: {}\n• Cleaned 0-Byte Stale Files: {}\n• Integrity Status: {}\n• Verified Categories ({}): {}\n• Activity Log:\n  • {}",
                         rep.vault_root,
                         rep.total_files_scanned,
                         rep.files_reorganized,
@@ -350,21 +350,23 @@ impl AiAssistantView {
                         log_preview
                     )
                 }
-                Err(e) => format!("🧹 [EigenAI Vault Restructure]: Gagal menjalankan restrukturisasi: {}", e),
+                Err(e) => format!("🧹 [EigenAI Vault Restructure]: Failed to execute restructuring: {}", e),
             }
-        } else if p_lower.contains("selesaikan struktur") || p_lower.contains("lengkapi balok") || p_lower.contains("lengkapi kolom") || p_lower.contains("selesaikan desain") || p_lower.contains("bantu selesaikan") || p_lower.contains("autocomplete") {
+        } else if p_lower.contains("autocomplete") || p_lower.contains("complete structure") || p_lower.contains("selesaikan struktur") || p_lower.contains("lengkapi balok") || p_lower.contains("lengkapi kolom") || p_lower.contains("selesaikan desain") || p_lower.contains("bantu selesaikan") {
             match crate::core::InternalVault::ai_autocomplete_active_structure() {
                 Ok(msg) => msg,
                 Err(e) => format!("🤖 [EigenAI Copilot]: {}", e),
             }
-        } else if p_lower.starts_with("baca file ") || p_lower.starts_with("lihat file ") || p_lower.starts_with("cat ") || p_lower.starts_with("read file ") {
-            let raw_arg = if let Some(s) = prompt.strip_prefix("baca file ") {
+        } else if p_lower.starts_with("read file ") || p_lower.starts_with("view file ") || p_lower.starts_with("cat ") || p_lower.starts_with("baca file ") || p_lower.starts_with("lihat file ") {
+            let raw_arg = if let Some(s) = prompt.strip_prefix("read file ") {
                 s
-            } else if let Some(s) = prompt.strip_prefix("lihat file ") {
+            } else if let Some(s) = prompt.strip_prefix("view file ") {
                 s
             } else if let Some(s) = prompt.strip_prefix("cat ") {
                 s
-            } else if let Some(s) = prompt.strip_prefix("read file ") {
+            } else if let Some(s) = prompt.strip_prefix("baca file ") {
+                s
+            } else if let Some(s) = prompt.strip_prefix("lihat file ") {
                 s
             } else {
                 ""
@@ -374,7 +376,7 @@ impl AiAssistantView {
                 match crate::core::InternalVault::ai_read_vault_file(cat.trim(), fname.trim()) {
                     Ok(content) => {
                         let preview = if content.len() > 1500 {
-                            format!("{}...\n[Dipotong: total {} byte]", &content[..1500], content.len())
+                            format!("{}...\n[Truncated: total {} bytes]", &content[..1500], content.len())
                         } else {
                             content
                         };
@@ -383,14 +385,16 @@ impl AiAssistantView {
                     Err(e) => format!("📖 [EigenAI Vault Reader]: {}", e),
                 }
             } else {
-                "📖 [EigenAI Vault Reader]: Format perintah salah. Gunakan: `baca file <Kategori>/<NamaBerkas.json>` (Contoh: `baca file Columns/col_001_Kolom_500x500.json`).".to_string()
+                "📖 [EigenAI Vault Reader]: Invalid command format. Use: `read file <Category>/<FileName.json>` (e.g. `read file Columns/col_001_Column_500x500.json`).".to_string()
             }
-        } else if p_lower.starts_with("hapus file ") || p_lower.starts_with("delete file ") || p_lower.starts_with("rm ") {
-            let raw_arg = if let Some(s) = prompt.strip_prefix("hapus file ") {
+        } else if p_lower.starts_with("delete file ") || p_lower.starts_with("remove file ") || p_lower.starts_with("rm ") || p_lower.starts_with("hapus file ") {
+            let raw_arg = if let Some(s) = prompt.strip_prefix("delete file ") {
                 s
-            } else if let Some(s) = prompt.strip_prefix("delete file ") {
+            } else if let Some(s) = prompt.strip_prefix("remove file ") {
                 s
             } else if let Some(s) = prompt.strip_prefix("rm ") {
+                s
+            } else if let Some(s) = prompt.strip_prefix("hapus file ") {
                 s
             } else {
                 ""
@@ -398,16 +402,18 @@ impl AiAssistantView {
 
             if let Some((cat, fname)) = raw_arg.split_once('/') {
                 match crate::core::InternalVault::ai_delete_vault_file(cat.trim(), fname.trim()) {
-                    Ok(_) => format!("🗑️ [EigenAI Vault Deletion]: Berkas '{}/{}' berhasil dihapus dari Vault dengan aman.", cat.trim(), fname.trim()),
-                    Err(e) => format!("🗑️ [EigenAI Vault Deletion]: Gagal menghapus: {}", e),
+                    Ok(_) => format!("🗑️ [EigenAI Vault Deletion]: File '{}/{}' successfully deleted from Vault safely.", cat.trim(), fname.trim()),
+                    Err(e) => format!("🗑️ [EigenAI Vault Deletion]: Failed to delete file: {}", e),
                 }
             } else {
-                "🗑️ [EigenAI Vault Deletion]: Format perintah salah. Gunakan: `hapus file <Kategori>/<NamaBerkas.json>`.".to_string()
+                "🗑️ [EigenAI Vault Deletion]: Invalid command format. Use: `delete file <Category>/<FileName.json>`.".to_string()
             }
-        } else if p_lower.starts_with("tulis file ") || p_lower.starts_with("write file ") || p_lower.starts_with("modifikasi file ") {
-            let raw_arg = if let Some(s) = prompt.strip_prefix("tulis file ") {
+        } else if p_lower.starts_with("write file ") || p_lower.starts_with("modify file ") || p_lower.starts_with("tulis file ") || p_lower.starts_with("modifikasi file ") {
+            let raw_arg = if let Some(s) = prompt.strip_prefix("write file ") {
                 s
-            } else if let Some(s) = prompt.strip_prefix("write file ") {
+            } else if let Some(s) = prompt.strip_prefix("modify file ") {
+                s
+            } else if let Some(s) = prompt.strip_prefix("tulis file ") {
                 s
             } else if let Some(s) = prompt.strip_prefix("modifikasi file ") {
                 s
@@ -418,22 +424,22 @@ impl AiAssistantView {
             if let Some((target_path, content)) = raw_arg.split_once(' ') {
                 if let Some((cat, fname)) = target_path.split_once('/') {
                     match crate::core::InternalVault::ai_write_vault_file(cat.trim(), fname.trim(), content.trim()) {
-                        Ok(p) => format!("✍️ [EigenAI Vault Writer]: Berhasil menulis berkas ke {}\nKategori: {} | Ukuran: {} byte", p.display(), cat.trim(), content.trim().len()),
-                        Err(e) => format!("✍️ [EigenAI Vault Writer]: Gagal menulis: {}", e),
+                        Ok(p) => format!("✍️ [EigenAI Vault Writer]: Successfully wrote file to {}\nCategory: {} | Size: {} bytes", p.display(), cat.trim(), content.trim().len()),
+                        Err(e) => format!("✍️ [EigenAI Vault Writer]: Failed to write file: {}", e),
                     }
                 } else {
-                    "✍️ [EigenAI Vault Writer]: Format path harus `<Kategori>/<NamaBerkas>`. Contoh: `tulis file Custom_Components/catatan.txt ini isinya`.".to_string()
+                    "✍️ [EigenAI Vault Writer]: Target path format must be `<Category>/<FileName>`. Example: `write file Custom_Components/notes.txt content here`.".to_string()
                 }
             } else {
-                "✍️ [EigenAI Vault Writer]: Format perintah salah. Gunakan: `tulis file <Kategori>/<NamaBerkas> <isi konten>`.".to_string()
+                "✍️ [EigenAI Vault Writer]: Invalid command format. Use: `write file <Category>/<FileName> <content>`.".to_string()
             }
-        } else if p_lower.contains("ragam") || p_lower.contains("modal") || p_lower.contains("sni 1726") || p_lower.contains("gempa") || p_lower.contains("spektrum") || p_lower.contains("frekuensi alami") {
+        } else if p_lower.contains("modal") || p_lower.contains("ragam") || p_lower.contains("sni 1726") || p_lower.contains("spectrum") || p_lower.contains("spektrum") || p_lower.contains("earthquake") || p_lower.contains("gempa") || p_lower.contains("natural frequency") || p_lower.contains("frekuensi alami") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
                 let spec = crate::core::modal::Sni1726Spectrum::new(crate::core::modal::SiteClass::SD, 1.20, 0.50, 8.0, 1.0);
                 if let Ok(report) = crate::core::modal::ModalEngine::analyze(&model, 4, spec) {
                     format!(
-                        "🌊 [Analisis Dinamik Ragam Getar & Spektrum Gempa SNI 1726:2019]:\n• Perioda Fundamental (T1): {:.4} s (Frekuensi Alami f1 = {:.2} Hz)\n• Gaya Geser Seismik Desain (Vb): {:.1} kN (Cs = {:.4}, Berat Seismik W = {:.1} kN)\n• Parameter Spektra: SDS = {:.3} g, SD1 = {:.3} g, Ts = {:.3} s (Situs Tanah SD)\n• Partisipasi Massa Ragam (Mode 1–4): X = {:.1}%, Y = {:.1}%\n• Evaluasi Kepatuhan: {} (Persyaratan Partisipasi Massa Minimum 90%).",
+                        "🌊 [Dynamic Modal Analysis & Seismic Spectrum SNI 1726:2019]:\n• Fundamental Period (T1): {:.4} s (Natural Frequency f1 = {:.2} Hz)\n• Seismic Design Base Shear (Vb): {:.1} kN (Cs = {:.4}, Seismic Weight W = {:.1} kN)\n• Spectral Parameters: SDS = {:.3} g, SD1 = {:.3} g, Ts = {:.3} s (Site Class SD)\n• Modal Mass Participation (Modes 1–4): X = {:.1}%, Y = {:.1}%\n• Compliance Verdict: {} (Minimum 90% Mass Participation Requirement).",
                         report.fundamental_period_s,
                         report.fundamental_frequency_hz,
                         report.seismic_base_shear_kn,
@@ -444,23 +450,23 @@ impl AiAssistantView {
                         report.spectrum.ts,
                         report.cumulative_mass_ratio_x,
                         report.cumulative_mass_ratio_y,
-                        if report.is_90_percent_satisfied { "✅ MEMENUHI STANDAR SNI" } else { "⚠️ PERLU PENAMBAHAN RAGAM GETAR" }
+                        if report.is_90_percent_satisfied { "✅ MEETS SNI STANDARD" } else { "⚠️ ADDITIONAL MODES REQUIRED" }
                     )
                 } else {
-                    "🌊 [Modal Dynamics]: Gagal menyelesaikan persamaan eigen getaran.".to_string()
+                    "🌊 [Modal Dynamics]: Failed to solve vibration eigenvalue equation.".to_string()
                 }
             } else {
-                "🌊 [Modal Dynamics]: Gagal menginisialisasi model struktur.".to_string()
+                "🌊 [Modal Dynamics]: Failed to initialize structural model.".to_string()
             }
-        } else if p_lower.contains("terapkan bracing") || p_lower.contains("pasang bracing") || p_lower.contains("auto-remedi") {
-            "⚡ [Autonomous 1-Click Auto-Remediation Berhasil]:\n• Aksi: Menginjeksikan elemen pengaku bracing baru (Hubungkan Node 4 ➔ Node 11 dengan profil WF300x150).\n• Hasil Rekalkulasi FEA & SVD: Bebas mekanisme kinematis (rank 100% penuh).\n• Peningkatan Redundansi: Minimum System ARI melompat dari 0.6800 ➔ 0.9124 (+34.2% [GRADE A SAFE]).\n• Topologi aktif telah dimutasi secara langsung dan visualisasi 3D diperbarui.".to_string()
-        } else if p_lower.contains("pushover") || p_lower.contains("non-linear") || p_lower.contains("p-delta") || p_lower.contains("sendi plastis") {
+        } else if p_lower.contains("apply bracing") || p_lower.contains("install bracing") || p_lower.contains("terapkan bracing") || p_lower.contains("pasang bracing") || p_lower.contains("auto-remedi") {
+            "⚡ [Autonomous 1-Click Auto-Remediation Successful]:\n• Action: Injected new bracing stiffener element (Connecting Node 4 ➔ Node 11 with profile WF300x150).\n• Recalculation Results FEA & SVD: Free of kinematic mechanisms (100% full rank).\n• Redundancy Increase: Minimum System ARI jumped from 0.6800 ➔ 0.9124 (+34.2% [GRADE A SAFE]).\n• Active topology updated live and 3D visualization refreshed.".to_string()
+        } else if p_lower.contains("pushover") || p_lower.contains("non-linear") || p_lower.contains("p-delta") || p_lower.contains("plastic hinge") || p_lower.contains("sendi plastis") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
                 let report = crate::core::NonlinearEngine::run_pushover(&model, 15);
                 format!(
-                    "📉 [Non-Linear Second-Order P-Δ Pushover Analysis]:\n• Status: {}\n• Base Shear Leleh (Vy): {:.1} kN (Drift Atap: {:.2} mm)\n• Base Shear Maksimum (Vu): {:.1} kN (Drift Atap: {:.2} mm)\n• Rasio Duktilitas Sistem (µ): {:.2} (Sangat Daktail)\n• Faktor Kuat Lebih (Ω0): {:.2}x\n• Total Sendi Plastis Terbentuk: {} titik\n• Standar Acuan: AISC 360-16 Ch. C / FEMA 356 Table 9-6.",
-                    if report.is_stable { "Stabil (Daktilitas Penuh Tanpa Runtuh Dini)" } else { "Kritis (Mekanisme Sendi Plastis)" },
+                    "📉 [Non-Linear Second-Order P-Δ Pushover Analysis]:\n• Status: {}\n• Yield Base Shear (Vy): {:.1} kN (Roof Drift: {:.2} mm)\n• Ultimate Base Shear (Vu): {:.1} kN (Roof Drift: {:.2} mm)\n• System Ductility Ratio (µ): {:.2} (High Ductility)\n• Overstrength Factor (Ω0): {:.2}x\n• Total Plastic Hinges Formed: {} locations\n• Standard Reference: AISC 360-16 Ch. C / FEMA 356 Table 9-6.",
+                    if report.is_stable { "Stable (Full Ductility Without Premature Collapse)" } else { "Critical (Plastic Hinge Mechanism Formed)" },
                     report.yield_base_shear_kn,
                     report.yield_drift_mm,
                     report.ultimate_base_shear_kn,
@@ -470,46 +476,46 @@ impl AiAssistantView {
                     report.formed_hinges.len()
                 )
             } else {
-                "📉 [Non-Linear Pushover]: Gagal menginisialisasi model struktur.".to_string()
+                "📉 [Non-Linear Pushover]: Failed to initialize structural model.".to_string()
             }
-        } else if p_lower.contains("dstv") || p_lower.contains("cnc") || p_lower.contains("nc1") || p_lower.contains("robotik") {
+        } else if p_lower.contains("dstv") || p_lower.contains("cnc") || p_lower.contains("nc1") || p_lower.contains("robotic") || p_lower.contains("robotik") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
                 let pieces = crate::core::DstvExporter::export_to_dstv(&model);
                 format!(
-                    "🦾 [DSTV CNC .nc1 Robotic Fabrication Exporter]:\n• Standar: Deutscher Stahlbau-Verband (DSTV Standard Part Program)\n• Total Berkas .nc1: {} batang fabrikasi baja siap potong & bor\n• Contoh Piece Mark: {} ({})\n• Operasi CNC: Outer Contour (AK) & Lubang Baut Pelat Buhul (BO Ø22mm)\n• Kompatibilitas Mesin: Voortman V630, Kaltenbach, Ficep Robotic Drill Line.",
+                    "🦾 [DSTV CNC .nc1 Robotic Fabrication Exporter]:\n• Standard: Deutscher Stahlbau-Verband (DSTV Standard Part Program)\n• Total .nc1 Files: {} structural steel members ready for cut & drill\n• Sample Piece Mark: {} ({})\n• CNC Operations: Outer Contour (AK) & Gusset Bolt Holes (BO Ø22mm)\n• Machine Compatibility: Voortman V630, Kaltenbach, Ficep Robotic Drill Line.",
                     pieces.len(),
                     pieces.first().map(|p| p.piece_mark.as_str()).unwrap_or("BM-001"),
                     pieces.first().map(|p| p.profile.as_str()).unwrap_or("WF400x200")
                 )
             } else {
-                "🦾 [DSTV CNC]: Gagal menginisialisasi model struktur.".to_string()
+                "🦾 [DSTV CNC]: Failed to initialize structural model.".to_string()
             }
-        } else if p_lower.contains("segel") || p_lower.contains("sha256") || p_lower.contains("kripto") || p_lower.contains("tamper") {
+        } else if p_lower.contains("seal") || p_lower.contains("segel") || p_lower.contains("sha256") || p_lower.contains("crypto") || p_lower.contains("kripto") || p_lower.contains("tamper") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
                 if let Ok(assessment) = crate::core::AriEngine::evaluate_redundancy(&model) {
                     let hash = crate::core::Sha256Hasher::hash_model_and_ari(&model, &assessment);
                     format!(
-                        "🔐 [NIST FIPS 180-4 Cryptographic Audit Seal]:\n• Status: ✅ ASLI & TERVERIFIKASI (Tamper-Proof)\n• Model: {}\n• SHA-256 Digest: {}\n• URI Verifikasi QR: eigengraph://verify?hash={}&org=eigengraph\n• Sertifikasi: EigenGraph Structural Authority & Cryptographic Registry (2026).",
+                        "🔐 [NIST FIPS 180-4 Cryptographic Audit Seal]:\n• Status: ✅ AUTHENTIC & VERIFIED (Tamper-Proof)\n• Model: {}\n• SHA-256 Digest: {}\n• QR Verification URI: eigengraph://verify?hash={}&org=eigengraph\n• Certification: EigenGraph Structural Authority & Cryptographic Registry (2026).",
                         model.name,
                         hash,
                         &hash[..16]
                     )
                 } else {
-                    "🔐 [Cryptographic Seal]: Model belum dievaluasi.".to_string()
+                    "🔐 [Cryptographic Seal]: Model has not been evaluated yet.".to_string()
                 }
             } else {
-                "🔐 [Cryptographic Seal]: Gagal menginisialisasi model struktur.".to_string()
+                "🔐 [Cryptographic Seal]: Failed to initialize structural model.".to_string()
             }
-        } else if p_lower.contains("impor ifc") || p_lower.contains("baca ifc") || p_lower.contains("parse ifc") {
-            "🌐 [Native OpenBIM IFC 4.3 & 2x3 Parser]:\n• Kemampuan: Mengimpor geometri STEP ISO-10303-21 (IFCBEAM, IFCCOLUMN, IFCMEMBER, IFCPOLYLINE, IFCCARTESIANPOINT).\n• Toleransi Titik Kumpul (Node Snapping): 20 mm.\n• Boundary Condition Otomatis: Restraint tumpuan jepit/sendi pada level Z terendah.\n• Beban Otomatis: Gravitasi awal pada pelat atap agar model dapat langsung dianalisis SVD & ARI tanpa konfigurasi manual.".to_string()
-        } else if p_lower.contains("n-2") || p_lower.contains("disrupsi ganda") || p_lower.contains("disrupsi jamak") || p_lower.contains("domino") {
+        } else if p_lower.contains("import ifc") || p_lower.contains("impor ifc") || p_lower.contains("read ifc") || p_lower.contains("baca ifc") || p_lower.contains("parse ifc") {
+            "🌐 [Native OpenBIM IFC 4.3 & 2x3 Parser]:\n• Capabilities: Imports STEP ISO-10303-21 geometry (IFCBEAM, IFCCOLUMN, IFCMEMBER, IFCPOLYLINE, IFCCARTESIANPOINT).\n• Node Snapping Tolerance: 20 mm.\n• Automated Boundary Conditions: Fixed/pinned support restraints at lowest Z level.\n• Automated Loading: Initial roof gravity load for instant SVD & ARI analysis without manual setup.".to_string()
+        } else if p_lower.contains("n-2") || p_lower.contains("disruption") || p_lower.contains("disrupsi") || p_lower.contains("cascading") || p_lower.contains("domino") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
                 if let Ok(report) = crate::core::CascadingSimulator::simulate_disruption(&model, &[1, 2], Some(1.25)) {
                     format!(
-                        "💥 [Simulasi Disrupsi & Cascading Failure - Live Engine]:\n• Status: {:?}\n• Initial Disrupted: Member {:?}\n• Total Collapsed: {} Batang {:?}\n• Dinamika: DAF = {:.2}x | Steps: {}\n• Propagation Vulnerability Index (PVI): {:.4}\n• System Robustness (R_sys): {:.4}\n• Residual System ARI: {:.4} | Max Redistributed DCR: {:.2}%\n• Mitigasi: {}",
+                        "💥 [Disruption & Cascading Failure Simulation - Live Engine]:\n• Status: {:?}\n• Initial Disrupted: Member {:?}\n• Total Collapsed: {} Members {:?}\n• Dynamics: DAF = {:.2}x | Steps: {}\n• Propagation Vulnerability Index (PVI): {:.4}\n• System Robustness (R_sys): {:.4}\n• Residual System ARI: {:.4} | Max Redistributed DCR: {:.2}%\n• Mitigation: {}",
                         report.status,
                         report.initial_disrupted_ids,
                         report.total_collapsed_ids.len(),
@@ -520,25 +526,25 @@ impl AiAssistantView {
                         report.robustness_index,
                         report.residual_ari,
                         report.max_redistributed_dcr * 100.0,
-                        if report.robustness_index > 0.7 { "Aman — Beban berhasil diredistribusikan tanpa meruntuhkan struktur global." } else { "Kritis — Efek domino meruntuhkan kestabilan rangka." }
+                        if report.robustness_index > 0.7 { "Safe — Load successfully redistributed without collapsing global structure." } else { "Critical — Domino effect collapsed truss stability." }
                     )
                 } else {
-                    "💥 [Simulasi Disrupsi]: Simulasi disrupsi menghasilkan peringatan numerik.".to_string()
+                    "💥 [Disruption Simulation]: Disruption simulation produced a numerical warning.".to_string()
                 }
             } else {
-                "💥 [Simulasi Disrupsi]: Gagal menginisialisasi model parametrik.".to_string()
+                "💥 [Disruption Simulation]: Failed to initialize parametric model.".to_string()
             }
-        } else if p_lower.contains("p-m-v") || p_lower.contains("interaksi") || p_lower.contains("frame 3d") || p_lower.contains("momen") {
-            "📐 [AISC 360-16 / SNI 1729:2020 LRFD P-M-V Interaction]:\n• Batang E1 (W14x90): Pu=-45.2kN, My=12.4kNm, Mz=34.8kNm, Vy=18.2kN -> DCR = 48.5% (Code Compliant)\n• Batang E2 (W14x90): Pu=-18.5kN, My=8.5kNm, Mz=22.1kNm, Vy=11.4kN -> DCR = 52.8% (Code Compliant)\n• Seluruh elemen balok-kolom berada jauh di bawah batas leleh elastis (DCR < 1.0).".to_string()
-        } else if p_lower.contains("sertifikat") || p_lower.contains("audit") || p_lower.contains("dossier") {
-            "📜 [Sertifikat Audit Resmi EigenGraph 2026]:\n• Auditor / Lead: Harids Irawan, S.T., M.T. (EigenGraph Systems)\n• Kerangka: Pengembangan dan Validasi Adjusted Redundancy Index untuk Penapisan Pra-Analisis Skenario Gangguan Elemen pada Struktur Linear-Elastik\n• Hasil Model Aktif: Minimum System ARI = 0.942 [GRADE A], SVD Kinematic Guard = STABIL BEBAS MEKANISME (dim(Null)=0), CI_max = 0.4200.\n• Status: RESMI TERVALIDASI (EIGENGRAPH 2026). Silakan buka pilar MY PROJECT untuk mencetak dokumen dossier lengkap.".to_string()
+        } else if p_lower.contains("p-m-v") || p_lower.contains("interaction") || p_lower.contains("interaksi") || p_lower.contains("frame 3d") || p_lower.contains("moment") || p_lower.contains("momen") {
+            "📐 [AISC 360-16 / SNI 1729:2020 LRFD P-M-V Interaction]:\n• Member E1 (W14x90): Pu=-45.2kN, My=12.4kNm, Mz=34.8kNm, Vy=18.2kN -> DCR = 48.5% (Code Compliant)\n• Member E2 (W14x90): Pu=-18.5kN, My=8.5kNm, Mz=22.1kNm, Vy=11.4kN -> DCR = 52.8% (Code Compliant)\n• All beam-column elements remain well below elastic yield limits (DCR < 1.0).".to_string()
+        } else if p_lower.contains("certificate") || p_lower.contains("sertifikat") || p_lower.contains("audit") || p_lower.contains("dossier") {
+            "📜 [Official EigenGraph 2026 Audit Certificate]:\n• Auditor / Lead: Harids Irawan, S.T., M.T. (EigenGraph Systems)\n• Framework: Development and Validation of Adjusted Redundancy Index for Pre-Analysis Element Disruption Screening in Linear-Elastic Structures\n• Active Model Results: Minimum System ARI = 0.942 [GRADE A], SVD Kinematic Guard = STABLE ZERO MECHANISM (dim(Null)=0), CI_max = 0.4200.\n• Status: OFFICIALLY VALIDATED (EIGENGRAPH 2026). Open the MY PROJECT workspace to print full calculation dossier.".to_string()
         } else if p_lower.contains("bracing") || p_lower.contains("suggest") || p_lower.contains("rekomendasi") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
                 if let Ok(report) = crate::core::AriTopologyOptimizer::optimize_bracing(&model, Some(5.0)) {
                     if let Some(best) = &report.best_candidate {
                         format!(
-                            "🪄 [AI-ARI Bracing Suggestion - Live Optimizer]:\n• Evaluasi: {} kandidat bracing dievaluasi secara otonom.\n• Rekomendasi Terbaik: Hubungkan Node {} ➔ Node {} dengan profil {}\n• Proyeksi Peningkatan: System ARI naik dari {:.4} ➔ {:.4} (+{:.1}%)\n• Status SVD: Bebas mekanisme kinematis\n• Estimasi Bobot Tambahan: {:.1} kg.",
+                            "🪄 [AI-ARI Bracing Suggestion - Live Optimizer]:\n• Evaluation: {} bracing candidates evaluated autonomously.\n• Best Recommendation: Connect Node {} ➔ Node {} with profile {}\n• Projected Improvement: System ARI increases from {:.4} ➔ {:.4} (+{:.1}%)\n• SVD Status: Free of kinematic mechanisms\n• Added Mass Estimate: {:.1} kg.",
                             report.candidates_evaluated,
                             best.from_node,
                             best.to_node,
@@ -549,20 +555,20 @@ impl AiAssistantView {
                             best.added_weight_kg
                         )
                     } else {
-                        format!("🪄 [AI-ARI Bracing Suggestion]: Struktur dasar stabil (ARI = {:.4}), tidak ada kandidat bracing tambahan yang diperlukan.", report.baseline_min_ari)
+                        format!("🪄 [AI-ARI Bracing Suggestion]: Baseline structure is stable (ARI = {:.4}), no additional bracing candidates required.", report.baseline_min_ari)
                     }
                 } else {
-                    "🪄 [AI-ARI Bracing Suggestion]: Optimasi bracing gagal dijalankan.".to_string()
+                    "🪄 [AI-ARI Bracing Suggestion]: Bracing optimization failed to execute.".to_string()
                 }
             } else {
-                "🪄 [AI-ARI Bracing Suggestion]: Gagal menginisialisasi model parametrik.".to_string()
+                "🪄 [AI-ARI Bracing Suggestion]: Failed to initialize parametric model.".to_string()
             }
-        } else if p_lower.contains("top 5") || p_lower.contains("top 3") || p_lower.contains("paling kritis") {
-            "🚨 [Top Fracture Critical Elements Ranking]:\n1. E1 (Bottom Chord Tengah): ARI = 0.5800, CI = 0.4200 — ⚠️ Rawan Runtuh jika terputus\n2. E2 (Top Chord Tengah): ARI = 0.6500, CI = 0.3500 — Perlu pemeriksaan tekuk\n3. E3 (Diagonal Web): ARI = 0.8200, CI = 0.1800 — Redundan Baik\n4. E4 (Vertical Post): ARI = 0.9100, CI = 0.0900 — Sangat Aman\nBuka pilar ANALYZE untuk melihat diagram gaya dalam lengkap.".to_string()
+        } else if p_lower.contains("top 5") || p_lower.contains("top 3") || p_lower.contains("critical") || p_lower.contains("paling kritis") {
+            "🚨 [Top Fracture Critical Elements Ranking]:\n1. E1 (Center Bottom Chord): ARI = 0.5800, CI = 0.4200 — ⚠️ Vulnerable to Collapse if severed\n2. E2 (Center Top Chord): ARI = 0.6500, CI = 0.3500 — Buckling verification required\n3. E3 (Diagonal Web): ARI = 0.8200, CI = 0.1800 — Good Redundancy\n4. E4 (Vertical Post): ARI = 0.9100, CI = 0.0900 — Very Safe\nOpen ANALYZE workspace to inspect full internal forces diagrams.".to_string()
         } else if p_lower.contains("portfolio") || p_lower.contains("summary") {
             format!("📑 [Portfolio Analysis]: Loaded {} active projects. Highest redundancy: '{}' (ARI = 0.94, Safe). Project '{}' has ARI = 0.64 and requires member screening before municipal submission.", projects.len(), projects[0].title, projects[2].title)
         } else if p_lower.contains("rank by safety") || p_lower.contains("rank") {
-            "📊 [Safety Ranking]:\n1. Jembatan Busur Pelengkung (ARI: 0.94, Defl: 1.2mm) — Grade A\n2. Struktur Kubah Bandara (ARI: 0.91, Defl: 2.1mm) — Grade A\n3. Warehouse Gedebage (ARI: 0.64, Defl: 4.8mm) — Grade B- (Review Needed)".to_string()
+            "📊 [Safety Ranking]:\n1. Steel Arch Bridge (ARI: 0.94, Defl: 1.2mm) — Grade A\n2. Airport Dome Structure (ARI: 0.91, Defl: 2.1mm) — Grade A\n3. Gedebage Industrial Warehouse (ARI: 0.64, Defl: 4.8mm) — Grade B- (Review Needed)".to_string()
         } else if p_lower.contains("ifc") || p_lower.contains("openbim") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
@@ -570,15 +576,15 @@ impl AiAssistantView {
                 let ifc_str = crate::core::IfcExporter::export_to_ifc(&model, ari_assessment.as_ref());
                 let lines_count = ifc_str.lines().count();
                 format!(
-                    "🌐 [OpenBIM IFC 4.3 Add2 Export]:\n• Schema: ISO 16739-1:2024 / IFC4X3_ADD2\n• Entitas STEP SPF: {} baris entitas berhasil digenerate.\n• Property Set: Pset_StructuralRedundancy (ARI System = {:.4}, SVD Status = Valid)\n• Kompatibilitas: Revit 2026, Tekla Structures, BlenderBIM, Solibri Anywhere.",
+                    "🌐 [OpenBIM IFC 4.3 Add2 Export]:\n• Schema: ISO 16739-1:2024 / IFC4X3_ADD2\n• STEP SPF Entities: {} entity lines successfully generated.\n• Property Set: Pset_StructuralRedundancy (ARI System = {:.4}, SVD Status = Valid)\n• Compatibility: Revit 2026, Tekla Structures, BlenderBIM, Solibri Anywhere.",
                     lines_count,
                     ari_assessment.as_ref().map(|a| a.min_system_ari).unwrap_or(0.942)
                 )
             } else {
-                "🌐 [OpenBIM IFC]: Gagal mengekspor model IFC.".to_string()
+                "🌐 [OpenBIM IFC]: Failed to export IFC model.".to_string()
             }
         } else if p_lower.contains("dossier") || p_lower.contains("export") {
-            "📤 [Engineering Dossier]: Compiled 42-page calculation sheet for 'Jembatan Busur Pelengkung Baja Merah'. SVD nullspace certificates, ARI member sensitivity matrix, and BIM 5D RAB (Rp 3.84B) ready for client export.".to_string()
+            "📤 [Engineering Dossier]: Compiled 42-page calculation sheet for 'Red Steel Arch Bridge'. SVD nullspace certificates, ARI member sensitivity matrix, and BIM 5D BoQ (Rp 3.84B) ready for client export.".to_string()
         } else if p_lower.contains("svd") || p_lower.contains("mechanism") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
@@ -619,13 +625,13 @@ impl AiAssistantView {
             }
         } else if p_lower.contains("collapse") || p_lower.contains("path") {
             "🛡️ [Progressive Collapse Safeguard]: Dynamic load redistribution check complete. Reserve capacity is 1.84x above minimum collapse threshold.".to_string()
-        } else if p_lower.contains("rab") || p_lower.contains("cost") || p_lower.contains("biaya") {
+        } else if p_lower.contains("rab") || p_lower.contains("cost") || p_lower.contains("boq") || p_lower.contains("budget") || p_lower.contains("biaya") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
                 let rates = crate::core::AhspUnitRates::default();
                 let boq = crate::core::CostEngine::calculate_boq(&model, Some(&rates));
                 format!(
-                    "💰 [BIM 5D Cost Intelligence - Live AHSP Engine]:\n• Total Estimasi Biaya Konstruksi: Rp {}\n• Total Bobot Baja Struktural: {:.2} Ton ({:.1} kg)\n• Rincian Item Pekerjaan (BoQ 6-Division):\n  1. {}\n  2. {}\n  3. {}\n• Efisiensi ARI per Miliar Biaya: {:.3} ARI/Miliar IDR",
+                    "💰 [BIM 5D Cost Intelligence - Live AHSP Engine]:\n• Total Estimated Construction Cost: Rp {}\n• Total Structural Steel Mass: {:.2} Tonnes ({:.1} kg)\n• Work Breakdown Items (BoQ 6-Division):\n  1. {}\n  2. {}\n  3. {}\n• ARI Efficiency per Billion Cost: {:.3} ARI/Billion IDR",
                     crate::core::cost::CostEngine::format_idr(boq.total_cost_idr),
                     boq.grand_total_steel_tonnage,
                     boq.total_profile_steel_mass_kg,
@@ -635,34 +641,34 @@ impl AiAssistantView {
                     if boq.total_cost_idr > 0.0 { 0.942 / (boq.total_cost_idr / 1e9) } else { 0.0 }
                 )
             } else {
-                "💰 [BIM 5D Cost Intelligence]: Gagal menghitung RAB parametrik.".to_string()
+                "💰 [BIM 5D Cost Intelligence]: Failed to compute parametric BoQ estimate.".to_string()
             }
         } else if p_lower.contains("erection") || p_lower.contains("staged") || p_lower.contains("4d") || p_lower.contains("schedule") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
                 let report = crate::core::ScheduleEngine::generate_standard_schedule(&model, 3_840_000_000.0);
                 format!(
-                    "📅 [BIM 4D Erection Scheduling & Staged SVD Guard - Live Engine]:\n• Total Durasi Proyek: {} Hari Kerja ({} Minggu Kalender)\n• Lintasan Kritis (Critical Path): WBS Aktivitas {:?}\n• Progres Mingguan: S-Curve {} milestone terdistribusi (100% pada Minggu {})\n• Evaluasi Stabilitas Erection Bertahap (SVD Guard):\n  - {}\n  - {}\n  - {}\n  - {}\n• Status Keamanan Erection: {}",
+                    "📅 [BIM 4D Erection Scheduling & Staged SVD Guard - Live Engine]:\n• Total Project Duration: {} Work Days ({} Calendar Weeks)\n• Critical Path: WBS Activities {:?}\n• Weekly Progress: S-Curve with {} distributed milestones (100% at Week {})\n• Staged Erection Stability Evaluation (SVD Guard):\n  - {}\n  - {}\n  - {}\n  - {}\n• Erection Safety Status: {}",
                     report.total_duration_days,
                     (report.total_duration_days + 6) / 7,
                     report.critical_path_activity_ids,
                     report.scurve.len(),
                     report.scurve.len(),
-                    report.staged_stability.get(0).map(|s| format!("{}: {} (Rank {}/{})", s.stage_name, if s.is_stable { "STABIL" } else { "MEKANISME" }, s.rank, s.active_dofs)).unwrap_or_default(),
-                    report.staged_stability.get(1).map(|s| format!("{}: {} (Rank {}/{})", s.stage_name, if s.is_stable { "STABIL" } else { "MEKANISME" }, s.rank, s.active_dofs)).unwrap_or_default(),
-                    report.staged_stability.get(2).map(|s| format!("{}: {} (Rank {}/{})", s.stage_name, if s.is_stable { "STABIL" } else { "MEKANISME" }, s.rank, s.active_dofs)).unwrap_or_default(),
-                    report.staged_stability.get(3).map(|s| format!("{}: {} (Rank {}/{})", s.stage_name, if s.is_stable { "STABIL" } else { "MEKANISME" }, s.rank, s.active_dofs)).unwrap_or_default(),
-                    if report.is_erection_sequence_safe { "Lolos Verifikasi Bebas Mekanisme Goyang (Zero SVD Instability)" } else { "Kritis — Diperlukan perancah sementara (shoring towers)" }
+                    report.staged_stability.get(0).map(|s| format!("{}: {} (Rank {}/{})", s.stage_name, if s.is_stable { "STABLE" } else { "MECHANISM" }, s.rank, s.active_dofs)).unwrap_or_default(),
+                    report.staged_stability.get(1).map(|s| format!("{}: {} (Rank {}/{})", s.stage_name, if s.is_stable { "STABLE" } else { "MECHANISM" }, s.rank, s.active_dofs)).unwrap_or_default(),
+                    report.staged_stability.get(2).map(|s| format!("{}: {} (Rank {}/{})", s.stage_name, if s.is_stable { "STABLE" } else { "MECHANISM" }, s.rank, s.active_dofs)).unwrap_or_default(),
+                    report.staged_stability.get(3).map(|s| format!("{}: {} (Rank {}/{})", s.stage_name, if s.is_stable { "STABLE" } else { "MECHANISM" }, s.rank, s.active_dofs)).unwrap_or_default(),
+                    if report.is_erection_sequence_safe { "Passed Verification Free of Sway Mechanisms (Zero SVD Instability)" } else { "Critical — Temporary shoring towers required" }
                 )
             } else {
-                "📅 [BIM 4D Schedule Guard]: Gagal menghitung jadwal ereksi parametrik.".to_string()
+                "📅 [BIM 4D Schedule Guard]: Failed to compute parametric erection schedule.".to_string()
             }
         } else if p_lower.contains("karbon") || p_lower.contains("carbon") || p_lower.contains("co2") || p_lower.contains("gbci") || p_lower.contains("leed") || p_lower.contains("lca") || p_lower.contains("sustain") {
             let mut engine = crate::core::ParametricEngine::new();
             if let Ok(model) = engine.generate_warren_truss() {
                 let report = crate::core::CarbonEngine::calculate_lca(&model, crate::core::CarbonSteelRoute::EafRecycled, Some(65.0), Some(0.942));
                 format!(
-                    "🌱 [Embodied Carbon & Sustainability LCA - ISO 14040/EN 15978]:\n• Total Massa Baja: {:.2} Ton ({})\n• Total Jejak Karbon Embodied (A1–A5): {:.2} tCO2e\n• Rincian Siklus Hidup:\n  - A1–A3 (Material & Fabrikasi): {:.2} tCO2e ({:.1}%)\n  - A4 (Transportasi {:.0} km): {:.3} tCO2e ({:.1}%)\n  - A5 (Ereksi & Alat Berat): {:.2} tCO2e ({:.1}%)\n• Penurunan Emisi vs Konvensional (BF-BOF): -{:.1}%\n• Prediksi Sertifikasi: {}\n• Efisiensi Eko-Redundansi (η_eco): {:.4} ARI / tCO2e",
+                    "🌱 [Embodied Carbon & Sustainability LCA - ISO 14040/EN 15978]:\n• Total Steel Mass: {:.2} Tonnes ({})\n• Total Embodied Carbon Footprint (A1–A5): {:.2} tCO2e\n• Lifecycle Breakdown:\n  - A1–A3 (Material & Fabrication): {:.2} tCO2e ({:.1}%)\n  - A4 (Transport {:.0} km): {:.3} tCO2e ({:.1}%)\n  - A5 (Erection & Heavy Equipment): {:.2} tCO2e ({:.1}%)\n• Emission Reduction vs Conventional (BF-BOF): -{:.1}%\n• Rating Tier Prediction: {}\n• Eco-Redundancy Efficiency (η_eco): {:.4} ARI / tCO2e",
                     report.steel_tonnage,
                     report.route.display_name(),
                     report.total_embodied_carbon_ton,
@@ -678,7 +684,7 @@ impl AiAssistantView {
                     report.eco_redundancy_efficiency
                 )
             } else {
-                "🌱 [Sustainability LCA]: Gagal mengevaluasi jejak karbon parametrik.".to_string()
+                "🌱 [Sustainability LCA]: Failed to evaluate parametric carbon footprint.".to_string()
             }
         } else if p_lower.contains("gemini") || p_lower.contains("api") {
             "🔑 [Gemini API Gateway]: Connection to Google Gemini 2.5 Flash API active. Latency: 38ms • Model: gemini-2.5-flash-preview • Autonomous agent tools enabled.".to_string()
@@ -726,35 +732,35 @@ mod tests {
         let mut db_components = vec![];
 
         // 1. Test inspect vault summary
-        ai.execute_prompt("inspeksi vault", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
+        ai.execute_prompt("inspect vault", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
         let last_msg = &ai.chat_history.last().unwrap().message;
-        assert!(last_msg.contains("Audit & Inspeksi Vault Penuh"));
-        assert!(last_msg.contains("Folder Kategori"));
+        assert!(last_msg.contains("Vault Audit") || last_msg.contains("Audit & Inspeksi"));
+        assert!(last_msg.contains("Category Directories") || last_msg.contains("Folder Kategori"));
 
         // 2. Test writing file via Copilot
-        ai.execute_prompt("tulis file Custom_Components/test_ai.txt Halo dari EigenAI", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
+        ai.execute_prompt("write file Custom_Components/test_ai.txt Hello from EigenAI", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
         let last_msg = &ai.chat_history.last().unwrap().message;
-        assert!(last_msg.contains("Berhasil menulis berkas"));
+        assert!(last_msg.contains("Successfully wrote file") || last_msg.contains("Berhasil menulis berkas"));
         assert!(temp_dir.join("Custom_Components").join("test_ai.txt").exists());
 
         // 3. Test reading file via Copilot
-        ai.execute_prompt("baca file Custom_Components/test_ai.txt", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
+        ai.execute_prompt("read file Custom_Components/test_ai.txt", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
         let last_msg = &ai.chat_history.last().unwrap().message;
-        assert!(last_msg.contains("Halo dari EigenAI"));
+        assert!(last_msg.contains("Hello from EigenAI"));
 
         // 4. Test restructuring vault via Copilot
-        ai.execute_prompt("rapikan vault", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
+        ai.execute_prompt("organize vault", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
         let last_msg = &ai.chat_history.last().unwrap().message;
-        assert!(last_msg.contains("Restrukturisasi & Pembersihan Vault Berhasil"));
+        assert!(last_msg.contains("Vault Restructuring & Cleanup Complete") || last_msg.contains("Restrukturisasi & Pembersihan"));
 
         // 5. Test deleting file via Copilot
-        ai.execute_prompt("hapus file Custom_Components/test_ai.txt", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
+        ai.execute_prompt("delete file Custom_Components/test_ai.txt", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
         let last_msg = &ai.chat_history.last().unwrap().message;
-        assert!(last_msg.contains("berhasil dihapus dari Vault"));
+        assert!(last_msg.contains("successfully deleted from Vault") || last_msg.contains("berhasil dihapus dari Vault"));
         assert!(!temp_dir.join("Custom_Components").join("test_ai.txt").exists());
 
         // 6. Test live context in general query
-        ai.execute_prompt("bagaimana kondisi desain kita?", NavigationPillar::ModelingGeometry, &members, &projects, &mut db_components);
+        ai.execute_prompt("how is our design condition?", NavigationPillar::ModelingGeometry, &members, &projects, &mut db_components);
         let last_msg = &ai.chat_history.last().unwrap().message;
         assert!(last_msg.contains("Live Vault Working Context"));
 

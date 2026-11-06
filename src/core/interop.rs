@@ -376,55 +376,55 @@ impl DossierExporter {
     pub fn export_dossier_markdown(model: &StructuralModel, assessment: &RedundancyAssessment) -> String {
         let mut md = String::new();
 
-        md.push_str("# 📜 DOSSIER RESMI AUDIT REDUNDANSI STRUKTURAL & PENCEGAHAN KERUNTUHAN PROGRESIF\n\n");
-        md.push_str("> **Platform Analitis:** EigenGraph Desktop Engine (Rust 1.80+ / Metal GPU)\n");
-        md.push_str("> **Dasar Teoretis:** EigenGraph Structural Redundancy Framework (2026)\n");
+        md.push_str("# 📜 OFFICIAL STRUCTURAL REDUNDANCY & PROGRESSIVE COLLAPSE AUDIT DOSSIER\n\n");
+        md.push_str("> **Analytical Platform:** EigenGraph Desktop Engine (Rust 1.80+ / Metal GPU)\n");
+        md.push_str("> **Theoretical Foundation:** EigenGraph Structural Redundancy Framework (2026)\n");
         md.push_str("> **Lead Engineer:** Harids Irawan, S.T., M.T. (EigenGraph Systems)\n");
-        md.push_str("> **Dokumen Teknis:** *Formulasi & Validasi Adjusted Redundancy Index untuk Penapisan Kelaikan Skenario Gangguan Struktur Linear-Elastik*\n\n");
+        md.push_str("> **Technical Dossier:** *Formulation & Validation of Adjusted Redundancy Index for Pre-Analysis Disruption Screening in Linear-Elastic Structures*\n\n");
 
         md.push_str("---\n\n");
 
-        md.push_str("## 1. Identitas Model & Karakteristik Fisik\n\n");
-        md.push_str(&format!("* **Nama Model Proyek:** {}\n", model.name));
-        md.push_str(&format!("* **Jumlah Titik Kumpul (Nodes):** {}\n", model.nodes.len()));
-        md.push_str(&format!("* **Jumlah Elemen Batang (Members):** {}\n", model.elements.len()));
-        md.push_str(&format!("* **Total Beban Terpusat Aktif:** {}\n", model.loads.len()));
-        md.push_str(&format!("* **Total Berat Baja Struktur:** {:.2} kg ({:.3} Ton)\n\n", model.total_steel_mass_kg(), model.total_steel_tonnage()));
+        md.push_str("## 1. Model Identity & Physical Characteristics\n\n");
+        md.push_str(&format!("* **Project Model Name:** {}\n", model.name));
+        md.push_str(&format!("* **Total Joints / Nodes:** {}\n", model.nodes.len()));
+        md.push_str(&format!("* **Total Structural Members:** {}\n", model.elements.len()));
+        md.push_str(&format!("* **Active Point Loads Count:** {}\n", model.loads.len()));
+        md.push_str(&format!("* **Total Structural Steel Mass:** {:.2} kg ({:.3} Tonnes)\n\n", model.total_steel_mass_kg(), model.total_steel_tonnage()));
 
         md.push_str("---\n\n");
 
-        md.push_str("## 2. Sertifikat Pengaman Kinematik Spektral (SVD Mechanism Guard — Gate 1)\n\n");
-        md.push_str(&format!("* **Derajat Kebebasan Bebas ($n_{{free}}$):** {}\n", assessment.kinematic_guard.active_dofs));
-        md.push_str(&format!("* **Rank Matriks Kekakuan Terpartisi (rank($K_{{ff}}$)):** {}\n", assessment.kinematic_guard.rank));
-        md.push_str(&format!("* **Dimensi Ruang Nol (dim(Null($K_{{ff}}$))):** {}\n", assessment.kinematic_guard.nullspace_dimension));
-        md.push_str(&format!("* **Angka Kondisi Matriks Spektral ($\\kappa$):** {:.3e}\n", assessment.kinematic_guard.condition_number));
-        md.push_str(&format!("* **Nilai Singular Maksimum ($\\sigma_{{\\max}}$):** {:.3e}\n", assessment.kinematic_guard.sigma_max));
-        md.push_str(&format!("* **Nilai Singular Minimum ($\\sigma_{{\\min}}$):** {:.3e}\n", assessment.kinematic_guard.sigma_min));
-        let stability_badge = if assessment.kinematic_guard.is_stable { "✅ STABIL (Bebas Kinematic Mechanism)" } else { "❌ TIDAK STABIL (Mekanisme Terdeteksi)" };
-        md.push_str(&format!("* **Status Stabilitas Awal:** {}\n\n", stability_badge));
+        md.push_str("## 2. Spectral Kinematic Security Certificate (SVD Mechanism Guard — Gate 1)\n\n");
+        md.push_str(&format!("* **Free Degrees of Freedom ($n_{{free}}$):** {}\n", assessment.kinematic_guard.active_dofs));
+        md.push_str(&format!("* **Partitioned Stiffness Matrix Rank (rank($K_{{ff}}$)):** {}\n", assessment.kinematic_guard.rank));
+        md.push_str(&format!("* **Nullspace Dimension (dim(Null($K_{{ff}}$))):** {}\n", assessment.kinematic_guard.nullspace_dimension));
+        md.push_str(&format!("* **Spectral Matrix Condition Number ($\\kappa$):** {:.3e}\n", assessment.kinematic_guard.condition_number));
+        md.push_str(&format!("* **Maximum Singular Value ($\\sigma_{{\\max}}$):** {:.3e}\n", assessment.kinematic_guard.sigma_max));
+        md.push_str(&format!("* **Minimum Singular Value ($\\sigma_{{\\min}}$):** {:.3e}\n", assessment.kinematic_guard.sigma_min));
+        let stability_badge = if assessment.kinematic_guard.is_stable { "✅ STABLE (Free of Kinematic Mechanisms)" } else { "❌ UNSTABLE (Kinematic Mechanism Detected)" };
+        md.push_str(&format!("* **Initial Stability Status:** {}\n\n", stability_badge));
 
         md.push_str("---\n\n");
 
-        md.push_str("## 3. Rekapitulasi Metrik Redundansi Global (ARI System Metrics)\n\n");
-        md.push_str("| Indikator Metrik | Nilai Numerik | Standar Kelaikan EigenGraph / ASCE 7 |\n");
+        md.push_str("## 3. Global Redundancy Metrics Summary (ARI System Metrics)\n\n");
+        md.push_str("| Metric Indicator | Numerical Value | EigenGraph / ASCE 7 Standard Threshold |\n");
         md.push_str("| :--- | :---: | :--- |\n");
-        md.push_str(&format!("| **Indeks Redundansi Global Rata-Rata ($\\overline{{\\text{{ARI}}}}$)** | `{:.4}` | $\\ge 0.70$ (Direkomendasikan Multi-Path) |\n", assessment.average_ari));
-        md.push_str(&format!("| **Indeks Redundansi Minimum Elemen ($\\text{{ARI}}_{{\\min}}$)** | `{:.4}` | Ambang Batas FCM $\\tau = 0.50$ |\n", assessment.min_system_ari));
-        md.push_str(&format!("| **Jumlah Elemen Kritis (FCM, ARI < 0.70)** | `{}` | Target EigenGraph: Zero Miss pada Ambang $\\tau$ |\n\n", assessment.critical_members_count));
+        md.push_str(&format!("| **Average Global Redundancy Index ($\\overline{{\\text{{ARI}}}}$)** | `{:.4}` | $\\ge 0.70$ (Multi-Path Recommended) |\n", assessment.average_ari));
+        md.push_str(&format!("| **Minimum Element Redundancy Index ($\\text{{ARI}}_{{\\min}}$)** | `{:.4}` | FCM Threshold $\\tau = 0.50$ |\n", assessment.min_system_ari));
+        md.push_str(&format!("| **Critical Members Count (FCM, ARI < 0.70)** | `{}` | Target EigenGraph: Zero Miss at Threshold $\\tau$ |\n\n", assessment.critical_members_count));
 
         md.push_str("---\n\n");
 
-        md.push_str("## 4. Tabel Hasil Evaluasi Anggota Struktur (Member-by-Member Screening)\n\n");
-        md.push_str("| ID | Nama Batang | Gaya $N_e$ [kN] | Kapasitas [kN] | $U_e^*$ | $RR_e$ | ARI | CI | SVD Margin $m_e$ | Klasifikasi Status |\n");
+        md.push_str("## 4. Member-by-Member Screening Evaluation Table\n\n");
+        md.push_str("| ID | Member Name | Axial Force $N_e$ [kN] | Capacity [kN] | $U_e^*$ | $RR_e$ | ARI | CI | SVD Margin $m_e$ | Status Classification |\n");
         md.push_str("| :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n");
 
         for m in &assessment.member_results {
             let status_tag = if m.is_critical || m.ari < 0.50 {
                 "🔴 **FRACTURE CRITICAL (UNSAFE)**"
             } else if m.ari < 0.70 {
-                "🟡 MODERAT (MONITOR)"
+                "🟡 MODERATE (MONITOR)"
             } else {
-                "🟢 REDUNDAN (SAFE)"
+                "🟢 REDUNDANT (SAFE)"
             };
 
             md.push_str(&format!(
@@ -444,14 +444,14 @@ impl DossierExporter {
 
         md.push_str("\n---\n\n");
 
-        md.push_str("## 5. Pernyataan Sertifikasi Kelaikan Struktur\n\n");
-        md.push_str("Berdasarkan formulasi Adjusted Redundancy Index (Persamaan 2.5a–2.19) dan Pengaman Kinematik Sherman-Morrison (Persamaan 4.1–4.7), model ini telah dievaluasi terhadap potensi keruntuhan progresif (*disproportionate collapse*). Seluruh parameter berada di dalam batas aman yang diverifikasi secara analitis dan terikat pada standar AISC 360-16 / SNI 1729:2020 serta DoD UFC 4-023-03.\n\n");
-        md.push_str("*Dossier ini digenerasi secara otomatis oleh EigenGraph Analysis & BIM Lifecycle Platform.*\n");
+        md.push_str("## 5. Structural Compliance Certification Statement\n\n");
+        md.push_str("Based on the Adjusted Redundancy Index formulation (Eqs. 2.5a–2.19) and Sherman-Morrison Kinematic Guard (Eqs. 4.1–4.7), this model has been evaluated for disproportionate progressive collapse vulnerability. All parameters remain within verified analytical safe bounds compliant with AISC 360-16 / SNI 1729:2020 and DoD UFC 4-023-03.\n\n");
+        md.push_str("*This dossier was generated automatically by EigenGraph Analysis & BIM Lifecycle Platform.*\n");
 
         md
     }
 
-    /// Menghasilkan Naskah Laporan Audit Rekayasa Komprehensif (30+ Halaman)
+    /// Generates Comprehensive Engineering Audit Dossier (30+ Pages)
     pub fn export_comprehensive_dossier(
         model: &StructuralModel,
         assessment: &RedundancyAssessment,
@@ -462,19 +462,19 @@ impl DossierExporter {
     ) -> String {
         let mut md = Self::export_dossier_markdown(model, assessment);
 
-        // Bagian 6: Analisis Dinamik Ragam Getar & Spektrum Gempa SNI 1726:2019
+        // Section 6: Dynamic Modal Analysis & Seismic Spectrum SNI 1726:2019 / ASCE 7-16
         if let Some(m) = modal_report {
             md.push_str("\n---\n\n");
-            md.push_str("## 6. Analisis Dinamik Ragam Getar & Spektrum Gempa SNI 1726:2019 / ASCE 7-16\n\n");
-            md.push_str(&format!("* **Klasifikasi Situs Tanah:** {}\n", m.spectrum.site_class.label()));
-            md.push_str(&format!("* **Parameter Spektra:** $S_s = {:.2}\\text{{g}}$, $S_1 = {:.2}\\text{{g}}$, $F_a = {:.2}$, $F_v = {:.2}$\n", m.spectrum.ss, m.spectrum.s1, m.spectrum.fa, m.spectrum.fv));
-            md.push_str(&format!("* **Percepatan Desain:** $S_{{DS}} = {:.3}\\text{{g}}$, $S_{{D1}} = {:.3}\\text{{g}}$\n", m.spectrum.sds, m.spectrum.sd1));
-            md.push_str(&format!("* **Perioda Transisi:** $T_0 = {:.3}\\text{{ s}}$, $T_s = {:.3}\\text{{ s}}$\n", m.spectrum.t0, m.spectrum.ts));
-            md.push_str(&format!("* **Perioda Fundamental Struktur ($T_1$):** `{:.4} s` (Frekuensi Alami: `{:.2} Hz`)\n", m.fundamental_period_s, m.fundamental_frequency_hz));
-            md.push_str(&format!("* **Gaya Geser Dasar Seismik ($V_b$):** `{:.1} kN` (Koefisien Seismik $C_s = {:.4}$, Berat Seismik $W = {:.1} kN$)\n", m.seismic_base_shear_kn, m.spectrum.cs, m.total_weight_kn));
-            md.push_str(&format!("* **Status Partisipasi Massa Ragam ($\\sum M_{{eff}} \\ge 90\\%$):** {}\n\n", if m.is_90_percent_satisfied { "✅ MEMENUHI (Partisipasi Massa Efektif)" } else { "⚠️ PERLU PENAMBAHAN RAGAM" }));
+            md.push_str("## 6. Dynamic Modal Analysis & Seismic Spectrum SNI 1726:2019 / ASCE 7-16\n\n");
+            md.push_str(&format!("* **Soil Site Classification:** {}\n", m.spectrum.site_class.label()));
+            md.push_str(&format!("* **Spectral Parameters:** $S_s = {:.2}\\text{{g}}$, $S_1 = {:.2}\\text{{g}}$, $F_a = {:.2}$, $F_v = {:.2}$\n", m.spectrum.ss, m.spectrum.s1, m.spectrum.fa, m.spectrum.fv));
+            md.push_str(&format!("* **Design Accelerations:** $S_{{DS}} = {:.3}\\text{{g}}$, $S_{{D1}} = {:.3}\\text{{g}}$\n", m.spectrum.sds, m.spectrum.sd1));
+            md.push_str(&format!("* **Transition Periods:** $T_0 = {:.3}\\text{{ s}}$, $T_s = {:.3}\\text{{ s}}$\n", m.spectrum.t0, m.spectrum.ts));
+            md.push_str(&format!("* **Fundamental Period of Structure ($T_1$):** `{:.4} s` (Natural Frequency: `{:.2} Hz`)\n", m.fundamental_period_s, m.fundamental_frequency_hz));
+            md.push_str(&format!("* **Seismic Design Base Shear ($V_b$):** `{:.1} kN` (Seismic Coefficient $C_s = {:.4}$, Seismic Weight $W = {:.1} kN$)\n", m.seismic_base_shear_kn, m.spectrum.cs, m.total_weight_kn));
+            md.push_str(&format!("* **Modal Mass Participation Status ($\\sum M_{{eff}} \\ge 90\\%$):** {}\n\n", if m.is_90_percent_satisfied { "✅ COMPLIANT (Effective Mass Participation)" } else { "⚠️ ADDITIONAL MODES REQUIRED" }));
 
-            md.push_str("| Ragam (Mode) | Frekuensi $\\omega$ [rad/s] | Frekuensi $f$ [Hz] | Perioda $T$ [s] | Partisipasi Arah X | Partisipasi Arah Y |\n");
+            md.push_str("| Mode | Frequency $\\omega$ [rad/s] | Frequency $f$ [Hz] | Period $T$ [s] | Participation Dir-X | Participation Dir-Y |\n");
             md.push_str("| :---: | :---: | :---: | :---: | :---: | :---: |\n");
             for mode in &m.modes {
                 md.push_str(&format!(
@@ -489,22 +489,22 @@ impl DossierExporter {
             }
         }
 
-        // Bagian 7: Analisis Non-Linear Orde Kedua P-Delta & Kurva Pushover FEMA 356
+        // Section 7: Second-Order Non-Linear P-Delta Analysis & Pushover Capacity Curve FEMA 356
         if let Some(p) = pushover_report {
             md.push_str("\n---\n\n");
-            md.push_str("## 7. Analisis Non-Linear Orde Kedua $P-\\Delta$ & Kurva Kapasitas Pushover FEMA 356\n\n");
-            md.push_str(&format!("* **Status Keruntuhan Struktur:** {}\n", if p.is_stable { "✅ STABIL (Daktil Penuh)" } else { "❌ MEKANISME SENDI PLASTIS TERBENTUK" }));
-            md.push_str(&format!("* **Base Shear Leleh ($V_y$):** `{:.1} kN` (Simpangan Atap: `{:.2} mm`)\n", p.yield_base_shear_kn, p.yield_drift_mm));
-            md.push_str(&format!("* **Base Shear Maksimum ($V_u$):** `{:.1} kN` (Simpangan Atap: `{:.2} mm`)\n", p.ultimate_base_shear_kn, p.ultimate_drift_mm));
-            md.push_str(&format!("* **Rasio Duktilitas Sistem ($\\mu$):** `{:.2}` (Sangat Daktail)\n", p.ductility_ratio_mu));
-            md.push_str(&format!("* **Faktor Kuat Lebih ($\\Omega_0$):** `{:.2}x`\n", p.overstrength_factor_omega0));
-            md.push_str(&format!("* **Total Sendi Plastis Terbentuk:** `{}` titik elemen\n\n", p.formed_hinges.len()));
+            md.push_str("## 7. Second-Order Non-Linear $P-\\Delta$ Analysis & Pushover Capacity Curve FEMA 356\n\n");
+            md.push_str(&format!("* **Structural Collapse Status:** {}\n", if p.is_stable { "✅ STABLE (Full Ductility)" } else { "❌ PLASTIC HINGE MECHANISM FORMED" }));
+            md.push_str(&format!("* **Yield Base Shear ($V_y$):** `{:.1} kN` (Roof Drift: `{:.2} mm`)\n", p.yield_base_shear_kn, p.yield_drift_mm));
+            md.push_str(&format!("* **Ultimate Base Shear ($V_u$):** `{:.1} kN` (Roof Drift: `{:.2} mm`)\n", p.ultimate_base_shear_kn, p.ultimate_drift_mm));
+            md.push_str(&format!("* **System Ductility Ratio ($\\mu$):** `{:.2}` (High Ductility)\n", p.ductility_ratio_mu));
+            md.push_str(&format!("* **Overstrength Factor ($\\Omega_0$):** `{:.2}x`\n", p.overstrength_factor_omega0));
+            md.push_str(&format!("* **Total Formed Plastic Hinges:** `{}` element hinges\n\n", p.formed_hinges.len()));
 
-            md.push_str("| Tahap (Step) | Drift Atap [mm] | Base Shear $V_b$ [kN] | Status FEMA 356 | Sendi Aktif |\n");
+            md.push_str("| Step | Roof Drift [mm] | Base Shear $V_b$ [kN] | FEMA 356 State | Active Hinges |\n");
             md.push_str("| :---: | :---: | :---: | :---: | :---: |\n");
             for step in &p.steps {
                 md.push_str(&format!(
-                    "| Step {} | {:.2} | {:.1} | {:?} | {} Titik |\n",
+                    "| Step {} | {:.2} | {:.1} | {:?} | {} Hinges |\n",
                     step.step,
                     step.roof_drift_mm,
                     step.base_shear_kn,
@@ -514,21 +514,21 @@ impl DossierExporter {
             }
         }
 
-        // Bagian 8: BIM 5D BoQ (AHSP) & BIM 6D Jejak Karbon Embodied (ISO 14040)
+        // Section 8: BIM 5D BoQ (AHSP) & BIM 6D Embodied Carbon Footprint (ISO 14040 LCA)
         if let (Some(boq), Some(lca)) = (boq_report, carbon_report) {
             md.push_str("\n---\n\n");
-            md.push_str("## 8. BIM 5D Rincian Anggaran Biaya (AHSP) & BIM 6D Jejak Karbon Embodied (LCA)\n\n");
-            md.push_str(&format!("* **Total Estimasi Biaya Konstruksi (BoQ):** `Rp {:.0}`\n", boq.final_project_cost_idr));
-            md.push_str(&format!("* **Total Jejak Karbon Embodied (A1–A5):** `{:.2} tCO2e`\n", lca.total_embodied_carbon_ton));
-            md.push_str(&format!("* **Rute Fabrikasi Baja:** {}\n", lca.route.display_name()));
-            md.push_str(&format!("* **Prediksi Peringkat Bangunan Hijau (GBCI / LEED):** `{}`\n", lca.greenship_leed_tier));
-            md.push_str(&format!("* **Indeks Efisiensi Eko-Redundansi ($\\eta_{{eco}}$):** `{:.4} ARI / tCO2e`\n\n", lca.eco_redundancy_efficiency));
+            md.push_str("## 8. BIM 5D Bill of Quantities (AHSP) & BIM 6D Embodied Carbon Footprint (LCA)\n\n");
+            md.push_str(&format!("* **Total Estimated Construction Cost (BoQ):** `Rp {:.0}`\n", boq.final_project_cost_idr));
+            md.push_str(&format!("* **Total Embodied Carbon Footprint (A1–A5):** `{:.2} tCO2e`\n", lca.total_embodied_carbon_ton));
+            md.push_str(&format!("* **Steel Fabrication Route:** {}\n", lca.route.display_name()));
+            md.push_str(&format!("* **Green Building Rating Prediction (GBCI / LEED):** `{}`\n", lca.greenship_leed_tier));
+            md.push_str(&format!("* **Eco-Redundancy Efficiency Index ($\\eta_{{eco}}$):** `{:.4} ARI / tCO2e`\n\n", lca.eco_redundancy_efficiency));
         }
 
-        // Bagian 9: Segel Kriptografis NIST FIPS 180-4 SHA-256
+        // Section 9: NIST FIPS 180-4 SHA-256 Cryptographic Seal
         let hash = Sha256Hasher::hash_model_and_ari(model, assessment);
         md.push_str("\n---\n\n");
-        md.push_str("## 9. Segel Audit Kriptografis Digital (NIST FIPS 180-4 SHA-256 Tamper-Proof)\n\n");
+        md.push_str("## 9. Digital Cryptographic Audit Seal (NIST FIPS 180-4 SHA-256 Tamper-Proof)\n\n");
         md.push_str("```\n");
         md.push_str(&format!("CRYPTOGRAPHIC SEAL : {}\n", hash));
         md.push_str(&format!("AUTHENTICATION URI : eigengraph://verify?hash={}&org=eigengraph\n", &hash[..16]));
@@ -1046,7 +1046,7 @@ impl IfcImporter {
         }
 
         if model.elements.is_empty() {
-            return Err("Tidak ditemukan elemen batang atau polylines 3D yang valid di dalam file IFC.".to_string());
+            return Err("No valid 3D member elements or polylines found in IFC file.".to_string());
         }
 
         // Boundary conditions
@@ -1415,12 +1415,12 @@ impl HtmlViewerExporter {
         </div>
         <div class="header-stats">
             <div class="stat-pill">Nodes: <span class="stat-val">{nodes_count}</span></div>
-            <div class="stat-pill">Batang: <span class="stat-val">{elems_count}</span></div>
-            <div class="stat-pill">Berat Baja: <span class="stat-val">{total_tonnage:.2} Ton</span></div>
+            <div class="stat-pill">Members: <span class="stat-val">{elems_count}</span></div>
+            <div class="stat-pill">Steel Weight: <span class="stat-val">{total_tonnage:.2} Tonnes</span></div>
             <div class="stat-pill">Avg ARI: <span class="stat-val" style="color: #38bdf8;">{avg_ari:.4}</span></div>
             <div class="stat-pill">Min System ARI: <span class="stat-val" style="color: {min_ari_color};">{min_ari:.4}</span></div>
-            <div class="stat-pill">Kritis: <span class="stat-val" style="color: {crit_color};">{crit_count}</span></div>
-            <div class="stat-pill">SVD Guard: <span class="stat-val" style="color: #34d399;">STABIL BEBAS MEKANISME</span></div>
+            <div class="stat-pill">Critical: <span class="stat-val" style="color: {crit_color};">{crit_count}</span></div>
+            <div class="stat-pill">SVD Guard: <span class="stat-val" style="color: #34d399;">STABLE ZERO MECHANISM</span></div>
         </div>
     </header>
 
@@ -1428,9 +1428,9 @@ impl HtmlViewerExporter {
         <div class="toolbar">
             <button class="btn active" id="btn-solid" onclick="setMode('solid')">🧱 Solid 3D</button>
             <button class="btn" id="btn-wire" onclick="setMode('wireframe')">🕸️ Wireframe</button>
-            <button class="btn" id="btn-nfd" onclick="setMode('nfd')">📊 NFD (Aksial)</button>
-            <button class="btn" id="btn-sfd" onclick="setMode('sfd')">⚡ SFD (Geser)</button>
-            <button class="btn" id="btn-bmd" onclick="setMode('bmd')">📈 BMD (Momen)</button>
+            <button class="btn" id="btn-nfd" onclick="setMode('nfd')">📊 NFD (Axial)</button>
+            <button class="btn" id="btn-sfd" onclick="setMode('sfd')">⚡ SFD (Shear)</button>
+            <button class="btn" id="btn-bmd" onclick="setMode('bmd')">📈 BMD (Moment)</button>
             <div style="height: 1px; background: var(--border-subtle); margin: 4px 0;"></div>
             <button class="btn" onclick="resetCamera()">🔄 Reset View</button>
         </div>
@@ -1438,10 +1438,10 @@ impl HtmlViewerExporter {
         <canvas id="glcanvas"></canvas>
 
         <div class="hud-legend" id="hud-legend">
-            <div class="legend-item"><div class="legend-dot" style="background: #34d399;"></div> ARI &ge; 0.85 (Aman)</div>
+            <div class="legend-item"><div class="legend-dot" style="background: #34d399;"></div> ARI &ge; 0.85 (Safe)</div>
             <div class="legend-item"><div class="legend-dot" style="background: #38bdf8;"></div> ARI 0.70 - 0.85</div>
-            <div class="legend-item"><div class="legend-dot" style="background: #fbbf24;"></div> ARI 0.50 - 0.70 (Perlu Review)</div>
-            <div class="legend-item"><div class="legend-dot" style="background: #f87171;"></div> ARI &lt; 0.50 (Fraktur Kritis)</div>
+            <div class="legend-item"><div class="legend-dot" style="background: #fbbf24;"></div> ARI 0.50 - 0.70 (Review Needed)</div>
+            <div class="legend-item"><div class="legend-dot" style="background: #f87171;"></div> ARI &lt; 0.50 (Fracture Critical)</div>
         </div>
 
         <div class="seal-badge">
@@ -1454,15 +1454,15 @@ impl HtmlViewerExporter {
                 <span id="insp-title">Element #1</span>
                 <span class="close-btn" onclick="closeInspector()">&times;</span>
             </h3>
-            <div class="inspector-row"><span>Profil Penampang:</span><strong id="insp-section">W14x90</strong></div>
-            <div class="inspector-row"><span>Gaya Aksial (Pu):</span><strong id="insp-force">-45.2 kN (C)</strong></div>
-            <div class="inspector-row"><span>Gaya Geser (Vy):</span><strong id="insp-shear">12.4 kN</strong></div>
-            <div class="inspector-row"><span>Momen Lentur (My):</span><strong id="insp-moment">24.5 kNm</strong></div>
-            <div class="inspector-row"><span>Kapasitas (ϕPn):</span><strong id="insp-cap">120.0 kN</strong></div>
-            <div class="inspector-row"><span>Rasio Utilisasi (DCR):</span><strong id="insp-util">37.6%</strong></div>
-            <div class="inspector-row"><span>Redundansi (ARI):</span><strong id="insp-ari" style="color: #34d399;">0.9400</strong></div>
+            <div class="inspector-row"><span>Cross Section:</span><strong id="insp-section">W14x90</strong></div>
+            <div class="inspector-row"><span>Axial Force (Pu):</span><strong id="insp-force">-45.2 kN (C)</strong></div>
+            <div class="inspector-row"><span>Shear Force (Vy):</span><strong id="insp-shear">12.4 kN</strong></div>
+            <div class="inspector-row"><span>Bending Moment (My):</span><strong id="insp-moment">24.5 kNm</strong></div>
+            <div class="inspector-row"><span>Capacity (ϕPn):</span><strong id="insp-cap">120.0 kN</strong></div>
+            <div class="inspector-row"><span>Demand/Capacity Ratio (DCR):</span><strong id="insp-util">37.6%</strong></div>
+            <div class="inspector-row"><span>Redundancy (ARI):</span><strong id="insp-ari" style="color: #34d399;">0.9400</strong></div>
             <div class="inspector-row"><span>Criticality Index (CI):</span><strong id="insp-ci">0.0600</strong></div>
-            <div class="inspector-row"><span>Status Anggota:</span><strong id="insp-status" style="color: #34d399;">REDUNDAN AMAN</strong></div>
+            <div class="inspector-row"><span>Member Status:</span><strong id="insp-status" style="color: #34d399;">SAFE REDUNDANT</strong></div>
         </div>
     </div>
 
@@ -1733,7 +1733,7 @@ impl HtmlViewerExporter {
             insp.style.display = 'block';
             document.getElementById('insp-title').innerText = m.name + ' (#' + m.id + ')';
             document.getElementById('insp-section').innerText = m.section;
-            document.getElementById('insp-force').innerText = m.force.toFixed(1) + ' kN ' + (m.force < 0 ? '(Tekan)' : '(Tarik)');
+            document.getElementById('insp-force').innerText = m.force.toFixed(1) + ' kN ' + (m.force < 0 ? '(Compression)' : '(Tension)');
             document.getElementById('insp-shear').innerText = m.vy.toFixed(1) + ' kN';
             document.getElementById('insp-moment').innerText = m.my.toFixed(1) + ' kNm';
             document.getElementById('insp-cap').innerText = m.capacity.toFixed(1) + ' kN';
@@ -1742,13 +1742,13 @@ impl HtmlViewerExporter {
             document.getElementById('insp-ci').innerText = m.ci.toFixed(4);
             const statusEl = document.getElementById('insp-status');
             if (m.ari < 0.50 || m.critical) {{
-                statusEl.innerText = '🔴 FRAKTUR KRITIS (UNSAFE)';
+                statusEl.innerText = '🔴 FRACTURE CRITICAL (UNSAFE)';
                 statusEl.style.color = '#f87171';
             }} else if (m.ari < 0.70) {{
-                statusEl.innerText = '🟡 MODERAT (MONITOR)';
+                statusEl.innerText = '🟡 MODERATE (MONITOR)';
                 statusEl.style.color = '#fbbf24';
             }} else {{
-                statusEl.innerText = '🟢 REDUNDAN AMAN';
+                statusEl.innerText = '🟢 SAFE REDUNDANT';
                 statusEl.style.color = '#34d399';
             }}
         }}
@@ -2040,7 +2040,7 @@ END-ISO-10303-21;"#;
         let pushover = crate::core::nonlinear::NonlinearEngine::run_pushover(&model, 5);
 
         let dossier = DossierExporter::export_comprehensive_dossier(&model, &assessment, modal.as_ref(), Some(&pushover), None, None);
-        assert!(dossier.contains("DOSSIER RESMI AUDIT REDUNDANSI STRUKTURAL"));
+        assert!(dossier.contains("OFFICIAL STRUCTURAL REDUNDANCY") || dossier.contains("DOSSIER RESMI AUDIT REDUNDANSI STRUKTURAL"));
         assert!(dossier.contains("SNI 1726:2019"));
         assert!(dossier.contains("FEMA 356"));
         assert!(dossier.contains("CRYPTOGRAPHIC SEAL"));

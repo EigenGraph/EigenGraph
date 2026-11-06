@@ -922,7 +922,7 @@ function initCsoSimulator() {
     const elScrap = document.getElementById('cso-val-scrap');
 
     if (elYield) elYield.textContent = `${yieldPct}%`;
-    if (elBars) elBars.textContent = `${bars.length} Batang`;
+    if (elBars) elBars.textContent = `${bars.length} Bars`;
     if (elScrap) elScrap.textContent = `${(100 - yieldPct).toFixed(1)}%`;
   }
 
@@ -1120,7 +1120,7 @@ function initSeismicSpectrumSimulator() {
     for (let t = 0; t <= maxT; t += 1.0) {
       ctx.fillText(`${t.toFixed(0)}s`, toX(t), padT + plotH + 18);
     }
-    ctx.fillText('Periode Alami T (detik)', padL + plotW / 2, padT + plotH + 36);
+    ctx.fillText('Natural Period T (seconds)', padL + plotW / 2, padT + plotH + 36);
 
     ctx.textAlign = 'right';
     for (let s = 0; s <= maxSa; s += saStep) {
@@ -1376,7 +1376,7 @@ function initDafSimulator() {
     for (let t = 0; t <= maxT; t += 0.5) {
       ctx.fillText(`${t.toFixed(1)}s`, toX(t), padT + plotH + 18);
     }
-    ctx.fillText('Waktu t (detik) Pasca Pelepasan Elemen', padL + plotW / 2, padT + plotH + 36);
+    ctx.fillText('Time t (seconds) Post Member Removal', padL + plotW / 2, padT + plotH + 36);
 
     ctx.textAlign = 'right';
     for (let u = 0; u <= maxU; u += uStep) {

@@ -139,7 +139,7 @@ impl Default for ParametricView {
             sheet_paper_size: SheetPaperSize::A3Landscape,
             sheet_scale: SheetScale::Scale1_100,
             sheet_number: "A101".to_string(),
-            sheet_title: "Denah Rangka Struktur & Potongan A-A".to_string(),
+            sheet_title: "Structural Framing Plan & Section A-A".to_string(),
             sheet_author: "Harids Irawan, S.T., M.T.".to_string(),
             component_name: "NVW_DCR Portal Frame FL1-FL6 (ASTM A992)".to_string(),
             component_category: "NVW_DCR-LOD350_BIMCraft".to_string(),
@@ -224,7 +224,7 @@ impl Default for ParametricView {
             show_db_drawer: false,
             save_notification: None,
             ai_suggestion_text: Some(
-                "AI Copilot: 3 Ruangan tertutup (108.0 m²) & 18 Kolom/Balok terdeteksi otomatis via Planar Half-Edge. ARI Global: 0.942."
+                "AI Copilot: 3 enclosed rooms (108.0 m²) & 18 columns/beams automatically detected via Planar Half-Edge. Global ARI: 0.942."
                     .to_string(),
             ),
             live_ari_score: 0.942,
@@ -514,15 +514,15 @@ impl ParametricView {
                             ui.label(RichText::new("No:").size(10.5).color(theme.text_secondary));
                             ui.add(egui::TextEdit::singleline(&mut self.sheet_number).desired_width(45.0));
 
-                            ui.label(RichText::new("Judul:").size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new("Title:").size(10.5).color(theme.text_secondary));
                             ui.add(egui::TextEdit::singleline(&mut self.sheet_title).desired_width(170.0));
 
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 if ui.add(
-                                    egui::Button::new(RichText::new("📥 Cetak PDF Vektor").size(11.0).strong().color(Color32::WHITE))
+                                    egui::Button::new(RichText::new("📥 Print Vector PDF").size(11.0).strong().color(Color32::WHITE))
                                         .fill(theme.accent_blue)
                                 )
-                                .on_hover_text("Ekspor lembar gambar kerja skala resmi ke PDF vektor")
+                                .on_hover_text("Export official scaled drawing sheet to vector PDF")
                                 .clicked()
                                 {
                                     self.export_bim_deliverables();
@@ -557,7 +557,7 @@ impl ParametricView {
         let _ = std::fs::write(&ifc_path, ifc_str);
 
         self.save_notification = Some(format!(
-            "✅ Berhasil mencetak Lembar Gambar Kerja '{}' ke {}",
+            "✅ Successfully exported Drawing Sheet '{}' to {}",
             pdf_path.file_name().and_then(|f| f.to_str()).unwrap_or("Sheet.pdf"),
             export_dir.display()
         ));
@@ -723,7 +723,7 @@ impl ParametricView {
                 if ui
                     .add(
                         egui::Button::new(
-                            RichText::new("📊 Lihat Hasil di PLANNING (5D RAB) →")
+                            RichText::new("📊 View Results in PLANNING (5D BoQ) →")
                                 .size(11.0)
                                 .strong()
                                 .color(Color32::WHITE),
@@ -741,7 +741,7 @@ impl ParametricView {
                 if ui
                     .add(
                         egui::Button::new(
-                            RichText::new("🌱 Cek Karbon di SUSTAINABILITY (6D) →")
+                            RichText::new("🌱 Check Carbon in SUSTAINABILITY (6D) →")
                                 .size(11.0)
                                 .color(theme.text_primary),
                         )
@@ -1711,14 +1711,14 @@ impl ParametricView {
         painter.text(
             sched_rect.min + Vec2::new(8.0, 5.0),
             Align2::LEFT_TOP,
-            "3) JADWAL STRUKTURAL & AUDIT REDUNDANSI EIGENGRAPH",
+            "3) STRUCTURAL SCHEDULE & EIGENGRAPH REDUNDANCY AUDIT",
             egui::FontId::monospace(9.5),
             Color32::from_rgb(15, 23, 42),
         );
         let sched_lines = [
-            format!("• Elemen Struktur: {} Dinding, {} Kolom, {} Balok, {} Ruangan", self.bim_bus.project.walls.len(), self.bim_bus.project.columns.len(), self.bim_bus.project.runs.len(), self.bim_bus.project.rooms.len()),
-            format!("• Volume & Pembesian: Rebar {:.1} kg | Mutu Beton fc' 30 MPa | Baja ASTM A992", self.bim_bus.project.total_rebar_weight_kg()),
-            format!("• SVD Kinematic Guard: rank(K) = Penuh | dim(Null) = 0 | Kondisi: STABIL BEBAS MEKANISME"),
+            format!("• Structural Elements: {} Walls, {} Columns, {} Beams, {} Rooms", self.bim_bus.project.walls.len(), self.bim_bus.project.columns.len(), self.bim_bus.project.runs.len(), self.bim_bus.project.rooms.len()),
+            format!("• Volume & Reinforcement: Rebar {:.1} kg | Concrete Grade fc' 30 MPa | Steel ASTM A992", self.bim_bus.project.total_rebar_weight_kg()),
+            format!("• SVD Kinematic Guard: rank(K) = Full | dim(Null) = 0 | Condition: STABLE / MECHANISM-FREE"),
             format!("• Adjusted Redundancy Index: Min System ARI = {:.4} [GRADE A SAFE] | SNI 1729 / AISC 360", self.live_ari_score),
         ];
         for (i, line) in sched_lines.iter().enumerate() {
@@ -1746,11 +1746,11 @@ impl ParametricView {
 
         let lines = [
             "⚛️ EIGENGRAPH 10D BIM & STRUCTURAL SUITE",
-            &format!("Proyek: {}", self.bim_bus.project.project_name),
-            &format!("Lembar: {} — {}", self.sheet_number, self.sheet_title),
-            &format!("Skala: {} | Ukuran: {}", self.sheet_scale.label(), self.sheet_paper_size.display_name()),
-            &format!("Perancang: {}", self.sheet_author),
-            "Validasi: NIST FIPS 180-4 SHA-256 Validated",
+            &format!("Project: {}", self.bim_bus.project.project_name),
+            &format!("Sheet: {} — {}", self.sheet_number, self.sheet_title),
+            &format!("Scale: {} | Size: {}", self.sheet_scale.label(), self.sheet_paper_size.display_name()),
+            &format!("Engineer: {}", self.sheet_author),
+            "Validation: NIST FIPS 180-4 SHA-256 Validated",
         ];
         for (i, l) in lines.iter().enumerate() {
             painter.text(
@@ -1871,7 +1871,7 @@ impl ParametricView {
             crate::core::InternalVault::autosave_parametric_components(db_components)
         {
             self.save_notification = Some(format!(
-                "Komponen '{}' berhasil disimpan otomatis ke Package Contents: {} (Siap dirakit di BUILD 3D).",
+                "Component '{}' automatically saved to Package Contents: {} (Ready to assemble in BUILD 3D).",
                 self.component_name, saved_path
             ));
         } else {
@@ -1894,7 +1894,7 @@ impl ParametricView {
         let mut load_idx: Option<usize> = None;
         let mut assemble_in_build = false;
 
-        egui::Window::new("📦 Database Komponen Parametrik & Potongan IFC")
+        egui::Window::new("📦 Parametric Component Database & IFC Sections")
             .open(&mut open)
             .collapsible(false)
             .resizable(true)
@@ -1915,7 +1915,7 @@ impl ParametricView {
                         ui.vertical(|ui| {
                             ui.label(
                                 RichText::new(
-                                    "Katalog Potongan Parametrik & Struktur Rumit (OpenBIM IFC)",
+                                    "Parametric & Complex Structure Section Catalog (OpenBIM IFC)",
                                 )
                                 .size(15.0)
                                 .strong()
@@ -1923,7 +1923,7 @@ impl ParametricView {
                             );
                             ui.label(
                                 RichText::new(
-                                    "Potongan modular dari gedung berarsitektur kompleks siap pakai sebagai referensi & perakitan.",
+                                    "Modular sections from complex architectural buildings ready to use as reference & assembly.",
                                 )
                                 .size(11.5)
                                 .color(theme.text_secondary),
@@ -1976,7 +1976,7 @@ impl ParametricView {
                                 ui.add_space(6.0);
                                 ui.horizontal_wrapped(|ui| {
                                     ui.label(
-                                        RichText::new("Variabel:")
+                                        RichText::new("Variables:")
                                             .size(10.5)
                                             .strong()
                                             .color(theme.text_muted),
@@ -2000,7 +2000,7 @@ impl ParametricView {
                                     if ui
                                         .add(
                                             egui::Button::new(
-                                                RichText::new("📥 Muat ke Kanvas (Load)")
+                                                RichText::new("📥 Load into Canvas")
                                                     .size(11.0)
                                                     .strong()
                                                     .color(Color32::WHITE),
@@ -2016,7 +2016,7 @@ impl ParametricView {
                                     if ui
                                         .add(
                                             egui::Button::new(
-                                                RichText::new("🏗️ Rakit di BUILD (3D)")
+                                                RichText::new("🏗️ Assemble in BUILD (3D)")
                                                     .size(11.0)
                                                     .color(theme.text_secondary),
                                             )
@@ -2038,7 +2038,7 @@ impl ParametricView {
                     ui.add_space(6.0);
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.button("Tutup").clicked() {
+                        if ui.button("Close").clicked() {
                             should_close = true;
                         }
                     });
@@ -2056,7 +2056,7 @@ impl ParametricView {
                 self.component_category = comp.category.clone();
                 self.variables = comp.variables.clone();
                 self.save_notification = Some(format!(
-                    "Komponen '{}' berhasil dimuat ke editor parametrik!",
+                    "Component '{}' loaded into parametric editor successfully!",
                     comp.name
                 ));
                 self.show_db_drawer = false;

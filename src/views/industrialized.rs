@@ -123,25 +123,25 @@ impl IndustrializedView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🏭 Desain untuk Fabrikasi & Perakitan (DfMA Hierarchy)").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("🏭 Design for Manufacture & Assembly (DfMA Hierarchy)").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Toleransi Pabrikasi: ± 1.5 mm").size(11.0).color(theme.accent_blue));
+                        ui.label(RichText::new("Fabrication Tolerance: ± 1.5 mm").size(11.0).color(theme.accent_blue));
                     });
                 });
                 ui.add_space(12.0);
 
                 let modules = [
-                    ("MOD-TRUSS-01 (Kiri Bentang 12m)", "Sub-Assembling Warren Truss A", "24.2 Ton", "Robotic Jig Fixture", "🟢 Selesai di Pabrik (Inspected)"),
-                    ("MOD-TRUSS-02 (Kanan Bentang 12m)", "Sub-Assembling Warren Truss B", "24.2 Ton", "Robotic Jig Fixture", "🟢 Selesai di Pabrik (Inspected)"),
-                    ("MOD-SPLICE-KEY (Sambungan Tengah)", "Center Crown Splice Bolted Node", "0.8 Ton", "CNC Milled Gusset Plate", "🟢 Ready for Site Bolting"),
-                    ("MOD-BRG-SEAT (Dudukan Tumpuan)", "Pedestal Anchor & Bearing Plate", "1.2 Ton", "Automated Flame Cut", "🟢 Terpasang di Abutment"),
+                    ("MOD-TRUSS-01 (Left 12m Span)", "Sub-Assembling Warren Truss A", "24.2 Tons", "Robotic Jig Fixture", "🟢 Completed in Shop (Inspected)"),
+                    ("MOD-TRUSS-02 (Right 12m Span)", "Sub-Assembling Warren Truss B", "24.2 Tons", "Robotic Jig Fixture", "🟢 Completed in Shop (Inspected)"),
+                    ("MOD-SPLICE-KEY (Crown Mid-Splice)", "Center Crown Splice Bolted Node", "0.8 Tons", "CNC Milled Gusset Plate", "🟢 Ready for Site Bolting"),
+                    ("MOD-BRG-SEAT (Abutment Bearing Seat)", "Pedestal Anchor & Bearing Plate", "1.2 Tons", "Automated Flame Cut", "🟢 Installed on Abutment"),
                 ];
 
                 for (code, name, wt, fab, status) in modules {
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
                             ui.label(RichText::new(format!("{} • {}", code, name)).size(12.0).strong().color(theme.text_primary));
-                            ui.label(RichText::new(format!("Metode: {} | Berat: {}", fab, wt)).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("Method: {} | Weight: {}", fab, wt)).size(11.0).color(theme.text_secondary));
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(RichText::new(status).size(11.5).strong().color(theme.accent_green));
@@ -160,25 +160,25 @@ impl IndustrializedView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🦾 Otomatisasi Robotik & Kontrol Mutu Industry 4.0").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("🦾 Robotic Automation & Industry 4.0 Quality Control").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Tingkat Kelulusan NDT: 99.4%").size(12.0).strong().color(theme.accent_green));
+                        ui.label(RichText::new("NDT Pass Rate: 99.4%").size(12.0).strong().color(theme.accent_green));
                     });
                 });
                 ui.add_space(12.0);
 
                 let robotics = [
-                    ("Lengan Robotik 6-Axis GMAW/FCAW", "Pengelasan Otomatis Pelat Buhul Gusset", "14.5 mm/s", "AWS D1.1 Certified", "🟢 Beroperasi Sinkron"),
-                    ("Mesin CNC Laser Cutting Fiber 15kW", "Pemotongan Profil Web & Flens Baja", "85.0 mm/s", "Toleransi 0.05 mm", "🟢 Nesting Otomatis"),
-                    ("Scanner AI Ultrasonic Phased-Array", "Uji Tak Merusak (NDT) Bebas Cacat Las", "Real-Time 3D", "Defect: 0 Porositas", "🟢 Kualitas Superior"),
-                    ("Mesin Pengeboran Balok CNC 3-Spindle", "Pengeboran Lubang Baut HTB A325", "36 Lubang/menit", "Akurasi Lubang ±0.2mm", "🟢 Siap Rakit Langsung"),
+                    ("6-Axis Robotic GMAW/FCAW Arm", "Automated Gusset Joint Welding", "14.5 mm/s", "AWS D1.1 Certified", "🟢 Operating Synchronized"),
+                    ("15kW Fiber Laser CNC Machine", "Steel Web & Flange Profile Cutting", "85.0 mm/s", "Tolerance 0.05 mm", "🟢 Automated Nesting"),
+                    ("AI Ultrasonic Phased-Array Scanner", "Non-Destructive Testing (NDT) Flaw Detection", "Real-Time 3D", "Defect: 0 Porosity", "🟢 Superior Quality"),
+                    ("3-Spindle CNC Beam Drill Line", "HTB A325 Bolt Hole Drilling", "36 Holes/min", "Hole Accuracy ±0.2mm", "🟢 Ready for Erection"),
                 ];
 
                 for (mach, role, spd, cert, st) in robotics {
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
                             ui.label(RichText::new(mach).size(12.0).strong().color(theme.text_primary));
-                            ui.label(RichText::new(format!("Aplikasi: {} | Kecepatan: {}", role, spd)).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("Application: {} | Speed: {}", role, spd)).size(11.0).color(theme.text_secondary));
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(RichText::new(st).size(11.5).strong().color(theme.accent_green));
@@ -198,13 +198,13 @@ impl IndustrializedView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("🏗️ Crane Otonom, Trajektori Anti-Tabrakan & Inspeksi Drone LiDAR").size(13.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("🏗️ Autonomous Crane, Collision-Free Trajectory & LiDAR Drone Inspection").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(10.0);
 
                 ui.columns(3, |cols| {
-                    self.render_stat_card(&mut cols[0], theme, "CRANE TRAJECTORY CLEARANCE", "2.8 m", "Zona Bebas Tabrakan Boom Dinamis", theme.accent_green);
-                    self.render_stat_card(&mut cols[1], theme, "DRONE LIDAR AS-BUILT", "± 2.1 mm", "Penyimpangan Model vs Aktual Lapangan", theme.accent_blue);
-                    self.render_stat_card(&mut cols[2], theme, "SVD ERECTION GUARD", "Rank Penuh", "Kestabilan Tiap Tahap Terjamin Bebas Mekanisme", theme.accent_green);
+                    self.render_stat_card(&mut cols[0], theme, "CRANE TRAJECTORY CLEARANCE", "2.8 m", "Dynamic Boom Collision-Free Zone", theme.accent_green);
+                    self.render_stat_card(&mut cols[1], theme, "DRONE LIDAR AS-BUILT", "± 2.1 mm", "Model vs. As-Built Field Deviation", theme.accent_blue);
+                    self.render_stat_card(&mut cols[2], theme, "SVD ERECTION GUARD", "Full Rank", "All Erection Stages Certified Mechanism-Free", theme.accent_green);
                 });
             });
     }
@@ -216,14 +216,14 @@ impl IndustrializedView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("🌐 Jembatan Integrasi Industri 4.0 & OpenBIM Ekosistem").size(13.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("🌐 Industry 4.0 & OpenBIM Integration Bridge").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(10.0);
 
                 let formats = [
-                    ("IFC 4.3 Structural Analysis MVD", "Interoperabilitas Standar buildingSMART", "Mengekspor topologi elemen, beban kombinasi, dan metadata ARI langsung ke software komersial (SAP2000, ETABS, Revit)."),
-                    ("BCF 3.0 (BIM Collaboration Format)", "Manajemen Isu Desain & Clash Berbasis Cloud", "Sinkronisasi otomatis peringatan SVD Mechanism dan tegangan kritis ke platform kolaborasi tim."),
-                    ("STEP-NC & G-Code Robotik", "Instruksi Mesin CNC & Pengelasan Otomatis", "Toolpath numerik diekspor langsung dari geometri 3D tanpa perlu gambar manual tambahan."),
-                    ("REST API & IoT MQTT Telemetry", "Konektivitas Sensor Digital Twin", "Menerima aliran data sensor lapangan dan memperbarui nilai ARI(t) secara real-time."),
+                    ("IFC 4.3 Structural Analysis MVD", "buildingSMART International Standard", "Exporting element topology, factored load cases, and ARI metadata directly to commercial FEA suites (SAP2000, ETABS, Revit)."),
+                    ("BCF 3.0 (BIM Collaboration Format)", "Cloud-based Issue & Clash Management", "Automated synchronization of SVD Mechanism warnings and critical stresses to collaboration platforms."),
+                    ("STEP-NC & G-Code Robotics", "CNC Machining & Automated Welding Instructions", "Numerical toolpaths exported directly from 3D geometry without manual drafting overhead."),
+                    ("REST API & IoT MQTT Telemetry", "Digital Twin Sensor Connectivity", "Streams field sensor data and updates real-time ARI(t) structural resilience scores."),
                 ];
 
                 for (name, sub, desc) in formats {
@@ -239,24 +239,24 @@ impl IndustrializedView {
 
                 ui.add_space(12.0);
                 ui.horizontal(|ui| {
-                    if ui.add(egui::Button::new(RichText::new("🌐 Ekspor Berkas OpenBIM IFC 4.3 (.ifc)").size(12.0).strong().color(Color32::WHITE))
+                    if ui.add(egui::Button::new(RichText::new("🌐 Export OpenBIM IFC 4.3 (.ifc)").size(12.0).strong().color(Color32::WHITE))
                         .fill(theme.accent_blue)
                         .corner_radius(CornerRadius::same(6))).clicked() {
                         let mut engine = crate::core::ParametricEngine::new();
                         if let Ok(model) = engine.generate_warren_truss() {
                             let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                             let ifc = crate::core::IfcExporter::export_to_ifc(&model, ari.as_ref());
-                            self.export_status = Some(format!("Model diekspor ke format OpenBIM IFC 4.3 ({} baris). Siap dibuka di Solibri, Revit, dan Tekla.", ifc.lines().count()));
+                            self.export_status = Some(format!("Model exported to OpenBIM IFC 4.3 ({} lines). Compatible with Solibri, Revit, and Tekla.", ifc.lines().count()));
                         }
                     }
 
-                    if ui.add(egui::Button::new(RichText::new("🦾 Ekspor Paket DSTV CNC (.nc1)").size(12.0).strong().color(Color32::WHITE))
+                    if ui.add(egui::Button::new(RichText::new("🦾 Export DSTV CNC Package (.nc1)").size(12.0).strong().color(Color32::WHITE))
                         .fill(theme.accent_green)
                         .corner_radius(CornerRadius::same(6))).clicked() {
                         let mut engine = crate::core::ParametricEngine::new();
                         if let Ok(model) = engine.generate_warren_truss() {
                             let pieces = crate::core::DstvExporter::export_to_dstv(&model);
-                            self.export_status = Some(format!("{} berkas instruksi robotik DSTV .nc1 berhasil digenerasi untuk pemotongan dan pengeboran CNC otomatis.", pieces.len()));
+                            self.export_status = Some(format!("{} DSTV .nc1 robotic instruction files generated successfully for automated CNC cutting and drilling.", pieces.len()));
                         }
                     }
                 });

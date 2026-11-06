@@ -6,24 +6,24 @@ use serde::{Deserialize, Serialize};
 use crate::core::linalg::Matrix;
 use crate::core::model::StructuralModel;
 
-/// Klasifikasi Situs Tanah berdasarkan SNI 1726:2019 Pasal 5.3
+/// Soil site classification based on SNI 1726:2019 Section 5.3 / ASCE 7-16
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SiteClass {
-    SA, // Batuan Keras (Hard Rock)
-    SB, // Batuan (Rock)
-    SC, // Tanah Sangat Padat dan Batuan Lunak (Dense Soil)
-    SD, // Tanah Sedang (Stiff Soil) - Default SNI 1726 / Jawa
-    SE, // Tanah Lunak (Soft Clay)
+    SA, // Hard Rock
+    SB, // Rock
+    SC, // Very Dense Soil and Soft Rock
+    SD, // Stiff Soil - Default SNI 1726
+    SE, // Soft Clay Soil
 }
 
 impl SiteClass {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::SA => "SA — Batuan Keras (vs > 1500 m/s)",
-            Self::SB => "SB — Batuan (750 < vs ≤ 1500 m/s)",
-            Self::SC => "SC — Tanah Sangat Padat (350 < vs ≤ 750 m/s)",
-            Self::SD => "SD — Tanah Sedang (175 < vs ≤ 350 m/s) [Standar]",
-            Self::SE => "SE — Tanah Lunak (vs < 175 m/s)",
+            Self::SA => "SA — Hard Rock (vs > 1500 m/s)",
+            Self::SB => "SB — Rock (750 < vs ≤ 1500 m/s)",
+            Self::SC => "SC — Very Dense Soil & Soft Rock (350 < vs ≤ 750 m/s)",
+            Self::SD => "SD — Stiff Soil (175 < vs ≤ 350 m/s) [Standard]",
+            Self::SE => "SE — Soft Clay Soil (vs < 175 m/s)",
         }
     }
 }
@@ -187,7 +187,7 @@ pub struct ModalAnalysisReport {
 pub struct ModalEngine;
 
 impl ModalEngine {
-    /// Menjalankan Analisis Ragam Dinamik & Menghitung Spektrum Respons SNI 1726:2019
+    /// Runs dynamic modal analysis and computes SNI 1726:2019 / ASCE 7-16 response spectrum
     pub fn analyze(
         model: &StructuralModel,
         num_modes: usize,
@@ -195,15 +195,15 @@ impl ModalEngine {
     ) -> Result<ModalAnalysisReport, String> {
         let n_nodes = model.nodes.len();
         if n_nodes < 2 {
-            return Err("Model harus memiliki minimal 2 titik kumpul untuk analisis dinamik".to_string());
+            return Err("Model must have at least 2 nodes for dynamic modal analysis".to_string());
         }
 
-        // Jalankan FEA solver untuk perakitan matriks kekakuan K dan partisi derajat kebebasan bebas
+        // Run FEA solver to assemble global stiffness matrix K and partition free DOFs
         let fea = crate::core::solver::FemSolver::solve(model)?;
         let free_dofs = fea.free_dofs;
         let n_free = free_dofs.len();
         if n_free == 0 {
-            return Err("Struktur tidak memiliki derajat kebebasan bebas aktif".to_string());
+            return Err("Structure has no active free degrees of freedom".to_string());
         }
 
         let dofs_per_node = 6;

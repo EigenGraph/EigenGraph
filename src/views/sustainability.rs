@@ -126,10 +126,10 @@ impl SustainabilityView {
 
         // Metric Cards Row
         ui.columns(4, |cols| {
-            self.render_stat_card(&mut cols[0], theme, "TOTAL EMBODIED CARBON", &format!("{:.1} t CO₂e", total_co2), &format!("Massa Baja: {:.1} Ton (A1–A5)", total_steel_tons), theme.accent_green);
-            self.render_stat_card(&mut cols[1], theme, "CARBON INTENSITY", &format!("{:.1} kg/m²", (total_co2 * 1000.0) / 288.0), "Bentang 24m x 12m Floor", theme.accent_blue);
-            self.render_stat_card(&mut cols[2], theme, "PENGHEMATAN EMISI", &format!("-{:.1}%", reduction_pct), "vs. Baseline BF-BOF", if reduction_pct > 30.0 { theme.accent_green } else { theme.accent_orange });
-            self.render_stat_card(&mut cols[3], theme, "EKO-REDUNDANSI (η)", &format!("{:.4}", eco_eff), "ARI / Total tCO₂e", theme.accent_blue);
+            self.render_stat_card(&mut cols[0], theme, "TOTAL EMBODIED CARBON", &format!("{:.1} t CO₂e", total_co2), &format!("Steel Mass: {:.1} Tons (A1–A5)", total_steel_tons), theme.accent_green);
+            self.render_stat_card(&mut cols[1], theme, "CARBON INTENSITY", &format!("{:.1} kg/m²", (total_co2 * 1000.0) / 288.0), "24m Span x 12m Floor", theme.accent_blue);
+            self.render_stat_card(&mut cols[2], theme, "EMISSIONS SAVINGS", &format!("-{:.1}%", reduction_pct), "vs. Baseline BF-BOF", if reduction_pct > 30.0 { theme.accent_green } else { theme.accent_orange });
+            self.render_stat_card(&mut cols[3], theme, "ECO-REDUNDANCY (η)", &format!("{:.4}", eco_eff), "ARI / Total tCO₂e", theme.accent_blue);
         });
 
         ui.add_space(16.0);
@@ -142,9 +142,9 @@ impl SustainabilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🏭 Jalur Fabrikasi Baja:").size(12.0).strong().color(theme.text_primary));
+                    ui.label(RichText::new("🏭 Steel Production Route:").size(12.0).strong().color(theme.text_primary));
                     ui.selectable_value(&mut self.steel_production_route, SteelProductionRoute::ElectricArcFurnace, "♻️ EAF Electric Arc (1.15 t CO₂e/t)");
-                    ui.selectable_value(&mut self.steel_production_route, SteelProductionRoute::BlastFurnaceBof, "⚙️ BF-BOF Konvensional (2.35 t CO₂e/t)");
+                    ui.selectable_value(&mut self.steel_production_route, SteelProductionRoute::BlastFurnaceBof, "⚙️ Conventional BF-BOF (2.35 t CO₂e/t)");
                     ui.selectable_value(&mut self.steel_production_route, SteelProductionRoute::HydrogenDri, "🌱 Green Hydrogen DRI (0.45 t CO₂e/t)");
                 });
             });
@@ -162,10 +162,10 @@ impl SustainabilityView {
                 ui.add_space(10.0);
 
                 let rows = [
-                    ("A1–A3 Baja Struktural (Profil WF & HSS)", format!("{:.1} Ton", total_steel_tons), format!("{:.2} t CO₂e", steel_co2), format!("{:.1}%", (steel_co2 / total_co2) * 100.0)),
-                    ("A1–A3 Substruktur Beton Bertulang", "72.0 m³".to_string(), format!("{:.2} t CO₂e", concrete_co2), format!("{:.1}%", (concrete_co2 / total_co2) * 100.0)),
-                    ("A1–A3 Coating Antikorosi & Fireproofing", "340.0 m²".to_string(), format!("{:.2} t CO₂e", coating_co2), format!("{:.1}%", (coating_co2 / total_co2) * 100.0)),
-                    ("A4 Transportasi Workshop ke Tapak (120 km)", "48.5 Ton-rit".to_string(), format!("{:.2} t CO₂e", transport_co2), format!("{:.1}%", (transport_co2 / total_co2) * 100.0)),
+                    ("A1–A3 Structural Steel (WF & HSS Sections)", format!("{:.1} Tons", total_steel_tons), format!("{:.2} t CO₂e", steel_co2), format!("{:.1}%", (steel_co2 / total_co2) * 100.0)),
+                    ("A1–A3 Reinforced Concrete Substructure", "72.0 m³".to_string(), format!("{:.2} t CO₂e", concrete_co2), format!("{:.1}%", (concrete_co2 / total_co2) * 100.0)),
+                    ("A1–A3 Anticorrosion & Fireproofing Coating", "340.0 m²".to_string(), format!("{:.2} t CO₂e", coating_co2), format!("{:.1}%", (coating_co2 / total_co2) * 100.0)),
+                    ("A4 Workshop to Site Transport (120 km)", "48.5 Ton-trips".to_string(), format!("{:.2} t CO₂e", transport_co2), format!("{:.1}%", (transport_co2 / total_co2) * 100.0)),
                 ];
 
                 for (name, qty, co2, pct) in rows {
@@ -184,9 +184,9 @@ impl SustainabilityView {
 
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("JUMLAH EMBODIED CARBON GLOBAL:").size(12.5).strong().color(theme.accent_green));
+                    ui.label(RichText::new("TOTAL GLOBAL EMBODIED CARBON:").size(12.5).strong().color(theme.accent_green));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new(format!("{:.2} Ton CO₂e", total_co2)).size(13.0).strong().color(theme.accent_green));
+                        ui.label(RichText::new(format!("{:.2} Tons CO₂e", total_co2)).size(13.0).strong().color(theme.accent_green));
                     });
                 });
             });
@@ -199,16 +199,16 @@ impl SustainabilityView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("📈 Kurva Pareto: Redundansi Struktural (ARI) vs Emisi Karbon (CO₂e)").size(13.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("📈 Pareto Frontier: Structural Redundancy (ARI) vs. Embodied Carbon (CO₂e)").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(6.0);
-                ui.label(RichText::new("Menemukan titik keseimbangan optimum di mana ketahanan struktur terhadap keruntuhan meningkat signifikan tanpa pemborosan jejak karbon.").size(11.5).color(theme.text_secondary));
+                ui.label(RichText::new("Finding the optimum trade-off where progressive collapse resilience increases significantly without disproportionate carbon expenditure.").size(11.5).color(theme.text_secondary));
                 ui.add_space(14.0);
 
                 let scenarios = [
-                    ("Desain Rawan (Non-Redundan)", "0.58", "38.2 Ton", "43.9 t CO₂e", "🔴 Risiko Runtuh Katastropik (Rekonstruksi = +120 t CO₂e)", false),
-                    ("Desain Dasar Standar SNI", "0.72", "44.0 Ton", "50.6 t CO₂e", "🟡 Memenuhi Syarat Minimal, Belum Redundan Sekunder", false),
-                    ("Desain Optimum EigenGraph (Rekomendasi)", "0.94", "48.5 Ton", "55.8 t CO₂e", "🟢 SWEET SPOT: ARI +30.5%, Karbon Hanya +5.2 t CO₂e (+10.2%)", true),
-                    ("Desain Konservatif Berlebih", "0.98", "62.0 Ton", "71.3 t CO₂e", "⚪ Tidak Ekonomis: Penambahan Karbon +27.8% Tidak Signifikan Menaikkan ARI", false),
+                    ("Vulnerable Design (Non-Redundant)", "0.58", "38.2 Tons", "43.9 t CO₂e", "🔴 Catastrophic Collapse Risk (Reconstruction = +120 t CO₂e)", false),
+                    ("Code-Baseline Standard Design", "0.72", "44.0 Tons", "50.6 t CO₂e", "🟡 Meets Minimum Code, Lacks Secondary Redundancy", false),
+                    ("EigenGraph Optimal Design (Recommended)", "0.94", "48.5 Tons", "55.8 t CO₂e", "🟢 SWEET SPOT: ARI +30.5%, Carbon Only +5.2 t CO₂e (+10.2%)", true),
+                    ("Over-Conservative Design", "0.98", "62.0 Tons", "71.3 t CO₂e", "⚪ Inefficient: +27.8% Carbon Surcharge for Negligible ARI Gain", false),
                 ];
 
                 for (name, ari, steel, co2, desc, is_opt) in scenarios {
@@ -254,19 +254,19 @@ impl SustainabilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🏅 Penilaian Sertifikasi Bangunan Hijau (GBCI Greenship & LEED)").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("🏅 Green Building Certification Scorecard (Greenship & LEED)").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Skor: 86 / 100 (Predikat PLATINUM)").size(12.0).strong().color(theme.accent_green));
+                        ui.label(RichText::new("Score: 86 / 100 (PLATINUM Rating)").size(12.0).strong().color(theme.accent_green));
                     });
                 });
                 ui.add_space(12.0);
 
                 let criteria = [
-                    ("MR 1: Material Ramah Lingkungan (Recycled Steel Scrap > 80%)", "12 / 12 Poin", "✅ Terpenuhi melalui verifikasi EPD Krakatau Steel"),
-                    ("MR 2: Regional Material (< 150 km jarak fabrikasi)", "8 / 8 Poin", "✅ Workshop fabrikasi lokal Karawang-Cikarang"),
-                    ("SE 1: Efisiensi Struktural & Optimasi Bobot Struktur (DfMA)", "15 / 15 Poin", "✅ Rasio span-to-depth L/7.5 meminimalkan tonase baja"),
-                    ("SE 2: Resilience & Long Life Durability (ARI > 0.85)", "10 / 10 Poin", "✅ SVD Kinematic Guard mencegah keruntuhan dini dan renovasi"),
-                    ("WA 1: Minimasi Limbah Konstruksi (Offcut Waste < 3%)", "9 / 10 Poin", "✅ Algoritma 1D Cutting Stock Optimizer terintegrasi"),
+                    ("MR 1: Sustainable Materials (Recycled Steel Scrap > 80%)", "12 / 12 Pts", "✅ Verified via manufacturer EPD certifications"),
+                    ("MR 2: Regional Materials (< 150 km fabrication haul)", "8 / 8 Pts", "✅ Local regional fabrication yard"),
+                    ("SE 1: Structural Efficiency & Weight Optimization (DfMA)", "15 / 15 Pts", "✅ L/7.5 span-to-depth ratio minimizes steel tonnage"),
+                    ("SE 2: Resilience & Long-Life Durability (ARI > 0.85)", "10 / 10 Pts", "✅ SVD Kinematic Guard prevents premature collapse and retrofit"),
+                    ("WA 1: Construction Waste Minimization (Offcut Waste < 3%)", "9 / 10 Pts", "✅ Integrated 1D Cutting Stock Optimizer heuristic"),
                 ];
 
                 for (name, pts, notes) in criteria {

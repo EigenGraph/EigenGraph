@@ -104,8 +104,8 @@ impl AnalyzeView {
                 // 2. PLANNING NAVIGATION BANNER
                 theme.card_frame().show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("📊 5D CONSTRUCTION PLANNING TERSEDIA:").size(11.5).strong().color(theme.accent_blue));
-                        ui.label(RichText::new("Estimasi Biaya (RAB 5D), Schedule Ereksi WBS (4D), dan Optimasi Trade-Off Cost-ARI kini dapat diakses di pilar PLANNING.").size(11.5).color(theme.text_secondary));
+                        ui.label(RichText::new("📊 5D CONSTRUCTION PLANNING AVAILABLE:").size(11.5).strong().color(theme.accent_blue));
+                        ui.label(RichText::new("Cost Estimation (5D BoQ), WBS Erection Schedule (4D), and Cost-ARI Trade-Off Optimization are now accessible under the PLANNING pillar.").size(11.5).color(theme.text_secondary));
                     });
                 });
 
@@ -131,14 +131,14 @@ impl AnalyzeView {
     fn render_subtabs_header(&mut self, ui: &mut Ui, theme: &MacTheme) {
         ui.horizontal(|ui| {
             let tabs = [
-                (AnalyzeSubTab::RedundancySvd, "⚡ SVD Guard & Redundansi"),
-                (AnalyzeSubTab::MemberCriticality, "🎯 Matriks Sensitivitas ARI"),
-                (AnalyzeSubTab::DisplacementForces, "📊 Gaya Dalam & Lendutan"),
-                (AnalyzeSubTab::Frame3dInteraction, "📐 Frame 3D P-M-V"),
-                (AnalyzeSubTab::ConcretePmInteraction, "🧱 Beton P-M (SNI 2847)"),
-                (AnalyzeSubTab::CascadingCollapse, "💥 Kolaps Kaskade"),
+                (AnalyzeSubTab::RedundancySvd, "⚡ SVD Guard & Redundancy"),
+                (AnalyzeSubTab::MemberCriticality, "🎯 ARI Sensitivity Matrix"),
+                (AnalyzeSubTab::DisplacementForces, "📊 Forces & Deflection"),
+                (AnalyzeSubTab::Frame3dInteraction, "📐 3D Frame P-M-V"),
+                (AnalyzeSubTab::ConcretePmInteraction, "🧱 Concrete P-M (SNI/ACI)"),
+                (AnalyzeSubTab::CascadingCollapse, "💥 Cascading Collapse"),
                 (AnalyzeSubTab::NonlinearPushover, "📉 Pushover P-Δ"),
-                (AnalyzeSubTab::ModalDynamics, "🌊 Ragam SNI 1726"),
+                (AnalyzeSubTab::ModalDynamics, "🌊 SNI 1726 Modal"),
             ];
 
             for (tab, label) in tabs {
@@ -176,7 +176,7 @@ impl AnalyzeView {
                         let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                         let s2k = crate::core::Sap2000Exporter::export_to_s2k(&model, ari.as_ref());
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_SAP2000.s2k", &s2k) {
-                            self.export_status = Some(format!("CSI SAP2000 .s2k tersimpan di: {}", path));
+                            self.export_status = Some(format!("CSI SAP2000 .s2k saved to: {}", path));
                         }
                     }
                 }
@@ -190,7 +190,7 @@ impl AnalyzeView {
                         let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                         let dxf = crate::core::DxfExporter::export_to_dxf(&model, ari.as_ref());
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_3D.dxf", &dxf) {
-                            self.export_status = Some(format!("AutoCAD 3D DXF tersimpan di: {}", path));
+                            self.export_status = Some(format!("AutoCAD 3D DXF saved to: {}", path));
                         }
                     }
                 }
@@ -204,7 +204,7 @@ impl AnalyzeView {
                         let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                         let ifc = crate::core::IfcExporter::export_to_ifc(&model, ari.as_ref());
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_OpenBIM.ifc", &ifc) {
-                            self.export_status = Some(format!("OpenBIM IFC 4.3 tersimpan di: {}", path));
+                            self.export_status = Some(format!("OpenBIM IFC 4.3 saved to: {}", path));
                         }
                     }
                 }
@@ -230,7 +230,7 @@ impl AnalyzeView {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("🛡️ SVD Kinematic Guard & Sherman-Morrison Engine:").size(13.0).strong().color(theme.text_primary));
-                ui.label(RichText::new("rank(K) = ndof - nrigid. Perturbasi cepat m_e(λ) = 1 - (1-λ)h_e via Sherman-Morrison Rank-1 O(N²) diverifikasi aman.").size(12.0).color(theme.text_secondary));
+                ui.label(RichText::new("rank(K) = ndof - nrigid. Fast perturbation m_e(λ) = 1 - (1-λ)h_e via Sherman-Morrison Rank-1 O(N²) verified safe.").size(12.0).color(theme.text_secondary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("Gate 1 SVD & ARI v2 Certified").size(11.0).color(theme.accent_green).strong());
                 });
@@ -243,7 +243,7 @@ impl AnalyzeView {
             // 🎬 SVD Rigid-Body Mechanism Mode Player
             ui.horizontal(|ui| {
                 ui.label(RichText::new("🎬 SVD Kinematic Mechanism Mode Player:").size(12.0).strong().color(theme.accent_blue));
-                ui.label(RichText::new("Kondisi Spektral: kappa(K) = 1.42e4  |  dim(Null(K)) = 0 (Zero Singular Mechanisms)").size(11.5).color(theme.text_secondary));
+                ui.label(RichText::new("Spectral Condition: kappa(K) = 1.42e4  |  dim(Null(K)) = 0 (Zero Singular Mechanisms)").size(11.5).color(theme.text_secondary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui.add(egui::Button::new(RichText::new("▶ Animate Rigid Swing Mode").size(11.0).color(Color32::WHITE))
                         .fill(theme.accent_blue)
@@ -260,12 +260,12 @@ impl AnalyzeView {
         theme.card_frame().show(ui, |ui| {
             ui.label(RichText::new("🌐 MULTIGRAPH K-DISJOINT LOAD PATH TRACER (MENGER THEOREM)").size(13.0).strong().color(theme.text_primary));
             ui.add_space(4.0);
-            ui.label(RichText::new("Pencarian lintasan bebas sisi independen (edge-disjoint) dari simpul berbeban (Node 3) ke simpul tumpuan (Node 0 & 6):").size(11.5).color(theme.text_secondary));
+            ui.label(RichText::new("Independent edge-disjoint load path search from loaded node (Node 3) to support reactions (Nodes 0 & 6):").size(11.5).color(theme.text_secondary));
             ui.add_space(8.0);
 
             let paths = [
-                ("Lintasan Utama (pi_1)", "Node 3 -> E1 -> Node 2 -> E3 -> Node 0 (Tumpuan Sendi Kiri)", "Panjang l_1 = 3 batang", "Biaya Kepatuhan sum(c_e) = 1.750", "Kapasitas Jalur: 80 kN", theme.accent_green),
-                ("Lintasan Cadangan (pi_2)", "Node 3 -> E2 -> Node 4 -> E3 -> Node 6 (Tumpuan Rol Kanan)", "Panjang l_2 = 3 batang", "Biaya Kepatuhan sum(c_e) = 2.500", "Kapasitas Jalur: 40 kN", theme.accent_blue),
+                ("Primary Path (pi_1)", "Node 3 -> E1 -> Node 2 -> E3 -> Node 0 (Left Pinned Support)", "Length l_1 = 3 members", "Compliance Cost sum(c_e) = 1.750", "Path Capacity: 80 kN", theme.accent_green),
+                ("Backup Path (pi_2)", "Node 3 -> E2 -> Node 4 -> E3 -> Node 6 (Right Roller Support)", "Length l_2 = 3 members", "Compliance Cost sum(c_e) = 2.500", "Path Capacity: 40 kN", theme.accent_blue),
             ];
 
             for (title, route, len, cost, cap, col) in paths {
@@ -339,29 +339,29 @@ impl AnalyzeView {
     }
 
     // -------------------------------------------------------------
-    // SUB-TAB 2: Matriks Sensitivitas Batang (ARI Perturbation)
+    // SUB-TAB 2: Member Sensitivity Matrix (ARI Perturbation)
     // -------------------------------------------------------------
     fn render_member_criticality(&self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         ui.columns(4, |cols| {
             let crit_count = members.iter().filter(|m| m.is_critical || m.ari < 0.70).count();
-            self.metric_card(&mut cols[0], theme, "TOTAL ELEMEN", &format!("{}", members.len()), "3D Truss & Frame Bars", theme.accent_blue);
-            self.metric_card(&mut cols[1], theme, "ELEMEN KRITIS (ARI < 0.7)", &format!("{}", crit_count), "Memerlukan Alternatif Jalur Beban", if crit_count > 0 { theme.accent_red } else { theme.accent_green });
-            self.metric_card(&mut cols[2], theme, "RATA-RATA ARI", "0.884", "Kapasitas Redundansi Baik", theme.accent_green);
-            self.metric_card(&mut cols[3], theme, "SVD MINIMUM SINGULAR VALUE", "1.42e5", "Jauh Di Atas Singularitas", theme.accent_orange);
+            self.metric_card(&mut cols[0], theme, "TOTAL MEMBERS", &format!("{}", members.len()), "3D Truss & Frame Bars", theme.accent_blue);
+            self.metric_card(&mut cols[1], theme, "CRITICAL MEMBERS (ARI < 0.7)", &format!("{}", crit_count), "Requires Alternative Load Path", if crit_count > 0 { theme.accent_red } else { theme.accent_green });
+            self.metric_card(&mut cols[2], theme, "AVERAGE ARI", "0.884", "Good Redundancy Capacity", theme.accent_green);
+            self.metric_card(&mut cols[3], theme, "SVD MINIMUM SINGULAR VALUE", "1.42e5", "Far Above Singularity", theme.accent_orange);
         });
 
         ui.add_space(16.0);
 
-        // 🚨 TOP-5 FRACTURE CRITICAL ELEMENTS RANKING (Urutan Kerentanan Keruntuhan)
+        // 🚨 TOP-5 FRACTURE CRITICAL ELEMENTS RANKING (Vulnerability Order)
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("🚨 TOP-5 FRACTURE CRITICAL MEMBERS RANKING (ASCE 7 & UFC 4-023-03)").size(13.0).strong().color(theme.accent_red));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("Diurutkan Berdasarkan Skor ARI Terendah").size(11.0).color(theme.text_muted));
+                    ui.label(RichText::new("Ranked by Lowest ARI Score").size(11.0).color(theme.text_muted));
                 });
             });
             ui.add_space(4.0);
-            ui.label(RichText::new("Batang-batang di bawah ini adalah elemen penopang utama paling rentan yang memerlukan pengawasan ketat atau penambahan jalur alternatif:").size(11.5).color(theme.text_secondary));
+            ui.label(RichText::new("The members below are the most vulnerable primary structural elements requiring close monitoring or alternative load path provisions:").size(11.5).color(theme.text_secondary));
             ui.add_space(8.0);
 
             let mut sorted_members = members.to_vec();
@@ -374,7 +374,7 @@ impl AnalyzeView {
                     ui.add_space(10.0);
                     ui.label(RichText::new(format!("E{}: {}", m.id, m.name)).size(12.0).strong().color(theme.text_primary));
                     ui.add_space(20.0);
-                    ui.label(RichText::new(format!("Profil: {}", m.section)).size(11.5).color(theme.accent_blue));
+                    ui.label(RichText::new(format!("Section: {}", m.section)).size(11.5).color(theme.accent_blue));
                     ui.add_space(20.0);
                     ui.label(RichText::new(format!("ARI: {:.4}", m.ari)).size(12.0).strong().color(if m.ari < 0.70 { theme.accent_red } else { theme.accent_green }));
                     ui.add_space(20.0);
@@ -383,7 +383,7 @@ impl AnalyzeView {
                     ui.label(RichText::new(format!("SVD Margin: {:.4}", m.svd_margin)).size(11.5).color(theme.accent_orange));
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let stat_label = if m.ari < 0.70 { "⚠️ SINGLE POINT OF FAILURE" } else { "REDUNDAN MODERAT" };
+                        let stat_label = if m.ari < 0.70 { "⚠️ SINGLE POINT OF FAILURE" } else { "MODERATE REDUNDANT" };
                         let stat_color = if m.ari < 0.70 { theme.accent_red } else { theme.accent_blue };
                         ui.label(RichText::new(stat_label).size(11.0).strong().color(stat_color));
                     });
@@ -396,23 +396,23 @@ impl AnalyzeView {
         ui.add_space(16.0);
 
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("MATRIKS PERTURBASI KEKAKUAN SINGLE-MEMBER REMOVAL").size(13.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("SINGLE-MEMBER REMOVAL STIFFNESS PERTURBATION MATRIX").size(13.0).strong().color(theme.text_primary));
             ui.add_space(4.0);
-            ui.label(RichText::new("Setiap elemen diuji melalui simulasi pelepasan numerik (perturbasi λ -> 0). SVD Guard mengonfirmasi struktur tetap stabil tanpa pembentukan mekanisme lokal.").size(11.5).color(theme.text_secondary));
+            ui.label(RichText::new("Each element is tested via numerical removal simulation (perturbation λ -> 0). SVD Guard verifies structure remains stable without local mechanism formation.").size(11.5).color(theme.text_secondary));
             ui.add_space(10.0);
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new("ID Batang").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Member ID").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(20.0);
-                ui.label(RichText::new("Nama Elemen").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Element Name").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(80.0);
-                ui.label(RichText::new("Indeks ARI").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("ARI Index").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(40.0);
-                ui.label(RichText::new("Kapasitas Cadangan").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Reserve Capacity").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(40.0);
                 ui.label(RichText::new("SVD Margin m_e").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(40.0);
-                ui.label(RichText::new("Status Redundansi").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Redundancy Status").strong().size(12.0).color(theme.text_muted));
             });
             ui.separator();
 
@@ -428,7 +428,7 @@ impl AnalyzeView {
                     ui.add_space(80.0);
                     ui.label(RichText::new(format!("{:.6}", m.svd_margin)).size(12.0).color(theme.accent_orange));
                     ui.add_space(70.0);
-                    let (stat, col) = if m.is_critical || m.ari < 0.70 { ("🔴 Kritis / Non-Redundan", theme.accent_red) } else { ("🟢 Redundan Aman", theme.accent_green) };
+                    let (stat, col) = if m.is_critical || m.ari < 0.70 { ("🔴 Critical / Non-Redundant", theme.accent_red) } else { ("🟢 Safe Redundant", theme.accent_green) };
                     ui.label(RichText::new(stat).size(12.0).color(col));
                 });
                 ui.add_space(3.0);
@@ -440,13 +440,13 @@ impl AnalyzeView {
         // N-2 WOODBURY RANK-2 SIMULTANEOUS DUAL-MEMBER SCREENING
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("🔥 MATRIKS SCREENING DISRUPSI GANDA SIMULTAN N-2 (WOODBURY RANK-2 IDENTITY)").size(13.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("🔥 N-2 SIMULTANEOUS DUAL-MEMBER DISRUPTION SCREENING MATRIX (WOODBURY RANK-2 IDENTITY)").size(13.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("det(I_2 - (1-λ)H_{ab}) = (1 - (1-λ)h_a)(1 - (1-λ)h_b) - (1-λ)² h_{ab}²").size(10.5).color(theme.accent_blue));
                 });
             });
             ui.add_space(4.0);
-            ui.label(RichText::new("Mengevaluasi seluruh kombinasi pasangan 2 batang yang terputus secara bersamaan tanpa merakit ulang matriks kekakuan global (kompleksitas O(m²)).")
+            ui.label(RichText::new("Evaluates all pairwise combinations of 2 concurrently severed members without reassembling global stiffness matrix (O(m²) complexity).")
                 .size(11.5).color(theme.text_secondary));
             ui.add_space(8.0);
 
@@ -458,11 +458,11 @@ impl AnalyzeView {
                         .min_col_width(105.0)
                         .spacing(Vec2::new(14.0, 6.0))
                         .show(ui, |ui| {
-                            ui.label(RichText::new("Pasangan Batang").size(11.0).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Kopling Silang |h_ab|").size(11.0).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Determinan Woodbury").size(11.0).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Skor ARI_ab (N-2)").size(11.0).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Status Kestabilan N-2").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Member Pair").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Cross-Coupling |h_ab|").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Woodbury Determinant").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("ARI_ab Score (N-2)").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("N-2 Stability Status").size(11.0).strong().color(theme.text_muted));
                             ui.end_row();
 
                             for pair in n2_rep.pair_results.iter().take(6) {
@@ -477,7 +477,7 @@ impl AnalyzeView {
                                 ui.label(RichText::new(format!("{:.4}", pair.h12_coupling)).size(11.0).color(theme.text_secondary));
                                 ui.label(RichText::new(format!("{:.4}", pair.woodbury_determinant)).size(11.0).color(theme.accent_blue));
                                 ui.label(RichText::new(format!("{:.4}", pair.pair_ari)).size(11.0).strong().color(col));
-                                ui.label(RichText::new(if pair.is_coupled_mechanism { "⚠️ Mekanisme N-2" } else { "✅ Stabil Redundan" }).size(11.0).color(col));
+                                ui.label(RichText::new(if pair.is_coupled_mechanism { "⚠️ N-2 Mechanism" } else { "✅ Stable Redundant" }).size(11.0).color(col));
                                 ui.end_row();
                             }
                         });
@@ -487,27 +487,27 @@ impl AnalyzeView {
     }
 
     // -------------------------------------------------------------
-    // SUB-TAB 3: Gaya Dalam & Lendutan (FEM 3D)
+    // SUB-TAB 3: Internal Forces & Deflection (3D FEM)
     // -------------------------------------------------------------
     fn render_displacement_and_forces(&self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember]) {
         ui.columns(4, |cols| {
-            self.metric_card(&mut cols[0], theme, "LENDUTAN MAKSIMUM", "1.20 mm", "L/2000 (Ijin L/800)", theme.accent_green);
-            self.metric_card(&mut cols[1], theme, "TEGANGAN TARIK MAKS", "148.5 MPa", "Fy = 250 MPa (AISC LRFD)", theme.accent_blue);
-            self.metric_card(&mut cols[2], theme, "TEGANGAN TEKAN MAKS", "-112.4 MPa", "Aman Terhadap Tekuk Global", theme.accent_orange);
-            self.metric_card(&mut cols[3], theme, "UTILISASI TERBESAR", "59.4%", "Faktor Keamanan 1.68x", theme.accent_green);
+            self.metric_card(&mut cols[0], theme, "MAXIMUM DEFLECTION", "1.20 mm", "L/2000 (Allowable L/800)", theme.accent_green);
+            self.metric_card(&mut cols[1], theme, "MAX TENSILE STRESS", "148.5 MPa", "Fy = 250 MPa (AISC LRFD)", theme.accent_blue);
+            self.metric_card(&mut cols[2], theme, "MAX COMPRESSIVE STRESS", "-112.4 MPa", "Safe Against Global Buckling", theme.accent_orange);
+            self.metric_card(&mut cols[3], theme, "MAX UTILIZATION", "59.4%", "Safety Factor 1.68x", theme.accent_green);
         });
 
         ui.add_space(16.0);
 
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("REKAPITULASI DISPLACEMENT & REAKSI TUMPUAN (FEM SOLVER)").size(13.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("DISPLACEMENT & SUPPORT REACTIONS SUMMARY (FEM SOLVER)").size(13.0).strong().color(theme.text_primary));
             ui.add_space(8.0);
 
             let node_disps = [
-                ("Node 0 (Tumpuan Sendi Kiri)", "X: 0.000, Y: 0.000, Z: 0.000", "Rx: -45.2 kN, Ry: +248.5 kN, Rz: 0.0 kN", "Pinned Base"),
-                ("Node 3 (Tengah Bentang Bawah)", "X: 0.000, Y: -1.204, Z: 0.000", "Fext_y: -120.0 kN (Beban Hidup Truk T)", "Lendutan Maksimum"),
-                ("Node 6 (Tumpuan Rol Kanan)", "X: +0.420, Y: 0.000, Z: 0.000", "Rx: 0.0 kN, Ry: +248.5 kN, Rz: 0.0 kN", "Roller Base"),
-                ("Node 9 (Puncak Rangka Atas)", "X: 0.000, Y: -1.050, Z: 0.000", "Fext_y: -40.0 kN (Beban Angin & Rangka)", "Tekan Aksial Tinggi"),
+                ("Node 0 (Left Pinned Support)", "X: 0.000, Y: 0.000, Z: 0.000", "Rx: -45.2 kN, Ry: +248.5 kN, Rz: 0.0 kN", "Pinned Base"),
+                ("Node 3 (Bottom Midspan)", "X: 0.000, Y: -1.204, Z: 0.000", "Fext_y: -120.0 kN (Truck T Live Load)", "Maximum Deflection"),
+                ("Node 6 (Right Roller Support)", "X: +0.420, Y: 0.000, Z: 0.000", "Rx: 0.0 kN, Ry: +248.5 kN, Rz: 0.0 kN", "Roller Base"),
+                ("Node 9 (Top Ridge)", "X: 0.000, Y: -1.050, Z: 0.000", "Fext_y: -40.0 kN (Wind & Truss Load)", "High Axial Compression"),
             ];
 
             for (nod, coord, r, note) in node_disps {
@@ -528,41 +528,41 @@ impl AnalyzeView {
     }
 
     // -------------------------------------------------------------
-    // SUB-TAB 4: Frame 3D P-M-V Interaction & Skenario Jamak (N-2)
+    // SUB-TAB 4: 3D Frame P-M-V Interaction & Multiple Scenarios (N-2)
     // -------------------------------------------------------------
     fn render_frame_3d_interaction(&self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         ui.columns(4, |cols| {
             self.metric_card(&mut cols[0], theme, "FRAME 3D CAPACITY (LRFD)", "AISC 360-16", "SNI 1729:2020 Compliant", theme.accent_blue);
-            self.metric_card(&mut cols[1], theme, "MAKS INTERAKSI P-M-V", "52.8%", "Batang E2 (Aman DCR < 1.0)", theme.accent_green);
-            self.metric_card(&mut cols[2], theme, "SKENARIO DISRUPSI GANDA", "N-2 Verified", "Zero Cascading Collapse", theme.accent_orange);
-            self.metric_card(&mut cols[3], theme, "PVI (PROPAGATION VULNERABILITY)", "0.00", "Bebas Efek Domino Runtuh", theme.accent_green);
+            self.metric_card(&mut cols[1], theme, "MAX P-M-V INTERACTION", "52.8%", "Member E2 (Safe DCR < 1.0)", theme.accent_green);
+            self.metric_card(&mut cols[2], theme, "DUAL DISRUPTION SCENARIOS", "N-2 Verified", "Zero Cascading Collapse", theme.accent_orange);
+            self.metric_card(&mut cols[3], theme, "PVI (PROPAGATION VULNERABILITY)", "0.00", "Free of Collapse Domino Effect", theme.accent_green);
         });
 
         ui.add_space(16.0);
 
-        // 1. Tabel Interaksi P-M-V Balok-Kolom Frame 3D
+        // 1. 3D Frame Beam-Column P-M-V Interaction Table
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("TABEL EVALUASI INTERAKSI BALOK-KOLOM FRAME 3D (AISC 360-16 / SNI 1729:2020)").size(13.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("3D FRAME BEAM-COLUMN INTERACTION EVALUATION TABLE (AISC 360-16 / SNI 1729:2020)").size(13.0).strong().color(theme.text_primary));
             ui.add_space(4.0);
-            ui.label(RichText::new("Memperhitungkan interaksi simultan Gaya Aksial (Pu), Momen Lentur Dua Sumbu (Mux, Muy), dan Gaya Geser (Vu):").size(11.5).color(theme.text_secondary));
+            ui.label(RichText::new("Considers simultaneous interaction of Axial Force (Pu), Biaxial Bending Moments (Mux, Muy), and Shear Force (Vu):").size(11.5).color(theme.text_secondary));
             ui.add_space(8.0);
 
             ui.horizontal(|ui| {
                 ui.label(RichText::new("ID").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(16.0);
-                ui.label(RichText::new("Nama Elemen").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Element Name").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(60.0);
-                ui.label(RichText::new("Aksial Pu [kN]").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Axial Pu [kN]").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(20.0);
-                ui.label(RichText::new("Momen My [kNm]").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Moment My [kNm]").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(20.0);
-                ui.label(RichText::new("Momen Mz [kNm]").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Moment Mz [kNm]").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(20.0);
-                ui.label(RichText::new("Geser Vy [kN]").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Shear Vy [kN]").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(20.0);
                 ui.label(RichText::new("DCR P-M-V").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(30.0);
-                ui.label(RichText::new("Kapasitas & Status").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Capacity & Status").strong().size(12.0).color(theme.text_muted));
             });
             ui.separator();
 
@@ -592,49 +592,49 @@ impl AnalyzeView {
 
         ui.add_space(16.0);
 
-        // 2. Matriks Evaluasi Pasangan Kritis Disrupsi Ganda (N-2 Critical Pairs)
+        // 2. N-2 Dual-Member Collapse & Cascade Scenarios
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("MATRIKS SKENARIO DISRUPSI GANDA (N-2 DUAL-MEMBER COLLAPSE & CASCADE)").size(13.0).strong().color(theme.accent_orange));
+            ui.label(RichText::new("N-2 DUAL-MEMBER COLLAPSE & CASCADE SCENARIOS").size(13.0).strong().color(theme.accent_orange));
             ui.add_space(4.0);
-            ui.label(RichText::new("Simulasi perturbasi hilangnya 2 batang sekaligus secara simultan (misal ledakan, impak ganda, atau kabel putus berturutan):").size(11.5).color(theme.text_secondary));
+            ui.label(RichText::new("Perturbation simulation of 2 members concurrently severed (e.g. blast, dual impact, or consecutive cable failure):").size(11.5).color(theme.text_secondary));
             ui.add_space(8.0);
 
             let n2_pairs = [
                 (
-                    "Pasangan Kritis (E1, E2): Batang Bawah & Batang Atas Tengah",
-                    "rank(K) < n_free (Mekanisme Goyang Labil)",
+                    "Critical Pair (E1, E2): Bottom Chord & Mid Top Chord",
+                    "rank(K) < n_free (Unstable Sway Mechanism)",
                     0.000,
                     1.00,
-                    "🔴 MEKANISME TOTAL (KATASTROPIK)",
+                    "🔴 TOTAL MECHANISM (CATASTROPHIC)",
                     theme.accent_red,
-                    "Kedua kabel/batang penopang tengah putus memicu keruntuhan instan.",
+                    "Severing both central chord members triggers instantaneous collapse.",
                 ),
                 (
-                    "Pasangan Parsial (E1, E3): Batang Bawah & Web Diagonal",
-                    "rank(K) = n_free (Stabil), DCR Maks = 94.5%",
+                    "Partial Pair (E1, E3): Bottom Chord & Web Diagonal",
+                    "rank(K) = n_free (Stable), Max DCR = 94.5%",
                     0.412,
                     0.25,
-                    "🟡 PERINGATAN (BEBAN TINGGI / CASCADE RISK)",
+                    "🟡 WARNING (HIGH LOAD / CASCADE RISK)",
                     theme.accent_orange,
-                    "Gaya terdistribusi ke batang E2 & E4. Mendekati batas leleh penampang.",
+                    "Forces redistribute to members E2 & E4. Nearing cross-section yield limit.",
                 ),
                 (
-                    "Pasangan Redundan (E2, E4): Batang Atas & Tiang Vertikal",
-                    "rank(K) = n_free (Stabil), DCR Maks = 72.0%",
+                    "Redundant Pair (E2, E4): Top Chord & Vertical Post",
+                    "rank(K) = n_free (Stable), Max DCR = 72.0%",
                     0.765,
                     0.00,
-                    "🟢 STABIL (DUAL-PATH BERFUNGSI)",
+                    "🟢 STABLE (DUAL-PATH ACTIVE)",
                     theme.accent_blue,
-                    "Struktur tetap memiliki cadangan elastis 28% tanpa efek domino runtuh.",
+                    "Structure retains 28% elastic reserve with zero domino collapse effect.",
                 ),
                 (
-                    "Pasangan Sekunder (E3, E4): Diagonal & Tiang Vertikal",
-                    "rank(K) = n_free (Stabil), DCR Maks = 61.0%",
+                    "Secondary Pair (E3, E4): Diagonal & Vertical Post",
+                    "rank(K) = n_free (Stable), Max DCR = 61.0%",
                     0.850,
                     0.00,
-                    "🟢 AMAN REDUNDAN SEMPURNA",
+                    "🟢 FULLY SAFE REDUNDANT",
                     theme.accent_green,
-                    "Jalur beban utama dialihkan sepenuhnya melalui chord tanpa kendala.",
+                    "Primary load path successfully transferred via chords without disruption.",
                 ),
             ];
 
@@ -649,7 +649,7 @@ impl AnalyzeView {
                             ui.label(RichText::new("●").size(14.0).color(col));
                             ui.vertical(|ui| {
                                 ui.label(RichText::new(pair_title).size(12.5).strong().color(theme.text_primary));
-                                ui.label(RichText::new(format!("Kondisi SVD: {} • {}", rank_info, note)).size(11.0).color(theme.text_secondary));
+                                ui.label(RichText::new(format!("SVD Condition: {} • {}", rank_info, note)).size(11.0).color(theme.text_secondary));
                             });
 
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -696,21 +696,21 @@ impl AnalyzeView {
     fn render_cascading_collapse(&mut self, ui: &mut Ui, theme: &MacTheme) {
         // Controls card
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("💥 SIMULASI KERUNTUHAN BERANTAI & KASKADE (PROGRESSIVE COLLAPSE ENGINE)").size(14.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("💥 PROGRESSIVE COLLAPSE & CASCADE SIMULATION (PROGRESSIVE COLLAPSE ENGINE)").size(14.0).strong().color(theme.text_primary));
             ui.add_space(4.0);
-            ui.label(RichText::new("Pemodelan keruntuhan progresif dinamis sesuai standar DoD UFC 4-023-03 dan ASCE 7-22 Alternate Path Method. Masukkan elemen pemicu disrupsi mendadak untuk mengevaluasi amplifikasi dinamis (DAF) dan efek domino ke elemen penopang sekunder.").size(12.0).color(theme.text_secondary));
+            ui.label(RichText::new("Dynamic progressive collapse modeling per DoD UFC 4-023-03 and ASCE 7-22 Alternate Path Method. Specify initial disruption triggers to evaluate Dynamic Amplification Factor (DAF) and domino propagation across secondary load-bearing elements.").size(12.0).color(theme.text_secondary));
             ui.add_space(12.0);
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new("ID Batang Pemicu (pisahkan koma):").size(12.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("Trigger Member IDs (comma-separated):").size(12.0).strong().color(theme.text_primary));
                 ui.add(egui::TextEdit::singleline(&mut self.initial_disrupt_input).desired_width(120.0));
                 ui.add_space(16.0);
 
-                ui.label(RichText::new(format!("Faktor DAF: {:.2}x", self.daf_val)).size(12.0).strong().color(theme.text_primary));
+                ui.label(RichText::new(format!("DAF Factor: {:.2}x", self.daf_val)).size(12.0).strong().color(theme.text_primary));
                 ui.add(egui::Slider::new(&mut self.daf_val, 1.0..=2.0).step_by(0.05));
                 ui.add_space(16.0);
 
-                if ui.add(egui::Button::new(RichText::new("💥 Jalankan Simulasi").size(12.0).strong().color(Color32::WHITE))
+                if ui.add(egui::Button::new(RichText::new("💥 Run Simulation").size(12.0).strong().color(Color32::WHITE))
                     .fill(theme.accent_red)
                     .corner_radius(CornerRadius::same(6))).clicked() {
                     let ids: Vec<usize> = self.initial_disrupt_input
@@ -730,14 +730,14 @@ impl AnalyzeView {
 
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Skenario Cepat:").size(11.0).color(theme.text_muted));
-                if ui.button("⚡ Batang Tunggal Tengah (ID 1)").clicked() {
+                ui.label(RichText::new("Quick Scenarios:").size(11.0).color(theme.text_muted));
+                if ui.button("⚡ Midspan Single Member (ID 1)").clicked() {
                     self.initial_disrupt_input = "1".to_string();
                 }
-                if ui.button("💥 Disrupsi Ganda Kritis (ID 1, 2)").clicked() {
+                if ui.button("💥 Critical Dual Disruption (ID 1, 2)").clicked() {
                     self.initial_disrupt_input = "1, 2".to_string();
                 }
-                if ui.button("🛡️ Batang Web Diagonal (ID 18)").clicked() {
+                if ui.button("🛡️ Diagonal Web Member (ID 18)").clicked() {
                     self.initial_disrupt_input = "18".to_string();
                 }
             });
@@ -748,15 +748,15 @@ impl AnalyzeView {
         // If simulation report is available
         if let Some(ref report) = self.last_cascade_report {
             let (status_text, status_color) = match report.status {
-                crate::core::CollapseStatus::ArrestedSafe => ("ARRESTED SAFE (REDUNDAN AMAN)", theme.accent_green),
-                crate::core::CollapseStatus::ArrestedPartialCollapse => ("ARRESTED PARTIAL COLLAPSE (STABILISASI PARSIAL)", theme.accent_orange),
-                crate::core::CollapseStatus::CatastrophicCollapse => ("CATASTROPHIC COLLAPSE (MEKANISME RUNTUH GLOBAL)", theme.accent_red),
+                crate::core::CollapseStatus::ArrestedSafe => ("ARRESTED SAFE (REDUNDANT SAFE)", theme.accent_green),
+                crate::core::CollapseStatus::ArrestedPartialCollapse => ("ARRESTED PARTIAL COLLAPSE (PARTIAL STABILIZATION)", theme.accent_orange),
+                crate::core::CollapseStatus::CatastrophicCollapse => ("CATASTROPHIC COLLAPSE (GLOBAL COLLAPSE MECHANISM)", theme.accent_red),
             };
 
             ui.columns(4, |cols| {
-                self.metric_card(&mut cols[0], theme, "STATUS SIMULASI", status_text, &format!("DAF: {:.2}x • {} Tahap", report.daf, report.steps_count), status_color);
-                self.metric_card(&mut cols[1], theme, "TOTAL RUNTUH", &format!("{} Batang", report.total_collapsed_ids.len()), &format!("Awal: {:?}", report.initial_disrupted_ids), if report.total_collapsed_ids.len() > report.initial_disrupted_ids.len() { theme.accent_red } else { theme.accent_blue });
-                self.metric_card(&mut cols[2], theme, "ROBUSTNESS INDEX (R_sys)", &format!("{:.3}", report.robustness_index), &format!("PVI: {:.2}% Keruntuhan", report.pvi * 100.0), if report.robustness_index > 0.7 { theme.accent_green } else { theme.accent_red });
+                self.metric_card(&mut cols[0], theme, "SIMULATION STATUS", status_text, &format!("DAF: {:.2}x • {} Steps", report.daf, report.steps_count), status_color);
+                self.metric_card(&mut cols[1], theme, "TOTAL COLLAPSED", &format!("{} Members", report.total_collapsed_ids.len()), &format!("Initial: {:?}", report.initial_disrupted_ids), if report.total_collapsed_ids.len() > report.initial_disrupted_ids.len() { theme.accent_red } else { theme.accent_blue });
+                self.metric_card(&mut cols[2], theme, "ROBUSTNESS INDEX (R_sys)", &format!("{:.3}", report.robustness_index), &format!("PVI: {:.2}% Collapse", report.pvi * 100.0), if report.robustness_index > 0.7 { theme.accent_green } else { theme.accent_red });
                 self.metric_card(&mut cols[3], theme, "MAX REDISTRIBUTED DCR", &format!("{:.1}%", report.max_redistributed_dcr * 100.0), &format!("Residual ARI: {:.3}", report.residual_ari), if report.max_redistributed_dcr > 1.0 { theme.accent_red } else { theme.accent_green });
             });
 
@@ -764,7 +764,7 @@ impl AnalyzeView {
 
             // Chronology timeline table
             theme.card_frame().show(ui, |ui| {
-                ui.label(RichText::new("KRONOLOGI PERAMBATAN KERUNTUHAN (DOMINO SEQUENCE CHRONOLOGY)").size(13.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("DOMINO SEQUENCE & COLLAPSE PROPAGATION CHRONOLOGY").size(13.0).strong().color(theme.text_primary));
                 ui.add_space(10.0);
 
                 for step in &report.chronology {
@@ -801,9 +801,9 @@ impl AnalyzeView {
             theme.card_frame().show(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(20.0);
-                    ui.label(RichText::new("Belum ada simulasi kolaps kaskade yang dijalankan.").size(13.0).color(theme.text_muted));
+                    ui.label(RichText::new("No cascading collapse simulation has been executed yet.").size(13.0).color(theme.text_muted));
                     ui.add_space(6.0);
-                    ui.label(RichText::new("Klik tombol '💥 Jalankan Simulasi' di atas untuk memulai kalkulasi domino nonlinier ASCE 7-22.").size(12.0).color(theme.text_secondary));
+                    ui.label(RichText::new("Click '💥 Run Simulation' above to initiate ASCE 7-22 nonlinear domino analysis.").size(12.0).color(theme.text_secondary));
                     ui.add_space(20.0);
                 });
             });
@@ -817,10 +817,10 @@ impl AnalyzeView {
 
         // Top Summary Cards
         ui.columns(4, |cols| {
-            self.metric_card(&mut cols[0], theme, "BASE SHEAR LELEH (Vy)", &format!("{:.1} kN", report.yield_base_shear_kn), &format!("Drift: {:.2} mm", report.yield_drift_mm), theme.accent_blue);
-            self.metric_card(&mut cols[1], theme, "KAPASITAS ULTIMATE (Vu)", &format!("{:.1} kN", report.ultimate_base_shear_kn), &format!("Drift: {:.2} mm", report.ultimate_drift_mm), theme.accent_green);
+            self.metric_card(&mut cols[0], theme, "YIELD BASE SHEAR (Vy)", &format!("{:.1} kN", report.yield_base_shear_kn), &format!("Drift: {:.2} mm", report.yield_drift_mm), theme.accent_blue);
+            self.metric_card(&mut cols[1], theme, "ULTIMATE CAPACITY (Vu)", &format!("{:.1} kN", report.ultimate_base_shear_kn), &format!("Drift: {:.2} mm", report.ultimate_drift_mm), theme.accent_green);
             self.metric_card(&mut cols[2], theme, "OVERSTRENGTH FACTOR (Ω0)", &format!("{:.2}x", report.overstrength_factor_omega0), "AISC 341 Seismic Resilient", theme.accent_orange);
-            self.metric_card(&mut cols[3], theme, "RASIO DUKTILITAS (µ)", &format!("{:.2}", report.ductility_ratio_mu), "Kategori Struktur Sangat Daktail", theme.accent_blue);
+            self.metric_card(&mut cols[3], theme, "DUCTILITY RATIO (µ)", &format!("{:.2}", report.ductility_ratio_mu), "Highly Ductile Structural Category", theme.accent_blue);
         });
 
         ui.add_space(16.0);
@@ -833,9 +833,9 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📉 Kurva Kapasitas Pushover Statik Non-Linear (P-Δ Bending & Axial Interaction)").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📉 Nonlinear Static Pushover Capacity Curve (P-Δ Bending & Axial Interaction)").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let status_tag = if report.is_stable { "✅ Stabil Tanpa Mekanisme Runtuh Dini" } else { "⚠️ Hinge Mekanisme Terdeteksi" };
+                        let status_tag = if report.is_stable { "✅ Stable Without Premature Mechanism" } else { "⚠️ Mechanism Hinge Detected" };
                         ui.label(RichText::new(status_tag).size(11.5).strong().color(if report.is_stable { theme.accent_green } else { theme.accent_orange }));
                     });
                 });
@@ -881,7 +881,7 @@ impl AnalyzeView {
                 ui.add_space(12.0);
 
                 // Step Progression
-                ui.label(RichText::new("Tahapan Inkrementasi Gaya Lateral & Riwayat Pembentukan Sendi Plastis (FEMA 356 / ASCE 41):").size(11.5).color(theme.text_secondary));
+                ui.label(RichText::new("Lateral Force Increment Stages & Plastic Hinge Formation History (FEMA 356 / ASCE 41):").size(11.5).color(theme.text_secondary));
                 ui.add_space(6.0);
 
                 for step in &report.steps {
@@ -890,9 +890,9 @@ impl AnalyzeView {
                         ui.add_space(12.0);
                         ui.label(RichText::new(format!("Base Shear: {:6.1} kN", step.base_shear_kn)).size(11.5).color(theme.text_secondary));
                         ui.add_space(12.0);
-                        ui.label(RichText::new(format!("Drift Atap: {:5.2} mm", step.roof_drift_mm)).size(11.5).color(theme.text_secondary));
+                        ui.label(RichText::new(format!("Roof Drift: {:5.2} mm", step.roof_drift_mm)).size(11.5).color(theme.text_secondary));
                         ui.add_space(12.0);
-                        ui.label(RichText::new(format!("Sendi Plastis: {} Titik", step.active_hinges_count)).size(11.5).color(theme.accent_blue));
+                        ui.label(RichText::new(format!("Plastic Hinges: {} Locations", step.active_hinges_count)).size(11.5).color(theme.accent_blue));
 
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             let badge_col = match step.state_summary {
@@ -918,9 +918,9 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🌊 Analisis Ragam Dinamik & Spektrum Gempa SNI 1726:2019 / ASCE 7-16").size(14.0).strong().color(theme.text_primary));
+                    ui.label(RichText::new("🌊 Dynamic Modal Analysis & Seismic Spectrum SNI 1726:2019 / ASCE 7-16").size(14.0).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Solusi Persamaan Eigen K*phi = omega^2*M*phi").size(11.0).color(theme.accent_blue));
+                        ui.label(RichText::new("Eigenvalue Solution: K*phi = omega^2*M*phi").size(11.0).color(theme.accent_blue));
                     });
                 });
 
@@ -930,12 +930,12 @@ impl AnalyzeView {
 
                 // Parameter Input Row (Site Class, Ss, S1, R, Ie)
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("Situs Tanah:").size(11.5).strong().color(theme.text_secondary));
+                    ui.label(RichText::new("Site Class:").size(11.5).strong().color(theme.text_secondary));
                     let classes = [
-                        (crate::core::SiteClass::SB, "SB (Batuan)"),
-                        (crate::core::SiteClass::SC, "SC (Padat)"),
-                        (crate::core::SiteClass::SD, "SD (Sedang/Standar)"),
-                        (crate::core::SiteClass::SE, "SE (Lunak)"),
+                        (crate::core::SiteClass::SB, "SB (Rock)"),
+                        (crate::core::SiteClass::SC, "SC (Dense/Soft Rock)"),
+                        (crate::core::SiteClass::SD, "SD (Stiff/Standard)"),
+                        (crate::core::SiteClass::SE, "SE (Soft Clay)"),
                     ];
                     for (sc, sc_lbl) in classes {
                         let is_sel = self.site_class == sc;
@@ -957,7 +957,7 @@ impl AnalyzeView {
                     ui.add(egui::DragValue::new(&mut self.r_val).speed(0.5).range(1.0..=10.0));
 
                     ui.add_space(12.0);
-                    if ui.add(egui::Button::new(RichText::new("⚡ Hitung Ragam & Gempa").size(11.5).strong().color(Color32::WHITE))
+                    if ui.add(egui::Button::new(RichText::new("⚡ Compute Modes & Seismic").size(11.5).strong().color(Color32::WHITE))
                         .fill(theme.accent_blue)
                         .corner_radius(CornerRadius::same(6))).clicked() {
                         let mut engine = crate::core::ParametricEngine::new();
@@ -982,11 +982,11 @@ impl AnalyzeView {
                 if let Some(ref report) = self.modal_report {
                     // Summary Stat Cards Row (4 Columns)
                     ui.columns(4, |cols| {
-                        self.render_stat_card(&mut cols[0], theme, "PERIODA FUNDAMENTAL (T1)", &format!("{:.4} s", report.fundamental_period_s), &format!("Frekuensi: {:.2} Hz", report.fundamental_frequency_hz), theme.accent_blue);
-                        self.render_stat_card(&mut cols[1], theme, "GAYA GESER SEISMIK (V_b)", &format!("{:.1} kN", report.seismic_base_shear_kn), &format!("Cs = {:.4} • W = {:.1} kN", report.spectrum.cs, report.total_weight_kn), theme.accent_green);
-                        self.render_stat_card(&mut cols[2], theme, "PERCEPATAN DESAIN (SDS)", &format!("{:.3} g", report.spectrum.sds), &format!("SD1: {:.3} g • Ts: {:.2} s", report.spectrum.sd1, report.spectrum.ts), theme.text_primary);
+                        self.render_stat_card(&mut cols[0], theme, "FUNDAMENTAL PERIOD (T1)", &format!("{:.4} s", report.fundamental_period_s), &format!("Frequency: {:.2} Hz", report.fundamental_frequency_hz), theme.accent_blue);
+                        self.render_stat_card(&mut cols[1], theme, "SEISMIC BASE SHEAR (V_b)", &format!("{:.1} kN", report.seismic_base_shear_kn), &format!("Cs = {:.4} • W = {:.1} kN", report.spectrum.cs, report.total_weight_kn), theme.accent_green);
+                        self.render_stat_card(&mut cols[2], theme, "DESIGN SPECTRAL ACCEL (SDS)", &format!("{:.3} g", report.spectrum.sds), &format!("SD1: {:.3} g • Ts: {:.2} s", report.spectrum.sd1, report.spectrum.ts), theme.text_primary);
                         let badge_col = if report.is_90_percent_satisfied { theme.accent_green } else { theme.accent_orange };
-                        self.render_stat_card(&mut cols[3], theme, "PARTISIPASI MASSA RAGAM", &format!("{:.1}%", report.cumulative_mass_ratio_x.max(report.cumulative_mass_ratio_y)), "Standar SNI: Min. 90%", badge_col);
+                        self.render_stat_card(&mut cols[3], theme, "MODAL MASS PARTICIPATION", &format!("{:.1}%", report.cumulative_mass_ratio_x.max(report.cumulative_mass_ratio_y)), "Code Standard: Min. 90%", badge_col);
                     });
 
                     ui.add_space(14.0);
@@ -1029,21 +1029,21 @@ impl AnalyzeView {
                     ui.add_space(16.0);
 
                     // Mode Shapes Table
-                    ui.label(RichText::new("📋 Tabel Karakteristik Ragam Getar Alami (Natural Vibration Modes):").size(12.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📋 Natural Vibration Modes Characteristics Table:").size(12.5).strong().color(theme.text_primary));
                     ui.add_space(6.0);
 
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Ragam").size(11.0).strong().color(theme.text_secondary));
+                        ui.label(RichText::new("Mode").size(11.0).strong().color(theme.text_secondary));
                         ui.add_space(30.0);
-                        ui.label(RichText::new("Frekuensi Sudut (ω)").size(11.0).strong().color(theme.text_secondary));
+                        ui.label(RichText::new("Angular Frequency (ω)").size(11.0).strong().color(theme.text_secondary));
                         ui.add_space(40.0);
-                        ui.label(RichText::new("Frekuensi (f)").size(11.0).strong().color(theme.text_secondary));
+                        ui.label(RichText::new("Frequency (f)").size(11.0).strong().color(theme.text_secondary));
                         ui.add_space(40.0);
-                        ui.label(RichText::new("Perioda (T)").size(11.0).strong().color(theme.text_secondary));
+                        ui.label(RichText::new("Period (T)").size(11.0).strong().color(theme.text_secondary));
                         ui.add_space(40.0);
-                        ui.label(RichText::new("Partisipasi X (%)").size(11.0).strong().color(theme.text_secondary));
+                        ui.label(RichText::new("Participation X (%)").size(11.0).strong().color(theme.text_secondary));
                         ui.add_space(40.0);
-                        ui.label(RichText::new("Partisipasi Y (%)").size(11.0).strong().color(theme.text_secondary));
+                        ui.label(RichText::new("Participation Y (%)").size(11.0).strong().color(theme.text_secondary));
                     });
                     ui.separator();
 
@@ -1101,25 +1101,25 @@ impl AnalyzeView {
             self.metric_card(
                 &mut cols[0],
                 theme,
-                "BATAS AKSIAL MAKS (φPn,max)",
+                "MAX AXIAL LIMIT (φPn,max)",
                 &format!("{:.0} kN", pm_report.cardinal.phi_pn_max_kn),
-                "SNI 2847:2019 Pasal 22.4.2 (Tied)",
+                "SNI 2847:2019 Section 22.4.2 (Tied)",
                 theme.accent_blue,
             );
             self.metric_card(
                 &mut cols[1],
                 theme,
-                "TITIK BALANCED (φPb, φMb)",
+                "BALANCED POINT (φPb, φMb)",
                 &format!("{:.0} kN, {:.0} kNm", pm_report.cardinal.balanced.phi_pn_kn, pm_report.cardinal.balanced.phi_mn_knm),
-                "Kelelehan Tarik Simultan (εt = εy)",
+                "Simultaneous Tensile Yield (εt = εy)",
                 theme.accent_orange,
             );
             self.metric_card(
                 &mut cols[2],
                 theme,
-                "RASIO TULANGAN (ρ)",
+                "REBAR RATIO (ρ)",
                 &format!("{:.2}%", pm_report.rebar_ratio_pct),
-                &format!("{} Batang D{:.0} (Ast = {:.0} mm²)", total_bars, self.concrete_bar_dia_mm, pm_report.ast_mm2),
+                &format!("{} Bars D{:.0} (Ast = {:.0} mm²)", total_bars, self.concrete_bar_dia_mm, pm_report.ast_mm2),
                 if pm_report.rebar_ratio_pct >= 1.0 && pm_report.rebar_ratio_pct <= 4.0 { theme.accent_green } else { Color32::from_rgb(245, 158, 11) },
             );
             self.metric_card(
@@ -1127,7 +1127,7 @@ impl AnalyzeView {
                 theme,
                 "DEMAND AUDIT (DCR)",
                 &format!("{:.3}", dcr),
-                if is_safe { "🟢 AMAN (Kapasitas Mencukupi)" } else { "🔴 OVERSTRESSED (Melebihi Kapasitas)" },
+                if is_safe { "🟢 SAFE (Adequate Capacity)" } else { "🔴 OVERSTRESSED (Capacity Exceeded)" },
                 if is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) },
             );
         });
@@ -1137,10 +1137,10 @@ impl AnalyzeView {
         // 3. Section Preset Buttons & Parameter Controls
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("🏛️ Preset Penampang Standar SNI 2847:").size(12.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("🏛️ Standard Section Presets (SNI 2847 / ACI 318):").size(12.5).strong().color(theme.text_primary));
                 ui.add_space(8.0);
 
-                if ui.button(RichText::new("Kolom Gedung 400x400 (8 D22, fc' 30)").size(11.0)).clicked() {
+                if ui.button(RichText::new("Building Column 400x400 (8 D22, fc' 30)").size(11.0)).clicked() {
                     self.concrete_col_width_mm = 400.0;
                     self.concrete_col_height_mm = 400.0;
                     self.concrete_fc_mpa = 30.0;
@@ -1149,7 +1149,7 @@ impl AnalyzeView {
                     self.concrete_bars_intermediate_y = 1;
                     self.concrete_bar_dia_mm = 22.0;
                 }
-                if ui.button(RichText::new("Kolom Interior 600x600 (12 D25, fc' 35)").size(11.0)).clicked() {
+                if ui.button(RichText::new("Interior Column 600x600 (12 D25, fc' 35)").size(11.0)).clicked() {
                     self.concrete_col_width_mm = 600.0;
                     self.concrete_col_height_mm = 600.0;
                     self.concrete_fc_mpa = 35.0;
@@ -1158,7 +1158,7 @@ impl AnalyzeView {
                     self.concrete_bars_intermediate_y = 2;
                     self.concrete_bar_dia_mm = 25.0;
                 }
-                if ui.button(RichText::new("Kolom Menara 800x800 (16 D32, fc' 40)").size(11.0)).clicked() {
+                if ui.button(RichText::new("Tower Column 800x800 (16 D32, fc' 40)").size(11.0)).clicked() {
                     self.concrete_col_width_mm = 800.0;
                     self.concrete_col_height_mm = 800.0;
                     self.concrete_fc_mpa = 40.0;
@@ -1167,7 +1167,7 @@ impl AnalyzeView {
                     self.concrete_bars_intermediate_y = 3;
                     self.concrete_bar_dia_mm = 32.0;
                 }
-                if ui.button(RichText::new("Kolom Pipih 250x600 (10 D19, fc' 25)").size(11.0)).clicked() {
+                if ui.button(RichText::new("Blade Column 250x600 (10 D19, fc' 25)").size(11.0)).clicked() {
                     self.concrete_col_width_mm = 250.0;
                     self.concrete_col_height_mm = 600.0;
                     self.concrete_fc_mpa = 25.0;
@@ -1185,25 +1185,25 @@ impl AnalyzeView {
             // Parameter Sliders
             ui.columns(3, |cols| {
                 cols[0].vertical(|ui| {
-                    ui.label(RichText::new("📐 Dimensi & Selimut Beton:").size(11.5).strong().color(theme.text_secondary));
+                    ui.label(RichText::new("📐 Dimensions & Concrete Cover:").size(11.5).strong().color(theme.text_secondary));
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Lebar b:").size(11.0));
+                        ui.label(RichText::new("Width b:").size(11.0));
                         ui.add(egui::Slider::new(&mut self.concrete_col_width_mm, 200.0..=1200.0).suffix(" mm").step_by(50.0));
                     });
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Tinggi h:").size(11.0));
+                        ui.label(RichText::new("Height h:").size(11.0));
                         ui.add(egui::Slider::new(&mut self.concrete_col_height_mm, 200.0..=1200.0).suffix(" mm").step_by(50.0));
                     });
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Selimut:").size(11.0));
+                        ui.label(RichText::new("Cover:").size(11.0));
                         ui.add(egui::Slider::new(&mut self.concrete_cover_mm, 25.0..=75.0).suffix(" mm").step_by(5.0));
                     });
                 });
 
                 cols[1].vertical(|ui| {
-                    ui.label(RichText::new("🔩 Mutu Material (SNI 2847):").size(11.5).strong().color(theme.text_secondary));
+                    ui.label(RichText::new("🔩 Material Grades (SNI / ACI):").size(11.5).strong().color(theme.text_secondary));
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Mutu Beton f'c:").size(11.0));
+                        ui.label(RichText::new("Concrete Grade f'c:").size(11.0));
                         egui::ComboBox::from_id_salt("fc_select")
                             .selected_text(format!("{:.0} MPa", self.concrete_fc_mpa))
                             .show_ui(ui, |ui| {
@@ -1213,18 +1213,18 @@ impl AnalyzeView {
                             });
                     });
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Mutu Baja fy:").size(11.0));
+                        ui.label(RichText::new("Steel Grade fy:").size(11.0));
                         egui::ComboBox::from_id_salt("fy_select")
                             .selected_text(format!("BJTS {:.0}", self.concrete_fy_mpa))
                             .show_ui(ui, |ui| {
                                 for &fy in &[280.0, 420.0, 520.0] {
-                                    let label = if fy > 400.0 { format!("BJTS {:.0} (Ulir)", fy) } else { format!("BJTP {:.0} (Polos)", fy) };
+                                    let label = if fy > 400.0 { format!("Grade {:.0} (Deformed)", fy) } else { format!("Grade {:.0} (Plain)", fy) };
                                     ui.selectable_value(&mut self.concrete_fy_mpa, fy, label);
                                 }
                             });
                     });
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Diameter Tulangan:").size(11.0));
+                        ui.label(RichText::new("Rebar Diameter:").size(11.0));
                         egui::ComboBox::from_id_salt("dia_select")
                             .selected_text(format!("D{:.0}", self.concrete_bar_dia_mm))
                             .show_ui(ui, |ui| {
@@ -1236,17 +1236,17 @@ impl AnalyzeView {
                 });
 
                 cols[2].vertical(|ui| {
-                    ui.label(RichText::new("⚡ Beban Rencana Terfaktor (Factored Demand):").size(11.5).strong().color(theme.text_secondary));
+                    ui.label(RichText::new("⚡ Factored Design Demand:").size(11.5).strong().color(theme.text_secondary));
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Beban Aksial Pu:").size(11.0));
+                        ui.label(RichText::new("Axial Load Pu:").size(11.0));
                         ui.add(egui::Slider::new(&mut self.concrete_demand_pu_kn, -500.0..=5000.0).suffix(" kN").step_by(50.0));
                     });
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Momen Lentur Mu:").size(11.0));
+                        ui.label(RichText::new("Bending Moment Mu:").size(11.0));
                         ui.add(egui::Slider::new(&mut self.concrete_demand_mu_knm, 0.0..=800.0).suffix(" kNm").step_by(10.0));
                     });
                     ui.horizontal(|ui| {
-                        let status_label = if is_safe { "🟢 AMAN (Kapasitas Cukup)" } else { "🔴 TIDAK AMAN" };
+                        let status_label = if is_safe { "🟢 SAFE (Adequate Capacity)" } else { "🔴 UNSAFE" };
                         let status_col = if is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
                         ui.label(RichText::new(format!("DCR: {:.3} • {}", dcr, status_label)).size(11.0).strong().color(status_col));
                     });
@@ -1259,9 +1259,9 @@ impl AnalyzeView {
         // 4. Interactive Dual Canvas: P-M Diagram (Left) + Rebar Section View (Right)
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📊 Diagram Interaksi P-M & Visualisasi Penampang Kolom").size(13.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("📊 P-M Interaction Diagram & Column Section Visualizer").size(13.5).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new(format!("Standar: SNI 2847:2019 / ACI 318-19 • β₁ = {:.3}", pm_report.beta1)).size(11.0).color(theme.accent_blue));
+                    ui.label(RichText::new(format!("Standard: SNI 2847:2019 / ACI 318-19 • β₁ = {:.3}", pm_report.beta1)).size(11.0).color(theme.accent_blue));
                 });
             });
             ui.add_space(10.0);
@@ -1312,14 +1312,14 @@ impl AnalyzeView {
                 ui.painter().text(
                     egui::Pos2::new(pm_rect.min.x + margin_left + 10.0, pm_rect.min.y + 16.0),
                     egui::Align2::LEFT_TOP,
-                    "P (kN) [Aksial]",
+                    "P (kN) [Axial]",
                     egui::FontId::proportional(11.0),
                     theme.text_secondary,
                 );
                 ui.painter().text(
                     egui::Pos2::new(pm_rect.max.x - 20.0, zero_pt.y + 14.0),
                     egui::Align2::RIGHT_TOP,
-                    "M (kNm) [Lentur]",
+                    "M (kNm) [Flexure]",
                     egui::FontId::proportional(11.0),
                     theme.text_secondary,
                 );
@@ -1398,7 +1398,7 @@ impl AnalyzeView {
                 ui.painter().text(egui::Pos2::new(leg_x + 28.0, leg_y), egui::Align2::LEFT_CENTER, "Nominal Pn-Mn", egui::FontId::proportional(10.0), theme.text_muted);
 
                 ui.painter().line_segment([egui::Pos2::new(leg_x, leg_y + 16.0), egui::Pos2::new(leg_x + 22.0, leg_y + 16.0)], Stroke::new(2.5, theme.accent_green));
-                ui.painter().text(egui::Pos2::new(leg_x + 28.0, leg_y + 16.0), egui::Align2::LEFT_CENTER, "Desain Rencana φPn-φMn", egui::FontId::proportional(10.0), theme.accent_green);
+                ui.painter().text(egui::Pos2::new(leg_x + 28.0, leg_y + 16.0), egui::Align2::LEFT_CENTER, "Design Factored φPn-φMn", egui::FontId::proportional(10.0), theme.accent_green);
 
                 ui.add_space(16.0);
 
@@ -1470,7 +1470,7 @@ impl AnalyzeView {
                 ui.painter().text(
                     egui::Pos2::new(sec_rect.center().x, sec_rect.min.y + 12.0),
                     egui::Align2::CENTER_TOP,
-                    format!("Penampang: {} D{:.0} • Selimut: {:.0}mm", total_bars, self.concrete_bar_dia_mm, self.concrete_cover_mm),
+                    format!("Section: {} D{:.0} • Cover: {:.0}mm", total_bars, self.concrete_bar_dia_mm, self.concrete_cover_mm),
                     egui::FontId::proportional(10.5),
                     theme.accent_blue,
                 );
@@ -1481,27 +1481,27 @@ impl AnalyzeView {
 
         // 5. Technical Cardinal Values Verification Table per SNI 2847:2019
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("📋 Tabel Verifikasi Titik Kardinal Kapasitas Kolom (SNI 2847:2019):").size(12.5).strong().color(theme.text_primary));
+            ui.label(RichText::new("📋 Column Capacity Cardinal Points Verification Table (SNI 2847 / ACI 318):").size(12.5).strong().color(theme.text_primary));
             ui.add_space(8.0);
 
             let cardinals: [(&str, String, String, String, String); 5] = [
-                ("1. Tekan Murni (Pure Compression P0)", format!("{:.1} kN", pm_report.cardinal.p0_kn), "-".to_string(), "0.65".to_string(), "Batas Mutlak P0 = 0.85 f'c (Ag - Ast) + fy Ast".to_string()),
-                ("2. Batas Aksial Rencana (φPn,max)", format!("{:.1} kN", pm_report.cardinal.pn_max_kn), "-".to_string(), "0.65".to_string(), "φPn,max = 0.65 × 0.80 P0 (Pasal 22.4.2.1)".to_string()),
-                ("3. Titik Seimbang (Balanced Point)", format!("{:.1} kN", pm_report.cardinal.balanced.pn_kn), format!("{:.1} kNm", pm_report.cardinal.balanced.mn_knm), format!("{:.3}", pm_report.cardinal.balanced.phi), format!("εt = {:.4} = εy (Leleh simultan)", pm_report.cardinal.balanced.eps_t)),
-                ("4. Lentur Murni (Pure Flexure Pn = 0)", "0.0 kN".to_string(), format!("{:.1} kNm", pm_report.cardinal.pure_flexure.mn_knm), format!("{:.2}", pm_report.cardinal.pure_flexure.phi), format!("φM0 = {:.1} kNm (Tension-controlled)", pm_report.cardinal.pure_flexure.phi_mn_knm)),
-                ("5. Tarik Murni (Pure Tension Pnt)", format!("{:.1} kN", pm_report.cardinal.pnt_kn), "0.0 kNm".to_string(), "0.90".to_string(), format!("φPnt = 0.90 × (-fy Ast) = {:.1} kN", pm_report.cardinal.phi_pnt_kn)),
+                ("1. Pure Compression (P0)", format!("{:.1} kN", pm_report.cardinal.p0_kn), "-".to_string(), "0.65".to_string(), "Absolute Limit P0 = 0.85 f'c (Ag - Ast) + fy Ast".to_string()),
+                ("2. Factored Axial Limit (φPn,max)", format!("{:.1} kN", pm_report.cardinal.pn_max_kn), "-".to_string(), "0.65".to_string(), "φPn,max = 0.65 × 0.80 P0 (Section 22.4.2.1)".to_string()),
+                ("3. Balanced Point", format!("{:.1} kN", pm_report.cardinal.balanced.pn_kn), format!("{:.1} kNm", pm_report.cardinal.balanced.mn_knm), format!("{:.3}", pm_report.cardinal.balanced.phi), format!("εt = {:.4} = εy (Simultaneous yield)", pm_report.cardinal.balanced.eps_t)),
+                ("4. Pure Flexure (Pn = 0)", "0.0 kN".to_string(), format!("{:.1} kNm", pm_report.cardinal.pure_flexure.mn_knm), format!("{:.2}", pm_report.cardinal.pure_flexure.phi), format!("φM0 = {:.1} kNm (Tension-controlled)", pm_report.cardinal.pure_flexure.phi_mn_knm)),
+                ("5. Pure Tension (Pnt)", format!("{:.1} kN", pm_report.cardinal.pnt_kn), "0.0 kNm".to_string(), "0.90".to_string(), format!("φPnt = 0.90 × (-fy Ast) = {:.1} kN", pm_report.cardinal.phi_pnt_kn)),
             ];
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Kondisi Batas Kardinal").size(11.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new("Cardinal Limit State").size(11.0).strong().color(theme.text_secondary));
                 ui.add_space(140.0);
-                ui.label(RichText::new("Aksial Pn").size(11.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new("Axial Pn").size(11.0).strong().color(theme.text_secondary));
                 ui.add_space(45.0);
-                ui.label(RichText::new("Momen Mn").size(11.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new("Moment Mn").size(11.0).strong().color(theme.text_secondary));
                 ui.add_space(45.0);
-                ui.label(RichText::new("Faktor φ").size(11.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new("Factor φ").size(11.0).strong().color(theme.text_secondary));
                 ui.add_space(35.0);
-                ui.label(RichText::new("Catatan SNI 2847 / Keterangan Teknis").size(11.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new("SNI / ACI Code Notes & Technical Details").size(11.0).strong().color(theme.text_secondary));
             });
             ui.separator();
 

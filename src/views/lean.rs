@@ -162,21 +162,21 @@ impl LeanView {
                 theme,
                 "MATERIAL YIELD EFFICIENCY",
                 &format!("{:.1}%", report.material_yield_pct),
-                &format!("Limbah Scrap: {:.1}% ({:.2}m)", report.scrap_waste_pct, report.net_scrap_waste_m),
+                &format!("Scrap Waste: {:.1}% ({:.2}m)", report.scrap_waste_pct, report.net_scrap_waste_m),
                 yield_color,
             );
             self.render_stat_card(
                 &mut cols[1],
                 theme,
-                "ESTIMASI PENGHEMATAN BIAYA",
-                &format!("Rp {}", format_idr(report.cost_savings_idr)),
-                &format!("Limbah Terhindar: {:.1} kg Baja", (report.cost_savings_idr / self.steel_price_idr_per_kg as f64).max(0.0)),
+                "ESTIMATED COST SAVINGS",
+                &format!("${}", format_idr(report.cost_savings_idr)),
+                &format!("Avoided Scrap: {:.1} kg Steel", (report.cost_savings_idr / self.steel_price_idr_per_kg as f64).max(0.0)),
                 theme.accent_blue,
             );
             self.render_stat_card(
                 &mut cols[2],
                 theme,
-                "PANJANG BATANG MASTER",
+                "MASTER BAR STOCK LENGTH",
                 &format!("{:.2} m", report.stock_length_m),
                 &format!("Kerf: {:.1} mm • Min Offcut: {:.1} m", report.kerf_mm, report.min_reusable_m),
                 theme.text_primary,
@@ -184,9 +184,9 @@ impl LeanView {
             self.render_stat_card(
                 &mut cols[3],
                 theme,
-                "TOTAL BATANG MASTER DIBUTUHKAN",
-                &format!("{} Batang", report.master_bars_used),
-                &format!("Untuk Memotong {} Elemen Struktur", report.total_pieces_demanded),
+                "TOTAL MASTER BARS REQUIRED",
+                &format!("{} Bars", report.master_bars_used),
+                &format!("To Cut {} Structural Elements", report.total_pieces_demanded),
                 theme.text_primary,
             );
         });
@@ -201,11 +201,11 @@ impl LeanView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("⚙️ Parameter Optimasi Pemotongan").size(13.0).strong().color(theme.text_primary));
+                    ui.label(RichText::new("⚙️ Cutting Optimization Parameters").size(13.0).strong().color(theme.text_primary));
                     ui.add_space(20.0);
 
                     // Profile selector
-                    ui.label(RichText::new("Filter Profil:").size(11.5).color(theme.text_secondary));
+                    ui.label(RichText::new("Profile Filter:").size(11.5).color(theme.text_secondary));
                     egui::ComboBox::from_id_salt("cso_profile_filter")
                         .selected_text(RichText::new(&self.selected_profile).size(11.5))
                         .width(180.0)
@@ -216,7 +216,7 @@ impl LeanView {
                         });
 
                     ui.add_space(16.0);
-                    ui.label(RichText::new("Panjang Batang Stock:").size(11.5).color(theme.text_secondary));
+                    ui.label(RichText::new("Stock Bar Length:").size(11.5).color(theme.text_secondary));
                     ui.add(egui::Slider::new(&mut self.standard_bar_length_m, 6.0..=14.0).suffix(" m").step_by(0.5));
 
                     ui.add_space(12.0);
@@ -239,9 +239,9 @@ impl LeanView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("✂️ Pola Pemotongan Batang Baja Teroptimasi (Dynamic BFD)").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("✂️ Optimized Steel Bar Cutting Patterns (Dynamic BFD)").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new(format!("Algoritma: Best-Fit Decreasing • Total Potongan: {} pcs", report.total_pieces_demanded))
+                        ui.label(RichText::new(format!("Algorithm: Best-Fit Decreasing • Total Cut Pieces: {} pcs", report.total_pieces_demanded))
                             .size(11.0).color(theme.accent_blue));
                     });
                 });
@@ -263,11 +263,11 @@ impl LeanView {
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
                             let status_badge = if bar.remainder_m < 0.05 {
-                                "⭐ 100% Efisiensi (0 Waste)"
+                                "⭐ 100% Efficiency (Zero Waste)"
                             } else if bar.is_reusable_offcut {
-                                "♻️ Sisa Reusable (Dapat Dipakai Pengaku)"
+                                "♻️ Reusable Offcut (Gusset/Stiffener Ready)"
                             } else {
-                                "🟡 Scrap Limbah"
+                                "🟡 Net Scrap Waste"
                             };
 
                             let badge_color = if bar.remainder_m < 0.05 {
@@ -279,7 +279,7 @@ impl LeanView {
                             };
 
                             ui.label(RichText::new(format!(
-                                "Batang Master #{:02} • {} ({:.2}m)",
+                                "Master Bar #{:02} • {} ({:.2}m)",
                                 bar.bar_index, bar.profile, bar.stock_length_m
                             )).size(12.5).strong().color(theme.text_primary));
 
@@ -353,11 +353,11 @@ impl LeanView {
 
                         ui.add_space(4.0);
                         let sub_info = if bar.is_reusable_offcut {
-                            format!("Sisa: {:.2}m (Memenuhi syarat offcut reusable ≥ {:.1}m untuk pengaku/pelat)", bar.remainder_m, report.min_reusable_m)
+                            format!("Remainder: {:.2}m (Meets reusable threshold ≥ {:.1}m for stiffeners/plates)", bar.remainder_m, report.min_reusable_m)
                         } else if bar.remainder_m > 0.01 {
-                            format!("Sisa Keratan / Scrap: {:.2}m (Kehilangan kerf: {:.1}mm)", bar.remainder_m, bar.kerf_loss_m * 1e3)
+                            format!("Net Scrap Offcut: {:.2}m (Kerf loss: {:.1}mm)", bar.remainder_m, bar.kerf_loss_m * 1e3)
                         } else {
-                            "Batang terpakai sempurna tanpa sisa limbah".to_string()
+                            "Fully utilized with zero waste".to_string()
                         };
                         ui.label(RichText::new(sub_info).size(10.5).color(theme.text_muted));
                         ui.add_space(8.0);
@@ -369,29 +369,29 @@ impl LeanView {
 
                 // 6. Real Action Export Buttons
                 ui.horizontal(|ui| {
-                    if ui.add(egui::Button::new(RichText::new("📥 Ekspor Bar Bending Schedule (BBS) .CSV").size(12.0).strong().color(Color32::WHITE))
+                    if ui.add(egui::Button::new(RichText::new("📥 Export Bar Bending Schedule (BBS) .CSV").size(12.0).strong().color(Color32::WHITE))
                         .fill(theme.accent_blue)
                         .corner_radius(CornerRadius::same(6))).clicked() {
                         let bbs = CuttingStockOptimizer::generate_sample_bbs(members.len());
                         let csv = CuttingStockOptimizer::export_bbs_csv(&bbs);
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("Bar_Bending_Schedule_SNI2847.csv", &csv) {
-                            self.export_status = Some(format!("BBS diekspor ke: {}", path));
+                            self.export_status = Some(format!("BBS exported to: {}", path));
                         }
                     }
 
                     ui.add_space(8.0);
 
-                    if ui.add(egui::Button::new(RichText::new("📄 Ekspor Rencana Pemotongan (Cutting Plan) .CSV").size(12.0).strong().color(Color32::WHITE))
+                    if ui.add(egui::Button::new(RichText::new("📄 Export Cutting Plan .CSV").size(12.0).strong().color(Color32::WHITE))
                         .fill(Color32::from_rgb(16, 185, 129))
                         .corner_radius(CornerRadius::same(6))).clicked() {
                         let csv = CuttingStockOptimizer::export_cutting_plan_csv(&report);
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("Cutting_Plan_Optimized.csv", &csv) {
-                            self.export_status = Some(format!("Cutting plan diekspor ke: {}", path));
+                            self.export_status = Some(format!("Cutting plan exported to: {}", path));
                         }
                     }
 
                     ui.add_space(12.0);
-                    ui.label(RichText::new("Format standar interoperabel dengan software CAM Voortman, Tekla FabTrol, & CNC Bar Benders.")
+                    ui.label(RichText::new("Standard format interoperable with Voortman CAM, Tekla FabTrol, and CNC Bar Benders.")
                         .size(11.0).color(theme.text_secondary));
                 });
             });
@@ -405,19 +405,19 @@ impl LeanView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📋 Last Planner System (LPS) & Keandalan Komitmen Mingguan").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📋 Last Planner System (LPS) & Weekly Commitment Reliability").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("PPC Minggu Ini: 88.5% (Target > 80%)").size(12.0).strong().color(theme.accent_green));
+                        ui.label(RichText::new("Current PPC: 88.5% (Target > 80%)").size(12.0).strong().color(theme.accent_green));
                     });
                 });
                 ui.add_space(12.0);
 
                 let lookahead = [
-                    ("W-01: Fabrikasi & Perakitan Modul Warren Truss 1-2 di Workshop", "Bebas Hambatan (Sound)", "✅ Selesai Tepat Waktu (100%)", theme.accent_green),
-                    ("W-02: Pengiriman Gelombang 1 & Pengecoran Abutment Jembatan", "Bebas Hambatan (Sound)", "✅ Selesai Tepat Waktu (100%)", theme.accent_green),
-                    ("W-03: Erection Crane 50T & Pemasangan Segmental Bentang 12m", "Bebas Hambatan (Sound)", "✅ Selesai Tepat Waktu (100%)", theme.accent_green),
-                    ("W-04: Penyambungan Baut HTB A325 & Verifikasi Torsi Pelat Buhul", "Hambatan: Kalibrasi Torque Wrench", "🟡 Selesai Parsial (85%)", theme.accent_blue),
-                    ("W-05: Pengecatan Touch-Up C5-High & Uji Beban Statis", "Menunggu Izin Lalu Lintas Sungai", "⏳ Dalam Proses (Lookahead)", theme.text_muted),
+                    ("W-01: Fabrication & Pre-assembly of Warren Truss Modules 1-2", "Sound (Constraint-Free)", "✅ Completed on Time (100%)", theme.accent_green),
+                    ("W-02: Wave 1 Delivery & Bridge Abutment Concrete Pouring", "Sound (Constraint-Free)", "✅ Completed on Time (100%)", theme.accent_green),
+                    ("W-03: 50T Crane Erection & 12m Segmental Truss Hoisting", "Sound (Constraint-Free)", "✅ Completed on Time (100%)", theme.accent_green),
+                    ("W-04: HTB A325 Bolting & Gusset Torque Calibration", "Constraint: Torque Wrench Calibration", "🟡 Partially Complete (85%)", theme.accent_blue),
+                    ("W-05: C5-High Coating Touch-Up & Static Proof Load Testing", "Awaiting River Navigation Clearance", "⏳ In Progress (Lookahead)", theme.text_muted),
                 ];
 
                 for (act, sound, status, col) in lookahead {
@@ -442,17 +442,17 @@ impl LeanView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("🌊 Value Stream Mapping: Mengeliminasi 7 Pemborosan Konstruksi").size(13.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("🌊 Value Stream Mapping: Eliminating 7 Construction Wastes").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(10.0);
 
                 let wastes = [
-                    ("1. Overproduction", "Hanya pabrikasi modul sesuai urutan erection BIM 4D", "Eliminasi penumpukan stok di lapangan (-100%)"),
-                    ("2. Waiting Time", "Crane disewa tepat saat modul tiba (Just-In-Time)", "Biaya sewa crane turun 35%"),
-                    ("3. Transportation", "Rute pengiriman langsung dari workshop Karawang ke tapak", "Reduksi jarak tempuh dan emisi solar"),
-                    ("4. Overprocessing", "Sambungan modular baut HTB standar tanpa pengelasan lapangan berlebih", "Kualitas sambungan terjamin kontrol pabrik"),
-                    ("5. Inventory", "Buffer material dibatasi maksimal 2 hari kerja", "Ruang tapak bebas untuk manuver alat berat"),
-                    ("6. Motion", "Tata letak material diatur dalam radius putar boom crane", "Waktu siklus pengangkatan berkurang 25%"),
-                    ("7. Defects / Rework", "Simulasi SVD Kinematic Guard mencegah perakitan elemen yang labil", "Zero keruntuhan atau bongkar pasang ulang"),
+                    ("1. Overproduction", "Fabricate modules strictly aligned with 4D BIM erection sequence", "Eliminates onsite laydown congestion (-100%)"),
+                    ("2. Waiting Time", "Crane mobilized Just-In-Time with modular arrivals", "Crane rental cost reduced 35%"),
+                    ("3. Transportation", "Direct transport routes from fabrication yard to site", "Reduces haul distance and diesel emissions"),
+                    ("4. Overprocessing", "Standardized HTB bolted splices without field welding", "Factory-controlled joint quality verified"),
+                    ("5. Inventory", "Laydown buffer restricted to maximum 2 days work", "Clear jobsite footprint for equipment staging"),
+                    ("6. Motion", "Laydown organized within crane boom slewing radius", "Pick-and-place cycle duration reduced 25%"),
+                    ("7. Defects / Rework", "SVD Kinematic Guard simulation prevents erection instabilities", "Zero mechanism collapse or rework disassembly"),
                 ];
 
                 for (name, action, result) in wastes {
@@ -472,13 +472,13 @@ impl LeanView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("🚚 Penjadwalan Just-In-Time (JIT) Delivery Buffer").size(13.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("🚚 Just-In-Time (JIT) Delivery Buffer Scheduling").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(10.0);
 
                 ui.columns(3, |cols| {
-                    self.render_stat_card(&mut cols[0], theme, "BUFFER STAPEL DI TAPAK", "Maks 2 Hari", "Cegah Kongesti Area Kerja Lapangan", theme.accent_green);
-                    self.render_stat_card(&mut cols[1], theme, "DIRECT RIGGING FROM TRUCK", "70% Komponen", "Diangkat Langsung dari Trailer ke Posisi", theme.accent_blue);
-                    self.render_stat_card(&mut cols[2], theme, "DOUBLE HANDLING REDUCTION", "-80%", "Mengurangi Risiko Benturan Komponen", theme.text_primary);
+                    self.render_stat_card(&mut cols[0], theme, "MAX ONSITE STAGING BUFFER", "Max 2 Days", "Prevents Jobsite Congestion", theme.accent_green);
+                    self.render_stat_card(&mut cols[1], theme, "DIRECT RIGGING FROM TRUCK", "70% Components", "Rigged Directly from Trailer Bed to Position", theme.accent_blue);
+                    self.render_stat_card(&mut cols[2], theme, "DOUBLE HANDLING REDUCTION", "-80%", "Mitigates Structural Impact Risks", theme.text_primary);
                 });
             });
     }

@@ -1,16 +1,16 @@
 # EigenGraph Agent Guidelines & Architectural Rules
 
-## 🔒 ATURAN UTAMA: SIDEBAR TERKUNCI & WORKSPACE BEBAS MODEL SLIDE VERTIKAL
+## 🔒 CORE RULE: LOCKED SIDEBAR & SLIDE-MODEL WORKSPACE FREEDOM
 
-### 1. 🛡️ Layout Sidebar Terkunci Mutlak (Hingga Ada Perintah Eksplisit):
-Layout Sidebar Kiri (`src/app.rs`) dan macOS Window Chrome **DIKUNCI PENUH DAN TIDAK BOLEH DIUBAH SAMA SEKALI** sampai pengguna secara eksplisit memberikan perintah tertulis (misal: `UBAH_SIDEBAR:` atau `UBAH_UI:`).
+### 1. 🛡️ Absolute Locked Sidebar Layout (Until Explicit Instructions):
+The Left Sidebar Layout (`src/app.rs`) and macOS Window Chrome are **STRICTLY LOCKED AND MUST NOT BE MODIFIED** unless the user explicitly provides written instructions (e.g., `CHANGE_SIDEBAR:` or `CHANGE_UI:`).
 
-**Aturan Wajib Sidebar (macOS App Store Style):**
-- **Full-Height Geometry**: Sidebar membentang tanpa jeda dari ujung atas (`y = 0`) ke ujung bawah layar.
-- **Window Controls di Dalam Sidebar**: Lampu lalu lintas macOS (`🔴  🟡  🟢`) berada di pojok atas sidebar.
-- **Pill Search Bar (Tanpa Logo)**: Kolom `🔍 Search` berada langsung di bawah traffic lights tanpa logo merk/header.
-- **Dilarang Menambahkan Divider Header / Badge**: Tidak boleh ada section header seperti `LIBRARY`, `1D..10D`, atau pill badge.
-- **Daftar Baku 13 Navigation Pillars**:
+**Mandatory Sidebar Rules (macOS App Store Style):**
+- **Full-Height Geometry**: Sidebar extends continuously from top (`y = 0`) to bottom of the screen.
+- **Window Controls Inside Sidebar**: macOS traffic lights (`🔴  🟡  🟢`) sit in the top corner of the sidebar.
+- **Pill Search Bar (No Logo)**: Search pill (`🔍 Search`) is located directly below the traffic lights without branding/logo header.
+- **No Divider Headers / Badges**: Do not add section headers such as `LIBRARY`, `1D..10D`, or pill badges.
+- **Fixed List of 13 Navigation Pillars**:
   1. `📁   My Library`
   2. `💡   Research & Concept`
   3. `📐   Drafting & Drawings`
@@ -24,37 +24,36 @@ Layout Sidebar Kiri (`src/app.rs`) dan macOS Window Chrome **DIKUNCI PENUH DAN T
   11. `🤖   Industrialized & Automation`
   12. `🔮   Prediction`
   13. `📊   Results`
-- **Bagian Bawah Tersemat**: Profil Pengguna (`👤 Harids Irawan`) dengan gear `⚙️` (System Preferences ⌘,). Tombol Update dipindahkan ke dalam menu Settings Preferences, dan tombol AI Copilot di sidebar dihilangkan agar antarmuka bersih minimalis.
+- **Pinned Bottom Section**: User Profile (`👤 Harids Irawan`) with gear `⚙️` (System Preferences ⌘,). The Update button is located inside the Settings Preferences menu, and the AI Copilot button in the sidebar is removed for a clean minimalist UI.
 
 ---
 
-### 2. 🚀 Kebebasan Modifikasi Lembar Kerja (Workspace Canvas):
-Untuk **Lembar Kerja (Area Canvas Utama)** pada seluruh pilar navigasi:
-- **Bebas Diubah & Ditingkatkan**: Agen memiliki izin penuh untuk memodifikasi, memperkaya komponen grafis, menambah algoritma, panel kontrol, dan fitur analitik baru sesuai kebutuhan riset dan pengembangan fitur.
-- **Wajib Model Slide Vertikal (Gaya My Library)**:
-  - Tampilan lembar kerja **harus menggunakan scrolling vertikal yang mengalir mulus** (`egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| { ... })`).
-  - Struktur konten disusun vertikal bertingkat (*stacked cards*) bergaya macOS modern:
-    1. *Header Pilar Minimalis*: Judul bersih dengan pemisah garis halus (tanpa strip-bar ganda / breadcrumbs).
-    2. *Hero/Featured Master Card*: Ringkasan proyek utama, status ARI, dan quick action.
-    3. *Data & Parameter Control Cards*: Pengaturan parameter numerik, simulasi, dan matriks kekakuan.
-    4. *Visualizer / Blueprint / Interactive Canvas*: Area gambar kerja 2D/3D atau grafik konvergensi.
-    5. *Tabel Audit & Data Detil*: Rekapitulasi BoQ, emisi karbon, atau spektrum respon.
-- **Minimalis & Bersih**: Hindari toolbar pita horizontal (*strip bar*) yang memotong ruang visual canvas.
+### 2. 🚀 Workspace Canvas Modification Freedom:
+For the **Workspace (Main Canvas Area)** across all navigation pillars:
+- **Free to Modify & Enhance**: Agents have full authorization to modify, enrich graphic components, add algorithms, control panels, and new analytic features according to research and development needs.
+- **Mandatory Vertical Slide Model (My Library Style)**:
+  - Workspace displays **must use smooth vertical scrolling** (`egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| { ... })`).
+  - Content structure is organized in modern macOS stacked cards:
+    1. *Minimalist Pillar Header*: Clean title with subtle line divider (no double strip-bars / breadcrumbs).
+    2. *Hero/Featured Master Card*: Main project overview, ARI status, and quick actions.
+    3. *Data & Parameter Control Cards*: Numerical parameter configuration, simulation, and stiffness matrix controls.
+    4. *Visualizer / Blueprint / Interactive Canvas*: 2D/3D technical drawing or convergence plot areas.
+    5. *Detailed Audit Tables & Data*: BoQ recaps, carbon emissions, or response spectra.
+- **Minimalist & Clean**: Avoid horizontal strip toolbars that clutter the visual canvas area.
 
 ---
 
 ### 3. Window & Asset Icon:
-- Window icon di-load dari `assets/icon.png` via `eframe::icon_data::from_png_bytes`.
-- macOS application bundle icon adalah `assets/AppIcon.icns`.
+- Window icon is loaded from `assets/icon.png` via `eframe::icon_data::from_png_bytes`.
+- macOS application bundle icon is `assets/AppIcon.icns`.
 
 ---
 
-### 4. ⚡ Protokol Efisiensi Token & Eksekusi Lokal (Local-First Development):
-- **Local-First Secara Default**:
-  - Semua pengerjaan fitur baru, modifikasi antarmuka, perbaikan bug, dan pengujian unit dijalankan secara **100% lokal di dalam workspace komputer pengguna**.
-  - Agen **DILARANG** melakukan pemindaian remote GitHub, querying API (`curl api.github.com`), pengecekan workflow GitHub Actions, atau pembacaan git remote secara proaktif saat menangani instruksi coding atau penambahan fitur biasa.
-- **Pengecualian (Hanya Berdasarkan Perintah Eksplisit)**:
-  - Operasi yang melibatkan jaringan / remote GitHub (seperti `git push`, memantau CI/CD build, atau mempublikasikan rilis) **HANYA** boleh dijalankan jika pengguna secara eksplisit memberikan perintah tertulis (misalnya: *"push ke github"*, *"buatkan rilis"*, *"cek status build"*, atau sejenisnya).
-- **Prinsip Hemat Token**:
-  - Agen wajib langsung berfokus ke file target yang bersangkutan tanpa melakukan pembacaan direktori yang tidak perlu atau membuang token konteks untuk hal di luar ruang lingkup tugas.
-
+### 4. ⚡ Token Efficiency & Local Execution Protocol (Local-First Development):
+- **Local-First by Default**:
+  - All new feature work, interface modifications, bug fixes, and unit tests run **100% locally within the user workspace**.
+  - Agents **MUST NOT** proactively scan remote GitHub repos, query APIs (`curl api.github.com`), check GitHub Actions workflows, or read git remotes when handling coding or feature requests.
+- **Exceptions (Explicit Commands Only)**:
+  - Operations involving external network / remote GitHub (such as `git push`, monitoring CI/CD builds, or publishing releases) **ONLY** execute when the user explicitly gives written instructions (e.g., *"push to github"*, *"create a release"*, *"check build status"*).
+- **Token Conservation**:
+  - Agents must focus directly on target files without unnecessary directory scanning or consuming context tokens outside the scope of the task.

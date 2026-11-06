@@ -286,7 +286,7 @@ impl ScheduleEngine {
         let raw_activities = vec![
             ConstructionActivity {
                 id: 1,
-                name: "Mobilisasi & Survey Titik Pengukuran (Topografi)".to_string(),
+                name: "Mobilization & Topographical Setting-Out Survey".to_string(),
                 duration_days: 7,
                 predecessors: vec![],
                 early_start: 0,
@@ -300,7 +300,7 @@ impl ScheduleEngine {
             },
             ConstructionActivity {
                 id: 2,
-                name: "Pondasi Bored Pile & Pemasangan Angkur Pedestal".to_string(),
+                name: "Bored Pile Foundations & Pedestal Anchor Bolts".to_string(),
                 duration_days: 21,
                 predecessors: vec![1],
                 early_start: 0,
@@ -314,7 +314,7 @@ impl ScheduleEngine {
             },
             ConstructionActivity {
                 id: 3,
-                name: "Fabrikasi & Pengelasan Batang Rangka di Workshop".to_string(),
+                name: "Truss Member Fabrication & Welding in Workshop".to_string(),
                 duration_days: 28,
                 predecessors: vec![1],
                 early_start: 0,
@@ -328,7 +328,7 @@ impl ScheduleEngine {
             },
             ConstructionActivity {
                 id: 4,
-                name: "Transportasi Modul Baja & Erection Lower Chords".to_string(),
+                name: "Steel Module Transport & Lower Chords Erection".to_string(),
                 duration_days: 14,
                 predecessors: vec![2, 3],
                 early_start: 0,
@@ -342,7 +342,7 @@ impl ScheduleEngine {
             },
             ConstructionActivity {
                 id: 5,
-                name: "Erection Batang Diagonal Web & Upper Chords".to_string(),
+                name: "Erection of Web Diagonals & Upper Chords".to_string(),
                 duration_days: 21,
                 predecessors: vec![4],
                 early_start: 0,
@@ -356,7 +356,7 @@ impl ScheduleEngine {
             },
             ConstructionActivity {
                 id: 6,
-                name: "Pemasangan Bracing Sekunder & Pengencangan Baut Mutu Tinggi".to_string(),
+                name: "Secondary Bracing Installation & High-Strength Bolting".to_string(),
                 duration_days: 14,
                 predecessors: vec![5],
                 early_start: 0,
@@ -370,7 +370,7 @@ impl ScheduleEngine {
             },
             ConstructionActivity {
                 id: 7,
-                name: "Inspeksi NDT Ultrasonik & Uji Beban Jembatan (Proof Load)".to_string(),
+                name: "Ultrasonic NDT Inspection & Bridge Proof Load Testing".to_string(),
                 duration_days: 7,
                 predecessors: vec![6],
                 early_start: 0,

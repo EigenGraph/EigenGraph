@@ -80,10 +80,10 @@ impl ResultsView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 let tabs = [
-                    (ResultsSubTab::ExecutiveSummary, "📊 Ringkasan Eksekutif & Health Card"),
-                    (ResultsSubTab::MemberMatrix, "📋 Matriks Verifikasi Batang (SNI / AISC)"),
-                    (ResultsSubTab::DeformationsAndForces, "📈 Deformasi & Gaya Dalam Amplop"),
-                    (ResultsSubTab::CertificationExport, "📑 Dokumen Audit & Ekspor Multi-Format"),
+                    (ResultsSubTab::ExecutiveSummary, "📊 Executive Summary & Health Card"),
+                    (ResultsSubTab::MemberMatrix, "📋 Member Verification Matrix (SNI / AISC)"),
+                    (ResultsSubTab::DeformationsAndForces, "📈 Deformations & Internal Force Envelopes"),
+                    (ResultsSubTab::CertificationExport, "📑 Audit Documents & Multi-Format Export"),
                 ];
 
                 ui.columns(4, |cols| {
@@ -121,7 +121,7 @@ impl ResultsView {
             .inner_margin(Margin::same(14))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(if critical_count == 0 { "✅ STATUS KELAYAKAN: STRUKTUR MEMENUHI STANDAR (SAFE)" } else { "⚠️ STATUS KELAYAKAN: DITEMUKAN ELEMEN KRITIS (REVIEW NEEDED)" })
+                    ui.label(RichText::new(if critical_count == 0 { "✅ FEASIBILITY STATUS: STRUCTURE MEETS CODE STANDARDS (SAFE)" } else { "⚠️ FEASIBILITY STATUS: CRITICAL ELEMENTS DETECTED (REVIEW NEEDED)" })
                         .size(14.0).strong().color(Color32::WHITE));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new("SNI 1729:2020 / AISC 360-16 LRFD").size(11.0).color(Color32::from_white_alpha(200)));
@@ -129,9 +129,9 @@ impl ResultsView {
                 });
                 ui.add_space(4.0);
                 ui.label(RichText::new(if critical_count == 0 {
-                    "Seluruh elemen memiliki faktor redundansi di atas ambang kritis (ARI ≥ 0.70) dan bebas dari singularitas kinematis rank SVD. Struktur terbukti aman terhadap keruntuhan berantai."
+                    "All elements exhibit redundancy factors above the critical threshold (ARI ≥ 0.70) and are free from SVD kinematic rank singularities. The structure is verified safe against progressive collapse."
                 } else {
-                    "Terdapat elemen struktur dengan skor redundansi di bawah 0.70. Disarankan memasang bracing pengaku atau meningkatkan profil elemen tersebut."
+                    "Structural elements detected with redundancy scores below 0.70. Installing additional bracing or upgrading element profiles is recommended."
                 }).size(11.5).color(Color32::from_white_alpha(230)));
             });
 
@@ -144,7 +144,7 @@ impl ResultsView {
                     ui.set_width(ui.available_width());
                     ui.label(RichText::new("Minimum System ARI").size(10.5).color(theme.text_muted));
                     ui.label(RichText::new(format!("{:.4}", min_ari)).size(18.0).strong().color(if min_ari >= 0.70 { theme.accent_green } else { theme.accent_orange }));
-                    ui.label(RichText::new("Batas Aman ≥ 0.7000").size(9.5).color(theme.text_muted));
+                    ui.label(RichText::new("Safe Threshold ≥ 0.7000").size(9.5).color(theme.text_muted));
                 });
             });
             cols[1].vertical(|ui| {
@@ -152,23 +152,23 @@ impl ResultsView {
                     ui.set_width(ui.available_width());
                     ui.label(RichText::new("Average System ARI").size(10.5).color(theme.text_muted));
                     ui.label(RichText::new(format!("{:.4}", avg_ari)).size(18.0).strong().color(theme.accent_blue));
-                    ui.label(RichText::new("Rata-rata 11 Batang").size(9.5).color(theme.text_muted));
+                    ui.label(RichText::new("Average Across 11 Members").size(9.5).color(theme.text_muted));
                 });
             });
             cols[2].vertical(|ui| {
                 Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    ui.label(RichText::new("Elemen Kritis (ARI < 0.7)").size(10.5).color(theme.text_muted));
-                    ui.label(RichText::new(format!("{} Elemen", critical_count)).size(18.0).strong().color(if critical_count == 0 { theme.accent_green } else { theme.accent_orange }));
+                    ui.label(RichText::new("Critical Elements (ARI < 0.7)").size(10.5).color(theme.text_muted));
+                    ui.label(RichText::new(format!("{} Elements", critical_count)).size(18.0).strong().color(if critical_count == 0 { theme.accent_green } else { theme.accent_orange }));
                     ui.label(RichText::new("Zero Collapse Potential").size(9.5).color(theme.text_muted));
                 });
             });
             cols[3].vertical(|ui| {
                 Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    ui.label(RichText::new("Maksimum DCR Stress").size(10.5).color(theme.text_muted));
+                    ui.label(RichText::new("Maximum DCR Stress").size(10.5).color(theme.text_muted));
                     ui.label(RichText::new("0.684 (< 1.0)").size(18.0).strong().color(theme.accent_green));
-                    ui.label(RichText::new("Kapasitas Elastis Lolos").size(9.5).color(theme.text_muted));
+                    ui.label(RichText::new("Elastic Capacity Verified").size(9.5).color(theme.text_muted));
                 });
             });
         });
@@ -177,17 +177,17 @@ impl ResultsView {
 
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("🌟 RINGKASAN MULTI-DIMENSI PROYEK (BIM 1D - 10D INTEGRATION)").size(13.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("🌟 MULTI-DIMENSIONAL PROJECT SUMMARY (BIM 1D - 10D INTEGRATION)").size(13.0).strong().color(theme.text_primary));
             });
             ui.add_space(6.0);
 
             let dimensions_summary = [
-                ("3D Geometry & Topologi", "Warren Truss Bentang 24.0m, Tinggi 3.2m, 11 Batang Profil Baja WF/HSS.", "COMPLIANT"),
-                ("4D Scheduling & Ereksi", "Total durasi perakitan 18 hari kerja, jalur kritis CPM teridentifikasi, bebas goyang SVD.", "STABLE"),
-                ("5D Dynamic Budget (RAB)", "Total estimasi biaya konstruksi Rp 184.500.000 (Rp 7,68 Juta/meter bentang).", "ON BUDGET"),
-                ("6D Embodied Carbon LCA", "Total 14.85 tCO2e (Jalur EAF Recycled Steel). Predikat Greenship / LEED Platinum.", "PLATINUM"),
-                ("8D Structural Safety & ARI", "Minimum ARI 0.9420. Dynamic Amplification Factor DAF 1.25x lolos uji APM DoD UFC.", "SAFE GRADE A"),
-                ("10D DfMA & Robotik", "Tingkat prefabrikasi offsite 82.5%. Berkas potong otomatis DSTV .nc1 siap kirim mesin CNC.", "AUTOMATED"),
+                ("3D Geometry & Topology", "Warren Truss 24.0m Span, 3.2m Height, 11 Structural Steel WF/HSS Members.", "COMPLIANT"),
+                ("4D Scheduling & Erection", "Total erection duration 18 working days, CPM critical path identified, SVD mechanism-free.", "STABLE"),
+                ("5D Dynamic Budget (BoQ)", "Total estimated construction cost $184,500 ($7,680/meter span).", "ON BUDGET"),
+                ("6D Embodied Carbon LCA", "Total 14.85 tCO2e (EAF Recycled Steel Route). Rated Greenship / LEED Platinum.", "PLATINUM"),
+                ("8D Structural Safety & ARI", "Minimum ARI 0.9420. Dynamic Amplification Factor DAF 1.25x passes DoD UFC APM criteria.", "SAFE GRADE A"),
+                ("10D DfMA & Robotics", "Offsite prefabrication level 82.5%. Automated DSTV .nc1 cutting files ready for CNC.", "AUTOMATED"),
             ];
 
             for (dim, desc, status) in dimensions_summary {
@@ -208,9 +208,9 @@ impl ResultsView {
     fn render_member_matrix(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📋 TABEL LENGKAP AUDIT KINERJA SELURUH ELEMEN").size(14.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("📋 COMPLETE ELEMENT PERFORMANCE AUDIT TABLE").size(14.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.checkbox(&mut self.filter_critical_only, "Hanya Tampilkan Elemen Kritis (ARI < 0.70)");
+                    ui.checkbox(&mut self.filter_critical_only, "Show Critical Elements Only (ARI < 0.70)");
                 });
             });
             ui.add_space(8.0);
@@ -220,15 +220,15 @@ impl ResultsView {
                 .min_col_width(75.0)
                 .spacing(Vec2::new(12.0, 6.0))
                 .show(ui, |ui| {
-                    ui.label(RichText::new("Batang ID").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Tipe").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Profil").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Panjang (L)").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Gaya Aksial (Pu)").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Kapasitas (φPn)").size(11.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Member ID").size(11.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Type").size(11.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Section").size(11.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Length (L)").size(11.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Axial Force (Pu)").size(11.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Capacity (φPn)").size(11.0).strong().color(theme.text_muted));
                     ui.label(RichText::new("DCR Ratio").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Skor ARI").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Status Safety").size(11.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new("ARI Score").size(11.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new("Safety Status").size(11.0).strong().color(theme.text_muted));
                     ui.end_row();
 
                     for m in members {
@@ -268,9 +268,9 @@ impl ResultsView {
     fn render_deformations_and_forces(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📈 AMPLOP DEFORMASI, KOMBINASI LRFD SNI 1727:2020 & REAKSI PERLETAKAN").size(14.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("📈 DEFORMATION ENVELOPES, LRFD COMBINATIONS & SUPPORT REACTIONS").size(14.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("6 Kombinasi Beban SNI 1727:2020 / ASCE 7-22 LRFD").size(11.0).color(theme.accent_blue));
+                    ui.label(RichText::new("6 SNI 1727:2020 / ASCE 7-22 LRFD Load Combinations").size(11.0).color(theme.accent_blue));
                 });
             });
             ui.add_space(8.0);
@@ -279,23 +279,23 @@ impl ResultsView {
                 cols[0].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Lendutan Maksimum Tengah (Δy)").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("Maximum Mid-Span Deflection (Δy)").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new("14.8 mm").size(18.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("Batas Izin L/360 = 66.7 mm (Lolos 22.2%)").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("Allowable Limit L/360 = 66.7 mm (Pass 22.2%)").size(10.0).color(theme.text_muted));
                     });
                 });
                 cols[1].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Simpangan Horizontal (Drift Δx)").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("Horizontal Lateral Drift (Δx)").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new("3.2 mm").size(18.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("Batas Izin H/400 = 8.0 mm (Lolos 40.0%)").size(10.0).color(theme.text_muted));
+                        ui.label(RichText::new("Allowable Limit H/400 = 8.0 mm (Pass 40.0%)").size(10.0).color(theme.text_muted));
                     });
                 });
                 cols[2].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Total Reaksi Vertikal (Σ Ry)").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("Total Vertical Reaction (Σ Ry)").size(11.0).color(theme.text_muted));
                         ui.label(RichText::new("342.6 kN").size(18.0).strong().color(theme.accent_blue));
                         ui.label(RichText::new("Governing Combo: LC2 (1.2D + 1.6L)").size(10.0).color(theme.text_muted));
                     });
@@ -303,9 +303,9 @@ impl ResultsView {
             });
 
             ui.add_space(16.0);
-            ui.label(RichText::new("🔩 AUDIT SAMBUNGAN BAUT MUTU TINGGI, LAS SUDUT & GESER BLOK PELAT BUHUL (SNI 1729:2020 BAB J)").size(12.5).strong().color(theme.text_primary));
+            ui.label(RichText::new("🔩 HIGH-STRENGTH BOLT, FILLET WELD & GUSSET BLOCK SHEAR AUDIT (AISC 360-16 / SNI 1729:2020 CH. J)").size(12.5).strong().color(theme.text_primary));
             ui.add_space(4.0);
-            ui.label(RichText::new("Kapasitas sambungan simpul dilindungi dengan faktor overstrength Ω_ARI = 1.0 + 0.35(1 - ARI_e) agar kegagalan getas baut/las tidak mendahului redistribusi beban daktail.")
+            ui.label(RichText::new("Joint connection capacity is protected with overstrength factor Ω_ARI = 1.0 + 0.35(1 - ARI_e) ensuring brittle bolt/weld fracture does not precede ductile load redistribution.")
                 .size(11.0).color(theme.text_secondary));
             ui.add_space(8.0);
 
@@ -318,14 +318,14 @@ impl ResultsView {
                         .min_col_width(82.0)
                         .spacing(Vec2::new(12.0, 6.0))
                         .show(ui, |ui| {
-                            ui.label(RichText::new("Batang").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Member").size(10.5).strong().color(theme.text_muted));
                             ui.label(RichText::new("Ω_ARI").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Pu Sambungan").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Konfigurasi Baut").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Kapasitas Geser Baut").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Pelat Buhul & Block Shear").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Las Sudut E70XX").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("DCR Sambungan").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Joint Demand Pu").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Bolt Configuration").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Bolt Shear Capacity").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Gusset Plate & Block Shear").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Fillet Weld E70XX").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Joint DCR").size(10.5).strong().color(theme.text_muted));
                             ui.end_row();
 
                             for c in conn_rep.member_connections.iter().take(8) {
@@ -349,13 +349,13 @@ impl ResultsView {
     fn render_certification_export(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📑 DOKUMEN AUDIT RESMI, TABEL PUBLIKASI LATEX & EKSPOR MULTI-FORMAT").size(14.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("📑 OFFICIAL AUDIT DOCUMENTS, LATEX PUBLICATION TABLES & MULTI-FORMAT EXPORT").size(14.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("Platform EigenGraph 2026 • SHA-256 Sealed").size(11.0).color(theme.accent_blue));
                 });
             });
             ui.add_space(4.0);
-            ui.label(RichText::new("Terbitkan laporan audit redundansi struktural resmi bersertifikat, tabel LaTeX Booktabs untuk publikasi ilmiah/disertasi, atau ekspor topologi ke ekosistem CAD/BIM eksternal.")
+            ui.label(RichText::new("Publish certified structural redundancy audit reports, publication-ready LaTeX Booktabs tables, or export topology to external CAD/BIM ecosystems.")
                 .size(11.5).color(theme.text_secondary));
 
             ui.add_space(14.0);
@@ -364,13 +364,13 @@ impl ResultsView {
                 cols[0].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("📜 LAPORAN AUDIT, JURNAL LATEX & ARSIP .EIGEN").size(12.0).strong().color(theme.text_primary));
+                        ui.label(RichText::new("📜 AUDIT REPORTS, LATEX JOURNALS & .EIGEN ARCHIVES").size(12.0).strong().color(theme.text_primary));
                         ui.add_space(4.0);
-                        ui.label(RichText::new("Simpan dossier interaktif 3D HTML, tabel LaTeX Booktabs (.tex) siap pakai untuk jurnal Q1/disertasi, atau arsip proyek .eigen bersegel SHA-256.")
+                        ui.label(RichText::new("Save interactive 3D HTML dossier, publication-ready LaTeX Booktabs tables (.tex) for peer-reviewed journals, or SHA-256 sealed .eigen project archives.")
                             .size(10.5).color(theme.text_secondary));
                         ui.add_space(10.0);
                         ui.horizontal_wrapped(|ui| {
-                            if ui.add(egui::Button::new(RichText::new("📄 Laporan Audit 3D HTML").size(10.5).color(Color32::WHITE))
+                            if ui.add(egui::Button::new(RichText::new("📄 3D HTML Audit Dossier").size(10.5).color(Color32::WHITE))
                                 .fill(theme.accent_blue)
                                 .corner_radius(CornerRadius::same(6))).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
@@ -378,12 +378,12 @@ impl ResultsView {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                                     let html = crate::core::HtmlViewerExporter::export_standalone_html(&model, ari.as_ref());
                                     if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Audit_Dossier_2026.html", &html) {
-                                        self.export_status = Some(format!("Dossier 3D HTML tersimpan di: {}", path));
+                                        self.export_status = Some(format!("3D HTML Dossier saved to: {}", path));
                                     }
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🎓 Tabel LaTeX Booktabs (.tex)").size(10.5).color(Color32::WHITE))
+                            if ui.add(egui::Button::new(RichText::new("🎓 LaTeX Booktabs Table (.tex)").size(10.5).color(Color32::WHITE))
                                 .fill(theme.accent_green)
                                 .corner_radius(CornerRadius::same(6))).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
@@ -392,20 +392,20 @@ impl ResultsView {
                                         let n2 = crate::core::AriEngine::evaluate_n2_woodbury_fast(&model).ok();
                                         let tex = crate::core::LatexExporter::export_ari_publication_table(&model, &ari, n2.as_ref());
                                         if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_ARI_Table.tex", &tex) {
-                                            self.export_status = Some(format!("Tabel publikasi LaTeX Booktabs tersimpan di: {}", path));
+                                            self.export_status = Some(format!("LaTeX Booktabs publication table saved to: {}", path));
                                         }
                                     }
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🔐 Arsip Proyek (.eigen)").size(10.5).color(theme.text_primary))
+                            if ui.add(egui::Button::new(RichText::new("🔐 Project Archive (.eigen)").size(10.5).color(theme.text_primary))
                                 .fill(theme.bg_card)
                                 .corner_radius(CornerRadius::same(6))).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     if let Ok(json) = crate::core::EigenProjectArchive::serialize_to_eigen_json(&model) {
                                         if let Ok(path) = crate::core::DiskExporter::write_export_file("WarrenTruss24m.eigen", &json) {
-                                            self.export_status = Some(format!("Arsip .eigen tersegel SHA-256 tersimpan di: {}", path));
+                                            self.export_status = Some(format!("SHA-256 sealed .eigen archive saved to: {}", path));
                                         }
                                     }
                                 }
@@ -417,9 +417,9 @@ impl ResultsView {
                 cols[1].vertical(|ui| {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("🌐 EKSPOR OPENBIM & CAD TRIAD KE DISK").size(12.0).strong().color(theme.text_primary));
+                        ui.label(RichText::new("🌐 OPENBIM & CAD TRIAD DISK EXPORT").size(12.0).strong().color(theme.text_primary));
                         ui.add_space(4.0);
-                        ui.label(RichText::new("Ekspor topologi ke format industri IFC 4.3 (dengan Property Set Pset_StructuralRedundancy), CSI SAP2000 (.s2k), atau AutoCAD 3D DXF.")
+                        ui.label(RichText::new("Export structural topology to industry standards: IFC 4.3 (with Property Set Pset_StructuralRedundancy), CSI SAP2000 (.s2k), or AutoCAD 3D DXF.")
                             .size(10.5).color(theme.text_secondary));
                         ui.add_space(10.0);
                         ui.horizontal_wrapped(|ui| {
@@ -431,7 +431,7 @@ impl ResultsView {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                                     let ifc = crate::core::IfcExporter::export_to_ifc(&model, ari.as_ref());
                                     if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Model.ifc", &ifc) {
-                                        self.export_status = Some(format!("Berkas OpenBIM IFC 4.3 tersimpan di: {}", path));
+                                        self.export_status = Some(format!("OpenBIM IFC 4.3 file saved to: {}", path));
                                     }
                                 }
                             }
@@ -443,7 +443,7 @@ impl ResultsView {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                                     let s2k = crate::core::Sap2000Exporter::export_to_s2k(&model, ari.as_ref());
                                     if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Model.s2k", &s2k) {
-                                        self.export_status = Some(format!("Berkas CSI SAP2000 .s2k tersimpan di: {}", path));
+                                        self.export_status = Some(format!("CSI SAP2000 .s2k file saved to: {}", path));
                                     }
                                 }
                             }
@@ -455,7 +455,7 @@ impl ResultsView {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                                     let dxf = crate::core::DxfExporter::export_to_dxf(&model, ari.as_ref());
                                     if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Model.dxf", &dxf) {
-                                        self.export_status = Some(format!("Berkas AutoCAD 3D DXF tersimpan di: {}", path));
+                                        self.export_status = Some(format!("AutoCAD 3D DXF file saved to: {}", path));
                                     }
                                 }
                             }

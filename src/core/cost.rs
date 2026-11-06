@@ -135,62 +135,62 @@ impl CostEngine {
         let cost_mat_profiles = total_profile_mass * r.steel_material_idr_per_kg;
         boq_items.push(BoqLineItem {
             item_code: "DIV-05-101".to_string(),
-            description: "Pengadaan Material Profil Baja Struktural (AISC/SNI)".to_string(),
+            description: "Procurement of Structural Steel Section Material (AISC/SNI)".to_string(),
             quantity: total_profile_mass,
             unit: "kg".to_string(),
             unit_price_idr: r.steel_material_idr_per_kg,
             total_price_idr: cost_mat_profiles,
         });
 
-        // 2. Material Pelat Sambung & Buhul Gusset
+        // 2. Material Splice Plates & Gussets
         let cost_mat_gusset = connection_plates_mass * (r.steel_material_idr_per_kg * 1.05);
         boq_items.push(BoqLineItem {
             item_code: "DIV-05-102".to_string(),
-            description: "Pengadaan Pelat Sambung, Gusset Plate & Hardware (+8%)".to_string(),
+            description: "Procurement of Splice Plates, Gusset Plates & Hardware (+8%)".to_string(),
             quantity: connection_plates_mass,
             unit: "kg".to_string(),
             unit_price_idr: r.steel_material_idr_per_kg * 1.05,
             total_price_idr: cost_mat_gusset,
         });
 
-        // 3. Jasa Fabrikasi Workshop
+        // 3. Workshop Fabrication Services
         let cost_fab = all_steel_mass * r.workshop_fabrication_idr_per_kg;
         boq_items.push(BoqLineItem {
             item_code: "DIV-05-201".to_string(),
-            description: "Jasa Fabrikasi Workshop (Pemotongan, Pengeboran, Las CO2)".to_string(),
+            description: "Workshop Fabrication Services (Cutting, Drilling, CO2 Welding)".to_string(),
             quantity: all_steel_mass,
             unit: "kg".to_string(),
             unit_price_idr: r.workshop_fabrication_idr_per_kg,
             total_price_idr: cost_fab,
         });
 
-        // 4. Transportasi Ekspedisi Jobsite
+        // 4. Jobsite Expedition Transport
         let cost_trans = all_steel_mass * r.transport_idr_per_kg;
         boq_items.push(BoqLineItem {
             item_code: "DIV-05-301".to_string(),
-            description: "Mobilisasi & Transportasi Trailer ke Lokasi Proyek".to_string(),
+            description: "Jobsite Mobilization & Trailer Transport to Project Site".to_string(),
             quantity: all_steel_mass,
             unit: "kg".to_string(),
             unit_price_idr: r.transport_idr_per_kg,
             total_price_idr: cost_trans,
         });
 
-        // 5. Erection & Instalasi Mobile Crane
+        // 5. Erection & Mobile Crane Installation
         let cost_erection = all_steel_mass * r.erection_crane_idr_per_kg;
         boq_items.push(BoqLineItem {
             item_code: "DIV-05-401".to_string(),
-            description: "Jasa Ereksi Struktur Lapangan & Sewa Mobile Crane".to_string(),
+            description: "Field Structural Erection & Mobile Crane Rental Services".to_string(),
             quantity: all_steel_mass,
             unit: "kg".to_string(),
             unit_price_idr: r.erection_crane_idr_per_kg,
             total_price_idr: cost_erection,
         });
 
-        // 6. Pengecatan Primer Anti-Karat & Finishing
+        // 6. Anti-Corrosion Primer & Finishing Coating
         let cost_paint = total_surface * r.coating_paint_idr_per_m2;
         boq_items.push(BoqLineItem {
             item_code: "DIV-09-901".to_string(),
-            description: "Proteksi Permukaan: Primer Zinc Chromate & Finishing".to_string(),
+            description: "Surface Protection: Zinc Chromate Primer & Finishing Coat".to_string(),
             quantity: total_surface,
             unit: "m2".to_string(),
             unit_price_idr: r.coating_paint_idr_per_m2,

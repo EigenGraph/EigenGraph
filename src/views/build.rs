@@ -202,11 +202,11 @@ impl BuildView {
                 ui.add_space(6.0);
 
                 let rows = [
-                    ("Gaya Aksial (Pu)", format!("{:.1} kN", force), if force < 0.0 { theme.accent_blue } else { theme.accent_orange }),
-                    ("Kapasitas Nominal (ϕPn)", format!("{:.1} kN", capacity), theme.text_primary),
-                    ("Rasio Utilisasi (DCR)", format!("{:.1}%", util * 100.0), if util > 0.85 { theme.accent_red } else { theme.accent_green }),
-                    ("Indeks Redundansi (ARI)", format!("{:.3}", ari), if ari >= 0.85 { theme.accent_green } else { theme.accent_orange }),
-                    ("DCR Interaksi P-M-V", format!("{:.3}", dcr), theme.text_secondary),
+                    ("Axial Force (Pu)", format!("{:.1} kN", force), if force < 0.0 { theme.accent_blue } else { theme.accent_orange }),
+                    ("Nominal Capacity (ϕPn)", format!("{:.1} kN", capacity), theme.text_primary),
+                    ("Utilization Ratio (DCR)", format!("{:.1}%", util * 100.0), if util > 0.85 { theme.accent_red } else { theme.accent_green }),
+                    ("Redundancy Index (ARI)", format!("{:.3}", ari), if ari >= 0.85 { theme.accent_green } else { theme.accent_orange }),
+                    ("P-M-V Interaction DCR", format!("{:.3}", dcr), theme.text_secondary),
                 ];
 
                 for (lbl, val, col) in rows {
@@ -221,7 +221,7 @@ impl BuildView {
 
                 ui.add_space(8.0);
                 let is_elim = self.simulated_eliminated_ids.contains(&mid);
-                let btn_text = if is_elim { "🔄 Pulihkan Batang Ini" } else { "💥 Uji Disrupsi Batang Ini (N-1)" };
+                let btn_text = if is_elim { "🔄 Restore This Member" } else { "💥 Test Member Disruption (N-1)" };
                 let btn_bg = if is_elim { theme.accent_green } else { theme.accent_red };
 
                 if ui.add(egui::Button::new(RichText::new(btn_text).size(11.0).strong().color(Color32::WHITE))
@@ -251,12 +251,12 @@ impl BuildView {
                 ui.add_space(4.0);
 
                 let sys_rows = [
-                    ("Model Terpilih", self.active_model.label().to_string()),
-                    ("Indeks Redundansi (ARI Global)", "0.892 (Robust)".to_string()),
-                    ("Prediksi AI Surrogate (Memori)", format!("{:.3} ({} Siklus)", surrogate_ari, mem.total_ari_evaluations)),
-                    ("Konvergensi LOD 100 ➔ 300", format!("+{:.1}% ARI ({:.1}x κ)", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)),
-                    ("Auto-Checkpoints (InternalVault)", format!("{}x Tersimpan Otomatis", mem.total_autosaves_count)),
-                    ("Elemen Tereliminasi (Disrupsi)", format!("N-{}", self.simulated_eliminated_ids.len())),
+                    ("Selected Model", self.active_model.label().to_string()),
+                    ("Redundancy Index (Global ARI)", "0.892 (Robust)".to_string()),
+                    ("AI Surrogate Prediction (Memory)", format!("{:.3} ({} Cycles)", surrogate_ari, mem.total_ari_evaluations)),
+                    ("LOD 100 ➔ 300 Convergence", format!("+{:.1}% ARI ({:.1}x κ)", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)),
+                    ("Auto-Checkpoints (InternalVault)", format!("{}x Autosaved", mem.total_autosaves_count)),
+                    ("Eliminated Members (Disrupted)", format!("N-{}", self.simulated_eliminated_ids.len())),
                 ];
 
                 for (lbl, val) in sys_rows {
@@ -273,7 +273,7 @@ impl BuildView {
                 ui.separator();
                 ui.add_space(6.0);
 
-                if ui.add(egui::Button::new(RichText::new("💥 Uji Disrupsi Acak N-1 (Auto-Checkpoint)").size(11.0).color(theme.text_primary))
+                if ui.add(egui::Button::new(RichText::new("💥 Random N-1 Disruption Test (Auto-Checkpoint)").size(11.0).color(theme.text_primary))
                     .fill(theme.bg_canvas)
                     .corner_radius(CornerRadius::same(6))
                     .min_size(Vec2::new(ui.available_width(), 26.0))).clicked() {
@@ -291,7 +291,7 @@ impl BuildView {
 
         // Model Selector in Sidebar
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("🏛️ PILIH MODEL STRUKTUR 3D").size(11.0).strong().color(theme.text_secondary));
+            ui.label(RichText::new("🏛️ SELECT 3D STRUCTURAL MODEL").size(11.0).strong().color(theme.text_secondary));
             ui.add_space(6.0);
 
             let models = [
@@ -353,7 +353,7 @@ impl BuildView {
             .corner_radius(CornerRadius::same(6))
             .inner_margin(Margin::same(10))
             .show(ui, |ui| {
-                ui.label(RichText::new("💡 Kontrol Orbit 3D:\n• Klik Kiri + Geser: Putar / Orbit 360°\n• Klik Kanan + Geser: Geser / Pan Layar\n• Scroll Roda Mouse: Perbesar / Zoom").size(10.0).color(theme.text_muted));
+                ui.label(RichText::new("💡 3D Orbit Controls:\n• Left Click + Drag: Rotate / Orbit 360°\n• Right Click + Drag: Pan / Translate View\n• Mouse Wheel Scroll: Zoom In / Out").size(10.0).color(theme.text_muted));
             });
     }
 
@@ -383,7 +383,7 @@ impl BuildView {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new(&comp.name).size(11.5).strong().color(theme.accent_blue));
                         });
-                        ui.label(RichText::new(format!("{} • {} elemen", comp.category, comp.elements_count)).size(10.0).color(theme.text_secondary));
+                        ui.label(RichText::new(format!("{} • {} elements", comp.category, comp.elements_count)).size(10.0).color(theme.text_secondary));
                     });
                     ui.add_space(3.0);
                 }
@@ -521,10 +521,10 @@ impl BuildView {
         ui.label(RichText::new("3D Color Heatmap by:").size(11.0).strong().color(theme.text_primary));
         let modes = [
             ("ARI", "🎨 Heatmap Adjusted Redundancy (ARI)"),
-            ("Tension_Compression", "🔵🔴 Gaya Aksial (Biru=Tekan, Merah=Tarik)"),
+            ("Tension_Compression", "🔵🔴 Axial Force (Blue=Compression, Red=Tension)"),
             ("Criticality", "🚨 Top Fracture Critical Members"),
-            ("DCR_Stress", "🔥 Heatmap Rasio Kapasitas Leleh DCR"),
-            ("Material", "🧱 Material & Profil Penampang"),
+            ("DCR_Stress", "🔥 Yield Capacity Ratio Heatmap (DCR)"),
+            ("Material", "🧱 Material & Section Profiles"),
         ];
         for (m, label) in modes {
             let is_sel = self.color_mode == m;
@@ -554,10 +554,10 @@ impl BuildView {
         ui.checkbox(&mut self.show_deformed_shape, "Deformed Shape Mesh (FEM Elastic)");
         if self.show_deformed_shape {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Skala:").size(11.0).color(theme.text_secondary));
+                ui.label(RichText::new("Scale:").size(11.0).color(theme.text_secondary));
                 ui.add(egui::Slider::new(&mut self.deformation_scale, 1.0..=200.0).text("x"));
             });
-            ui.checkbox(&mut self.animate_vibration, "🌀 Animasi Osilasi Ragam Getar (Mode 1)");
+            ui.checkbox(&mut self.animate_vibration, "🌀 Mode 1 Vibration Animation");
         }
     }
 
@@ -580,13 +580,13 @@ impl BuildView {
                         if ui.selectable_label(self.render_mode == Render3DMode::Wireframe, "🕸️ Wireframe").clicked() {
                             self.render_mode = Render3DMode::Wireframe;
                         }
-                        if ui.selectable_label(self.render_mode == Render3DMode::AxialForceNFD, "📊 NFD").on_hover_text("Normal / Axial Force Diagram (Tarik Merah, Tekan Biru)").clicked() {
+                        if ui.selectable_label(self.render_mode == Render3DMode::AxialForceNFD, "📊 NFD").on_hover_text("Normal / Axial Force Diagram (Red=Tension, Blue=Compression)").clicked() {
                             self.render_mode = Render3DMode::AxialForceNFD;
                         }
-                        if ui.selectable_label(self.render_mode == Render3DMode::ShearForceSFD, "⚡ SFD").on_hover_text("Shear Force Diagram (Diagram Gaya Geser Melintang)").clicked() {
+                        if ui.selectable_label(self.render_mode == Render3DMode::ShearForceSFD, "⚡ SFD").on_hover_text("Shear Force Diagram (SFD)").clicked() {
                             self.render_mode = Render3DMode::ShearForceSFD;
                         }
-                        if ui.selectable_label(self.render_mode == Render3DMode::BendingMomentBMD, "📈 BMD").on_hover_text("Bending Moment Diagram (Diagram Momen Lentur Parabolik)").clicked() {
+                        if ui.selectable_label(self.render_mode == Render3DMode::BendingMomentBMD, "📈 BMD").on_hover_text("Bending Moment Diagram (BMD)").clicked() {
                             self.render_mode = Render3DMode::BendingMomentBMD;
                         }
 
@@ -655,7 +655,7 @@ impl BuildView {
                         // Right Status Badges
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             let (badge_text, badge_col) = if !self.simulated_eliminated_ids.is_empty() {
-                                (format!("⚠️ DISRUPSI N-{}: BATANG {:?}", self.simulated_eliminated_ids.len(), self.simulated_eliminated_ids), theme.accent_red)
+                                (format!("⚠️ N-{} DISRUPTION: MEMBERS {:?}", self.simulated_eliminated_ids.len(), self.simulated_eliminated_ids), theme.accent_red)
                             } else {
                                 (format!("🎨 {}", self.color_mode), theme.accent_blue)
                             };
@@ -1301,9 +1301,9 @@ impl BuildView {
                         Render3DMode::CsgSolidBrep => "CSG SOLID B-REP + 3D REBAR",
                         Render3DMode::SolidShaded => "SOLID EXTRUDED",
                         Render3DMode::Wireframe => "WIREFRAME",
-                        Render3DMode::AxialForceNFD => "DIAGRAM NFD (AKSIAL)",
-                        Render3DMode::ShearForceSFD => "DIAGRAM SFD (GESER)",
-                        Render3DMode::BendingMomentBMD => "DIAGRAM BMD (MOMEN)",
+                        Render3DMode::AxialForceNFD => "NFD DIAGRAM (AXIAL)",
+                        Render3DMode::ShearForceSFD => "SFD DIAGRAM (SHEAR)",
+                        Render3DMode::BendingMomentBMD => "BMD DIAGRAM (MOMENT)",
                     };
                     painter.text(
                         Pos2::new(rect.left() + 14.0, rect.top() + 14.0),
@@ -1332,10 +1332,10 @@ impl BuildView {
                                 painter.rect_stroke(tip_rect, CornerRadius::same(6), Stroke::new(1.0, theme.accent_blue), egui::StrokeKind::Outside);
 
                                 painter.text(tip_pos + Vec2::new(8.0, 6.0), Align2::LEFT_TOP, format!("{} [{}]", item.name, item.section), egui::FontId::proportional(11.0), Color32::WHITE);
-                                painter.text(tip_pos + Vec2::new(8.0, 22.0), Align2::LEFT_TOP, format!("Aksial Pu: {:.1} kN", item.force_kn), egui::FontId::monospace(10.0), theme.accent_blue);
-                                painter.text(tip_pos + Vec2::new(8.0, 38.0), Align2::LEFT_TOP, format!("Kapasitas ϕPn: {:.1} kN", item.capacity_kn), egui::FontId::monospace(10.0), theme.text_secondary);
-                                painter.text(tip_pos + Vec2::new(8.0, 54.0), Align2::LEFT_TOP, format!("Utilisasi DCR: {:.1}%", item.utilization * 100.0), egui::FontId::monospace(10.0), theme.accent_orange);
-                                painter.text(tip_pos + Vec2::new(8.0, 70.0), Align2::LEFT_TOP, format!("ARI Redundansi: {:.3}", item.ari), egui::FontId::monospace(10.0), theme.accent_green);
+                                painter.text(tip_pos + Vec2::new(8.0, 22.0), Align2::LEFT_TOP, format!("Axial Pu: {:.1} kN", item.force_kn), egui::FontId::monospace(10.0), theme.accent_blue);
+                                painter.text(tip_pos + Vec2::new(8.0, 38.0), Align2::LEFT_TOP, format!("Capacity ϕPn: {:.1} kN", item.capacity_kn), egui::FontId::monospace(10.0), theme.text_secondary);
+                                painter.text(tip_pos + Vec2::new(8.0, 54.0), Align2::LEFT_TOP, format!("Utilization DCR: {:.1}%", item.utilization * 100.0), egui::FontId::monospace(10.0), theme.accent_orange);
+                                painter.text(tip_pos + Vec2::new(8.0, 70.0), Align2::LEFT_TOP, format!("ARI Redundancy: {:.3}", item.ari), egui::FontId::monospace(10.0), theme.accent_green);
                             }
                         }
                     }

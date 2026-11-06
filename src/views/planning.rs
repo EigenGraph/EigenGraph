@@ -125,14 +125,14 @@ impl PlanningView {
 
         // Material & Stiffness
         let density_kg_m3 = get_val("density", 7850.0);
-        let stiffness_e_mpa = get_val("kekakuan", 200000.0);
+        let stiffness_e_mpa = get_val("stiffness", get_val("kekakuan", 200000.0));
 
         // Unit Prices (IDR)
-        let price_steel_kg = get_val("harga_baja", 24500.0);
-        let price_fab_kg = get_val("harga_fabrikasi", 8500.0);
-        let price_erect_ton = get_val("harga_ereksi", 4500000.0);
-        let price_coating_m2 = get_val("harga_coating", 145000.0);
-        let price_concrete_m3 = get_val("harga_pondasi", 1950000.0);
+        let price_steel_kg = get_val("price_steel", get_val("harga_baja", 24500.0));
+        let price_fab_kg = get_val("price_fab", get_val("harga_fabrikasi", 8500.0));
+        let price_erect_ton = get_val("price_erect", get_val("harga_ereksi", 4500000.0));
+        let price_coating_m2 = get_val("price_coating", get_val("harga_coating", 145000.0));
+        let price_concrete_m3 = get_val("price_concrete", get_val("harga_pondasi", 1950000.0));
 
         // Member Lengths & Quantities
         let panel_dx = span_m / (n_panels as f64);
@@ -260,9 +260,9 @@ impl PlanningView {
     fn render_header_bar(&mut self, ui: &mut Ui, theme: &MacTheme, takeoff: &Parametric5DTakeoff) {
         ui.horizontal(|ui| {
             let tabs = [
-                (PlanningSubTab::DynamicRab, "💰 RAB 5D"),
+                (PlanningSubTab::DynamicRab, "💰 5D BoQ / Cost"),
                 (PlanningSubTab::TakeoffQto, "📊 QTO"),
-                (PlanningSubTab::Schedule4d, "⏱️ Kurva S 4D"),
+                (PlanningSubTab::Schedule4d, "⏱️ 4D S-Curve"),
                 (PlanningSubTab::CostAriTradeoff, "📈 Cost vs ARI"),
                 (PlanningSubTab::StagedErectionSvd, "🏗️ Staged Erection Guard"),
             ];
@@ -284,22 +284,22 @@ impl PlanningView {
             // Right Side Actions
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 // Publish to Dossier
-                let pub_text = if self.published_to_dossier { "✅ Saved to Dossier" } else { "📁 Simpan ke MY PROJECT" };
+                let pub_text = if self.published_to_dossier { "✅ Saved to Dossier" } else { "📁 Save to MY PROJECT" };
                 let pub_bg = if self.published_to_dossier { theme.accent_green } else { theme.accent_blue.gamma_multiply(0.8) };
                 if ui.add(egui::Button::new(RichText::new(pub_text).size(11.5).strong().color(Color32::WHITE))
                     .fill(pub_bg)
                     .corner_radius(CornerRadius::same(8))).clicked() {
                     self.published_to_dossier = true;
-                    self.export_status = Some("RAB & Schedule 5D disinkronkan ke Dossier Proyek!".to_string());
+                    self.export_status = Some("5D BoQ & Schedule synchronized to Project Dossier!".to_string());
                 }
 
                 ui.add_space(6.0);
 
                 // Export CSV / Excel Button
-                if ui.add(egui::Button::new(RichText::new("📄 Ekspor RAB (CSV)").size(11.5).color(theme.text_primary))
+                if ui.add(egui::Button::new(RichText::new("📄 Export BoQ (CSV)").size(11.5).color(theme.text_primary))
                     .fill(theme.bg_card)
                     .corner_radius(CornerRadius::same(8))).clicked() {
-                    self.export_status = Some(format!("File RAB-5D_L{:.0}m.csv berhasil diekspor!", takeoff.span_m));
+                    self.export_status = Some(format!("File BoQ-5D_L{:.0}m.csv exported successfully!", takeoff.span_m));
                 }
             });
         });
@@ -325,18 +325,18 @@ impl PlanningView {
             .inner_margin(Margin::symmetric(16, 10))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🔗 TERIKAT OTOMATIS KE MODEL PARAMETRIK:").size(11.5).strong().color(theme.accent_blue));
+                    ui.label(RichText::new("🔗 AUTOMATICALLY BOUND TO PARAMETRIC MODEL:").size(11.5).strong().color(theme.accent_blue));
                     ui.add_space(8.0);
-                    ui.label(RichText::new(format!("Bentang L = {:.1} m", takeoff.span_m)).size(11.5).color(theme.text_primary));
+                    ui.label(RichText::new(format!("Span L = {:.1} m", takeoff.span_m)).size(11.5).color(theme.text_primary));
                     ui.label(RichText::new("•").size(11.5).color(theme.text_muted));
-                    ui.label(RichText::new(format!("Tinggi H = {:.1} m (L/{:.1})", takeoff.height_m, takeoff.span_m / takeoff.height_m)).size(11.5).color(theme.text_primary));
+                    ui.label(RichText::new(format!("Height H = {:.1} m (L/{:.1})", takeoff.height_m, takeoff.span_m / takeoff.height_m)).size(11.5).color(theme.text_primary));
                     ui.label(RichText::new("•").size(11.5).color(theme.text_muted));
-                    ui.label(RichText::new(format!("Bahan: ρ = {:.0} kg/m³", takeoff.density_kg_m3)).size(11.5).color(theme.text_primary));
+                    ui.label(RichText::new(format!("Material: ρ = {:.0} kg/m³", takeoff.density_kg_m3)).size(11.5).color(theme.text_primary));
                     ui.label(RichText::new("•").size(11.5).color(theme.text_muted));
-                    ui.label(RichText::new(format!("Harga Baja: Rp {}/kg", format_idr(takeoff.price_steel_kg))).size(11.5).color(theme.accent_green));
+                    ui.label(RichText::new(format!("Steel Price: IDR {}/kg", format_idr(takeoff.price_steel_kg))).size(11.5).color(theme.accent_green));
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("⚡ Perhitungan Live Dinamis").size(11.0).color(theme.text_muted));
+                        ui.label(RichText::new("⚡ Live Dynamic Calculation").size(11.0).color(theme.text_muted));
                     });
                 });
             });
@@ -348,10 +348,10 @@ impl PlanningView {
     fn render_dynamic_rab(&self, ui: &mut Ui, theme: &MacTheme, t: &Parametric5DTakeoff) {
         // 4 KPI Metric Cards
         ui.columns(4, |cols| {
-            self.metric_card(&mut cols[0], theme, "TOTAL RAB (5D)", &format!("Rp {}", format_idr(t.grand_total_rab)), "Termasuk PPN 11% & Overhead", theme.accent_blue);
-            self.metric_card(&mut cols[1], theme, "BIAYA MATERIAL BAJA", &format!("Rp {}", format_idr(t.cost_steel_material)), &format!("{:.1} Ton @ Rp {}/kg", t.total_steel_ton, format_idr(t.price_steel_kg)), theme.accent_green);
-            self.metric_card(&mut cols[2], theme, "FABRIKASI & EREKSI", &format!("Rp {}", format_idr(t.cost_workshop_fab + t.cost_erection_crane)), "Workshop + Mobile Crane 100T", theme.accent_orange);
-            self.metric_card(&mut cols[3], theme, "PONDASI & SUBSTRUCTURE", &format!("Rp {}", format_idr(t.cost_substructure)), &format!("{:.1} m³ Beton K-350", t.concrete_footing_m3), theme.text_secondary);
+            self.metric_card(&mut cols[0], theme, "TOTAL 5D BoQ / BUDGET", &format!("IDR {}", format_idr(t.grand_total_rab)), "Includes 11% VAT & Overhead", theme.accent_blue);
+            self.metric_card(&mut cols[1], theme, "STEEL MATERIAL COST", &format!("IDR {}", format_idr(t.cost_steel_material)), &format!("{:.1} Ton @ IDR {}/kg", t.total_steel_ton, format_idr(t.price_steel_kg)), theme.accent_green);
+            self.metric_card(&mut cols[2], theme, "FABRICATION & ERECTION", &format!("IDR {}", format_idr(t.cost_workshop_fab + t.cost_erection_crane)), "Workshop + 100T Mobile Crane", theme.accent_orange);
+            self.metric_card(&mut cols[3], theme, "FOUNDATION & SUBSTRUCTURE", &format!("IDR {}", format_idr(t.cost_substructure)), &format!("{:.1} m³ Concrete K-350", t.concrete_footing_m3), theme.text_secondary);
         });
 
         ui.add_space(16.0);
@@ -359,9 +359,9 @@ impl PlanningView {
         // Detailed AHSP Breakdown Table
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("RINCIAN ESTIMASI BIAYA (RAB) — STANDAR AHSP DINAMIS").size(13.0).strong().color(theme.text_primary));
+                ui.label(RichText::new("BILL OF QUANTITIES (BoQ) BREAKDOWN — DYNAMIC COST ESTIMATION").size(13.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("Mata Uang: IDR (Rupiah)").size(11.0).color(theme.text_muted));
+                    ui.label(RichText::new("Currency: IDR (Rupiah)").size(11.0).color(theme.text_muted));
                 });
             });
 
@@ -371,13 +371,13 @@ impl PlanningView {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("No").strong().size(12.0).color(theme.text_muted));
                 ui.add_space(18.0);
-                ui.label(RichText::new("Uraian Pekerjaan (WBS)").strong().size(12.0).color(theme.text_muted));
+                ui.label(RichText::new("Work Breakdown Structure (WBS)").strong().size(12.0).color(theme.text_muted));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("Total Harga (Rp)").strong().size(12.0).color(theme.text_muted));
+                    ui.label(RichText::new("Total Price (IDR)").strong().size(12.0).color(theme.text_muted));
                     ui.add_space(40.0);
-                    ui.label(RichText::new("Harga Satuan (Rp)").strong().size(12.0).color(theme.text_muted));
+                    ui.label(RichText::new("Unit Price (IDR)").strong().size(12.0).color(theme.text_muted));
                     ui.add_space(30.0);
-                    ui.label(RichText::new("Sat").strong().size(12.0).color(theme.text_muted));
+                    ui.label(RichText::new("Unit").strong().size(12.0).color(theme.text_muted));
                     ui.add_space(30.0);
                     ui.label(RichText::new("Volume").strong().size(12.0).color(theme.text_muted));
                 });
@@ -385,14 +385,14 @@ impl PlanningView {
             ui.separator();
 
             let items = [
-                ("1.0", "Mobilisasi Peralatan Berat (Crane 100T, Trailer, Genset)", 1.0, "ls", t.cost_mobilization, t.cost_mobilization),
-                ("2.0", "Pekerjaan Pondasi Bored Pile & Abutment Beton K-350", t.concrete_footing_m3, "m³", t.price_concrete_m3, t.cost_substructure),
-                ("3.0", "Pengadaan Material Baja Profil BJ41 (ASTM A992)", t.total_steel_kg, "kg", t.price_steel_kg, t.cost_steel_material),
-                ("4.0", "Fabrikasi Workshop (Cutting, Fitting, Full Pen Welding, NDT)", t.total_steel_kg, "kg", t.price_fab_kg, t.cost_workshop_fab),
-                ("5.0", "Proteksi Korosi: Sandblasting Sa 2.5 + Epoxy 3-Lapis", t.coating_surface_m2, "m²", t.price_coating_m2, t.cost_coating_fireproof),
-                ("6.0", "Transportasi & Pengangkutan Balok Rangka ke Lokasi Proyek", 1.0, "ls", t.cost_transportation, t.cost_transportation),
-                ("7.0", "Ereksi Rangka Baja Bentang Penuh dengan Crane & Shoring", t.total_steel_ton, "ton", t.price_erect_ton, t.cost_erection_crane),
-                ("8.0", "Pemasangan Baut Mutu Tinggi A325, Kalibrasi Torsi & Finishing", t.bolt_sets_count as f64, "set", 125_000.0, t.cost_bolts_finishing),
+                ("1.0", "Heavy Equipment Mobilization (100T Crane, Trailer, Genset)", 1.0, "ls", t.cost_mobilization, t.cost_mobilization),
+                ("2.0", "Bored Pile Foundation & K-350 Concrete Abutment Works", t.concrete_footing_m3, "m³", t.price_concrete_m3, t.cost_substructure),
+                ("3.0", "Structural Steel Material Procurement BJ41 (ASTM A992)", t.total_steel_kg, "kg", t.price_steel_kg, t.cost_steel_material),
+                ("4.0", "Workshop Fabrication (Cutting, Fitting, Full Pen Welding, NDT)", t.total_steel_kg, "kg", t.price_fab_kg, t.cost_workshop_fab),
+                ("5.0", "Corrosion Protection: Sa 2.5 Sandblasting + 3-Coat Epoxy", t.coating_surface_m2, "m²", t.price_coating_m2, t.cost_coating_fireproof),
+                ("6.0", "Truss Beam Haulage & Site Transportation", 1.0, "ls", t.cost_transportation, t.cost_transportation),
+                ("7.0", "Full-Span Steel Truss Erection with Crane & Shoring", t.total_steel_ton, "ton", t.price_erect_ton, t.cost_erection_crane),
+                ("8.0", "A325 High-Strength Bolt Installation, Torque Calibration & Finishing", t.bolt_sets_count as f64, "set", 125_000.0, t.cost_bolts_finishing),
             ];
 
             for (no, desc, vol, sat, hrg, tot) in items {
@@ -419,30 +419,30 @@ impl PlanningView {
 
             // Summary Totals
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Subtotal Biaya Langsung (Direct Cost):").size(12.0).color(theme.text_secondary));
+                ui.label(RichText::new("Direct Cost Subtotal:").size(12.0).color(theme.text_secondary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new(format!("Rp {}", format_idr(t.direct_cost_total))).size(12.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new(format!("IDR {}", format_idr(t.direct_cost_total))).size(12.5).strong().color(theme.text_primary));
                 });
             });
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new(format!("Overhead & Jasa Kontraktor ({:.1}%):", self.overhead_percent)).size(11.5).color(theme.text_muted));
+                ui.label(RichText::new(format!("Contractor Overhead & Profit ({:.1}%):", self.overhead_percent)).size(11.5).color(theme.text_muted));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new(format!("Rp {}", format_idr(t.overhead_cost))).size(11.5).color(theme.text_muted));
+                    ui.label(RichText::new(format!("IDR {}", format_idr(t.overhead_cost))).size(11.5).color(theme.text_muted));
                 });
             });
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new(format!("Biaya Tak Terduga / Contingency ({:.1}%):", self.contingency_percent)).size(11.5).color(theme.text_muted));
+                ui.label(RichText::new(format!("Contingency ({:.1}%):", self.contingency_percent)).size(11.5).color(theme.text_muted));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new(format!("Rp {}", format_idr(t.contingency_cost))).size(11.5).color(theme.text_muted));
+                    ui.label(RichText::new(format!("IDR {}", format_idr(t.contingency_cost))).size(11.5).color(theme.text_muted));
                 });
             });
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new(format!("Pajak Pertambahan Nilai (PPN {:.1}%):", self.vat_percent)).size(11.5).color(theme.text_muted));
+                ui.label(RichText::new(format!("Value Added Tax (VAT {:.1}%):", self.vat_percent)).size(11.5).color(theme.text_muted));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new(format!("Rp {}", format_idr(t.vat_cost))).size(11.5).color(theme.text_muted));
+                    ui.label(RichText::new(format!("IDR {}", format_idr(t.vat_cost))).size(11.5).color(theme.text_muted));
                 });
             });
 
@@ -450,9 +450,9 @@ impl PlanningView {
             ui.add_space(4.0);
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new("GRAND TOTAL RENCANA ANGGARAN BIAYA (5D BIM):").size(13.0).strong().color(Color32::WHITE));
+                ui.label(RichText::new("GRAND TOTAL ESTIMATED COST (5D BIM):").size(13.0).strong().color(Color32::WHITE));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new(format!("Rp {},-", format_idr(t.grand_total_rab))).size(17.0).strong().color(theme.accent_blue));
+                    ui.label(RichText::new(format!("IDR {},-", format_idr(t.grand_total_rab))).size(17.0).strong().color(theme.accent_blue));
                 });
             });
         });
@@ -463,16 +463,16 @@ impl PlanningView {
     // -------------------------------------------------------------
     fn render_qto_takeoff(&self, ui: &mut Ui, theme: &MacTheme, t: &Parametric5DTakeoff, _members: &[StructuralMember]) {
         ui.columns(4, |cols| {
-            self.metric_card(&mut cols[0], theme, "TOTAL TONASE BAJA", &format!("{:.2} Ton", t.total_steel_ton), &format!("{} kg volume murni", format_idr(t.total_steel_kg)), theme.accent_blue);
-            self.metric_card(&mut cols[1], theme, "LUAS PROTEKSI CAT", &format!("{:.1} m²", t.coating_surface_m2), "Sa 2.5 + 3-Coat System", theme.accent_green);
-            self.metric_card(&mut cols[2], theme, "SAMBUNGAN BAUT A325", &format!("{} Sets", t.bolt_sets_count), "Grade 8.8 High Strength", theme.accent_orange);
-            self.metric_card(&mut cols[3], theme, "VOLUME BETON PONDASI", &format!("{:.1} m³", t.concrete_footing_m3), "Mutu fc' 30 MPa (K-350)", theme.text_secondary);
+            self.metric_card(&mut cols[0], theme, "TOTAL STEEL TONNAGE", &format!("{:.2} Ton", t.total_steel_ton), &format!("{} kg pure volume", format_idr(t.total_steel_kg)), theme.accent_blue);
+            self.metric_card(&mut cols[1], theme, "PAINT PROTECTION AREA", &format!("{:.1} m²", t.coating_surface_m2), "Sa 2.5 + 3-Coat System", theme.accent_green);
+            self.metric_card(&mut cols[2], theme, "A325 BOLTED CONNECTIONS", &format!("{} Sets", t.bolt_sets_count), "Grade 8.8 High Strength", theme.accent_orange);
+            self.metric_card(&mut cols[3], theme, "FOUNDATION CONCRETE VOLUME", &format!("{:.1} m³", t.concrete_footing_m3), "Grade fc' 30 MPa (K-350)", theme.text_secondary);
         });
 
         ui.add_space(16.0);
 
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("BILL OF QUANTITIES (BOQ) — FORMULA GEOMETRI ELEMEN").size(13.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("BILL OF QUANTITIES (BoQ) — ELEMENT GEOMETRY FORMULAS").size(13.0).strong().color(theme.text_primary));
             ui.add_space(8.0);
 
             let top_len = format!("{:.2} m", t.span_m - (t.span_m / t.n_panels as f64));
@@ -485,21 +485,21 @@ impl PlanningView {
             let conc_vol = format!("{:.1} m³", t.concrete_footing_m3);
 
             let qto_rows = [
-                ("BATANG TEKAN ATAS (Top Chord)", top_len.as_str(), "W14x90", top_wt.as_str(), "AISC 360-16 LRFD"),
-                ("BATANG TARIK BAWAH (Bottom Chord)", bot_len.as_str(), "W14x90", bot_wt.as_str(), "Tension Net Section"),
-                ("BATANG DIAGONAL WEB (Diagonals)", diag_len.as_str(), "HSS8x8x1/2", diag_wt.as_str(), "Alternating Warren"),
-                ("PLAT BUHUL & PENGAKU (Gusset Plates)", "52 Lembar", "Plat T=16mm BJ41", gusset_wt.as_str(), "ASTM A36 / BJ41"),
-                ("ANGKUR & BASEPLATE TUMPAN", "4 Titik Perletakan", "T=32mm + 8x M36", "1.85 Ton", "Elastomeric Bearing Support"),
-                ("PONDASI TIANG PANCANG / BORED PILE", conc_vol.as_str(), "Beton K-350", "156.0 Ton", "Substructure Civil Work"),
+                ("TOP CHORD COMPRESSION (Top Chord)", top_len.as_str(), "W14x90", top_wt.as_str(), "AISC 360-16 LRFD"),
+                ("BOTTOM CHORD TENSION (Bottom Chord)", bot_len.as_str(), "W14x90", bot_wt.as_str(), "Tension Net Section"),
+                ("WEB DIAGONALS (Diagonals)", diag_len.as_str(), "HSS8x8x1/2", diag_wt.as_str(), "Alternating Warren"),
+                ("GUSSET PLATES & STIFFENERS", "52 Sheets", "Plate T=16mm BJ41", gusset_wt.as_str(), "ASTM A36 / BJ41"),
+                ("ANCHOR BOLTS & BEARING BASEPLATES", "4 Support Points", "T=32mm + 8x M36", "1.85 Ton", "Elastomeric Bearing Support"),
+                ("BORED PILE / PILE CAP FOUNDATION", conc_vol.as_str(), "Concrete K-350", "156.0 Ton", "Substructure Civil Work"),
             ];
 
             for (elem, dim, sec, weight, code) in qto_rows {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(elem).size(12.0).strong().color(theme.text_primary));
                     ui.label(RichText::new("—").size(12.0).color(theme.text_muted));
-                    ui.label(RichText::new(format!("Dimensi: {}", dim)).size(12.0).color(theme.text_secondary));
+                    ui.label(RichText::new(format!("Dimensions: {}", dim)).size(12.0).color(theme.text_secondary));
                     ui.label(RichText::new("•").size(12.0).color(theme.text_muted));
-                    ui.label(RichText::new(format!("Profil: {}", sec)).size(12.0).color(theme.accent_blue));
+                    ui.label(RichText::new(format!("Section: {}", sec)).size(12.0).color(theme.accent_blue));
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new(code).size(11.0).color(theme.text_muted));
@@ -514,20 +514,20 @@ impl PlanningView {
     }
 
     // -------------------------------------------------------------
-    // SUB-TAB 3: PENJADWALAN 4D & KURVA S
+    // SUB-TAB 3: 4D SCHEDULING & S-CURVE
     // -------------------------------------------------------------
     fn render_schedule_4d(&self, ui: &mut Ui, theme: &MacTheme, t: &Parametric5DTakeoff) {
         ui.columns(4, |cols| {
-            self.metric_card(&mut cols[0], theme, "TOTAL WAKTU KERJA", &format!("{} Hari", t.duration_days), &format!("{:.1} Bulan Kalender", t.duration_days as f64 / 30.0), theme.accent_blue);
-            self.metric_card(&mut cols[1], theme, "TOTAL MAN-DAYS (OH)", &format!("{} OH", t.total_man_days), "Kebutuhan Tenaga Kerja", theme.accent_orange);
-            self.metric_card(&mut cols[2], theme, "LINTASAN KRITIS (CPM)", "WBS 5.0 (Ereksi)", "Zero Float Critical Path", theme.accent_red);
-            self.metric_card(&mut cols[3], theme, "SVD ERECTION GUARD", "Rank Safe (14/14)", "Zero Mechanism saat Cantilever", theme.accent_green);
+            self.metric_card(&mut cols[0], theme, "TOTAL WORKING DURATION", &format!("{} Days", t.duration_days), &format!("{:.1} Calendar Months", t.duration_days as f64 / 30.0), theme.accent_blue);
+            self.metric_card(&mut cols[1], theme, "TOTAL MAN-DAYS", &format!("{} MD", t.total_man_days), "Labor Requirement", theme.accent_orange);
+            self.metric_card(&mut cols[2], theme, "CRITICAL PATH (CPM)", "WBS 5.0 (Erection)", "Zero Float Critical Path", theme.accent_red);
+            self.metric_card(&mut cols[3], theme, "SVD ERECTION GUARD", "Rank Safe (14/14)", "Zero Mechanism during Cantilever", theme.accent_green);
         });
 
         ui.add_space(16.0);
 
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("WBS 4D PENJADWALAN & SIMULASI TAHAPAN EREKSI (STAGED CONSTRUCTION)").size(13.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("WBS 4D SCHEDULING & STAGED ERECTION SIMULATION (STAGED CONSTRUCTION)").size(13.0).strong().color(theme.text_primary));
             ui.add_space(10.0);
 
             let mut engine = crate::core::ParametricEngine::new();
@@ -545,9 +545,9 @@ impl PlanningView {
                         theme.accent_green
                     };
                     let status_str = if act.is_critical {
-                        "Kritis (CPM - Float 0)"
+                        "Critical (CPM - Float 0)"
                     } else {
-                        "Float Aman"
+                        "Safe Float"
                     };
 
                     ui.horizontal(|ui| {
@@ -555,7 +555,7 @@ impl PlanningView {
                         ui.add_space(10.0);
                         ui.label(RichText::new(&act.name).size(12.0).strong().color(theme.text_primary));
                         ui.add_space(14.0);
-                        ui.label(RichText::new(format!("⏱️ Hari {}-{} (Dur: {}h)", act.early_start, act.early_finish, act.duration_days)).size(11.5).color(theme.text_secondary));
+                        ui.label(RichText::new(format!("⏱️ Day {}-{} (Dur: {}d)", act.early_start, act.early_finish, act.duration_days)).size(11.5).color(theme.text_secondary));
 
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             Frame::new()
@@ -566,9 +566,9 @@ impl PlanningView {
                                     ui.label(RichText::new(status_str).size(10.5).color(stat_color));
                                 });
                             ui.add_space(14.0);
-                            ui.label(RichText::new(format!("Float: {}h", act.total_float)).size(11.0).color(theme.text_muted));
+                            ui.label(RichText::new(format!("Float: {}d", act.total_float)).size(11.0).color(theme.text_muted));
                             ui.add_space(10.0);
-                            ui.label(RichText::new(format!("Bobot: {:.1}%", act.weight_percentage)).size(11.5).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("Weight: {:.1}%", act.weight_percentage)).size(11.5).color(theme.text_secondary));
                         });
                     });
 
@@ -589,18 +589,18 @@ impl PlanningView {
 
         // Visual Kurva S Display
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("📈 KURVA S — PROYEKSI CASHFLOW & PROGRES KUMULATIF MINGGUAN").size(13.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("📈 S-CURVE — CASHFLOW PROJECTION & WEEKLY CUMULATIVE PROGRESS").size(13.0).strong().color(theme.text_primary));
             ui.add_space(8.0);
-            ui.label(RichText::new("Target kumulatif progres fisik mingguan (Rencana S-Curve) terintegrasi dengan pencairan termin RAB:").size(11.5).color(theme.text_muted));
+            ui.label(RichText::new("Weekly physical cumulative progress targets (Planned S-Curve) integrated with BoQ progress payment disbursements:").size(11.5).color(theme.text_muted));
             ui.add_space(8.0);
 
             // Graphical ASCII representation of S-Curve Progression
             let weeks = [
-                ("M01-M04", " 8.5%", " Rp 280 Jt", "██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ Mobilisasi & Galian"),
-                ("M05-M08", "24.0%", " Rp 780 Jt", "█████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ Abutment Selesai & Fabrikasi Dimulai"),
-                ("M09-M12", "58.0%", "Rp 1.880 Jt", "███████████▒▒▒▒▒▒▒▒▒ Fabrikasi 100% & Coating Selesai"),
-                ("M13-M16", "86.5%", "Rp 2.850 Jt", "█████████████████▒▒▒ Ereksi Rangka Bentang 1-6 (SVD Certified)"),
-                ("M17-M20", "100.0%", "Rp Selesai", "████████████████████ Finishing, Baut Torsi & Serah Terima"),
+                ("W01-W04", " 8.5%", " IDR 280 M", "██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ Mobilization & Earthworks"),
+                ("W05-W08", "24.0%", " IDR 780 M", "█████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ Abutment Completed & Fabrication Starts"),
+                ("W09-W12", "58.0%", "IDR 1,880 M", "███████████▒▒▒▒▒▒▒▒▒ Fabrication 100% & Coating Completed"),
+                ("W13-W16", "86.5%", "IDR 2,850 M", "█████████████████▒▒▒ Full-Span Erection Stages 1-6 (SVD Certified)"),
+                ("W17-W20", "100.0%", "Completed", "████████████████████ Finishing, Torque Bolting & Handover"),
             ];
 
             for (w, pct, cash, bar) in weeks {
@@ -609,8 +609,8 @@ impl PlanningView {
                     ui.add_space(10.0);
                     ui.label(RichText::new(pct).size(11.5).color(theme.accent_green));
                     ui.add_space(10.0);
-                    let display_cash = if cash == "Rp Selesai" {
-                        format!("Rp {} Jt", format_idr(t.grand_total_rab / 1_000_000.0))
+                    let display_cash = if cash == "Completed" {
+                        format!("IDR {} M", format_idr(t.grand_total_rab / 1_000_000.0))
                     } else {
                         cash.to_string()
                     };
@@ -628,16 +628,16 @@ impl PlanningView {
     // -------------------------------------------------------------
     fn render_cost_ari_tradeoff(&self, ui: &mut Ui, theme: &MacTheme, t: &Parametric5DTakeoff) {
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("VALUE ENGINEERING: SENSITIVITAS BIAYA (RAB) TERHADAP INDEKS REDUNDANSI (ARI)").size(13.5).strong().color(theme.accent_blue));
+            ui.label(RichText::new("VALUE ENGINEERING: COST SENSITIVITY (BoQ) TO REDUNDANCY INDEX (ARI)").size(13.5).strong().color(theme.accent_blue));
             ui.add_space(4.0);
-            ui.label(RichText::new("Analisis komparatif untuk mengetahui seberapa besar penambahan biaya investasi yang dibutuhkan guna meningkatkan ketahanan keruntuhan progresif struktur:").size(11.5).color(theme.text_secondary));
+            ui.label(RichText::new("Comparative analysis to evaluate the incremental investment required to enhance structural progressive collapse resistance:").size(11.5).color(theme.text_secondary));
             ui.add_space(14.0);
 
             let options = [
-                ("Opsi 1: Minimum Code Compliance", 0.64, t.grand_total_rab * 0.92, "-8.0%", "🔴 Rentan Kegagalan Tunggal (1 Member Hilang = Runtuh)", theme.accent_red),
-                ("Opsi 2: Desain Standar Baseline", 0.78, t.grand_total_rab * 0.97, "-3.0%", "🟡 Memenuhi Standar Minimal SNI / AISC", theme.accent_orange),
-                ("Opsi 3: Desain Teroptimasi Redundan (Rekomendasi)", t.predicted_system_ari, t.grand_total_rab, "0.0% (Base)", "🟢 Robust Multi-Path (Kapasitas Cadangan Tinggi)", theme.accent_green),
-                ("Opsi 4: Ultra-Redundant (Infrastruktur Kritis)", 0.965, t.grand_total_rab * 1.075, "+7.5%", "🛡️ Dual-Path Collapse Proof (Jembatan Strategis)", theme.accent_blue),
+                ("Option 1: Minimum Code Compliance", 0.64, t.grand_total_rab * 0.92, "-8.0%", "🔴 Vulnerable to Single Failure (1 Member Removed = Collapse)", theme.accent_red),
+                ("Option 2: Baseline Standard Design", 0.78, t.grand_total_rab * 0.97, "-3.0%", "🟡 Meets Minimal SNI / AISC Standards", theme.accent_orange),
+                ("Option 3: Redundancy-Optimized Design (Recommended)", t.predicted_system_ari, t.grand_total_rab, "0.0% (Base)", "🟢 Robust Multi-Path (High Reserve Capacity)", theme.accent_green),
+                ("Option 4: Ultra-Redundant (Critical Infrastructure)", 0.965, t.grand_total_rab * 1.075, "+7.5%", "🛡️ Dual-Path Collapse Proof (Strategic Bridge)", theme.accent_blue),
             ];
 
             for (title, ari, cost, diff, desc, badge_color) in options {
@@ -655,7 +655,7 @@ impl PlanningView {
                             });
 
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label(RichText::new(format!("Rp {},-", format_idr(cost))).size(13.5).strong().color(theme.accent_blue));
+                                ui.label(RichText::new(format!("IDR {},-", format_idr(cost))).size(13.5).strong().color(theme.accent_blue));
                                 ui.add_space(24.0);
                                 ui.label(RichText::new(diff).size(12.0).color(theme.text_muted));
                                 ui.add_space(24.0);
@@ -677,8 +677,8 @@ impl PlanningView {
             ui.add_space(8.0);
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new("💡 KESIMPULAN REKAYASA NILAI (VALUE ENGINEERING):").size(12.0).strong().color(theme.accent_green));
-                ui.label(RichText::new("Hanya dengan kenaikan biaya +3.8% dari baseline standar, indeks redundansi ARI meningkat drastis +16.9%, mencegah mekanisme keruntuhan katastropik saat terjadi gempa atau benturan kendaraan.").size(12.0).color(theme.text_secondary));
+                ui.label(RichText::new("💡 VALUE ENGINEERING CONCLUSION:").size(12.0).strong().color(theme.accent_green));
+                ui.label(RichText::new("With only a +3.8% cost increase from baseline standard, the ARI redundancy index jumps significantly by +16.9%, preventing catastrophic collapse mechanisms during earthquakes or vehicular impacts.").size(12.0).color(theme.text_secondary));
             });
         });
     }
@@ -688,18 +688,18 @@ impl PlanningView {
     // -------------------------------------------------------------
     fn render_staged_erection_svd(&self, ui: &mut Ui, theme: &MacTheme, _takeoff: &Parametric5DTakeoff) {
         ui.columns(4, |cols| {
-            self.metric_card(&mut cols[0], theme, "TAHAPAN EREKSI", "5 Tahap", "WBS Erection Sequence", theme.accent_blue);
-            self.metric_card(&mut cols[1], theme, "TAHAP PALING KRITIS", "Tahap 2 (WBS 2.2)", "ARI: 0.285 (Shoring Wajib)", theme.accent_red);
-            self.metric_card(&mut cols[2], theme, "STABILITAS CLOSURE", "Minggu Ke-12", "SVD Gate 1 Full Rank", theme.accent_green);
+            self.metric_card(&mut cols[0], theme, "ERECTION STAGES", "5 Stages", "WBS Erection Sequence", theme.accent_blue);
+            self.metric_card(&mut cols[1], theme, "MOST CRITICAL STAGE", "Stage 2 (WBS 2.2)", "ARI: 0.285 (Shoring Required)", theme.accent_red);
+            self.metric_card(&mut cols[2], theme, "CLOSURE STABILITY", "Week 12", "SVD Gate 1 Full Rank", theme.accent_green);
             self.metric_card(&mut cols[3], theme, "FINAL OPERATIONAL ARI", "0.942", "Safe Multi-Path System", theme.accent_green);
         });
 
         ui.add_space(16.0);
 
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("SIMULASI KESELAMATAN EREKSI BERTAHAP (STAGED ERECTION SVD GUARD)").size(14.0).strong().color(theme.text_primary));
+            ui.label(RichText::new("STAGED ERECTION SAFETY SIMULATION (STAGED ERECTION SVD GUARD)").size(14.0).strong().color(theme.text_primary));
             ui.add_space(4.0);
-            ui.label(RichText::new("Struktur baja sering kali belum memiliki kekakuan redundan sempurna selama masa ereksi di lapangan sebelum penutupan rangka (closure). Evaluasi tahapan ini mendeteksi titik rawan keruntuhan saat perakitan:").size(12.0).color(theme.text_secondary));
+            ui.label(RichText::new("Steel structures frequently lack full redundant stiffness during field erection before closure. This staged evaluation detects critical collapse hazards during assembly:").size(12.0).color(theme.text_secondary));
             ui.add_space(12.0);
 
             let mut engine = crate::core::ParametricEngine::new();
@@ -710,10 +710,10 @@ impl PlanningView {
             if let Some(stages) = staged_results {
                 for stage in &stages {
                     let col = if stage.is_stable { theme.accent_green } else { theme.accent_red };
-                    let status_str = if stage.is_stable { "🟢 STABIL BEBAS MEKANISME" } else { "🔴 KRITIS SHORING WAJIB" };
+                    let status_str = if stage.is_stable { "🟢 STABLE / NO MECHANISM" } else { "🔴 CRITICAL / SHORING REQUIRED" };
                     let note = match stage.warning.as_deref() {
                         Some(w) => w,
-                        None => "Kekakuan bertahap stabil rank penuh, deformasi terkendali.",
+                        None => "Staged stiffness stable with full rank, deflections within limits.",
                     };
 
                     Frame::new()
@@ -726,9 +726,9 @@ impl PlanningView {
                                 ui.label(RichText::new("●").size(14.0).color(col));
                                 ui.vertical(|ui| {
                                     ui.label(RichText::new(&stage.stage_name).size(12.5).strong().color(theme.text_primary));
-                                    ui.label(RichText::new(format!("Elemen: {} batang • Rank SVD: {}/{} • Kondisi: {:.1e}", stage.erected_elements_count, stage.rank, stage.active_dofs, stage.condition_number)).size(11.0).color(theme.text_secondary));
+                                    ui.label(RichText::new(format!("Elements: {} members • SVD Rank: {}/{} • Condition: {:.1e}", stage.erected_elements_count, stage.rank, stage.active_dofs, stage.condition_number)).size(11.0).color(theme.text_secondary));
                                     ui.add_space(2.0);
-                                    ui.label(RichText::new(format!("💡 Evaluasi: {}", note)).size(11.0).color(theme.text_muted));
+                                    ui.label(RichText::new(format!("💡 Evaluation: {}", note)).size(11.0).color(theme.text_muted));
                                 });
 
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {

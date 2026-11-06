@@ -440,9 +440,9 @@ impl ConcreteEngine {
 
             let is_safe = best_dcr <= 1.0;
             if is_safe {
-                governing = format!("Aman: DCR = {:.3} ≤ 1.00 (Kapasitas Cadangan: {:.1}%)", best_dcr, (1.0 - best_dcr) * 100.0);
+                governing = format!("Safe: DCR = {:.3} ≤ 1.00 (Reserve Capacity: {:.1}%)", best_dcr, (1.0 - best_dcr) * 100.0);
             } else if governing.is_empty() {
-                governing = format!("Overstressed: DCR = {:.3} > 1.00 (Kelebihan Beban: {:.1}%)", best_dcr, (best_dcr - 1.0) * 100.0);
+                governing = format!("Overstressed: DCR = {:.3} > 1.00 (Overload: {:.1}%)", best_dcr, (best_dcr - 1.0) * 100.0);
             }
 
             Some(DemandAudit {

@@ -87,17 +87,17 @@ impl SettingsView {
                 ui.label(RichText::new("Used for autonomous BIM modeling, load path diagnostics, and structural reports.").size(11.0).color(theme.text_muted));
 
                 ui.add_space(12.0);
-                ui.label(RichText::new("GitHub Personal Access Token (PAT) [Opsional]:").size(13.0).color(theme.text_primary));
+                ui.label(RichText::new("GitHub Personal Access Token (PAT) [Optional]:").size(13.0).color(theme.text_primary));
                 ui.add(egui::TextEdit::singleline(&mut self.github_token).password(true));
-                ui.label(RichText::new("Digunakan untuk otentikasi update otomatis dari aplikasi jika repositori GitHub berstatus privat.").size(11.0).color(theme.text_muted));
+                ui.label(RichText::new("Used for automatic update authentication if GitHub repository is private.").size(11.0).color(theme.text_muted));
 
                 ui.add_space(12.0);
                 ui.separator();
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Pembaruan Perangkat Lunak:").size(13.0).strong().color(theme.text_primary));
+                    ui.label(RichText::new("Software Updates:").size(13.0).strong().color(theme.text_primary));
                     if ui.add(
-                        egui::Button::new(RichText::new("🚀 Periksa Pembaruan Sekarang").size(12.0).strong().color(Color32::WHITE))
+                        egui::Button::new(RichText::new("🚀 Check for Updates Now").size(12.0).strong().color(Color32::WHITE))
                             .fill(theme.accent_blue)
                             .corner_radius(egui::CornerRadius::same(6)),
                     ).clicked() {
@@ -105,7 +105,7 @@ impl SettingsView {
                         updater.check_for_updates();
                     }
                 });
-                ui.label(RichText::new("Memeriksa ketersediaan versi rilis terbaru dan rincian update resmi dari GitHub Releases.").size(11.0).color(theme.text_muted));
+                ui.label(RichText::new("Checks for latest release versions and official update details from GitHub Releases.").size(11.0).color(theme.text_muted));
             });
 
             ui.add_space(16.0);
@@ -123,7 +123,7 @@ impl SettingsView {
                     if ui.add(
                         egui::Button::new(RichText::new("🚀 Update").size(11.0).color(theme.accent_blue))
                             .fill(Color32::TRANSPARENT),
-                    ).on_hover_text("Periksa rilis versi terbaru").clicked() {
+                    ).on_hover_text("Check for latest release").clicked() {
                         updater.github_token = self.github_token.clone();
                         updater.check_for_updates();
                     }

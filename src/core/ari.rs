@@ -1,8 +1,8 @@
-//! ari.rs — Mesin Adjusted Redundancy Index (ARI) & Pengaman Kinematik Spektral.
-//! Diporting langsung dari repositori resmi: https://github.com/haridsirawan/Adjusted-Redundancy-Index
-//! Berdasarkan Formulasi Resmi EigenGraph:
-//! "Pengembangan dan Validasi Adjusted Redundancy Index untuk Penapisan Pra-Analisis Skenario Gangguan Elemen pada Struktur Linear-Elastik"
-//! Oleh: Harids Irawan, S.T., M.T., EigenGraph Platform, 2026.
+//! ari.rs — Adjusted Redundancy Index (ARI) Engine & Spectral Kinematic Guard.
+//! Ported directly from official repository: https://github.com/haridsirawan/Adjusted-Redundancy-Index
+//! Based on Official EigenGraph Formulation:
+//! "Development and Validation of Adjusted Redundancy Index for Pre-Analysis Element Disruption Scenario Screening in Linear-Elastic Structures"
+//! By: Harids Irawan, S.T., M.T., EigenGraph Platform, 2026.
 
 use std::collections::{HashMap, HashSet};
 use crate::core::linalg::Matrix;
@@ -10,14 +10,14 @@ use crate::core::model::StructuralModel;
 use crate::core::solver::FemSolver;
 
 // -----------------------------------------------------------------------------
-// KONSTANTA & PARAMETER KALIBRASI RESMI EIGENGRAPH (Persamaan 2.6 - 2.19, 4.13b)
+// OFFICIAL EIGENGRAPH CONSTANTS & CALIBRATION PARAMETERS (Eqs. 2.6 - 2.19, 4.13b)
 // -----------------------------------------------------------------------------
-pub const EPS_W: f64 = 1e-9;          // Regularisasi biaya sisi elastis (Eq 2.8)
-pub const EPS_D: f64 = 1e-9;          // Regularisasi pembagi skor lintasan (Eq 2.9)
-pub const EPS_R: f64 = 1e-6;          // Penstabil kapasitas batas pada U* (Eq 2.16)
-pub const BASELINE_TOL: f64 = 1e-12;  // Toleransi singularitas skor acuan
-pub const MARGIN_TOL: f64 = 1e-8;     // Toleransi batas pengaman stabilitas Sherman-Morrison m_e (Eq 4.2)
-pub const RANK_TOL: f64 = 1e-10;      // Toleransi rank relatif solver Gate 1
+pub const EPS_W: f64 = 1e-9;          // Elastic edge weight regularization (Eq 2.8)
+pub const EPS_D: f64 = 1e-9;          // Path score divisor regularization (Eq 2.9)
+pub const EPS_R: f64 = 1e-6;          // Limit capacity stabilizer for U* (Eq 2.16)
+pub const BASELINE_TOL: f64 = 1e-12;  // Baseline score singularity tolerance
+pub const MARGIN_TOL: f64 = 1e-8;     // Sherman-Morrison stability guard boundary tolerance m_e (Eq 4.2)
+pub const RANK_TOL: f64 = 1e-10;      // Gate 1 relative rank solver tolerance
 
 /// Konfigurasi Parameter Analitis ARI (Formulasi EigenGraph Bab II & Bab IV)
 #[derive(Debug, Clone)]
