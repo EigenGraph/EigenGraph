@@ -7,6 +7,40 @@ Per Section 6 of `AGENTS.md`, versioning strictly follows:
 
 ---
 
+## 🚀 EigenGraph v0.0.4 — Phase 3: Advanced Seismic & Pushover Analysis (ASCE 41-17 / ATC-40)
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.4`  
+**Target:** Production Engine
+
+EigenGraph v0.0.4 introduces the **Non-Linear Static Pushover Engine & Capacity Spectrum Method (CSM / ATC-40)**, enabling structural engineers to conduct Performance-Based Earthquake Engineering (PBEE) assessments in accordance with ASCE 41-17, FEMA 356, and SNI 1726:2019.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Capacity Spectrum Method (CSM / ATC-40) in ADRS Space
+- **ADRS Coordinate Transformation**: Converts traditional Pushover curve coordinates $(D_{\text{roof}}, V_b)$ into Acceleration-Displacement Response Spectrum ($ADRS$) spectral coordinates $(S_d, S_a)$:
+  $$S_d = \frac{D_{\text{roof}}}{\Gamma_1 \cdot \phi_{\text{roof}, 1}}, \quad S_a = \frac{V_b / W}{\alpha_1}$$
+  where $\Gamma_1$ is the first-mode participation factor and $\alpha_1$ is the effective modal mass coefficient.
+- **Inelastic Damping Reduction**: Derives equivalent hysteretic viscous damping:
+  $$\beta_{\text{eff}} = \beta_0 + \kappa \cdot \frac{2}{\pi} \frac{A_y D_p - D_y A_p}{A_p D_p}$$
+  with spectral damping reduction factors $SR_A = \frac{3.21 - 0.68 \ln(\beta_{\text{eff}})}{2.12}$ and $SR_V = \frac{2.31 - 0.41 \ln(\beta_{\text{eff}})}{1.65}$.
+- **Performance Point Convergence**: Uses iterative ATC-40 Procedure A to locate the intersecting Performance Point $P^*(S_d^*, S_a^*)$, determining target roof drift $D_t$, target base shear $V_t$, and secant period $T_{\text{eff}}$.
+
+#### 2. Performance-Based Earthquake Engineering (PBEE) Classification
+- Evaluates the structural system against ASCE 41-17 Table 9-6 / FEMA 356 performance levels:
+  - `ImmediateOccupancy` (IO): Minor micro-yielding, no residual drift, immediate re-entry.
+  - `LifeSafety` (LS): Controlled plastification, wide collapse margin under Design Basis Earthquake (DBE).
+  - `CollapsePrevention` (CP): Severe structural damage, prevents global collapse under Maximum Considered Earthquake (MCE).
+  - `CollapseExceeded`: Demand exceeds inelastic capacity limit, indicating structural collapse risk.
+- Tallies plastic hinge performance states (Elastic, IO, LS, CP, Mechanism) across all frame members.
+
+#### 3. Dual Vector Visualization in Desktop UI
+- Side-by-side interactive vector plots:
+  - **Plot 1**: Base Shear vs Roof Drift capacity curve with target displacement $D_t$ reticle indicator.
+  - **Plot 2**: ADRS Capacity-Demand Spectrum showing Elastic 5% Demand (red dashed), Inelastic Reduced Demand (amber), Capacity Spectrum (emerald green), and intersecting Performance Point $P^*(S_d^*, S_a^*)$.
+- Dynamic toolbar controls for Lateral Load Patterns (`FirstModeModal`, `UniformMass`, `InvertedTriangular`) and Soil Site Classes (SB, SC, SD, SE).
+
+---
+
 ## 🚀 EigenGraph v0.0.3 — Phase 2: Core Upgrade (Shell FEA, P-Delta & IFC4 SAM)
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.3`  

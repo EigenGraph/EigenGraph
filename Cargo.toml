@@ -1,12 +1,12 @@
 [package]
 name = "eigengraph"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 authors = ["Harids Irawan <harids.irawan@gmail.com>"]
 description = "EigenGraph - Desktop BIM & Structural Graph Analytics with Mac App Store UI"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/haridsirawan/EigenGraph"
+repository = "https://github.com/EigenGraph/EigenGraph"
 
 [dependencies]
 eframe = { version = "0.36", default-features = false, features = [

@@ -411,7 +411,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🏛️ Laporan PBG/SIMBG (.html)").size(10.5).color(Color32::WHITE))
+                            if ui.add(egui::Button::new(RichText::new("🏛️ PBG/SIMBG Dossier (.html)").size(10.5).color(Color32::WHITE))
                                 .fill(Color32::from_rgb(180, 83, 9))
                                 .corner_radius(CornerRadius::same(6))).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
@@ -419,14 +419,14 @@ impl ResultsView {
                                     if let Ok(ari) = crate::core::AriEngine::evaluate_redundancy(&model) {
                                         let meta = crate::core::PbgProjectMetadata::default();
                                         let html = crate::core::PbgReportGenerator::generate_printable_html(&model, &ari, &meta);
-                                        if let Ok(path) = crate::core::DiskExporter::write_export_file("Laporan_Teknis_PBG_SIMBG_SNI.html", &html) {
-                                            self.export_status = Some(format!("Dokumen Perhitungan PBG/SIMBG tersimpan: {}", path));
+                                        if let Ok(path) = crate::core::DiskExporter::write_export_file("PBG_SIMBG_Calculation_Report.html", &html) {
+                                            self.export_status = Some(format!("PBG/SIMBG Compliance Report saved to: {}", path));
                                         }
                                     }
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("📋 Bar Bending Schedule (.html)").size(10.5).color(Color32::WHITE))
+                            if ui.add(egui::Button::new(RichText::new("📋 Bar Bending Schedule (.md)").size(10.5).color(Color32::WHITE))
                                 .fill(Color32::from_rgb(109, 40, 217))
                                 .corner_radius(CornerRadius::same(6))).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
@@ -434,7 +434,27 @@ impl ResultsView {
                                     let bbs = crate::core::RebarBbsDetailer::generate_from_model(&model, 30.0, 420.0);
                                     let md = crate::core::RebarBbsDetailer::export_to_markdown(&bbs);
                                     if let Ok(path) = crate::core::DiskExporter::write_export_file("Bar_Bending_Schedule_SNI2847.md", &md) {
-                                        self.export_status = Some(format!("Jadwal Pemotongan Tulangan (BBS) tersimpan: {}", path));
+                                        self.export_status = Some(format!("Bar Bending Schedule (BBS) saved to: {}", path));
+                                    }
+                                }
+                            }
+
+                            if ui.add(egui::Button::new(RichText::new("📉 ASCE 41 Pushover Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(14, 165, 233))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let mut engine = crate::core::ParametricEngine::new();
+                                if let Ok(model) = engine.generate_warren_truss() {
+                                    let csm = crate::core::PushoverEngine::evaluate_csm(
+                                        &model,
+                                        crate::core::SiteClass::SD,
+                                        1.20,
+                                        0.50,
+                                        crate::core::LateralLoadPattern::FirstModeModal,
+                                        15,
+                                    );
+                                    let md = crate::core::PushoverEngine::generate_markdown_dossier(&csm);
+                                    if let Ok(path) = crate::core::DiskExporter::write_export_file("ASCE41_Pushover_Performance_Dossier.md", &md) {
+                                        self.export_status = Some(format!("ASCE 41 Pushover Dossier saved to: {}", path));
                                     }
                                 }
                             }

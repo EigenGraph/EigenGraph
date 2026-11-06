@@ -44,6 +44,7 @@ pub struct AnalyzeView {
     pub woodbury_disrupt_elem_id: usize,
     pub woodbury_lambda_val: f32,
     pub modal_damping_ratio: f32,
+    pub pushover_load_pattern: crate::core::LateralLoadPattern,
 }
 
 impl Default for AnalyzeView {
@@ -75,6 +76,7 @@ impl Default for AnalyzeView {
             woodbury_disrupt_elem_id: 1,
             woodbury_lambda_val: 0.0,
             modal_damping_ratio: 0.05,
+            pushover_load_pattern: crate::core::LateralLoadPattern::FirstModeModal,
         }
     }
 }
@@ -821,19 +823,82 @@ impl AnalyzeView {
     fn render_nonlinear_pushover(&mut self, ui: &mut Ui, theme: &MacTheme) {
         let mut engine = crate::core::ParametricEngine::new();
         let model = engine.generate_warren_truss().unwrap_or_else(|_| crate::core::StructuralModel::new("Pushover Model"));
-        let report = crate::core::NonlinearEngine::run_pushover(&model, 15);
+        let csm = crate::core::PushoverEngine::evaluate_csm(
+            &model,
+            self.site_class,
+            self.ss_val as f64,
+            self.s1_val as f64,
+            self.pushover_load_pattern,
+            15,
+        );
+        let report = &csm.raw_pushover;
 
         // Top Summary Cards
         ui.columns(4, |cols| {
-            self.metric_card(&mut cols[0], theme, "YIELD BASE SHEAR (Vy)", &format!("{:.1} kN", report.yield_base_shear_kn), &format!("Drift: {:.2} mm", report.yield_drift_mm), theme.accent_blue);
-            self.metric_card(&mut cols[1], theme, "ULTIMATE CAPACITY (Vu)", &format!("{:.1} kN", report.ultimate_base_shear_kn), &format!("Drift: {:.2} mm", report.ultimate_drift_mm), theme.accent_green);
-            self.metric_card(&mut cols[2], theme, "OVERSTRENGTH FACTOR (Ω0)", &format!("{:.2}x", report.overstrength_factor_omega0), "AISC 341 Seismic Resilient", theme.accent_orange);
-            self.metric_card(&mut cols[3], theme, "DUCTILITY RATIO (µ)", &format!("{:.2}", report.ductility_ratio_mu), "Highly Ductile Structural Category", theme.accent_blue);
+            self.metric_card(&mut cols[0], theme, "PERFORMANCE POINT (Dt)", &format!("{:.2} mm", csm.performance_point.target_displacement_dt_mm), &format!("Base Shear: {:.1} kN", csm.performance_point.target_base_shear_vt_kn), theme.accent_blue);
+            let perf_color = match csm.performance_point.performance_level {
+                crate::core::SeismicPerformanceLevel::ImmediateOccupancy => theme.accent_blue,
+                crate::core::SeismicPerformanceLevel::LifeSafety => theme.accent_green,
+                crate::core::SeismicPerformanceLevel::CollapsePrevention => theme.accent_orange,
+                crate::core::SeismicPerformanceLevel::CollapseExceeded => Color32::from_rgb(239, 68, 68),
+            };
+            self.metric_card(&mut cols[1], theme, "SEISMIC AUDIT LEVEL", match csm.performance_point.performance_level {
+                crate::core::SeismicPerformanceLevel::ImmediateOccupancy => "Immediate Occupancy",
+                crate::core::SeismicPerformanceLevel::LifeSafety => "Life Safety (LS)",
+                crate::core::SeismicPerformanceLevel::CollapsePrevention => "Collapse Prevention",
+                crate::core::SeismicPerformanceLevel::CollapseExceeded => "Collapse Exceeded",
+            }, &format!("Margin: {:.1}%", csm.seismic_safety_margin_pct), perf_color);
+            self.metric_card(&mut cols[2], theme, "EFFECTIVE DAMPING (βeff)", &format!("{:.1}%", csm.performance_point.effective_damping_pct), &format!("Secant Period: {:.2}s", csm.performance_point.effective_period_teff_s), theme.accent_orange);
+            self.metric_card(&mut cols[3], theme, "DUCTILITY DEMAND (µ)", &format!("{:.2}", csm.performance_point.ductility_demand_mu), &format!("Max Drift: {:.1} mm", report.ultimate_drift_mm), theme.accent_blue);
         });
 
-        ui.add_space(16.0);
+        ui.add_space(12.0);
 
-        // Capacity Curve Table & Hinge Sequence
+        // Control Toolbar: Lateral Load Pattern & Seismic Site Parameters
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::same(10))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Lateral Load Pattern:").size(11.0).strong().color(theme.text_secondary));
+                    let patterns = [
+                        (crate::core::LateralLoadPattern::FirstModeModal, "Mode 1 (Modal)"),
+                        (crate::core::LateralLoadPattern::UniformMass, "Uniform Mass"),
+                        (crate::core::LateralLoadPattern::InvertedTriangular, "Inverted Triangular"),
+                    ];
+                    for (pat, lbl) in patterns {
+                        let is_sel = self.pushover_load_pattern == pat;
+                        let btn = egui::Button::new(RichText::new(lbl).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_secondary }))
+                            .fill(if is_sel { Color32::from_rgb(37, 99, 235) } else { theme.bg_canvas });
+                        if ui.add(btn).clicked() {
+                            self.pushover_load_pattern = pat;
+                        }
+                    }
+
+                    ui.add_space(14.0);
+                    ui.label(RichText::new("Site Class:").size(11.0).strong().color(theme.text_secondary));
+                    for (sc, lbl) in [(crate::core::SiteClass::SB, "SB"), (crate::core::SiteClass::SC, "SC"), (crate::core::SiteClass::SD, "SD"), (crate::core::SiteClass::SE, "SE")] {
+                        let is_sel = self.site_class == sc;
+                        let btn = egui::Button::new(RichText::new(lbl).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_secondary }))
+                            .fill(if is_sel { theme.accent_blue } else { theme.bg_canvas });
+                        if ui.add(btn).clicked() {
+                            self.site_class = sc;
+                        }
+                    }
+
+                    ui.add_space(14.0);
+                    ui.label(RichText::new("Ss (g):").size(11.0).color(theme.text_muted));
+                    ui.add(egui::DragValue::new(&mut self.ss_val).speed(0.02).range(0.1..=2.5));
+                    ui.label(RichText::new("S1 (g):").size(11.0).color(theme.text_muted));
+                    ui.add(egui::DragValue::new(&mut self.s1_val).speed(0.02).range(0.05..=1.5));
+                });
+            });
+
+        ui.add_space(12.0);
+
+        // Capacity Curve Table & Dual Plot Area
         Frame::new()
             .fill(theme.bg_card)
             .corner_radius(CornerRadius::same(10))
@@ -841,50 +906,159 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📉 Nonlinear Static Pushover Capacity Curve (P-Δ Bending & Axial Interaction)").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📉 Capacity Spectrum Method (ATC-40 / ASCE 41-17) & Performance Point").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let status_tag = if report.is_stable { "✅ Stable Without Premature Mechanism" } else { "⚠️ Mechanism Hinge Detected" };
-                        ui.label(RichText::new(status_tag).size(11.5).strong().color(if report.is_stable { theme.accent_green } else { theme.accent_orange }));
+                        let status_tag = if csm.is_code_compliant { "✅ Life Safety (LS) Compliant" } else { "⚠️ Collapse Exceeded Limit" };
+                        let status_col = if csm.is_code_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                        ui.label(RichText::new(status_tag).size(11.5).strong().color(status_col));
                     });
                 });
 
                 ui.add_space(10.0);
 
-                // LIVE VECTOR PUSHOVER CAPACITY CURVE (V_base vs Drift)
-                let desired = Vec2::new(ui.available_width(), 145.0);
-                let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
-                let painter = ui.painter_at(rect);
-                painter.rect_filled(rect, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+                // DUAL VECTOR VISUALIZER (Left: V_base vs Drift, Right: ADRS Sa vs Sd)
+                ui.columns(2, |cols| {
+                    // LEFT: V_base vs Drift Capacity Curve
+                    cols[0].label(RichText::new("1. Base Shear vs Roof Drift (Pushover Curve)").size(11.0).strong().color(theme.text_secondary));
+                    let desired_left = Vec2::new(cols[0].available_width(), 160.0);
+                    let (rect_l, _) = cols[0].allocate_exact_size(desired_left, Sense::hover());
+                    let painter_l = cols[0].painter_at(rect_l);
+                    painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
 
-                let pad_l = 38.0;
-                let pad_r = 16.0;
-                let pad_t = 14.0;
-                let pad_b = 20.0;
-                let plot_w = (rect.width() - pad_l - pad_r).max(50.0);
-                let plot_h = (rect.height() - pad_t - pad_b).max(40.0);
-                let x0 = rect.left() + pad_l;
-                let y0 = rect.bottom() - pad_b;
+                    let pad_l = 42.0;
+                    let pad_r = 16.0;
+                    let pad_t = 16.0;
+                    let pad_b = 22.0;
+                    let plot_wl = (rect_l.width() - pad_l - pad_r).max(40.0);
+                    let plot_hl = (rect_l.height() - pad_t - pad_b).max(30.0);
+                    let x0_l = rect_l.left() + pad_l;
+                    let y0_l = rect_l.bottom() - pad_b;
 
-                for i in 0..=3 {
-                    let y = y0 - (i as f32 / 3.0) * plot_h;
-                    painter.line_segment([Pos2::new(x0, y), Pos2::new(x0 + plot_w, y)], Stroke::new(0.8, Color32::from_white_alpha(18)));
-                }
+                    for i in 0..=3 {
+                        let y = y0_l - (i as f32 / 3.0) * plot_hl;
+                        painter_l.line_segment([Pos2::new(x0_l, y), Pos2::new(x0_l + plot_wl, y)], Stroke::new(0.8, Color32::from_white_alpha(18)));
+                    }
 
-                let max_drift = report.ultimate_drift_mm.max(1.0) as f32 * 1.1;
-                let max_shear = report.ultimate_base_shear_kn.max(10.0) as f32 * 1.15;
-                let mut pts = Vec::with_capacity(report.steps.len() + 1);
-                pts.push(Pos2::new(x0, y0));
-                for st in &report.steps {
-                    let px = x0 + ((st.roof_drift_mm as f32) / max_drift).clamp(0.0, 1.0) * plot_w;
-                    let py = y0 - ((st.base_shear_kn as f32) / max_shear).clamp(0.0, 1.0) * plot_h;
-                    pts.push(Pos2::new(px, py));
-                }
-                for w in pts.windows(2) {
-                    painter.line_segment([w[0], w[1]], Stroke::new(2.2, theme.accent_green));
-                }
-                for &pt in pts.iter().skip(1) {
-                    painter.circle_filled(pt, 3.0, theme.accent_blue);
-                }
+                    let max_drift = report.ultimate_drift_mm.max(1.0) as f32 * 1.15;
+                    let max_shear = report.ultimate_base_shear_kn.max(10.0) as f32 * 1.15;
+                    let mut pts_l = Vec::with_capacity(report.steps.len() + 1);
+                    pts_l.push(Pos2::new(x0_l, y0_l));
+                    for st in &report.steps {
+                        let px = x0_l + ((st.roof_drift_mm as f32) / max_drift).clamp(0.0, 1.0) * plot_wl;
+                        let py = y0_l - ((st.base_shear_kn as f32) / max_shear).clamp(0.0, 1.0) * plot_hl;
+                        pts_l.push(Pos2::new(px, py));
+                    }
+                    for w in pts_l.windows(2) {
+                        painter_l.line_segment([w[0], w[1]], Stroke::new(2.2, theme.accent_green));
+                    }
+                    for &pt in pts_l.iter().skip(1) {
+                        painter_l.circle_filled(pt, 2.5, theme.accent_blue);
+                    }
+
+                    // Target Dt Reticle
+                    let dt_px = x0_l + ((csm.performance_point.target_displacement_dt_mm as f32) / max_drift).clamp(0.0, 1.0) * plot_wl;
+                    let vt_py = y0_l - ((csm.performance_point.target_base_shear_vt_kn as f32) / max_shear).clamp(0.0, 1.0) * plot_hl;
+                    let perf_pt_l = Pos2::new(dt_px, vt_py);
+                    painter_l.line_segment([Pos2::new(dt_px, y0_l), Pos2::new(dt_px, y0_l - plot_hl)], Stroke::new(1.0, Color32::from_rgba_premultiplied(14, 165, 233, 140)));
+                    painter_l.circle_filled(perf_pt_l, 4.5, Color32::from_rgb(14, 165, 233));
+                    painter_l.circle_stroke(perf_pt_l, 6.0, Stroke::new(1.2, Color32::WHITE));
+                    painter_l.text(perf_pt_l + Vec2::new(6.0, -8.0), egui::Align2::LEFT_BOTTOM, format!("Dt={:.1}mm", csm.performance_point.target_displacement_dt_mm), egui::FontId::proportional(9.5), Color32::WHITE);
+
+                    // Labels
+                    painter_l.text(Pos2::new(x0_l, rect_l.top() + 6.0), egui::Align2::LEFT_TOP, "V_base (kN)", egui::FontId::proportional(9.5), theme.text_muted);
+                    painter_l.text(Pos2::new(rect_l.right() - pad_r, y0_l + 6.0), egui::Align2::RIGHT_TOP, "Roof Drift (mm)", egui::FontId::proportional(9.5), theme.text_muted);
+
+                    // RIGHT: ADRS Sa vs Sd Capacity Spectrum
+                    cols[1].label(RichText::new("2. Acceleration-Displacement Response Spectrum (ADRS)").size(11.0).strong().color(theme.text_secondary));
+                    let desired_right = Vec2::new(cols[1].available_width(), 160.0);
+                    let (rect_r, _) = cols[1].allocate_exact_size(desired_right, Sense::hover());
+                    let painter_r = cols[1].painter_at(rect_r);
+                    painter_r.rect_filled(rect_r, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+                    let plot_wr = (rect_r.width() - pad_l - pad_r).max(40.0);
+                    let plot_hr = (rect_r.height() - pad_t - pad_b).max(30.0);
+                    let x0_r = rect_r.left() + pad_l;
+                    let y0_r = rect_r.bottom() - pad_b;
+
+                    for i in 0..=3 {
+                        let y = y0_r - (i as f32 / 3.0) * plot_hr;
+                        painter_r.line_segment([Pos2::new(x0_r, y), Pos2::new(x0_r + plot_wr, y)], Stroke::new(0.8, Color32::from_white_alpha(18)));
+                    }
+
+                    let max_sd = (csm.capacity_spectrum.peak_point_adrs.sd_m * 1.35).max(0.15) as f32;
+                    let max_sa = (csm.demand_spectrum.elastic_5pct_points.iter().map(|p| p.sa_g).fold(0.5, f64::max) * 1.25) as f32;
+
+                    // Draw Elastic Demand (Red Dashed)
+                    let mut pts_el = Vec::new();
+                    for p in &csm.demand_spectrum.elastic_5pct_points {
+                        let px = x0_r + ((p.sd_m as f32) / max_sd).clamp(0.0, 1.2) * plot_wr;
+                        let py = y0_r - ((p.sa_g as f32) / max_sa).clamp(0.0, 1.2) * plot_hr;
+                        pts_el.push(Pos2::new(px, py));
+                    }
+                    for w in pts_el.windows(2) {
+                        painter_r.line_segment([w[0], w[1]], Stroke::new(1.2, Color32::from_rgb(248, 113, 113)));
+                    }
+
+                    // Draw Reduced Inelastic Demand (Amber)
+                    let mut pts_red = Vec::new();
+                    for p in &csm.demand_spectrum.reduced_inelastic_points {
+                        let px = x0_r + ((p.sd_m as f32) / max_sd).clamp(0.0, 1.2) * plot_wr;
+                        let py = y0_r - ((p.sa_g as f32) / max_sa).clamp(0.0, 1.2) * plot_hr;
+                        pts_red.push(Pos2::new(px, py));
+                    }
+                    for w in pts_red.windows(2) {
+                        painter_r.line_segment([w[0], w[1]], Stroke::new(1.6, Color32::from_rgb(245, 158, 11)));
+                    }
+
+                    // Draw Capacity Spectrum (Solid Emerald)
+                    let mut pts_cap = Vec::new();
+                    pts_cap.push(Pos2::new(x0_r, y0_r));
+                    for p in &csm.capacity_spectrum.points {
+                        let px = x0_r + ((p.sd_m as f32) / max_sd).clamp(0.0, 1.2) * plot_wr;
+                        let py = y0_r - ((p.sa_g as f32) / max_sa).clamp(0.0, 1.2) * plot_hr;
+                        pts_cap.push(Pos2::new(px, py));
+                    }
+                    for w in pts_cap.windows(2) {
+                        painter_r.line_segment([w[0], w[1]], Stroke::new(2.4, theme.accent_green));
+                    }
+
+                    // Performance Point (Sd*, Sa*)
+                    let pt_x = x0_r + ((csm.performance_point.sd_star_m as f32) / max_sd).clamp(0.0, 1.0) * plot_wr;
+                    let pt_y = y0_r - ((csm.performance_point.sa_star_g as f32) / max_sa).clamp(0.0, 1.0) * plot_hr;
+                    let p_star = Pos2::new(pt_x, pt_y);
+                    painter_r.circle_filled(p_star, 5.0, Color32::from_rgb(56, 189, 248));
+                    painter_r.circle_stroke(p_star, 8.0, Stroke::new(1.4, Color32::WHITE));
+                    painter_r.text(p_star + Vec2::new(8.0, -6.0), egui::Align2::LEFT_BOTTOM, format!("P* ({:.3}m, {:.2}g)", csm.performance_point.sd_star_m, csm.performance_point.sa_star_g), egui::FontId::proportional(9.5), Color32::from_rgb(56, 189, 248));
+
+                    // Legend
+                    painter_r.text(Pos2::new(x0_r, rect_r.top() + 6.0), egui::Align2::LEFT_TOP, "Sa (g)", egui::FontId::proportional(9.5), theme.text_muted);
+                    painter_r.text(Pos2::new(rect_r.right() - pad_r, y0_r + 6.0), egui::Align2::RIGHT_TOP, "Sd (m)", egui::FontId::proportional(9.5), theme.text_muted);
+                });
+
+                ui.add_space(14.0);
+
+                // Plastic Hinge Distribution Table (ASCE 41-17 Performance Envelope)
+                Frame::new()
+                    .fill(Color32::from_rgb(15, 23, 42))
+                    .corner_radius(CornerRadius::same(6))
+                    .inner_margin(Margin::same(10))
+                    .show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(RichText::new("Inelastic Plastic Hinge Matrix at Performance Point:").size(11.0).strong().color(Color32::WHITE));
+                            ui.add_space(10.0);
+                            ui.label(RichText::new(format!("🟢 Elastic: {} Elements", csm.hinges_elastic)).size(10.5).color(theme.accent_green));
+                            ui.label(RichText::new("•").size(10.5).color(theme.text_muted));
+                            ui.label(RichText::new(format!("🔵 IO: {} Elements", csm.hinges_io)).size(10.5).color(theme.accent_blue));
+                            ui.label(RichText::new("•").size(10.5).color(theme.text_muted));
+                            ui.label(RichText::new(format!("🟠 LS: {} Elements", csm.hinges_ls)).size(10.5).color(theme.accent_orange));
+                            ui.label(RichText::new("•").size(10.5).color(theme.text_muted));
+                            ui.label(RichText::new(format!("🔴 CP: {} Elements", csm.hinges_cp)).size(10.5).color(Color32::from_rgb(255, 69, 58)));
+                            ui.label(RichText::new("•").size(10.5).color(theme.text_muted));
+                            ui.label(RichText::new(format!("🟣 Mech: {} Elements", csm.hinges_mechanism)).size(10.5).color(Color32::from_rgb(191, 90, 242)));
+                        });
+                        ui.add_space(4.0);
+                        ui.label(RichText::new(&csm.performance_point.compliance_audit).size(11.0).strong().color(Color32::from_rgb(226, 232, 240)));
+                    });
 
                 ui.add_space(12.0);
 
