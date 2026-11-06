@@ -238,6 +238,12 @@
                 <p><strong>2. Reactive Debounced Persistence Window:</strong></p>
                 $$\tau_{\text{save}} = \inf \{ t > t_0 \mid \dot{\mathcal{S}}(t) = 0 \land (t - t_{\text{last}}) \ge 250\text{ ms} \}$$
               </div>
+
+              <div class="math-box">
+                <p><strong>3. Cryptographic State Verification & Merkle Root:</strong></p>
+                $$\text{Root}_{\text{Merkle}} = \text{SHA256}\Big(H_{\text{LeftChild}} \parallel H_{\text{RightChild}}\Big)$$
+                $$\mathcal{S}_{v2} = \mathcal{M}_{v1 \to v2}(\mathcal{S}_{v1}) \quad \text{(Deterministic Schema Migration Equation)}$$
+              </div>
             </div>
 
             <div class="dossier-card">
@@ -300,6 +306,7 @@ impl InternalVault {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 2: RESEARCH & CONCEPT (ARI REDUNDANCY) -->
           <article class="pillar-dossier" id="pillar-2">
             <div class="dossier-hero">
@@ -325,30 +332,29 @@ impl InternalVault {
               <p style="color:var(--text-secondary); margin-bottom:12px;">
                 Traditional structural design relies on deterministic safety factors per individual member without quantifying system-wide reserve redundancy. If a primary load-bearing element suffers sudden fracture (due to fatigue, blast, impact, or seismic rupture), catastrophic progressive collapse can occur. The ARI engine performs rigorous Alternate Path Method (APM) audits in real-time.
               </p>
-              <ul style="color:var(--text-secondary); margin-left:20px; line-height:1.7;">
-                <li><strong>Adjusted Redundancy Index (\(\text{ARI}\)):</strong> Normalized system redundancy score between 0.0 (mechanism/collapse) and 1.0 (infinitely redundant).</li>
-                <li><strong>Spectral Leverage \(h_e\):</strong> Diagonal value of the orthogonal projection operator measuring individual member criticality.</li>
-                <li><strong>Gate 1 Kinematic Guard:</strong> SVD singular value audit ensuring the post-fracture stiffness matrix remains positive definite (\(\sigma_{\min} > 10^{-6}\)).</li>
-              </ul>
             </div>
 
             <div class="dossier-card">
-              <h3 class="dossier-card-title">📐 Mathematical Formulations & Derivations</h3>
+              <h3 class="dossier-card-title">📐 Mathematical Formulations & Complete Derivations</h3>
               <div class="math-box">
-                <p><strong>1. System Adjusted Redundancy Index (ARI):</strong></p>
+                <p><strong>1. System Adjusted Redundancy Index (ARI) & Collapse Index (CI):</strong></p>
                 $$\text{ARI} = \frac{1}{M} \sum_{e=1}^M \big(1 - h_e\big) \cdot \mathbb{I}\big(\sigma_{\min}(K(\lambda_e = 0)) > 10^{-6}\big)$$
-                $$\text{CI} = 1 - \text{ARI} \quad \text{(Collapse Index)}$$
+                $$\text{CI} = 1 - \text{ARI} \quad (0.0 \le \text{ARI} \le 1.0)$$
+                <div class="math-caption">
+                  Where \(M\) is total element count, \(h_e\) is diagonal leverage, and \(\mathbb{I}(\cdot)\) ensures mechanisms are penalized to 0.
+                </div>
               </div>
 
               <div class="math-box">
                 <p><strong>2. Sherman-Morrison Fast Rank-1 Perturbation:</strong></p>
-                $$\big(K^0 - \gamma_e \mathbf{u}_e \mathbf{u}_e^T\big)^{-1} = (K^0)^{-1} + \frac{\gamma_e (K^0)^{-1} \mathbf{u}_e \mathbf{u}_e^T (K^0)^{-1}}{1 - \gamma_e \mathbf{u}_e^T (K^0)^{-1} \mathbf{u}_e}$$
+                $$\big(K^0 - \gamma_e \mathbf{u}_e \mathbf{u}_e^T\big)^{-1} = (K^0)^{-1} + \frac{\gamma_e (K^0)^{-1} \mathbf{u}_e \mathbf{u}_e^T (K^0)^{-1}}{1 - \gamma_e \mathbf{u}_e^T (K^0)^{-1} \mathbf{u}_e}, \quad \gamma_e = 1 - \lambda_e$$
                 $$h_e = \mathbf{u}_e^T (K^0)^{-1} \mathbf{u}_e = \sum_{j=1}^N \frac{(\mathbf{v}_j^T \mathbf{u}_e)^2}{\sigma_j}$$
               </div>
 
               <div class="math-box">
-                <p><strong>3. Second-Order Geometric Stiffness & \(B_1\) Amplification:</strong></p>
-                $$K_{\text{total}} = K_e + K_g(P), \quad B_1 = \frac{C_m}{1 - P_u / P_{e1}} \ge 1.0, \quad P_{e1} = \frac{\pi^2 E I}{(K L)^2}$$
+                <p><strong>3. Second-Order Elastic Geometric Stiffness & \(B_1\) Factor (AISC 360-16):</strong></p>
+                $$K_{\text{total}} = K_e + K_g(P), \quad K_g(P) = \frac{P}{L} \begin{bmatrix} 1 & 0 & -1 & 0 \\ 0 & 0 & 0 & 0 \\ -1 & 0 & 1 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix}$$
+                $$B_1 = \frac{C_m}{1 - P_u / P_{e1}} \ge 1.0, \quad P_{e1} = \frac{\pi^2 E I}{(K L)^2}, \quad C_m = 0.6 - 0.4 \left(\frac{M_1}{M_2}\right)$$
               </div>
             </div>
 
@@ -410,6 +416,7 @@ impl InternalVault {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 3: DRAFTING & BLUEPRINTS -->
           <article class="pillar-dossier" id="pillar-3">
             <div class="dossier-hero">
@@ -435,26 +442,26 @@ impl InternalVault {
               <p style="color:var(--text-secondary); margin-bottom:12px;">
                 Parametric drafting connects 3D mathematical BIM models to official, permit-ready 2D engineering blueprints without third-party printer drivers or heavy external PDF libraries. The engine generates native vector streams directly in memory.
               </p>
-              <ul style="color:var(--text-secondary); margin-left:20px; line-height:1.7;">
-                <li><strong>Multi-Viewport Composition:</strong> Scaled floor plans, section cuts A-A, Bill of Quantities (BoQ) schedules, and official Title Block (Kop Gambar).</li>
-                <li><strong>Vector Stream Synthesis:</strong> Native low-level PDF 1.4 postscript operators (<code>q</code>, <code>cm</code>, <code>re</code>, <code>m</code>, <code>l</code>, <code>S</code>).</li>
-                <li><strong>Affine Coordinate Transformations:</strong> Precise scale normalization from world meters to paper points (\(1\text{ pt} = 1/72\text{ inch}\)).</li>
-              </ul>
             </div>
 
             <div class="dossier-card">
               <h3 class="dossier-card-title">📐 Mathematical Formulations & Paper Space Mapping</h3>
               <div class="math-box">
-                <p><strong>1. Affine Model-to-Paper Transformation:</strong></p>
+                <p><strong>1. Affine Model-to-Paper Coordinate Transformation:</strong></p>
                 $$\begin{bmatrix} x_{\text{paper}} \\ y_{\text{paper}} \end{bmatrix} = s \cdot \begin{bmatrix} \cos\theta & -\sin\theta \\ \sin\theta & \cos\theta \end{bmatrix} \begin{bmatrix} x_{\text{model}} \\ y_{\text{model}} \end{bmatrix} + \begin{bmatrix} t_x \\ t_y \end{bmatrix}$$
-                <div class="math-caption">
-                  Where \(s\) is the sheet drawing scale (e.g. \(1:100 \implies s = 0.01 \times 72 / 0.0254\)), \(\theta\) is viewport rotation, and \(\mathbf{t}\) is viewport paper origin.
-                </div>
+                $$s = \frac{1}{\text{ScaleRatio}} \times \frac{72\text{ pt}}{0.0254\text{ m}} \quad (1\text{ pt} = 1/72\text{ in})$$
               </div>
 
               <div class="math-box">
-                <p><strong>2. Cohen-Sutherland Viewport Boundary Clipping:</strong></p>
-                $$\mathbf{p} \in \mathcal{V} \iff x_{\min} \le x_{\text{paper}} \le x_{\max} \;\land\; y_{\min} \le y_{\text{paper}} \le y_{\max}$$
+                <p><strong>2. Cohen-Sutherland Viewport Boundary Clipping Algorithm:</strong></p>
+                $$\text{Outcode}(\mathbf{p}) = \big[ \text{sign}(y_p - y_{\max}), \; \text{sign}(y_{\min} - y_p), \; \text{sign}(x_p - x_{\max}), \; \text{sign}(x_{\min} - x_p) \big]$$
+                $$\mathbf{p} \in \mathcal{V} \iff \text{Outcode}(\mathbf{p}_1) \mid \text{Outcode}(\mathbf{p}_2) = 0000_2$$
+              </div>
+
+              <div class="math-box">
+                <p><strong>3. Low-Level Postscript PDF 1.4 Operator Mapping:</strong></p>
+                $$\mathbf{C} = \begin{bmatrix} a & b & 0 \\ c & d & 0 \\ e & f & 1 \end{bmatrix} \implies a \quad b \quad c \quad d \quad e \quad f \quad \text{cm}$$
+                $$\text{LineTo}(\mathbf{x}) \implies x \quad y \quad l, \quad \text{Stroke} \implies S$$
               </div>
             </div>
 
@@ -479,16 +486,6 @@ impl InternalVault {
     pub sheet_size: SheetSize,
     pub viewports: Vec&lt;Viewport2D&gt;,
     pub title_block: TitleBlockData,
-}
-
-impl DrawingSheet {
-    pub fn export_pdf_stream(&amp;self) -&gt; Vec&lt;u8&gt; {
-        let mut pdf = PdfWriter::new();
-        for vp in &amp;self.viewports {
-            vp.render_vector_primitives(&amp;mut pdf);
-        }
-        pdf.finalize()
-    }
 }</pre>
               </div>
             </div>
@@ -518,6 +515,7 @@ impl DrawingSheet {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 4: MODELING & GEOMETRY -->
           <article class="pillar-dossier" id="pillar-4">
             <div class="dossier-hero">
@@ -543,11 +541,6 @@ impl DrawingSheet {
               <p style="color:var(--text-secondary); margin-bottom:12px;">
                 Combines computational solid geometry (CSG) with finite element mesh generation. Rather than representing structural elements as mere 1D stick lines, EigenGraph extrudes genuine 3D B-Rep polygonal solids with flange thicknesses, web cutouts, and physical door/window opening subtractions.
               </p>
-              <ul style="color:var(--text-secondary); margin-left:20px; line-height:1.7;">
-                <li><strong>CSG Boolean Subtractions:</strong> Analytical geometric boolean operations cutting clean openings into structural walls and floor slabs.</li>
-                <li><strong>360° Turntable Orbit:</strong> Smooth mouse-controlled camera orbit, pan, and perspective zoom.</li>
-                <li><strong>Stress & Force Diagrams (P-M-V):</strong> 3D envelope representations of Normal Force (NFD), Shear Force (SFD), and Bending Moment (BMD).</li>
-              </ul>
             </div>
 
             <div class="dossier-card">
@@ -558,9 +551,15 @@ impl DrawingSheet {
               </div>
 
               <div class="math-box">
-                <p><strong>2. Camera Orbit Transformation & 3D Projection:</strong></p>
+                <p><strong>2. Möller-Trumbore Sub-Millisecond Ray-Triangle Intersection:</strong></p>
+                $$\mathbf{r}(t) = \mathbf{o} + t \mathbf{d} = (1 - u - v) \mathbf{v}_0 + u \mathbf{v}_1 + v \mathbf{v}_2$$
+                $$\begin{bmatrix} t \\ u \\ v \end{bmatrix} = \frac{1}{\mathbf{p} \cdot \mathbf{e}_1} \begin{bmatrix} \mathbf{q} \cdot \mathbf{e}_2 \\ \mathbf{p} \cdot \mathbf{t} \\ \mathbf{q} \cdot \mathbf{d} \end{bmatrix}, \quad \mathbf{p} = \mathbf{d} \times \mathbf{e}_2, \; \mathbf{q} = \mathbf{t} \times \mathbf{e}_1$$
+              </div>
+
+              <div class="math-box">
+                <p><strong>3. Camera Orbit Transformation & 3D Beam Force Envelopes (P-M-V):</strong></p>
                 $$\mathbf{P}_{\text{screen}} = \mathbf{M}_{\text{proj}} \cdot \mathbf{M}_{\text{view}}(\theta_{\text{yaw}}, \theta_{\text{pitch}}, \mathbf{d}_{\text{cam}}) \cdot \mathbf{P}_{\text{world}}$$
-                $$\mathbf{R}(\theta_y, \theta_p) = \begin{bmatrix} \cos\theta_y & 0 & \sin\theta_y \\ 0 & 1 & 0 \\ -\sin\theta_y & 0 & \cos\theta_y \end{bmatrix} \begin{bmatrix} 1 & 0 & 0 \\ 0 & \cos\theta_p & -\sin\theta_p \\ 0 & \sin\theta_p & \cos\theta_p \end{bmatrix}$$
+                $$N(x) = N_0, \quad V(x) = V_0 - q x, \quad M(x) = M_0 + V_0 x - \frac{1}{2} q x^2 \quad (x \in [0, L])$$
               </div>
             </div>
 
@@ -586,13 +585,6 @@ impl DrawingSheet {
     pub indices: Vec&lt;u32&gt;,
     pub normals: Vec&lt;[f32; 3]&gt;,
     pub material_id: u32,
-}
-
-impl CsgSolid {
-    pub fn subtract_opening(&amp;self, opening: &amp;CsgBox) -&gt; CsgSolid {
-        // Boolean subtraction generating boundary polygon triangulation
-        triangulate_boolean_difference(self, opening)
-    }
 }</pre>
               </div>
             </div>
@@ -609,6 +601,7 @@ impl CsgSolid {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 5: TIME & SCHEDULING (4D BIM) -->
           <article class="pillar-dossier" id="pillar-5">
             <div class="dossier-hero">
@@ -637,16 +630,21 @@ impl CsgSolid {
             </div>
 
             <div class="dossier-card">
-              <h3 class="dossier-card-title">📐 Mathematical Formulations: Forward & Backward Passes</h3>
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Forward & Backward Passes & EVM</h3>
               <div class="math-box">
                 <p><strong>1. CPM Forward Pass (Early Dates):</strong></p>
                 $$\text{ES}_j = \max_{i \in \text{Pred}(j)} (\text{EF}_i), \quad \text{EF}_j = \text{ES}_j + D_j$$
               </div>
               <div class="math-box">
-                <p><strong>2. CPM Backward Pass (Late Dates) & Floats:</strong></p>
+                <p><strong>2. CPM Backward Pass (Late Dates) & Total/Free Floats:</strong></p>
                 $$\text{LF}_i = \min_{j \in \text{Succ}(i)} (\text{LS}_j), \quad \text{LS}_i = \text{LF}_i - D_i$$
                 $$\text{TF}_i = \text{LF}_i - \text{EF}_i = \text{LS}_i - \text{ES}_i, \quad \text{FF}_i = \min_{j \in \text{Succ}(i)} (\text{ES}_j) - \text{EF}_i$$
-                $$\text{Critical Activity} \iff \text{TF}_i = 0$$
+                $$\text{Critical Activity Condition} \iff \text{TF}_i = 0$$
+              </div>
+              <div class="math-box">
+                <p><strong>3. Earned Value Management (EVM) S-Curve Metrics:</strong></p>
+                $$\text{CV} = \text{EV} - \text{AC}, \quad \text{SV} = \text{EV} - \text{PV}$$
+                $$\text{CPI} = \frac{\text{EV}}{\text{AC}}, \quad \text{SPI} = \frac{\text{EV}}{\text{PV}}, \quad \text{EAC} = \frac{\text{BAC}}{\text{CPI}}$$
               </div>
             </div>
 
@@ -700,6 +698,7 @@ impl CsgSolid {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 6: COST & BUDGETING (5D BIM) -->
           <article class="pillar-dossier" id="pillar-6">
             <div class="dossier-hero">
@@ -730,13 +729,14 @@ impl CsgSolid {
             <div class="dossier-card">
               <h3 class="dossier-card-title">📐 Mathematical Formulations: Unit Pricing & Pareto Optimization</h3>
               <div class="math-box">
-                <p><strong>1. Unit Price Analysis (AHSP PUPR):</strong></p>
+                <p><strong>1. Unit Price Analysis (AHSP PUPR 2024):</strong></p>
                 $$\text{HSP}_k = \sum_{i} \alpha_i \cdot U_{\text{labor}, i} + \sum_{j} \beta_j \cdot P_{\text{material}, j} + \sum_{m} \gamma_m \cdot E_{\text{equipment}, m}$$
                 $$\text{RAB} = \sum_{k=1}^K \big(Q_k \times \text{HSP}_k\big) \times (1 + \text{Overhead} + \text{Tax})$$
               </div>
               <div class="math-box">
                 <p><strong>2. Bi-Objective Pareto Optimization Formulation:</strong></p>
                 $$\min_{\mathbf{x} \in \mathcal{X}} \Big\{ \mathcal{C}(\mathbf{x}), \; -\text{ARI}(\mathbf{x}) \Big\} \quad \text{s.t.} \quad \sigma_e(\mathbf{x}) \le \phi F_y, \; \Delta_{\max} \le \frac{L}{360}$$
+                $$\mathbf{x}^* \in \mathcal{P} \iff \nexists \mathbf{x}' : \big(\mathcal{C}(\mathbf{x}') \le \mathcal{C}(\mathbf{x}^*) \;\land\; \text{ARI}(\mathbf{x}') \ge \text{ARI}(\mathbf{x}^*)\big)$$
               </div>
             </div>
 
@@ -789,6 +789,7 @@ impl CsgSolid {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 7: SUSTAINABILITY & LCA (6D BIM) -->
           <article class="pillar-dossier" id="pillar-7">
             <div class="dossier-hero">
@@ -826,8 +827,9 @@ impl CsgSolid {
                 </div>
               </div>
               <div class="math-box">
-                <p><strong>2. Decarbonization Efficiency Ratio:</strong></p>
+                <p><strong>2. Decarbonization Efficiency Ratio & Eco-Efficiency Index (EEI):</strong></p>
                 $$\Delta_{\text{CO}_2} = \frac{\text{EC}_{\text{BF-BOF}} - \text{EC}_{\text{Green}}}{\text{EC}_{\text{BF-BOF}}} \times 100\%$$
+                $$\text{EEI} = \frac{\text{ARI}}{\text{EC}_{\text{total}} / \text{EC}_{\text{target}}} \quad (\text{Carbon-Redundancy Trade-Off})$$
               </div>
             </div>
 
@@ -869,6 +871,7 @@ impl CsgSolid {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 8: FACILITY MANAGEMENT (7D BIM) -->
           <article class="pillar-dossier" id="pillar-8">
             <div class="dossier-hero">
@@ -898,15 +901,16 @@ impl CsgSolid {
             <div class="dossier-card">
               <h3 class="dossier-card-title">📐 Mathematical Formulations: Sensor Telemetry & Reliability Hazard</h3>
               <div class="math-box">
-                <p><strong>1. Real-Time Strain-to-Stress Gauge Conversion:</strong></p>
-                $$\sigma(t) = E \cdot \epsilon(t) \quad \text{(Hooke's Law)}$$
+                <p><strong>1. Real-Time Strain-to-Stress Gauge Conversion with Thermal Compensation:</strong></p>
+                $$\sigma(t) = E \cdot \epsilon_{\text{mechanical}}(t) = E \big( \epsilon_{\text{total}}(t) - \alpha_{\text{thermal}} \cdot \Delta T(t) \big)$$
               </div>
               <div class="math-box">
                 <p><strong>2. Reliability-Centered Predictive Maintenance (Weibull Hazard):</strong></p>
                 $$h(t) = \frac{\beta}{\eta} \left(\frac{t}{\eta}\right)^{\beta - 1}, \quad F(t) = 1 - \exp\left(-\left(\frac{t}{\eta}\right)^\beta\right)$$
-                <div class="math-caption">
-                  Where \(\beta\) is the shape parameter (\(\beta > 1\) indicates wear-out degradation) and \(\eta\) is characteristic life.
-                </div>
+              </div>
+              <div class="math-box">
+                <p><strong>3. Paris-Erdogan Fatigue Crack Growth Law:</strong></p>
+                $$\frac{da}{dN} = C (\Delta K)^m = C (Y \Delta\sigma \sqrt{\pi a})^m \implies N_f = \int_{a_0}^{a_c} \frac{da}{C (Y \Delta\sigma \sqrt{\pi a})^m}$$
               </div>
             </div>
 
@@ -924,7 +928,7 @@ impl CsgSolid {
                 <div class="code-box-header"><span>Facility Management Module: src/views/facility.rs</span><span>Rust 2021</span></div>
 <pre>pub struct ShmSensorNode {
     pub sensor_id: String,
-    pub channel_type: SensorType, // StrainGauge, Accelerometer, Tiltmeter
+    pub channel_type: SensorType,
     pub raw_microstrain: f64,
     pub calculated_stress_mpa: f64,
     pub alert_threshold_mpa: f64,
@@ -947,6 +951,7 @@ impl CsgSolid {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 9: SAFETY & NON-LINEAR SOLVER (8D BIM) -->
           <article class="pillar-dossier" id="pillar-9">
             <div class="dossier-hero">
@@ -958,12 +963,12 @@ impl CsgSolid {
               </div>
               <h1 class="dossier-title">🛡️ Safety & Non-Linear Mechanics Solver (8D BIM)</h1>
               <p class="dossier-subtitle">
-                Sherman-Morrison / Woodbury post-yield redistribution, 3D Biaxial \(P-M_x-M_y\) concrete column interaction surface, and dynamic response spectrum modal combinations (CQC & SRSS).
+                Sherman-Morrison / Woodbury post-yield redistribution, 3D Biaxial \(P-M_x-M_y\) concrete column interaction surface, dynamic modal combinations (CQC & SRSS), and AISC 360-16 LRFD steel checks.
               </p>
               <div class="dossier-meta-bar">
-                <div class="dossier-meta-item"><span>Core Engines:</span> <code>src/core/nonlinear.rs, concrete.rs, modal.rs</code></div>
+                <div class="dossier-meta-item"><span>Core Engines:</span> <code>src/core/nonlinear.rs, concrete.rs, modal.rs, solver.rs</code></div>
                 <div class="dossier-meta-item"><span>UI Module:</span> <code>src/views/analyze.rs</code></div>
-                <div class="dossier-meta-item"><span>Standards:</span> <code>SNI 2847:2019, SNI 1726:2019, ACI 318-19, ASCE 7-16</code></div>
+                <div class="dossier-meta-item"><span>Standards:</span> <code>SNI 2847:2019, SNI 1726:2019, ACI 318-19, ASCE 7-16, AISC 360-16</code></div>
               </div>
             </div>
 
@@ -976,32 +981,43 @@ impl CsgSolid {
                 <li><strong>Woodbury Non-Linear Redistribution:</strong> Exact force shedding \(\Delta N_i\) from plastified members into secondary load paths without full stiffness refactorization.</li>
                 <li><strong>3D Biaxial \(P-M_x-M_y\) Interaction Surface:</strong> Bresler reciprocal load method and PCA load contour exponent \(\alpha\) per SNI 2847:2019 / ACI 318-19.</li>
                 <li><strong>Dynamic Modal Combinations:</strong> Der Kiureghian CQC and SRSS modal combinations with 85% static base shear code scaling per SNI 1726:2019 Pasal 7.9.4.1.</li>
+                <li><strong>AISC 360-16 LRFD Steel Member Check:</strong> Combined axial compression and biaxial flexure interaction.</li>
               </ul>
             </div>
 
             <div class="dossier-card">
-              <h3 class="dossier-card-title">📐 Mathematical Formulations & Derivations</h3>
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Non-Linear, Concrete Biaxial, Dynamic Modal & Steel AISC</h3>
               
               <div class="math-box">
                 <p><strong>1. Sherman-Morrison / Woodbury Non-Linear Post-Yield Matrix Redistribution:</strong></p>
                 $$(K^0 + U C V^T)^{-1} = (K^0)^{-1} - (K^0)^{-1} U \big(C^{-1} + V^T (K^0)^{-1} U\big)^{-1} V^T (K^0)^{-1}$$
-                $$\Delta N_i = \lambda N_i^0 - N_i, \quad \text{RRR}(\lambda) = \frac{N_i(\lambda)}{N_i^0}, \quad \mu = \frac{\Delta_{\text{plastic}}}{\Delta_{\text{yield}}}$$
+                $$\Delta N_i = \lambda N_i^0 - N_i, \quad \text{RRR}(\lambda) = \frac{N_i(\lambda)}{N_i^0}, \quad \mu = \frac{\Delta_{\text{plastic}}}{\Delta_{\text{yield}}}, \quad m_s = 1 - \gamma_i h_i$$
                 <div class="math-caption">
                   Enables rapid \(O(N^2)\) post-yield recalculations, tracking redistributed load shedding into alternate paths while evaluating plastic ductility demand \(\mu\).
                 </div>
               </div>
 
               <div class="math-box">
-                <p><strong>2. 3D Biaxial \(P-M_x-M_y\) Concrete Interaction Surface (SNI 2847 / ACI 318):</strong></p>
+                <p><strong>2. 3D Biaxial \(P-M_x-M_y\) Concrete Interaction Surface (SNI 2847:2019 / ACI 318-19):</strong></p>
+                $$P_0 = 0.85 f'_c (A_g - A_{st}) + f_y A_{st}, \quad \phi P_{n,\max} = 0.80 \phi P_0 \; (\phi = 0.65), \quad \phi P_{nt} = 0.90 (-f_y A_{st})$$
+                $$\beta_1 = \begin{cases} 0.85 & f'_c \le 28\text{ MPa} \\ 0.85 - \frac{0.05(f'_c - 28)}{7} & 28 < f'_c < 55\text{ MPa} \\ 0.65 & f'_c \ge 55\text{ MPa} \end{cases}, \quad c_b = d \left(\frac{0.003}{0.003 + f_y / E_s}\right), \; a_b = \beta_1 c_b$$
                 $$\frac{1}{\phi P_n} = \frac{1}{\phi P_{nx}} + \frac{1}{\phi P_{ny}} - \frac{1}{\phi P_0} \quad \text{(Bresler Reciprocal Formula)}$$
-                $$\left(\frac{M_{ux}}{\phi M_{nx}}\right)^\alpha + \left(\frac{M_{uy}}{\phi M_{ny}}\right)^\alpha \le 1.0 \quad \text{(PCA Load Contour Envelope)}$$
-                $$\alpha = 1.0 + \left(\frac{P_u}{\phi P_{n0}} - 0.10\right) \frac{0.50}{0.70}, \quad 1.0 \le \alpha \le 1.55$$
+                $$\left(\frac{M_{ux}}{\phi M_{nx}}\right)^\alpha + \left(\frac{M_{uy}}{\phi M_{ny}}\right)^\alpha \le 1.0, \quad \alpha = 1.0 + \left(\frac{P_u}{\phi P_{n0}} - 0.10\right) \frac{0.50}{0.70} \quad (1.0 \le \alpha \le 1.55)$$
               </div>
 
               <div class="math-box">
-                <p><strong>3. Dynamic Response Spectrum Modal Combinations (SNI 1726:2019 Pasal 7.9.3):</strong></p>
-                $$V_{\text{CQC}} = \sqrt{\sum_{i=1}^n \sum_{j=1}^n V_i \, \rho_{ij} \, V_j}, \quad \rho_{ij} = \frac{8 \xi^2 (1 + r) r^{3/2}}{(1 - r^2)^2 + 4 \xi^2 r (1 + r)^2}, \quad r = \frac{\omega_j}{\omega_i}$$
-                $$V_{\text{SRSS}} = \sqrt{\sum_{i=1}^n V_i^2}, \quad \eta = \max\left(1.0, \; \frac{0.85 V_{\text{static}}}{V_{\text{dynamic}}}\right)$$
+                <p><strong>3. Dynamic Response Spectrum Modal Combinations (SNI 1726:2019 Pasal 7.9.3 & ASCE 7-16):</strong></p>
+                $$(K - \omega_i^2 M)\boldsymbol{\phi}_i = \mathbf{0}, \quad T_i = \frac{2\pi}{\omega_i}, \quad r = \frac{\omega_j}{\omega_i}$$
+                $$\rho_{ij} = \frac{8 \xi^2 (1 + r) r^{3/2}}{(1 - r^2)^2 + 4 \xi^2 r (1 + r)^2} \quad \text{(Der Kiureghian Modal Correlation)}$$
+                $$V_{\text{CQC}} = \sqrt{\sum_{i=1}^n \sum_{j=1}^n V_i \, \rho_{ij} \, V_j}, \quad V_{\text{SRSS}} = \sqrt{\sum_{i=1}^n V_i^2}$$
+                $$C_s = \frac{S_{DS}}{R / I_e}, \quad C_{s,\min} = \max(0.044 S_{DS} I_e, 0.01), \quad V_s = C_s W$$
+                $$V_t \ge 0.85 V_s \implies \eta = \max\left(1.0, \; \frac{0.85 V_s}{V_t}\right), \quad V_{\text{governing}} = \eta \cdot V_t$$
+              </div>
+
+              <div class="math-box">
+                <p><strong>4. AISC 360-16 LRFD Steel Member Axial & Flexure Interaction:</strong></p>
+                $$\text{For } \frac{P_u}{\phi P_n} \ge 0.2: \quad \frac{P_u}{\phi P_n} + \frac{8}{9}\left(\frac{M_{ux}}{\phi M_{nx}} + \frac{M_{uy}}{\phi M_{ny}}\right) \le 1.0$$
+                $$\text{For } \frac{P_u}{\phi P_n} < 0.2: \quad \frac{P_u}{2 \phi P_n} + \left(\frac{M_{ux}}{\phi M_{nx}} + \frac{M_{uy}}{\phi M_{ny}}\right) \le 1.0$$
               </div>
             </div>
 
@@ -1057,8 +1073,6 @@ pub struct BiaxialPmReport {
 
             <div class="dossier-card">
               <h3 class="dossier-card-title">🧪 Interactive Verification Lab: Non-Linear & Biaxial Mechanics</h3>
-              
-              <!-- TABBED SIMULATOR FOR PILLAR 9 -->
               <div class="controls-card">
                 <div style="display:flex; gap:10px; margin-bottom:14px; border-bottom:1px solid var(--border-subtle); padding-bottom:8px;">
                   <button class="btn btn-secondary active" id="btn-sub-woodbury" onclick="switchPillar9Sub('woodbury');">🔬 1. Woodbury Redistribution</button>
@@ -1127,6 +1141,7 @@ pub struct BiaxialPmReport {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 10: LEAN CONSTRUCTION & CSO -->
           <article class="pillar-dossier" id="pillar-10">
             <div class="dossier-hero">
@@ -1155,11 +1170,19 @@ pub struct BiaxialPmReport {
             </div>
 
             <div class="dossier-card">
-              <h3 class="dossier-card-title">📐 Mathematical Formulations: Integer Linear Programming</h3>
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Integer Linear Programming & Detailing</h3>
               <div class="math-box">
                 <p><strong>1. Gilmore-Gomory 1D Cutting Stock Problem Formulation:</strong></p>
                 $$\min \sum_{j=1}^P c_j x_j \quad \text{s.t.} \quad \sum_{j=1}^P a_{ij} x_j \ge d_i, \quad x_j \ge 0, \; x_j \in \mathbb{Z}$$
                 $$\text{Scrap Waste Ratio} = \frac{\sum_{j=1}^P x_j L_{\text{stock}} - \sum_{i=1}^m d_i l_i}{\sum_{j=1}^P x_j L_{\text{stock}}} \times 100\% \le 2.5\%$$
+              </div>
+              <div class="math-box">
+                <p><strong>2. Unbounded Knapsack Column Generation Subproblem:</strong></p>
+                $$\max \sum_{i=1}^m \pi_i a_i \quad \text{s.t.} \quad \sum_{i=1}^m l_i a_i \le L_{\text{stock}}, \quad a_i \in \mathbb{Z}_{\ge 0}$$
+              </div>
+              <div class="math-box">
+                <p><strong>3. SNI 2847:2019 Section 25.3 Rebar Hook Length Formulations:</strong></p>
+                $$L_{\text{hook, 90}^\circ} = 12 d_b, \quad L_{\text{hook, 135}^\circ} = \max(6 d_b, \; 75\text{ mm})$$
               </div>
             </div>
 
@@ -1218,6 +1241,7 @@ pub struct BiaxialPmReport {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 11: INDUSTRIALIZED DFMA -->
           <article class="pillar-dossier" id="pillar-11">
             <div class="dossier-hero">
@@ -1245,14 +1269,18 @@ pub struct BiaxialPmReport {
             </div>
 
             <div class="dossier-card">
-              <h3 class="dossier-card-title">📐 Mathematical Formulations: DfMA Scoring & Tolerance Stack</h3>
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: DfMA Scoring, RSS Tolerancing & Welds</h3>
               <div class="math-box">
                 <p><strong>1. DfMA Standardization Metric Score:</strong></p>
                 $$\text{Index}_{\text{DfMA}} = \frac{\sum_{k=1}^K w_k \cdot N_{\text{modular}, k}}{N_{\text{total}}} \times 100$$
               </div>
               <div class="math-box">
                 <p><strong>2. Statistical Tolerance Stack-Up (Root-Sum-Squares):</strong></p>
-                $$\sigma_{\text{stack}} = \pm \sqrt{\sum_{i=1}^n \sigma_i^2}$$
+                $$\sigma_{\text{stack}} = \pm \sqrt{\sum_{i=1}^n \sigma_i^2}, \quad \Delta_{\text{linear}} = \pm \sum_{i=1}^n |\delta_i|$$
+              </div>
+              <div class="math-box">
+                <p><strong>3. Fillet Weld Nominal Strength per AISC 360-16 Section J2:</strong></p>
+                $$R_n = F_{nw} A_{we} = (0.60 F_{EXX})(0.707 w L)\big(1.0 + 0.50 \sin^{1.5}\theta\big)$$
               </div>
             </div>
 
@@ -1292,6 +1320,7 @@ pub struct BiaxialPmReport {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 12: PREDICTION & RELIABILITY -->
           <article class="pillar-dossier" id="pillar-12">
             <div class="dossier-hero">
@@ -1320,17 +1349,19 @@ pub struct BiaxialPmReport {
             </div>
 
             <div class="dossier-card">
-              <h3 class="dossier-card-title">📐 Mathematical Formulations: FOSM & Fragility</h3>
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: FOSM, Fragility & AABB Clash</h3>
               <div class="math-box">
                 <p><strong>1. First-Order Second-Moment (FOSM) Reliability Index:</strong></p>
-                $$\beta = \frac{\mu_R - \mu_S}{\sqrt{\sigma_R^2 + \sigma_S^2}}, \quad P_f = \Phi(-\beta) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{-\beta} e^{-u^2/2} du$$
-                <div class="math-caption">
-                  Where \(\mu_R, \sigma_R\) are resistance mean and std deviation, and \(\mu_S, \sigma_S\) are load effect mean and std deviation.
-                </div>
+                $$\beta = \frac{\mu_R - \mu_S}{\sqrt{\sigma_R^2 + \sigma_S^2}} = \frac{\mu_R - \mu_S}{\sqrt{(\mu_R V_R)^2 + (\mu_S V_S)^2}}$$
+                $$P_f = \Phi(-\beta) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{-\beta} e^{-u^2/2} du, \quad U = \frac{X - \mu_X}{\sigma_X}$$
               </div>
               <div class="math-box">
-                <p><strong>2. FEMA P-58 Lognormal Seismic Fragility Curve:</strong></p>
-                $$P(\text{DS} \ge \text{ds}_i \mid \text{IM}) = \Phi\left(\frac{\ln(\text{IM} / \theta_i)}{\beta_i}\right)$$
+                <p><strong>2. FEMA P-58 Lognormal Seismic Fragility CDF:</strong></p>
+                $$P(\text{DS} \ge \text{ds}_i \mid \text{EDP}) = \Phi\left(\frac{\ln(\text{EDP} / \theta_i)}{\beta_i}\right)$$
+              </div>
+              <div class="math-box">
+                <p><strong>3. 3D Axis-Aligned Bounding Box (AABB) Spatial Collision Detection:</strong></p>
+                $$\text{Clash}(A, B) \iff \big(A_{\min}^x \le B_{\max}^x \land A_{\max}^x \ge B_{\min}^x\big) \land \big(A_{\min}^y \le B_{\max}^y \land A_{\max}^y \ge B_{\min}^y\big) \land \big(A_{\min}^z \le B_{\max}^z \land A_{\max}^z \ge B_{\min}^z\big)$$
               </div>
             </div>
 
@@ -1381,6 +1412,7 @@ pub struct BiaxialPmReport {
               </div>
             </div>
           </article>
+
           <!-- PILLAR 13: RESULTS & CERTIFICATION -->
           <article class="pillar-dossier" id="pillar-13">
             <div class="dossier-hero">
@@ -1409,14 +1441,19 @@ pub struct BiaxialPmReport {
             </div>
 
             <div class="dossier-card">
-              <h3 class="dossier-card-title">📐 Mathematical Formulations: Cryptographic Certification Seal</h3>
+              <h3 class="dossier-card-title">📐 Mathematical Formulations: Cryptographic Certification Seal & Margins</h3>
               <div class="math-box">
                 <p><strong>1. Cryptographic HMAC-SHA256 Structural Audit Seal:</strong></p>
                 $$\text{AuditSeal} = \text{HMAC-SHA256}\Big(\text{ProjID} \parallel \text{ARI}_{\min} \parallel \text{MaxDCR} \parallel \text{CodeChecks}, \; \mathcal{K}_{\text{secret}}\Big)$$
               </div>
               <div class="math-box">
-                <p><strong>2. Multi-Code Structural Compliance Ratio:</strong></p>
+                <p><strong>2. Multi-Code Limit State Structural Compliance Margin:</strong></p>
+                $$\text{Margin}_k = 1.0 - \text{DCR}_k = 1.0 - \frac{\text{Demand}_k}{\phi \cdot \text{Capacity}_k} \ge 0.0$$
                 $$\text{ComplianceRatio} = \min_{c \in \mathcal{C}} \left(\frac{\text{Capacity}_c}{\text{Demand}_c}\right) \ge 1.00$$
+              </div>
+              <div class="math-box">
+                <p><strong>3. Composite Multi-Dimensional Structural Safety Index:</strong></p>
+                $$\text{Score} = \left[ 0.40 \cdot \text{ARI} + 0.35 \cdot (1.0 - \text{DCR}_{\max}) + 0.25 \cdot \left(\frac{\beta}{4.0}\right) \right] \times 100$$
               </div>
             </div>
 
@@ -1460,6 +1497,7 @@ pub struct BiaxialPmReport {
               </div>
             </div>
           </article>
+
         </main>
       </div>
     </div>
