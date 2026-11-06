@@ -29,9 +29,12 @@ pub mod concrete;
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
     BoundaryFixity, CrossSection, Element3D, ElementType, LoadCaseType, LoadCombination, Material,
-    NodalLoad, Node3D, StructuralModel,
+    NodalLoad, Node3D, ShellElement4N, StructuralModel,
 };
-pub use solver::{AnalysisResult, EnvelopeAnalysisResult, FemSolver, MemberEnvelopeResult};
+pub use solver::{
+    AnalysisResult, EnvelopeAnalysisResult, FemSolver, MemberEnvelopeResult,
+    SecondOrderStabilityResult, SecondOrderStabilitySolver,
+};
 pub use ari::{
     AriEngine, KinematicGuardReport, MemberRedundancyResult, N2PairRedundancyResult,
     N2WoodburyScreeningReport, RedundancyAssessment,
@@ -39,9 +42,9 @@ pub use ari::{
 pub use parametric::{ParametricEngine, ParametricFormula};
 pub use interop::{
     DiskExporter, DossierExporter, DstvExporter, DstvPiece, DxfExporter, EigenProjectArchive,
-    EtabsE2kExporter, EtabsE2kImporter, HtmlViewerExporter, IfcExporter, IfcImporter, LatexExporter,
-    PbgProjectMetadata, PbgReportGenerator, RebarBbsDetailer, RebarBbsSchedule, Sap2000Exporter,
-    Sha256Hasher,
+    EtabsE2kExporter, EtabsE2kImporter, HtmlViewerExporter, IfcExporter, IfcImporter, IfcSamExporter,
+    LatexExporter, PbgProjectMetadata, PbgReportGenerator, RebarBbsDetailer, RebarBbsSchedule,
+    Sap2000Exporter, Sha256Hasher,
 };
 pub use optimizer::{AriTopologyOptimizer, BracingCandidate, BracingOptimizationReport};
 pub use cost::{AhspUnitRates, BoqLineItem, CostEngine, CostEstimationReport, ProfileQuantity};

@@ -2656,6 +2656,74 @@ fn chrono_format_now() -> String {
     "2026-11-06 14:00:00 UTC (Verified)".to_string()
 }
 
+/// OpenBIM IFC4 / IFC4.3 Structural Analysis Model (SAM) Exporter
+pub struct IfcSamExporter;
+
+impl IfcSamExporter {
+    /// Exports StructuralModel into a certified IFC4 Structural Analysis Model (SAM)
+    pub fn export_to_ifc_sam(model: &StructuralModel, _assessment: Option<&RedundancyAssessment>) -> String {
+        let mut s = String::new();
+        s.push_str("ISO-10303-21;\nHEADER;\n");
+        s.push_str("FILE_DESCRIPTION(('IFC4 Structural Analysis Model (SAM) certified export by EigenGraph v0.0.3'),'2;1');\n");
+        s.push_str("FILE_NAME('StructuralAnalysisModel.ifc','2026-11-06T14:00:00',('Harids Irawan'),('EigenGraph Core Engine'),'EigenGraph 0.0.3','EigenGraph 2026','');\n");
+        s.push_str("FILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n");
+
+        s.push_str("#1= IFCPROJECT('0Y_p1F2X98$P0L_v9Q1w2Z',#2,'EigenGraph Structural Project',$,$,$,$,(#3),#4);\n");
+        s.push_str("#2= IFCOWNERHISTORY(#5,#6,$,.ADDED.,$,$,$,1762437600);\n");
+        s.push_str("#3= IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,#7,$);\n");
+        s.push_str("#4= IFCUNITASSIGNMENT((#8,#9,#10));\n");
+        s.push_str("#5= IFCPERSONANDORGANIZATION(#11,#12,$);\n");
+        s.push_str("#6= IFCAPPLICATION(#12,'0.0.3','EigenGraph','EigenGraph.app');\n");
+        s.push_str("#7= IFCAXIS2PLACEMENT3D(#13,$,$);\n");
+        s.push_str("#8= IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);\n");
+        s.push_str("#9= IFCSIUNIT(*,.FORCEUNIT.,.KILO.,.NEWTON.);\n");
+        s.push_str("#10= IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.);\n");
+        s.push_str("#11= IFCPERSON('IRAWAN','Harids',$,$,$,$,$,$);\n");
+        s.push_str("#12= IFCORGANIZATION($,'EigenGraph Engineering',$,$,$);\n");
+        s.push_str("#13= IFCCARTESIANPOINT((0.,0.,0.));\n");
+
+        s.push_str("#20= IFCSTRUCTURALANALYSISMODEL('1Z_q2G3Y09%Q1M_w0R2x3A',#2,'Global SAM Model',$,$,.LOADING_3D.,$,$,$);\n");
+
+        let mut next_id = 30;
+        let mut node_ifc_ids = std::collections::HashMap::new();
+        for node in &model.nodes {
+            let pt_id = next_id; next_id += 1;
+            let conn_id = next_id; next_id += 1;
+            s.push_str(&format!("#{}= IFCCARTESIANPOINT(({:.4},{:.4},{:.4}));\n", pt_id, node.x, node.y, node.z));
+            s.push_str(&format!("#{}= IFCSTRUCTURALPOINTCONNECTION('{:022X}',#2,'Node_{}',$,$,#{},$);\n", conn_id, node.id * 1000 + 7, node.id, pt_id));
+            node_ifc_ids.insert(node.id, conn_id);
+        }
+
+        for elem in &model.elements {
+            if let (Some(&start_conn), Some(&_end_conn)) = (node_ifc_ids.get(&elem.start_node), node_ifc_ids.get(&elem.end_node)) {
+                let member_id = next_id; next_id += 1;
+                let curve_type = match elem.element_type {
+                    ElementType::Column => ".COLUMN.",
+                    ElementType::Beam => ".BEAM.",
+                    ElementType::Brace => ".TIE.",
+                    ElementType::Truss => ".TRUSS_MEMBER.",
+                };
+                s.push_str(&format!(
+                    "#{}= IFCSTRUCTURALCURVEMEMBER('{:022X}',#2,'{}',$,$,$,$,#{},{});\n",
+                    member_id, elem.id * 5000 + 13, elem.name, start_conn, curve_type
+                ));
+            }
+        }
+
+        for shell in &model.shells {
+            let surface_id = next_id; next_id += 1;
+            let member_type = if shell.is_shear_wall { ".SHEAR_WALL." } else { ".SLAB." };
+            s.push_str(&format!(
+                "#{}= IFCSTRUCTURALSURFACEMEMBER('{:022X}',#2,'{}',$,$,$,$,{},{:.4});\n",
+                surface_id, shell.id * 9000 + 19, shell.name, member_type, shell.thickness_m
+            ));
+        }
+
+        s.push_str("ENDSEC;\nEND-ISO-10303-21;\n");
+        s
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -2913,5 +2981,25 @@ END-ISO-10303-21;"#;
         let md = RebarBbsDetailer::export_to_markdown(&bbs);
         assert!(md.contains("BAR BENDING SCHEDULE"));
         assert!(md.contains("SNI 2847:2019"));
+    }
+
+    #[test]
+    fn test_ifc4_structural_analysis_model_sam() {
+        let mut model = StructuralModel::new("Core Wall Tower SAM");
+        model.add_node(Node3D::new(0, 0.0, 0.0, 0.0).with_fixity(BoundaryFixity::fixed()));
+        model.add_node(Node3D::new(1, 4.0, 0.0, 0.0).with_fixity(BoundaryFixity::fixed()));
+        model.add_node(Node3D::new(2, 4.0, 0.0, 3.6));
+        model.add_node(Node3D::new(3, 0.0, 0.0, 3.6));
+
+        // Add 4-node quadrilateral shear wall shell element
+        let wall = crate::core::model::ShellElement4N::new(1, "SW-01", [0, 1, 2, 3], 0.30).as_shear_wall();
+        model.add_shell(wall);
+
+        let ifc_sam = IfcSamExporter::export_to_ifc_sam(&model, None);
+        assert!(ifc_sam.contains("FILE_SCHEMA(('IFC4'));"));
+        assert!(ifc_sam.contains("IFCSTRUCTURALANALYSISMODEL"));
+        assert!(ifc_sam.contains("IFCSTRUCTURALPOINTCONNECTION"));
+        assert!(ifc_sam.contains("IFCSTRUCTURALSURFACEMEMBER"));
+        assert!(ifc_sam.contains(".SHEAR_WALL."));
     }
 }

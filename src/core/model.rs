@@ -494,12 +494,48 @@ impl NodalLoad {
     }
 }
 
+/// 2D 4-Node Quadrilateral Flat Shell Element (Mindlin-Reissner Plate Bending + Bilinear Membrane)
+/// Suitable for Floor Slabs, Shear Walls, Core Walls, and Foundation Rafts
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ShellElement4N {
+    pub id: usize,
+    pub name: String,
+    pub nodes: [usize; 4], // 4 corner node indices in counter-clockwise order
+    pub thickness_m: f64,  // Shell thickness t (meters)
+    pub material: Material,
+    pub is_shear_wall: bool,
+}
+
+impl ShellElement4N {
+    pub fn new(id: usize, name: impl Into<String>, nodes: [usize; 4], thickness_m: f64) -> Self {
+        Self {
+            id,
+            name: name.into(),
+            nodes,
+            thickness_m,
+            material: Material::default(),
+            is_shear_wall: false,
+        }
+    }
+
+    pub fn with_material(mut self, material: Material) -> Self {
+        self.material = material;
+        self
+    }
+
+    pub fn as_shear_wall(mut self) -> Self {
+        self.is_shear_wall = true;
+        self
+    }
+}
+
 /// The Complete Structural Graph Model
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct StructuralModel {
     pub name: String,
     pub nodes: Vec<Node3D>,
     pub elements: Vec<Element3D>,
+    pub shells: Vec<ShellElement4N>,
     pub loads: Vec<NodalLoad>,
 }
 
@@ -509,6 +545,7 @@ impl StructuralModel {
             name: name.into(),
             nodes: Vec::new(),
             elements: Vec::new(),
+            shells: Vec::new(),
             loads: Vec::new(),
         }
     }
@@ -519,6 +556,10 @@ impl StructuralModel {
 
     pub fn add_element(&mut self, element: Element3D) {
         self.elements.push(element);
+    }
+
+    pub fn add_shell(&mut self, shell: ShellElement4N) {
+        self.shells.push(shell);
     }
 
     pub fn add_load(&mut self, load: NodalLoad) {
@@ -533,10 +574,34 @@ impl StructuralModel {
         self.elements.iter().find(|e| e.id == id)
     }
 
+    pub fn find_shell(&self, id: usize) -> Option<&ShellElement4N> {
+        self.shells.iter().find(|s| s.id == id)
+    }
+
     pub fn member_length(&self, elem: &Element3D) -> Option<f64> {
         let n1 = self.find_node(elem.start_node)?;
         let n2 = self.find_node(elem.end_node)?;
         Some(n1.distance_to(n2))
+    }
+
+    pub fn shell_surface_area(&self, shell: &ShellElement4N) -> Option<f64> {
+        let n0 = self.find_node(shell.nodes[0])?;
+        let n1 = self.find_node(shell.nodes[1])?;
+        let n2 = self.find_node(shell.nodes[2])?;
+        let n3 = self.find_node(shell.nodes[3])?;
+
+        let tri_area = |a: &Node3D, b: &Node3D, c: &Node3D| -> f64 {
+            let ab = [b.x - a.x, b.y - a.y, b.z - a.z];
+            let ac = [c.x - a.x, c.y - a.y, c.z - a.z];
+            let cross = [
+                ab[1] * ac[2] - ab[2] * ac[1],
+                ab[2] * ac[0] - ab[0] * ac[2],
+                ab[0] * ac[1] - ab[1] * ac[0],
+            ];
+            0.5 * (cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]).sqrt()
+        };
+
+        Some(tri_area(n0, n1, n2) + tri_area(n0, n2, n3))
     }
 
     /// Computes total steel mass in kg

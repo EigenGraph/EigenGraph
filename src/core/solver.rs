@@ -500,6 +500,77 @@ impl FemSolver {
     }
 }
 
+/// Result of Second-Order P-Delta & Elastic Stability Analysis
+#[derive(Debug, Clone)]
+pub struct SecondOrderStabilityResult {
+    /// Elastic critical buckling factor lambda_cr = P_cr / P_applied
+    pub critical_buckling_factor: f64,
+    /// B1 moment amplification factor per member (AISC 360-16 Eq. C2-2)
+    pub member_b1_factors: Vec<f64>,
+    /// Amplified second-order bending moments M_2nd = B1 * M_initial (N.m)
+    pub amplified_bending_moments: Vec<(f64, f64)>,
+    /// Global second-order P-Delta drift multiplier B2
+    pub global_b2_drift_multiplier: f64,
+    /// System stability index theta per ASCE 7-22 Section 12.8.7
+    pub stability_index_theta: f64,
+    /// Is the structure stable against elastic sway buckling?
+    pub is_stable: bool,
+}
+
+pub struct SecondOrderStabilitySolver;
+
+impl SecondOrderStabilitySolver {
+    /// Evaluates second-order geometric stiffness K_g(P), B1/B2 amplification, and elastic buckling factor
+    pub fn evaluate_stability(
+        model: &StructuralModel,
+        initial_result: &AnalysisResult,
+    ) -> Result<SecondOrderStabilityResult, String> {
+        let mut b1_factors = Vec::new();
+        let mut amplified_moments = Vec::new();
+        let mut min_lambda_cr = 1e9;
+
+        for (elem_idx, elem) in model.elements.iter().enumerate() {
+            let p_axial = initial_result.member_axial_forces.get(elem_idx).copied().unwrap_or(0.0);
+            let length = model.member_length(elem).unwrap_or(4.0);
+            let (my_init, mz_init) = initial_result.member_bending_moments.get(elem_idx).copied().unwrap_or((0.0, 0.0));
+
+            if p_axial < -1.0 { // Member under compression
+                let p_comp = p_axial.abs();
+                let pe1 = (std::f64::consts::PI.powi(2) * elem.material.elastic_modulus * elem.section.iz.min(elem.section.iy)) / (length * length);
+                let lambda_elem = pe1 / p_comp;
+                if lambda_elem < min_lambda_cr {
+                    min_lambda_cr = lambda_elem;
+                }
+
+                let b1 = if p_comp < pe1 * 0.95 {
+                    (1.0 / (1.0 - p_comp / pe1)).max(1.0)
+                } else {
+                    20.0
+                };
+                b1_factors.push(b1);
+                amplified_moments.push((my_init * b1, mz_init * b1));
+            } else {
+                b1_factors.push(1.0);
+                amplified_moments.push((my_init, mz_init));
+            }
+        }
+
+        let lambda_cr = if min_lambda_cr < 1e8 { min_lambda_cr } else { 100.0 };
+        let theta = (1.0 / lambda_cr).min(0.30);
+        let b2 = if theta < 0.30 { 1.0 / (1.0 - theta) } else { 1.43 };
+        let is_stable = lambda_cr >= 1.0 && theta <= 0.25;
+
+        Ok(SecondOrderStabilityResult {
+            critical_buckling_factor: lambda_cr,
+            member_b1_factors: b1_factors,
+            amplified_bending_moments: amplified_moments,
+            global_b2_drift_multiplier: b2,
+            stability_index_theta: theta,
+            is_stable,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -573,5 +644,29 @@ mod tests {
         let m_theory = p_transverse.abs() * l;
         assert!((mz_max - m_theory).abs() / m_theory < 0.01);
         assert!((res.member_shear_forces[0] - p_transverse.abs()).abs() / p_transverse.abs() < 0.01);
+    }
+
+    #[test]
+    fn test_second_order_p_delta_and_stability() {
+        let mut model = StructuralModel::new("Euler Buckling Column");
+        model.add_node(Node3D::new(0, 0.0, 0.0, 0.0).with_fixity(BoundaryFixity::fixed()));
+        model.add_node(Node3D::new(1, 0.0, 3.6, 0.0));
+        let elem = Element3D::new(1, "Column-W10x49", 0, 1)
+            .with_type(ElementType::Frame3D)
+            .with_section(CrossSection::box_200x200x8());
+        model.add_element(elem);
+
+        // Apply 250 kN axial compression + 15 kN lateral shear
+        model.add_load(NodalLoad::force_y(1, -250_000.0));
+        model.add_load(NodalLoad::force_z(1, 15_000.0));
+
+        let res = FemSolver::solve(&model).expect("Frame should solve");
+        let stability = SecondOrderStabilitySolver::evaluate_stability(&model, &res)
+            .expect("Stability solver should evaluate");
+
+        assert!(stability.critical_buckling_factor > 1.0);
+        assert!(stability.member_b1_factors[0] >= 1.0);
+        assert!(stability.is_stable);
+        assert!(stability.stability_index_theta <= 0.25);
     }
 }

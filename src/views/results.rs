@@ -463,6 +463,18 @@ impl ResultsView {
                                     }
                                 }
                             }
+                            if ui.add(egui::Button::new(RichText::new("🏛️ IFC4 SAM (.ifc)").size(10.5).color(theme.accent_blue))
+                                .fill(theme.bg_card)
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let mut engine = crate::core::ParametricEngine::new();
+                                if let Ok(model) = engine.generate_warren_truss() {
+                                    let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
+                                    let sam = crate::core::IfcSamExporter::export_to_ifc_sam(&model, ari.as_ref());
+                                    if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_StructuralAnalysisModel.ifc", &sam) {
+                                        self.export_status = Some(format!("OpenBIM IFC4 SAM file saved to: {}", path));
+                                    }
+                                }
+                            }
                             if ui.add(egui::Button::new(RichText::new("🏢 CSI ETABS (.e2k)").size(10.5).color(theme.accent_green))
                                 .fill(theme.bg_card)
                                 .corner_radius(CornerRadius::same(6))).clicked() {
