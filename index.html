@@ -31,7 +31,7 @@
           <div class="titlebar-title">
             <img src="assets/icon.png" alt="EigenGraph" width="22" height="22" style="border-radius:4px;">
             <span>EigenGraph Workstation</span>
-            <span class="dossier-tag blue" style="padding:2px 8px; font-size:0.68rem;">v0.0.1-release</span>
+            <span class="dossier-tag blue" style="padding:2px 8px; font-size:0.68rem;">v0.0.3-release</span>
           </div>
         </div>
 
@@ -41,8 +41,8 @@
         </div>
 
         <div class="titlebar-right">
-          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.0.1" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
-            📥 Download v0.0.1
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.0.3" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v0.0.3
           </a>
           <a href="https://github.com/EigenGraph/EigenGraph" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
@@ -184,7 +184,7 @@
           <div class="sidebar-footer">
             <div><strong>Engine:</strong> Rust 1.80+ Core Engine</div>
             <div><strong>Status:</strong> 58/58 Verified Tests (100%)</div>
-            <div style="color:var(--accent-green);">● Desktop Release v0.0.1 Active</div>
+            <div style="color:var(--accent-green);">● Desktop Release v0.0.3 Active</div>
           </div>
         </aside>
 
@@ -975,9 +975,11 @@ impl InternalVault {
             <div class="dossier-card">
               <h3 class="dossier-card-title">🏛️ Architecture & Functional Purpose</h3>
               <p style="color:var(--text-secondary); margin-bottom:12px;">
-                Pillar 9 is the computational crown jewel of EigenGraph. Integrated in <strong>v0.0.1</strong>, it unifies non-linear matrix perturbation with international design code checks across reinforced concrete columns, structural steel members, and earthquake dynamic modal responses.
+                Pillar 9 is the computational crown jewel of EigenGraph. Upgraded in <strong>v0.0.3 (Phase 2)</strong>, it unifies second-order \(P-\Delta\) geometric stiffness \(\mathbf{K}_g(\mathbf{P})\), 2D Mindlin-Reissner shell finite elements, and non-linear matrix perturbation with international design code checks.
               </p>
               <ul style="color:var(--text-secondary); margin-left:20px; line-height:1.7;">
+                <li><strong>Second-Order Geometric Non-Linearity (\(P-\Delta\) & \(P-\delta\)):</strong> Direct geometric stiffness \(\mathbf{K}_g(\mathbf{P})\) and AISC \(B_1/B_2\) sway drift amplifications.</li>
+                <li><strong>2D Flat Shell & Shear Wall Elements:</strong> 4-node Mindlin-Reissner plate bending and bilinear membrane for core walls and slabs.</li>
                 <li><strong>Woodbury Non-Linear Redistribution:</strong> Exact force shedding \(\Delta N_i\) from plastified members into secondary load paths without full stiffness refactorization.</li>
                 <li><strong>3D Biaxial \(P-M_x-M_y\) Interaction Surface:</strong> Bresler reciprocal load method and PCA load contour exponent \(\alpha\) per SNI 2847:2019 / ACI 318-19.</li>
                 <li><strong>Dynamic Modal Combinations:</strong> Der Kiureghian CQC and SRSS modal combinations with 85% static base shear code scaling per SNI 1726:2019 Pasal 7.9.4.1.</li>

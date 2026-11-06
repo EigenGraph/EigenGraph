@@ -17,3 +17,27 @@
 ## ⚡ Local-First Execution Protocol
 - All UI modifications and local previews run locally within the workspace.
 - Operations pushing to external repositories or GitHub Pages execute only when the user explicitly gives instructions.
+
+---
+
+## 🔢 STRICT SEMANTIC VERSIONING PROGRESSION RULE
+
+To maintain predictable engineering cadence and transparent release lineage, all repositories (`EigenGraph`, `Website`, `EigenGate`, `EigenFlow`) follow a **mandatory three-tier numerical progression rule**:
+
+1. **Patch Level Progression (Initial Releases):**
+   - Versioning begins at initial baseline `v0.0.1`.
+   - Subsequent incremental releases advance strictly one patch digit at a time:
+     `v0.0.1` &rarr; `v0.0.2` &rarr; `v0.0.3` &rarr; `v0.0.4` &rarr; `v0.0.5` &rarr; `v0.0.6` &rarr; `v0.0.7` &rarr; `v0.0.8` &rarr; `v0.0.9`.
+   - **Prohibited:** Skipping directly from `v0.0.1` to `v0.1.0` or skipping any intermediate patch version is strictly forbidden.
+
+2. **Minor Level Progression (After v0.0.9):**
+   - Only after `v0.0.9` has been reached does the version advance to `v0.1.0`.
+   - Minor releases then proceed incrementally:
+     `v0.1.0` &rarr; `v0.1.1` &rarr; `v0.1.2` &rarr; ... &rarr; `v0.1.9` &rarr; `v0.2.0` &rarr; ... &rarr; `v0.9.9`.
+
+3. **Major Level Progression (Production Milestone v1.0.0):**
+   - Only after `v0.9.9` has completed does the version advance to major production milestone `v1.0.0`.
+   - Major releases follow the identical incremental rule:
+     `v1.0.0` &rarr; `v1.0.1` &rarr; `v1.0.2` &rarr; ...
+
+All agents and developers MUST record and uphold this rule across all `Cargo.toml`, release tags, download links, changelogs, and documentation.
