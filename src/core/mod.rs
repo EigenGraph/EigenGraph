@@ -39,7 +39,9 @@ pub use ari::{
 pub use parametric::{ParametricEngine, ParametricFormula};
 pub use interop::{
     DiskExporter, DossierExporter, DstvExporter, DstvPiece, DxfExporter, EigenProjectArchive,
-    HtmlViewerExporter, IfcExporter, IfcImporter, LatexExporter, Sap2000Exporter, Sha256Hasher,
+    EtabsE2kExporter, EtabsE2kImporter, HtmlViewerExporter, IfcExporter, IfcImporter, LatexExporter,
+    PbgProjectMetadata, PbgReportGenerator, RebarBbsDetailer, RebarBbsSchedule, Sap2000Exporter,
+    Sha256Hasher,
 };
 pub use optimizer::{AriTopologyOptimizer, BracingCandidate, BracingOptimizationReport};
 pub use cost::{AhspUnitRates, BoqLineItem, CostEngine, CostEstimationReport, ProfileQuantity};

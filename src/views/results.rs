@@ -410,6 +410,34 @@ impl ResultsView {
                                     }
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🏛️ Laporan PBG/SIMBG (.html)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(180, 83, 9))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let mut engine = crate::core::ParametricEngine::new();
+                                if let Ok(model) = engine.generate_warren_truss() {
+                                    if let Ok(ari) = crate::core::AriEngine::evaluate_redundancy(&model) {
+                                        let meta = crate::core::PbgProjectMetadata::default();
+                                        let html = crate::core::PbgReportGenerator::generate_printable_html(&model, &ari, &meta);
+                                        if let Ok(path) = crate::core::DiskExporter::write_export_file("Laporan_Teknis_PBG_SIMBG_SNI.html", &html) {
+                                            self.export_status = Some(format!("Dokumen Perhitungan PBG/SIMBG tersimpan: {}", path));
+                                        }
+                                    }
+                                }
+                            }
+
+                            if ui.add(egui::Button::new(RichText::new("📋 Bar Bending Schedule (.html)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(109, 40, 217))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let mut engine = crate::core::ParametricEngine::new();
+                                if let Ok(model) = engine.generate_warren_truss() {
+                                    let bbs = crate::core::RebarBbsDetailer::generate_from_model(&model, 30.0, 420.0);
+                                    let md = crate::core::RebarBbsDetailer::export_to_markdown(&bbs);
+                                    if let Ok(path) = crate::core::DiskExporter::write_export_file("Bar_Bending_Schedule_SNI2847.md", &md) {
+                                        self.export_status = Some(format!("Jadwal Pemotongan Tulangan (BBS) tersimpan: {}", path));
+                                    }
+                                }
+                            }
                         });
                     });
                 });
@@ -419,7 +447,7 @@ impl ResultsView {
                         ui.set_width(ui.available_width());
                         ui.label(RichText::new("🌐 OPENBIM & CAD TRIAD DISK EXPORT").size(12.0).strong().color(theme.text_primary));
                         ui.add_space(4.0);
-                        ui.label(RichText::new("Export structural topology to industry standards: IFC 4.3 (with Property Set Pset_StructuralRedundancy), CSI SAP2000 (.s2k), or AutoCAD 3D DXF.")
+                        ui.label(RichText::new("Export structural topology to industry standards: IFC 4.3, CSI ETABS (.e2k), CSI SAP2000 (.s2k), or AutoCAD 3D DXF.")
                             .size(10.5).color(theme.text_secondary));
                         ui.add_space(10.0);
                         ui.horizontal_wrapped(|ui| {
@@ -432,6 +460,18 @@ impl ResultsView {
                                     let ifc = crate::core::IfcExporter::export_to_ifc(&model, ari.as_ref());
                                     if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Model.ifc", &ifc) {
                                         self.export_status = Some(format!("OpenBIM IFC 4.3 file saved to: {}", path));
+                                    }
+                                }
+                            }
+                            if ui.add(egui::Button::new(RichText::new("🏢 CSI ETABS (.e2k)").size(10.5).color(theme.accent_green))
+                                .fill(theme.bg_card)
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let mut engine = crate::core::ParametricEngine::new();
+                                if let Ok(model) = engine.generate_warren_truss() {
+                                    let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
+                                    let e2k = crate::core::EtabsE2kExporter::export_to_e2k(&model, ari.as_ref());
+                                    if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Model.e2k", &e2k) {
+                                        self.export_status = Some(format!("CSI ETABS .e2k file saved to: {}", path));
                                     }
                                 }
                             }
