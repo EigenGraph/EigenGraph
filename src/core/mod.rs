@@ -26,6 +26,7 @@ pub mod bim;
 pub mod cso;
 pub mod concrete;
 pub mod pushover;
+pub mod geotech;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -60,6 +61,10 @@ pub use nonlinear::{
 pub use pushover::{
     AdrsPoint, CapacitySpectrum, InelasticDemandSpectrum, LateralLoadPattern, PerformancePoint,
     PushoverCsmReport, PushoverEngine, SeismicPerformanceLevel,
+};
+pub use geotech::{
+    GeotechEngine, GeotechSsiReport, PileElement, PileGroupReport, PunchingShearAudit, SoilLayer,
+    SoilType, SsiModalShiftReport, WinklerSpringMatrix,
 };
 pub use modal::{
     ModalAnalysisReport, ModalEngine, ModeShape, SiteClass, Sni1726Spectrum,

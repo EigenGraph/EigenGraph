@@ -14,6 +14,7 @@ pub enum AnalyzeSubTab {
     CascadingCollapse,
     NonlinearPushover,
     ModalDynamics,
+    GeotechSsi,
 }
 
 pub struct AnalyzeView {
@@ -45,6 +46,11 @@ pub struct AnalyzeView {
     pub woodbury_lambda_val: f32,
     pub modal_damping_ratio: f32,
     pub pushover_load_pattern: crate::core::LateralLoadPattern,
+    pub geotech_soil_type: crate::core::SoilType,
+    pub geotech_footing_w: f32,
+    pub geotech_footing_l: f32,
+    pub geotech_piles_x: usize,
+    pub geotech_piles_y: usize,
 }
 
 impl Default for AnalyzeView {
@@ -77,6 +83,11 @@ impl Default for AnalyzeView {
             woodbury_lambda_val: 0.0,
             modal_damping_ratio: 0.05,
             pushover_load_pattern: crate::core::LateralLoadPattern::FirstModeModal,
+            geotech_soil_type: crate::core::SoilType::MediumSand,
+            geotech_footing_w: 3.5,
+            geotech_footing_l: 3.5,
+            geotech_piles_x: 3,
+            geotech_piles_y: 3,
         }
     }
 }
@@ -131,6 +142,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::CascadingCollapse => self.render_cascading_collapse(ui, theme),
                     AnalyzeSubTab::NonlinearPushover => self.render_nonlinear_pushover(ui, theme),
                     AnalyzeSubTab::ModalDynamics => self.render_modal_dynamics(ui, theme),
+                    AnalyzeSubTab::GeotechSsi => self.render_geotech_ssi(ui, theme),
                 }
 
                 ui.add_space(24.0);
@@ -149,6 +161,7 @@ impl AnalyzeView {
                 (AnalyzeSubTab::CascadingCollapse, "💥 Cascading Collapse"),
                 (AnalyzeSubTab::NonlinearPushover, "📉 Pushover P-Δ"),
                 (AnalyzeSubTab::ModalDynamics, "🌊 SNI 1726 Modal"),
+                (AnalyzeSubTab::GeotechSsi, "🌱 Geotech & SSI"),
             ];
 
             for (tab, label) in tabs {
@@ -1901,4 +1914,391 @@ impl AnalyzeView {
             });
         });
     }
+
+    // -------------------------------------------------------------
+    // SUB-TAB 9: Geotechnical Engineering, Deep Foundations & SSI
+    // -------------------------------------------------------------
+    fn render_geotech_ssi(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let mut engine = crate::core::ParametricEngine::new();
+        let model = engine.generate_warren_truss().unwrap_or_else(|_| crate::core::StructuralModel::new("Geotech Foundation Model"));
+
+        let soil_layer = crate::core::SoilLayer::new_standard(self.geotech_soil_type, 0.0, 20.0);
+        let audit = crate::core::GeotechEngine::run_geotech_ssi_audit(
+            &model,
+            soil_layer.clone(),
+            self.geotech_footing_w as f64,
+            self.geotech_footing_l as f64,
+            self.geotech_piles_x,
+            self.geotech_piles_y,
+        );
+
+        let piles = &audit.pile_group;
+        let punch = &audit.punching_shear;
+        let ssi = &audit.ssi_modal_shift;
+        let winkler = &audit.winkler_springs;
+
+        // 1. Top Summary Metric Cards (4 Columns)
+        ui.columns(4, |cols| {
+            self.metric_card(
+                &mut cols[0],
+                theme,
+                "SUBGRADE MODULUS (ks)",
+                &format!("{:.0} kN/m³", soil_layer.subgrade_reaction_ks_kn_m3),
+                &format!("Vertical Kz: {:.1} MN/m", winkler.kz_trans_kn_m / 1000.0),
+                theme.accent_blue,
+            );
+            self.metric_card(
+                &mut cols[1],
+                theme,
+                "CONVERSE-LABARRE (Eg)",
+                &format!("{:.3} ({:.1}%)", piles.converse_labarre_efficiency, piles.converse_labarre_efficiency * 100.0),
+                &format!("{} Piles ({}x{}) • DCR: {:.3}", piles.total_piles, piles.piles_count_x, piles.piles_count_y, piles.governing_dcr),
+                if piles.is_group_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) },
+            );
+            self.metric_card(
+                &mut cols[2],
+                theme,
+                "PUNCHING SHEAR (SNI 22.6)",
+                &format!("DCR: {:.3}", punch.punching_dcr),
+                &format!("vu: {:.2} MPa ≤ φVc: {:.2} MPa", punch.punching_stress_vu_mpa, punch.concrete_capacity_phi_vc_mpa),
+                if punch.is_punching_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) },
+            );
+            self.metric_card(
+                &mut cols[3],
+                theme,
+                "SSI DYNAMIC SHIFT (T̃/T)",
+                &format!("{:.3}x", ssi.period_lengthening_ratio),
+                &format!("Base Shear: -{:.1}% (βssi: {:.1}%)", (1.0 - ssi.base_shear_reduction_ratio) * 100.0, ssi.foundation_damping_factor * 100.0),
+                theme.accent_orange,
+            );
+        });
+
+        ui.add_space(12.0);
+
+        // 2. Control Toolbar: Soil Stratum & Footing/Pile Geometry Configuration
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::same(10))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Stratum Stratigraphy:").size(11.0).strong().color(theme.text_secondary));
+                    let soil_types = [
+                        (crate::core::SoilType::DenseSand, "Dense Sand"),
+                        (crate::core::SoilType::MediumSand, "Medium Sand"),
+                        (crate::core::SoilType::LooseSand, "Loose Sand"),
+                        (crate::core::SoilType::StiffClay, "Stiff Clay"),
+                        (crate::core::SoilType::MediumClay, "Medium Clay"),
+                        (crate::core::SoilType::SoftClay, "Soft Clay"),
+                        (crate::core::SoilType::Bedrock, "Bedrock"),
+                    ];
+                    for (st, lbl) in soil_types {
+                        let is_sel = self.geotech_soil_type == st;
+                        let btn = egui::Button::new(RichText::new(lbl).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_secondary }))
+                            .fill(if is_sel { theme.accent_blue } else { theme.bg_canvas });
+                        if ui.add(btn).clicked() {
+                            self.geotech_soil_type = st;
+                        }
+                    }
+
+                    ui.add_space(14.0);
+                    ui.label(RichText::new("Footing Width B:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.geotech_footing_w).speed(0.1).range(1.0..=15.0).suffix(" m"));
+
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Footing Length L:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.geotech_footing_l).speed(0.1).range(1.0..=15.0).suffix(" m"));
+
+                    ui.add_space(14.0);
+                    ui.label(RichText::new("Pile Grid Nx:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.geotech_piles_x).speed(1).range(1..=6));
+
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Ny:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.geotech_piles_y).speed(1).range(1..=6));
+                });
+            });
+
+        ui.add_space(12.0);
+
+        // 3. DUAL VECTOR VISUALIZER: Left = 2D Pile Layout & Biaxial Load Iso-contours; Right = Punching Shear Critical Perimeter
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::same(16))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("📐 Foundation & SSI Vector Visualizer (Deep Foundation Grid + Two-Way Punching Perimeter)").size(13.5).strong().color(theme.text_primary));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let status_tag = if audit.is_fully_compliant { "✅ Geotech & Punching Compliant" } else { "⚠️ Reinforcement / Piles Required" };
+                        let status_col = if audit.is_fully_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                        ui.label(RichText::new(status_tag).size(11.5).strong().color(status_col));
+                    });
+                });
+
+                ui.add_space(10.0);
+
+                ui.columns(2, |cols| {
+                    // LEFT: Pile Group 2D Plan Layout with Biaxial Load Distribution
+                    cols[0].label(RichText::new(format!("1. Pile Group Layout ({}x{} = {} Piles, Cap {:.1}x{:.1}m, Eg = {:.1}%)", piles.piles_count_x, piles.piles_count_y, piles.total_piles, piles.cap_width_m, piles.cap_length_m, piles.converse_labarre_efficiency * 100.0)).size(11.0).strong().color(theme.text_secondary));
+                    let desired_left = Vec2::new(cols[0].available_width(), 200.0);
+                    let (rect_l, _) = cols[0].allocate_exact_size(desired_left, Sense::hover());
+                    let painter_l = cols[0].painter_at(rect_l);
+                    painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+                    let center_l = rect_l.center();
+                    let max_cap_dim = piles.cap_width_m.max(piles.cap_length_m).max(2.0) as f32;
+                    let scale_l = (rect_l.height() * 0.72) / max_cap_dim;
+
+                    // Draw Pile Cap outline
+                    let cap_w_px = (piles.cap_width_m as f32) * scale_l;
+                    let cap_l_px = (piles.cap_length_m as f32) * scale_l;
+                    let cap_rect = egui::Rect::from_center_size(center_l, Vec2::new(cap_w_px, cap_l_px));
+                    painter_l.rect_filled(cap_rect, CornerRadius::same(4), Color32::from_rgba_premultiplied(30, 41, 59, 180));
+                    painter_l.rect_stroke(cap_rect, CornerRadius::same(4), Stroke::new(1.5, Color32::from_rgb(100, 116, 139)), egui::StrokeKind::Inside);
+
+                    // Draw Column base at center of cap
+                    let col_w_px = 0.60 * scale_l;
+                    let col_rect = egui::Rect::from_center_size(center_l, Vec2::new(col_w_px, col_w_px));
+                    painter_l.rect_filled(col_rect, CornerRadius::same(2), Color32::from_rgb(51, 65, 85));
+                    painter_l.rect_stroke(col_rect, CornerRadius::same(2), Stroke::new(1.0, Color32::from_rgb(148, 163, 184)), egui::StrokeKind::Inside);
+
+                    // Draw Individual Piles
+                    let r_pile_px = ((piles.pile_diameter_m as f32 * 0.5) * scale_l).clamp(5.0, 24.0);
+                    for p in &piles.pile_details {
+                        let px = center_l.x + (p.x_coord_m as f32) * scale_l;
+                        let py = center_l.y - (p.y_coord_m as f32) * scale_l;
+                        let pile_pos = Pos2::new(px, py);
+
+                        let p_color = if p.axial_dcr > 1.0 {
+                            Color32::from_rgb(239, 68, 68)
+                        } else if p.axial_dcr > 0.80 {
+                            Color32::from_rgb(245, 158, 11)
+                        } else {
+                            Color32::from_rgb(16, 185, 129)
+                        };
+
+                        painter_l.circle_filled(pile_pos, r_pile_px, p_color.gamma_multiply(0.25));
+                        painter_l.circle_filled(pile_pos, r_pile_px * 0.75, p_color);
+                        painter_l.circle_stroke(pile_pos, r_pile_px, Stroke::new(1.2, Color32::WHITE));
+
+                        // Label pile ID and axial load
+                        painter_l.text(
+                            pile_pos + Vec2::new(0.0, r_pile_px + 4.0),
+                            egui::Align2::CENTER_TOP,
+                            format!("P{}: {:.0}kN", p.pile_id, p.factored_axial_demand_pu_kn),
+                            egui::FontId::proportional(8.5),
+                            Color32::from_rgb(226, 232, 240),
+                        );
+                    }
+
+                    // Annotations
+                    painter_l.text(
+                        Pos2::new(rect_l.left() + 8.0, rect_l.top() + 8.0),
+                        egui::Align2::LEFT_TOP,
+                        format!("Applied Pu = {:.0} kN • Mux = {:.0} kNm • Muy = {:.0} kNm", piles.applied_pu_kn, piles.applied_mux_knm, piles.applied_muy_knm),
+                        egui::FontId::proportional(9.5),
+                        theme.accent_blue,
+                    );
+
+                    // RIGHT: Punching Shear Critical Perimeter (SNI 2847:2019 / ACI 318-19)
+                    cols[1].label(RichText::new(format!("2. Critical Punching Perimeter (bo = {:.0} mm at d/2 = {:.0} mm)", punch.critical_perimeter_bo_mm, punch.slab_effective_depth_d_mm * 0.5)).size(11.0).strong().color(theme.text_secondary));
+                    let desired_right = Vec2::new(cols[1].available_width(), 200.0);
+                    let (rect_r, _) = cols[1].allocate_exact_size(desired_right, Sense::hover());
+                    let painter_r = cols[1].painter_at(rect_r);
+                    painter_r.rect_filled(rect_r, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+                    let center_r = rect_r.center();
+                    let slab_view_dim = (punch.column_dim_c1_mm + punch.slab_effective_depth_d_mm * 4.0).max(1200.0) as f32;
+                    let scale_r = (rect_r.height() * 0.75) / slab_view_dim;
+
+                    // Footing / Slab background slab patch
+                    let slab_patch_w = slab_view_dim * scale_r * 0.95;
+                    let slab_patch_rect = egui::Rect::from_center_size(center_r, Vec2::new(slab_patch_w, slab_patch_w));
+                    painter_r.rect_filled(slab_patch_rect, CornerRadius::same(4), Color32::from_rgba_premultiplied(30, 41, 59, 140));
+                    painter_r.rect_stroke(slab_patch_rect, CornerRadius::same(4), Stroke::new(1.0, Color32::from_rgb(71, 85, 105)), egui::StrokeKind::Inside);
+
+                    // Column cross-section (c1 x c2)
+                    let c1_px = (punch.column_dim_c1_mm as f32) * scale_r;
+                    let c2_px = (punch.column_dim_c2_mm as f32) * scale_r;
+                    let col_sec_rect = egui::Rect::from_center_size(center_r, Vec2::new(c1_px, c2_px));
+                    painter_r.rect_filled(col_sec_rect, CornerRadius::same(2), Color32::from_rgb(71, 85, 105));
+                    painter_r.rect_stroke(col_sec_rect, CornerRadius::same(2), Stroke::new(1.5, Color32::from_rgb(203, 213, 225)), egui::StrokeKind::Inside);
+
+                    // Critical Perimeter bo at d/2
+                    let bo_w_px = ((punch.column_dim_c1_mm + punch.slab_effective_depth_d_mm) as f32) * scale_r;
+                    let bo_h_px = ((punch.column_dim_c2_mm + punch.slab_effective_depth_d_mm) as f32) * scale_r;
+                    let bo_rect = egui::Rect::from_center_size(center_r, Vec2::new(bo_w_px, bo_h_px));
+
+                    let bo_color = if punch.is_punching_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                    painter_r.rect_stroke(bo_rect, CornerRadius::same(3), Stroke::new(2.2, bo_color), egui::StrokeKind::Inside);
+
+                    // Dimension lines for bo
+                    painter_r.text(
+                        Pos2::new(bo_rect.center().x, bo_rect.top() - 6.0),
+                        egui::Align2::CENTER_BOTTOM,
+                        format!("c1 + d = {:.0} mm", punch.column_dim_c1_mm + punch.slab_effective_depth_d_mm),
+                        egui::FontId::proportional(9.0),
+                        theme.accent_blue,
+                    );
+                    painter_r.text(
+                        Pos2::new(bo_rect.right() + 6.0, bo_rect.center().y),
+                        egui::Align2::LEFT_CENTER,
+                        format!("c2 + d = {:.0} mm", punch.column_dim_c2_mm + punch.slab_effective_depth_d_mm),
+                        egui::FontId::proportional(9.0),
+                        theme.accent_blue,
+                    );
+
+                    // Corner reticles at d/2
+                    for corner in [bo_rect.left_top(), bo_rect.right_top(), bo_rect.left_bottom(), bo_rect.right_bottom()] {
+                        painter_r.circle_filled(corner, 3.5, bo_color);
+                    }
+
+                    // Annotations
+                    painter_r.text(
+                        Pos2::new(rect_r.left() + 8.0, rect_r.top() + 8.0),
+                        egui::Align2::LEFT_TOP,
+                        format!("Vu = {:.1} kN • vu = {:.3} MPa • φVc = {:.3} MPa", punch.factored_shear_vu_kn, punch.punching_stress_vu_mpa, punch.concrete_capacity_phi_vc_mpa),
+                        egui::FontId::proportional(9.5),
+                        bo_color,
+                    );
+                    painter_r.text(
+                        Pos2::new(rect_r.left() + 8.0, rect_r.bottom() - 8.0),
+                        egui::Align2::LEFT_BOTTOM,
+                        if punch.is_punching_safe { "🟢 PASS: Two-way punching shear compliant without stud rails" } else { "⚠️ FAIL: Add shear studs or increase slab thickness" },
+                        egui::FontId::proportional(9.0),
+                        bo_color,
+                    );
+                });
+            });
+
+        ui.add_space(14.0);
+
+        // 4. Winkler Foundation 6-DOF Spring Matrix & Soil Stratum Parameters Card
+        Frame::new()
+            .fill(Color32::from_rgb(17, 24, 39))
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::same(12))
+            .stroke(Stroke::new(1.0, Color32::from_rgb(14, 165, 233)))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("🔬 Equivalent 6-DOF Winkler Subgrade Reaction Matrix (Vesic / Bowles Formulation):").size(12.5).strong().color(Color32::WHITE));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(RichText::new(format!("ks = {:.0} kN/m³ • E = {:.1} MPa • ν = {:.2} • φ = {:.1}°", soil_layer.subgrade_reaction_ks_kn_m3, soil_layer.elastic_modulus_es_mpa, soil_layer.poisson_ratio_nu, soil_layer.friction_angle_deg)).size(11.0).color(theme.accent_blue));
+                    });
+                });
+                ui.add_space(8.0);
+
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new(format!("Kz (Vert): {:.1} MN/m", winkler.kz_trans_kn_m / 1000.0)).size(11.0).strong().color(theme.accent_blue));
+                    ui.add_space(14.0);
+                    ui.label(RichText::new(format!("Kx, Ky (Shear): {:.1} MN/m", winkler.kx_trans_kn_m / 1000.0)).size(11.0).color(theme.text_secondary));
+                    ui.add_space(14.0);
+                    ui.label(RichText::new(format!("Kθx (Rocking L): {:.1} MNm/rad", winkler.k_theta_x_knm_rad / 1000.0)).size(11.0).strong().color(theme.accent_green));
+                    ui.add_space(14.0);
+                    ui.label(RichText::new(format!("Kθy (Rocking B): {:.1} MNm/rad", winkler.k_theta_y_knm_rad / 1000.0)).size(11.0).strong().color(theme.accent_green));
+                    ui.add_space(14.0);
+                    ui.label(RichText::new(format!("Kθz (Torsion): {:.1} MNm/rad", winkler.k_theta_z_knm_rad / 1000.0)).size(11.0).color(theme.accent_orange));
+                });
+            });
+
+        ui.add_space(14.0);
+
+        // 5. Individual Pile Biaxial Distribution & Deflection Table
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::same(14))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("📋 Individual Pile Biaxial Load Distribution & Lateral Deflection Schedule:").size(12.5).strong().color(theme.text_primary));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(RichText::new(format!("Allowable Compression: {:.0} kN • Tension: {:.0} kN", piles.pile_details.first().map(|p| p.allowable_compression_all_kn).unwrap_or(0.0), piles.pile_details.first().map(|p| p.allowable_tension_uplift_kn).unwrap_or(0.0))).size(11.0).color(theme.text_muted));
+                    });
+                });
+                ui.add_space(8.0);
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Pile ID").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(25.0);
+                    ui.label(RichText::new("Location (x, y)").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Axial Demand Pu").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Allowable Pall").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Axial DCR").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Lateral Hu").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Deflection δ").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Verdict").size(11.0).strong().color(theme.text_secondary));
+                });
+                ui.separator();
+
+                for p in &piles.pile_details {
+                    let dcr_col = if p.axial_dcr <= 0.80 {
+                        theme.accent_green
+                    } else if p.axial_dcr <= 1.00 {
+                        theme.accent_orange
+                    } else {
+                        Color32::from_rgb(239, 68, 68)
+                    };
+
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(format!("Pile #{:02}", p.pile_id)).size(11.0).strong().color(theme.accent_blue));
+                        ui.add_space(20.0);
+                        ui.label(RichText::new(format!("({:+.2}m, {:+.2}m)", p.x_coord_m, p.y_coord_m)).size(11.0).color(theme.text_primary));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new(format!("{:7.1} kN", p.factored_axial_demand_pu_kn)).size(11.0).color(theme.text_primary));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new(format!("{:7.1} kN", p.allowable_compression_all_kn)).size(11.0).color(theme.text_muted));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new(format!("{:.3}", p.axial_dcr)).size(11.0).strong().color(dcr_col));
+                        ui.add_space(45.0);
+                        ui.label(RichText::new(format!("{:.1} kN", p.lateral_shear_hu_kn)).size(11.0).color(theme.text_secondary));
+                        ui.add_space(40.0);
+                        ui.label(RichText::new(format!("{:.2} mm", p.lateral_deflection_mm)).size(11.0).color(theme.text_secondary));
+                        ui.add_space(40.0);
+                        ui.label(RichText::new(if p.is_safe { "🟢 SAFE" } else { "🔴 OVERSTRESSED" }).size(11.0).strong().color(dcr_col));
+                    });
+                    ui.separator();
+                }
+            });
+
+        ui.add_space(14.0);
+
+        // 6. Dynamic SSI Modal Period Shift & Base Shear Reduction Card
+        Frame::new()
+            .fill(Color32::from_rgb(15, 23, 42))
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::same(12))
+            .stroke(Stroke::new(1.0, Color32::from_rgb(16, 185, 129)))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("🌊 Veletsos & Meek Dynamic Soil-Structure Interaction (SSI) Modal Shift (ASCE 7-22 Ch. 19):").size(12.0).strong().color(Color32::WHITE));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(RichText::new(&ssi.ssi_classification).size(11.0).strong().color(theme.accent_green));
+                    });
+                });
+                ui.add_space(6.0);
+
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new(format!("Fixed-Base Period T: {:.3}s", ssi.fixed_base_period_t_s)).size(11.0).color(theme.text_secondary));
+                    ui.add_space(12.0);
+                    ui.label(RichText::new(format!("Flexible SSI Period T̃: {:.3}s", ssi.flexible_ssi_period_t_tilde_s)).size(11.0).strong().color(theme.accent_blue));
+                    ui.add_space(12.0);
+                    ui.label(RichText::new(format!("Period Lengthening T̃/T: {:.3}x (+{:.1}%)", ssi.period_lengthening_ratio, (ssi.period_lengthening_ratio - 1.0) * 100.0)).size(11.0).strong().color(theme.accent_green));
+                    ui.add_space(12.0);
+                    ui.label(RichText::new(format!("Base Shear Reduction: -{:.1}%", (1.0 - ssi.base_shear_reduction_ratio) * 100.0)).size(11.0).strong().color(theme.accent_orange));
+                    ui.add_space(12.0);
+                    ui.label(RichText::new(format!("Foundation Damping βssi: {:.1}%", ssi.foundation_damping_factor * 100.0)).size(11.0).color(theme.text_muted));
+                });
+            });
+    }
 }
+

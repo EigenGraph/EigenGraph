@@ -458,6 +458,20 @@ impl ResultsView {
                                     }
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🌱 Geotech & SSI Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(16, 185, 129))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let mut engine = crate::core::ParametricEngine::new();
+                                if let Ok(model) = engine.generate_warren_truss() {
+                                    let soil = crate::core::SoilLayer::new_standard(crate::core::SoilType::MediumSand, 0.0, 20.0);
+                                    let rep = crate::core::GeotechEngine::run_geotech_ssi_audit(&model, soil, 3.5, 3.5, 3, 3);
+                                    let md = crate::core::GeotechEngine::generate_markdown_dossier(&rep);
+                                    if let Ok(path) = crate::core::DiskExporter::write_export_file("Geotechnical_SSI_Foundation_Audit.md", &md) {
+                                        self.export_status = Some(format!("Geotechnical & SSI Audit Dossier saved to: {}", path));
+                                    }
+                                }
+                            }
                         });
                     });
                 });

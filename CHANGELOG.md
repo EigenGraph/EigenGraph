@@ -7,6 +7,49 @@ The project strictly adheres to sequential versioning:
 
 ---
 
+## [v0.0.5] - 2026-11-06 — Phase 4: Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI)
+
+### Added
+- **Winkler Subgrade Reaction & 6-DOF Foundation Spring Matrix (`WinklerSpringMatrix`, `SoilLayer`, `SoilType`)**:
+  - Implemented the Bowles / Vesic elastic subgrade reaction formulation in `src/core/geotech.rs` for spread and mat foundations.
+  - Formulated equivalent 6-DOF foundation stiffness matrix:
+    - Translational vertical stiffness: $K_z = k_s \cdot B \cdot L$ (kN/m).
+    - Translational horizontal shear stiffness: $K_x = K_y = 0.82 \cdot K_z$ (kN/m).
+    - Rocking rotational stiffness about primary axes: $K_{\theta x} = k_s \cdot \frac{B \cdot L^3}{12}$, $K_{\theta y} = k_s \cdot \frac{L \cdot B^3}{12}$ (kNm/rad).
+    - Torsional rotational stiffness: $K_{\theta z} = 0.65 \cdot k_s \cdot (I_x + I_y)$ (kNm/rad).
+  - Built stratigraphy models for 7 standard soil layers: Dense Sand, Medium Dense Sand, Loose Sand, Stiff Cohesive Clay, Medium Stiff Clay, Soft Clay, and Competent Bedrock ($\gamma, c_u, \phi, k_s, E_s, \nu$).
+- **Deep Foundation Pile Group Converse-Labarre Efficiency & Biaxial Distribution (`evaluate_pile_group`, `PileElement`, `PileGroupReport`)**:
+  - Implemented the Converse-Labarre pile group efficiency formulation:
+    $$E_g = 1 - \theta \cdot \frac{(n_x - 1)n_y + (n_y - 1)n_x}{90 \cdot n_x \cdot n_y}, \quad \text{where } \theta = \arctan(d / s)$$
+  - Formulated single pile ultimate compressive and uplift capacities ($q_{\text{end}} + q_{\text{skin}}$) per Meyerhof / Tomlinson standards.
+  - Evaluated rigorous 2D grid biaxial eccentric load distribution:
+    $$P_i = \frac{P_u}{N} \pm \frac{M_{uy} \cdot x_i}{\sum x^2} \pm \frac{M_{ux} \cdot y_i}{\sum y^2}$$
+  - Computed lateral subgrade resistance and lateral pile head deflection $\delta_{\text{lat}}$ under tributary horizontal shear.
+- **Two-Way Concrete Punching Shear Audit per SNI 2847:2019 / ACI 318-19 Section 22.6 (`audit_punching_shear`, `PunchingShearAudit`)**:
+  - Established critical shear perimeter $b_o = 2(c_1 + d) + 2(c_2 + d)$ at $d/2$ from column perimeter.
+  - Evaluated governing nominal concrete shear capacity per SNI 2847:2019 Eq. 22.6.5.2:
+    $$V_c = \min \left\{ 0.33 \sqrt{f'_c}, \; 0.17 \left(1 + \frac{2}{\beta}\right) \sqrt{f'_c}, \; 0.083 \left(2 + \frac{\alpha_s d}{b_o}\right) \sqrt{f'_c} \right\} \cdot b_o d$$
+  - Factored punching shear stress with direct shear and unbalanced eccentric moment transfer:
+    $$\nu_u = \frac{V_u}{b_o d} + \frac{\gamma_v M_{unb} c}{J_c}$$
+  - Automated safety verdict, demand-capacity ratio ($DCR_{\text{punch}}$), and prescriptive shear stud reinforcement advisories.
+- **Veletsos & Meek Dynamic Soil-Structure Interaction (SSI) Modal Period Lengthening (`evaluate_ssi_modal_shift`, `SsiModalShiftReport`)**:
+  - Formulated Veletsos & Meek dynamic SSI period lengthening:
+    $$\left(\frac{\tilde{T}}{T}\right)^2 = 1 + \frac{K_{\text{fixed}}}{K_h} + \frac{K_{\text{fixed}} h^2}{K_r}$$
+  - Evaluated ASCE 7-22 Chapter 19 foundation radiation and hysteretic damping $\beta_{\text{ssi}}$.
+  - Derived design base shear reduction allowance $(1 / (\tilde{T}/T)^{0.85})$ and lateral drift amplification.
+- **Interactive Geotechnical & SSI Dashboard in Analyze View (`src/views/analyze.rs`)**:
+  - Added new sub-tab `AnalyzeSubTab::GeotechSsi` (`🌱 Geotech & SSI`).
+  - Integrated 4 executive metric cards: `SUBGRADE MODULUS (ks)`, `CONVERSE-LABARRE (Eg)`, `PUNCHING SHEAR (SNI 22.6)`, and `SSI DYNAMIC SHIFT (T̃/T)`.
+  - Added interactive dual visualizer:
+    1. 2D Pile Group Plan Layout with cap geometry, column base, and individual pile axial load status colors.
+    2. Critical Punching Shear Perimeter $b_o$ with column cross-section, $d/2$ reticles, and stress callouts.
+  - Added 6-DOF Winkler Spring Matrix summary and individual pile biaxial load/deflection schedule table.
+- **Exportable Geotechnical & SSI Calculation Dossier (`generate_markdown_dossier`)**:
+  - Produces publication-ready Markdown calculation sheets with LaTeX equations, spring matrices, pile schedules, and SNI 2847 verification tables.
+  - Added one-click export button `🌱 Geotech & SSI Dossier (.md)` in Results View (`src/views/results.rs`).
+
+---
+
 ## [v0.0.4] - 2026-11-06 — Phase 3: Advanced Seismic & Pushover Analysis (ASCE 41-17 / ATC-40)
 
 ### Added

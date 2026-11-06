@@ -7,6 +7,47 @@ Per Section 6 of `AGENTS.md`, versioning strictly follows:
 
 ---
 
+## 🚀 EigenGraph v0.0.5 — Phase 4: Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI)
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.5`  
+**Target:** Production Engine
+
+EigenGraph v0.0.5 introduces full-stack **Geotechnical Engineering, Deep Foundation Analytics, and Dynamic Soil-Structure Interaction (SSI)**, bridging the critical gap between super-structure structural analysis and sub-structure soil foundations in accordance with SNI 2847:2019, SNI 1726:2019, ACI 318-19, and ASCE 7-22 Chapter 19.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Winkler Subgrade Reaction & 6-DOF Foundation Spring Matrix
+- **Bowles / Vesic Elastic Formulation**: Converts soil stratigraphy subgrade modulus $k_s$ into equivalent 6-DOF uncoupled spring stiffnesses for spread footings and mat foundations:
+  - Vertical translation: $K_z = k_s \cdot B \cdot L$ (kN/m)
+  - Horizontal shear translation: $K_x = K_y = 0.82 \cdot K_z$ (kN/m)
+  - Rocking rotation about primary axes: $K_{\theta x} = k_s \cdot \frac{B \cdot L^3}{12}$, $K_{\theta y} = k_s \cdot \frac{L \cdot B^3}{12}$ (kNm/rad)
+  - Torsional rotation about vertical axis: $K_{\theta z} = 0.65 \cdot k_s \cdot (I_x + I_y)$ (kNm/rad)
+- **Soil Stratum Library**: Pre-configured parameters for 7 geotechnical profiles (Dense Sand, Medium Sand, Loose Sand, Stiff Clay, Medium Clay, Soft Clay, Bedrock).
+
+#### 2. Deep Foundation Pile Group Converse-Labarre Efficiency & Biaxial Distribution
+- **Converse-Labarre Group Efficiency ($E_g$)**:
+  $$E_g = 1 - \theta \cdot \frac{(n_x - 1)n_y + (n_y - 1)n_x}{90 \cdot n_x \cdot n_y}, \quad \text{where } \theta = \arctan(d / s)$$
+- **Biaxial Eccentric Load Distribution**: Calculates individual pile vertical reaction forces $P_i$ under combined axial load $P_u$ and moments $M_{ux}, M_{uy}$:
+  $$P_i = \frac{P_u}{N} \pm \frac{M_{uy} \cdot x_i}{\sum x^2} \pm \frac{M_{ux} \cdot y_i}{\sum y^2}$$
+- **Individual Pile Capacity & Deflection**: Verifies compressive, tensile uplift, and lateral shear head deflection $\delta_{\text{lat}}$ for every pile in the group.
+
+#### 3. Two-Way Concrete Punching Shear Audit (SNI 2847:2019 / ACI 318-19 Section 22.6)
+- **Critical Perimeter ($b_o$)**: Evaluated at distance $d/2$ from column face ($b_o = 2(c_1 + d) + 2(c_2 + d)$).
+- **Nominal Concrete Shear Capacity ($V_c$)**:
+  $$V_c = \min \left\{ 0.33 \sqrt{f'_c}, \; 0.17 \left(1 + \frac{2}{\beta}\right) \sqrt{f'_c}, \; 0.083 \left(2 + \frac{\alpha_s d}{b_o}\right) \sqrt{f'_c} \right\} \cdot b_o d$$
+- **Unbalanced Moment Transfer**: Integrates polar moment of inertia $J_c$ and eccentric shear stress fraction $\gamma_v = 1 - \gamma_f$ into total factored shear stress $\nu_u$.
+
+#### 4. Veletsos & Meek Dynamic Soil-Structure Interaction (SSI)
+- **Modal Period Lengthening**:
+  $$\left(\frac{\tilde{T}}{T}\right)^2 = 1 + \frac{K_{\text{fixed}}}{K_h} + \frac{K_{\text{fixed}} h^2}{K_r}$$
+- **ASCE 7-22 Chapter 19 Damping & Base Shear Reduction**: Accounts for radiation and hysteretic soil damping $\beta_{\text{ssi}}$ to reduce design seismic base shear while verifying lateral drift amplification.
+
+#### 5. Interactive Desktop UI & Official Dossier Export
+- **Sub-Tab `🌱 Geotech & SSI`**: Interactive dual visualizer rendering the 2D pile cap layout with axial stress gradients alongside the critical punching shear perimeter.
+- **Audit Dossier Export**: Generates `Geotechnical_SSI_Foundation_Audit.md` directly via the export button in the Results pillar.
+
+---
+
 ## 🚀 EigenGraph v0.0.4 — Phase 3: Advanced Seismic & Pushover Analysis (ASCE 41-17 / ATC-40)
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.4`  
