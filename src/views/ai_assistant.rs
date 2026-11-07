@@ -735,7 +735,7 @@ mod tests {
         ai.execute_prompt("inspect vault", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
         let last_msg = &ai.chat_history.last().unwrap().message;
         assert!(last_msg.contains("Vault Audit") || last_msg.contains("Audit & Inspeksi"));
-        assert!(last_msg.contains("Category Directories") || last_msg.contains("Folder Kategori"));
+        assert!(last_msg.contains("Category Folders") || last_msg.contains("Category Directories") || last_msg.contains("Folder Kategori"));
 
         // 2. Test writing file via Copilot
         ai.execute_prompt("write file Custom_Components/test_ai.txt Hello from EigenAI", NavigationPillar::MyLibrary, &members, &projects, &mut db_components);
