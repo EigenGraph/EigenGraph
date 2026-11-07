@@ -1,0 +1,2 @@
+260ca3e0bbdde9fa374f89bd989fb5bd11d1b296a411d66c9b14c206c30bafd0  EigenGraph-Windows-x64.zip
+162891ab565ea2debf1d8f4615964c74e6de930c7545efb40ca7caf4d5ab711e  EigenGraph-macOS.dmg
