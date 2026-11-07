@@ -7,6 +7,55 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.1.0] - 2026-11-07 — Phase 10: Prestressed & Post-Tensioned Concrete Engine (ACI 318-19 / SNI 2847:2019)
+
+### Added
+- **Prestressed & Post-Tensioned Computational Engine (`src/core/prestressed_concrete.rs`)**:
+  - Full compliance with **ACI 318-19 Chapter 24**, **SNI 2847:2019 Pasal 24**, **AASHTO LRFD Section 5**, and **PCI Design Handbook (8th Edition)**.
+  - **Parametric Tendon Profiling**:
+    - Parabolic draped continuous profile with midspan and end eccentricities: $e(x) = e_{mid} - 4(e_{mid} - e_{end})(x/L - 0.5)^2$.
+    - Harped 2-point depressed profile with adjustable hold-down stations.
+    - Straight eccentric profile with constant eccentricity.
+    - Equivalent upward balancing load calculations: $w_{bal} = \frac{8 P_{eff} (e_{mid} - e_{end})}{L^2}$.
+  - **Prestress Losses Engine**:
+    - **Immediate Losses**:
+      - Curvature & wobble friction loss: $\Delta f_{pF}(x) = f_{pj} [1 - \exp(-(\mu \alpha + K x))]$.
+      - Anchorage seating draw-in slip: $\Delta f_{pA} = \frac{\Delta_{anc} E_p}{L_{set}}$.
+      - Concrete elastic shortening: $\Delta f_{pES} = \frac{N-1}{2N} \frac{E_p}{E_{ci}} f_{cgp}$ (post-tensioned) or $\frac{E_p}{E_{ci}} f_{cgp}$ (pre-tensioned).
+    - **Long-Term Time-Dependent Losses**:
+      - Concrete creep loss: $\Delta f_{pCR} = K_{cr} \frac{E_p}{E_c} (f_{cgp} - f_{cds})$.
+      - Concrete shrinkage loss: $\Delta f_{pSH} = 8.2 \times 10^{-6} K_{sh} E_p (1 - 0.06 V/S)(100 - RH)$.
+      - Steel strand relaxation: $\Delta f_{pRE} = [K_{re} - J(\Delta f_{pSH} + \Delta f_{pCR} + \Delta f_{pES})] C$.
+      - Total effective prestress: $P_{eff} = A_{ps} f_{se}$.
+  - **Concrete Fiber Stresses & Serviceability Verification**:
+    - Initial transfer stage stresses ($\sigma_{top,i}, \sigma_{bot,i}$) vs allowable compression ($0.60 f'_{ci}$) and tension ($0.25 \sqrt{f'_{ci}}$).
+    - Service limit state stresses ($\sigma_{top,s}, \sigma_{bot,s}$) vs sustained compression ($0.45 f'_c$) and tensile limits.
+    - ACI 318-19 Table 24.5.2.1 Classification: Class U (Uncracked), Class T (Transition), Class C (Cracked).
+    - Cracking moment: $M_{cr} = S_b [f_r + P_{eff}/A + P_{eff} e / S_b]$.
+  - **Ultimate Flexural & Shear Capacities**:
+    - Prestressing steel stress $f_{ps}$ at nominal flexural strength per ACI 318-19 Eq. 20.3.2.3.1.
+    - Equivalent rectangular Whitney compression block depth $a$ and neutral axis $c$.
+    - Flexural capacity $\phi M_n$ and minimum flexure requirement ($\phi M_n \ge 1.2 M_{cr}$).
+    - Concrete shear resistance: flexure-shear cracking $V_{ci}$ and web-shear cracking $V_{cw}$, with stirrup reinforcement capacity $V_s$ and design strength $\phi V_n$.
+  - **Camber & Deflection Analytics**:
+    - Upward prestress camber $\Delta_{p,i}$, self-weight downward deflection $\Delta_{sw}$, net transfer camber, and long-term camber via PCI Martin Multipliers.
+  - **Bridge Archetype Generator (`generate_bridge_archetype_elements`)**:
+    - Generates complete 3D structural model with precast AASHTO girders, transverse RC diaphragms, and 3D parabolic tendon runs.
+  - **Markdown Design Dossier Generator (`generate_markdown_dossier`)**:
+    - Formats comprehensive engineering calculation reports with KaTeX math, tables, and regulatory compliance status.
+- **Deep Analysis Studio (`src/views/analyze.rs`)**:
+  - Added `AnalyzeSubTab::PrestressedDesign` ("🪢 PT Concrete (ACI 318)").
+  - 4 Metric cards: Overall Compliance & Governing DCR, Effective Prestress & Total Losses, Flexural Strength $\phi M_n$, and Service Class & Camber.
+  - Real-time 2D Vector Canvas rendering girder elevation, neutral axis, and parabolic tendon trajectory with anchor plates.
+  - Prestress losses breakdown, fiber stress checks table, and code compliance audit.
+- **CAD Viewport Modeling Studio (`src/views/build.rs`)**:
+  - Added `ModelArchetype::PrestressedGirderBridge3D` ("🌉 Prestressed Bridge (30m PT Girder)").
+  - 3D Viewport renders precast I-girders, transverse diaphragms, and 3D internal parabolic prestressing cables.
+- **Results View Disk Exporters (`src/views/results.rs`)**:
+  - Added export action `🪢 Prestressed PT Dossier (.md)` generating `EigenGraph_Prestressed_Concrete_Dossier.md`.
+
+---
+
 ## [v0.0.9] - 2026-11-06 — Phase 9: Modeling & Advanced Computational Geometry Engine
 
 ### Added

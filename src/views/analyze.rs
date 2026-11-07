@@ -18,6 +18,7 @@ pub enum AnalyzeSubTab {
     SteelConnection,
     WindEngineering,
     CompositeDesign,
+    PrestressedDesign,
 }
 
 pub struct AnalyzeView {
@@ -89,6 +90,20 @@ pub struct AnalyzeView {
     pub comp_unshored: bool,
     pub comp_demand_mu_knm: f32,
     pub comp_live_load_kn_m: f32,
+    // Prestressed & Post-Tensioned Concrete Parameters (ACI 318-19 / SNI 2847:2019)
+    pub pt_span_length_m: f32,
+    pub pt_girder_spacing_m: f32,
+    pub pt_archetype: crate::core::GirderSectionArchetype,
+    pub pt_method: crate::core::PrestressingMethod,
+    pub pt_profile: crate::core::TendonProfileKind,
+    pub pt_strand_dia_mm: f32,
+    pub pt_num_strands: usize,
+    pub pt_eccentricity_mid_mm: f32,
+    pub pt_eccentricity_end_mm: f32,
+    pub pt_fc_mpa: f32,
+    pub pt_fci_mpa: f32,
+    pub pt_sdl_kn_m: f32,
+    pub pt_live_load_kn_m: f32,
 }
 
 impl Default for AnalyzeView {
@@ -158,6 +173,19 @@ impl Default for AnalyzeView {
             comp_unshored: true,
             comp_demand_mu_knm: 280.0,
             comp_live_load_kn_m: 12.0,
+            pt_span_length_m: 30.0,
+            pt_girder_spacing_m: 2.4,
+            pt_archetype: crate::core::GirderSectionArchetype::AashtoTypeIV,
+            pt_method: crate::core::PrestressingMethod::PostTensioned,
+            pt_profile: crate::core::TendonProfileKind::Parabolic,
+            pt_strand_dia_mm: 15.24,
+            pt_num_strands: 36,
+            pt_eccentricity_mid_mm: 480.0,
+            pt_eccentricity_end_mm: 100.0,
+            pt_fc_mpa: 50.0,
+            pt_fci_mpa: 35.0,
+            pt_sdl_kn_m: 4.0,
+            pt_live_load_kn_m: 12.0,
         }
     }
 }
@@ -216,6 +244,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::SteelConnection => self.render_steel_connection(ui, theme),
                     AnalyzeSubTab::WindEngineering => self.render_wind_engineering(ui, theme),
                     AnalyzeSubTab::CompositeDesign => self.render_composite_design(ui, theme),
+                    AnalyzeSubTab::PrestressedDesign => self.render_prestressed_design(ui, theme),
                 }
 
                 ui.add_space(24.0);
@@ -238,6 +267,7 @@ impl AnalyzeView {
                 (AnalyzeSubTab::SteelConnection, "🔩 Steel Connections"),
                 (AnalyzeSubTab::WindEngineering, "🌪️ ASCE 7 Wind"),
                 (AnalyzeSubTab::CompositeDesign, "🥞 AISC Composite"),
+                (AnalyzeSubTab::PrestressedDesign, "🪢 PT Concrete (ACI 318)"),
             ];
 
             for (tab, label) in tabs {
@@ -3463,6 +3493,386 @@ impl AnalyzeView {
                     ui.separator();
                 }
             });
+    }
+
+    fn render_prestressed_design(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let rep = crate::core::PrestressedConcreteEngine::evaluate_girder(
+            "EigenGraph Viaduct",
+            "Girder G-01",
+            self.pt_span_length_m as f64,
+            self.pt_girder_spacing_m as f64,
+            self.pt_archetype,
+            self.pt_method,
+            self.pt_profile,
+            crate::core::StrandGrade::Grade270LowRelaxation,
+            self.pt_strand_dia_mm as f64,
+            self.pt_num_strands,
+            0.75,
+            self.pt_eccentricity_mid_mm as f64,
+            self.pt_eccentricity_end_mm as f64,
+            self.pt_fc_mpa as f64,
+            self.pt_fci_mpa as f64,
+            self.pt_sdl_kn_m as f64,
+            self.pt_live_load_kn_m as f64,
+        );
+
+        // 1. Metric Cards Header
+        ui.columns(4, |cols| {
+            let status_col = if rep.is_code_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            let status_text = if rep.is_code_compliant { "🟢 PASS (Code Compliant)" } else { "🔴 FAIL (DCR Exceeded)" };
+            self.metric_card(
+                &mut cols[0],
+                theme,
+                "OVERALL COMPLIANCE",
+                status_text,
+                &format!("Gov. DCR: {:.3} • ACI 318-19 / SNI", rep.governing_dcr),
+                status_col,
+            );
+
+            let loss_col = if rep.losses.loss_percentage <= 25.0 { theme.accent_green } else { theme.accent_orange };
+            self.metric_card(
+                &mut cols[1],
+                theme,
+                "EFFECTIVE PRESTRESS (Peff)",
+                &format!("{:.1} kN", rep.losses.p_effective_kn),
+                &format!("Loss: {:.1}% ({:.1} MPa) • fse: {:.1} MPa", rep.losses.loss_percentage, rep.losses.total_loss_mpa, rep.losses.f_se_mpa),
+                loss_col,
+            );
+
+            let flex_col = if rep.flexure_dcr <= 1.0 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            self.metric_card(
+                &mut cols[2],
+                theme,
+                "FLEXURAL STRENGTH (φMn)",
+                &format!("{:.1} kN·m", rep.phi_mn_knm),
+                &format!("DCR: {:.3} • Mu: {:.1} kNm • 1.2Mcr: {:.1}", rep.flexure_dcr, rep.m_ultimate_knm, rep.min_flexure_req_knm),
+                flex_col,
+            );
+
+            let class_col = match rep.aci_class {
+                crate::core::AciTensionClass::ClassU => theme.accent_blue,
+                crate::core::AciTensionClass::ClassT => theme.accent_orange,
+                crate::core::AciTensionClass::ClassC => Color32::from_rgb(239, 68, 68),
+            };
+            self.metric_card(
+                &mut cols[3],
+                theme,
+                "SERVICE CLASS & CAMBER",
+                match rep.aci_class {
+                    crate::core::AciTensionClass::ClassU => "Class U (Uncracked)",
+                    crate::core::AciTensionClass::ClassT => "Class T (Transition)",
+                    crate::core::AciTensionClass::ClassC => "Class C (Cracked)",
+                },
+                &format!("Initial: +{:.1}mm • Long-term: {:.1}mm", rep.net_camber_transfer_mm, rep.long_term_camber_mm),
+                class_col,
+            );
+        });
+
+        ui.add_space(16.0);
+
+        // 2. Main Two-Column Layout
+        ui.columns(2, |cols| {
+            // LEFT COLUMN: PARAMETER CONTROLS
+            cols[0].group(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("⚙️").size(15.0));
+                    ui.label(RichText::new("Prestressed Girder & Tendon Studio").size(13.5).strong().color(theme.text_primary));
+                });
+                ui.separator();
+                ui.add_space(4.0);
+
+                ui.label(RichText::new("GIRDER GEOMETRY & ARCHETYPE").size(11.0).strong().color(theme.accent_blue));
+                ui.horizontal(|ui| {
+                    ui.label("Archetype: ");
+                    egui::ComboBox::from_id_salt("pt_arch_combo")
+                        .selected_text(match self.pt_archetype {
+                            crate::core::GirderSectionArchetype::AashtoTypeIV => "AASHTO Type IV (1370mm)",
+                            crate::core::GirderSectionArchetype::PrecastIGirder => "Bulb-T / I-Girder (1600mm)",
+                            crate::core::GirderSectionArchetype::BoxGirder => "Box Girder (1500mm)",
+                            crate::core::GirderSectionArchetype::RectangularBeam => "Rectangular (450x1200mm)",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.pt_archetype, crate::core::GirderSectionArchetype::AashtoTypeIV, "AASHTO Type IV (1370mm)");
+                            ui.selectable_value(&mut self.pt_archetype, crate::core::GirderSectionArchetype::PrecastIGirder, "Bulb-T / I-Girder (1600mm)");
+                            ui.selectable_value(&mut self.pt_archetype, crate::core::GirderSectionArchetype::BoxGirder, "Box Girder (1500mm)");
+                            ui.selectable_value(&mut self.pt_archetype, crate::core::GirderSectionArchetype::RectangularBeam, "Rectangular (450x1200mm)");
+                        });
+                });
+
+                ui.add(egui::Slider::new(&mut self.pt_span_length_m, 15.0..=45.0).text("Span Length L (m)").step_by(0.5));
+                ui.add(egui::Slider::new(&mut self.pt_girder_spacing_m, 1.5..=3.6).text("Girder Spacing S (m)").step_by(0.1));
+
+                ui.add_space(6.0);
+                ui.separator();
+                ui.label(RichText::new("PRESTRESSING TENDON PROFILE").size(11.0).strong().color(theme.accent_blue));
+
+                ui.horizontal(|ui| {
+                    ui.label("Profile Kind: ");
+                    egui::ComboBox::from_id_salt("pt_profile_combo")
+                        .selected_text(match self.pt_profile {
+                            crate::core::TendonProfileKind::Parabolic => "Parabolic Draped",
+                            crate::core::TendonProfileKind::HarpedTwoPoint => "Harped (2-Point)",
+                            crate::core::TendonProfileKind::StraightEccentric => "Straight Constant",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.pt_profile, crate::core::TendonProfileKind::Parabolic, "Parabolic Draped");
+                            ui.selectable_value(&mut self.pt_profile, crate::core::TendonProfileKind::HarpedTwoPoint, "Harped (2-Point)");
+                            ui.selectable_value(&mut self.pt_profile, crate::core::TendonProfileKind::StraightEccentric, "Straight Constant");
+                        });
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Method: ");
+                    egui::ComboBox::from_id_salt("pt_method_combo")
+                        .selected_text(match self.pt_method {
+                            crate::core::PrestressingMethod::PostTensioned => "Post-Tensioned (Grouted Duct)",
+                            crate::core::PrestressingMethod::PreTensioned => "Pre-Tensioned (Precast Yard)",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.pt_method, crate::core::PrestressingMethod::PostTensioned, "Post-Tensioned (Grouted Duct)");
+                            ui.selectable_value(&mut self.pt_method, crate::core::PrestressingMethod::PreTensioned, "Pre-Tensioned (Precast Yard)");
+                        });
+                });
+
+                ui.add(egui::Slider::new(&mut self.pt_num_strands, 12..=54).text("Strands Count Ns").step_by(2.0));
+                ui.add(egui::Slider::new(&mut self.pt_eccentricity_mid_mm, 200.0..=600.0).text("Midspan Drape e_mid (mm)").step_by(10.0));
+                ui.add(egui::Slider::new(&mut self.pt_eccentricity_end_mm, 0.0..=250.0).text("End Drape e_end (mm)").step_by(10.0));
+
+                ui.add_space(6.0);
+                ui.separator();
+                ui.label(RichText::new("CONCRETE & SERVICE LOADS").size(11.0).strong().color(theme.accent_blue));
+
+                ui.add(egui::Slider::new(&mut self.pt_fc_mpa, 35.0..=70.0).text("28-day Concrete f'c (MPa)").step_by(1.0));
+                ui.add(egui::Slider::new(&mut self.pt_fci_mpa, 25.0..=50.0).text("Release Concrete f'ci (MPa)").step_by(1.0));
+                ui.add(egui::Slider::new(&mut self.pt_sdl_kn_m, 1.0..=10.0).text("Superimposed DL w_sdl (kN/m)").step_by(0.5));
+                ui.add(egui::Slider::new(&mut self.pt_live_load_kn_m, 5.0..=30.0).text("Service Live Load w_LL (kN/m)").step_by(1.0));
+
+                ui.add_space(8.0);
+                if ui.add(egui::Button::new(RichText::new("📄 Export Prestressed Dossier (.md)").size(11.5).strong().color(Color32::WHITE))
+                    .fill(theme.accent_blue)
+                    .corner_radius(CornerRadius::same(6))).clicked() {
+                    let dossier = rep.generate_markdown_dossier();
+                    if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Prestressed_Concrete_Dossier.md", &dossier) {
+                        self.export_status = Some(format!("Prestressed Concrete Dossier saved to: {}", path));
+                    }
+                }
+            });
+
+            // RIGHT COLUMN: 2D VECTOR TENDON PROFILE & LOSSES
+            cols[1].group(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("📐").size(15.0));
+                    ui.label(RichText::new("Tendon Elevation & Neutral Axis Profile").size(13.5).strong().color(theme.text_primary));
+                });
+                ui.separator();
+
+                // 2D Vector Canvas for Tendon Profile
+                let (response, painter) = ui.allocate_painter(Vec2::new(ui.available_width(), 160.0), Sense::hover());
+                let rect = response.rect;
+
+                // Canvas background
+                painter.rect_filled(rect, CornerRadius::same(6), theme.bg_card);
+                painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, theme.border_subtle));
+
+                let margin_x = 35.0;
+                let margin_y = 20.0;
+                let draw_w = rect.width() - 2.0 * margin_x;
+                let draw_h = rect.height() - 2.0 * margin_y;
+
+                // Draw Girder Bounding Box
+                let top_left = Pos2::new(rect.min.x + margin_x, rect.min.y + margin_y);
+                let bot_right = Pos2::new(rect.min.x + margin_x + draw_w, rect.min.y + margin_y + draw_h);
+                let girder_rect = egui::Rect::from_min_max(top_left, bot_right);
+                painter.rect_filled(girder_rect, CornerRadius::ZERO, theme.bg_base);
+                painter.rect_stroke(girder_rect, CornerRadius::ZERO, Stroke::new(1.5, theme.text_muted));
+
+                // Draw Neutral Axis (dashed centerline)
+                let y_na = top_left.y + draw_h * (rep.y_top_mm as f32 / rep.depth_h_mm as f32);
+                let na_stroke = Stroke::new(1.0, theme.text_secondary);
+                let mut x_dash = top_left.x;
+                while x_dash < bot_right.x {
+                    painter.line_segment([Pos2::new(x_dash, y_na), Pos2::new((x_dash + 6.0).min(bot_right.x), y_na)], na_stroke);
+                    x_dash += 12.0;
+                }
+                painter.text(Pos2::new(top_left.x + 4.0, y_na - 10.0), Align::Min, "N.A.", egui::FontId::proportional(9.0), theme.text_secondary);
+
+                // Draw Tendon Profile Curve
+                let mut tendon_pts = Vec::with_capacity(rep.tendon_profile_points.len());
+                for pt in &rep.tendon_profile_points {
+                    let px = top_left.x + (pt.x_m as f32 / self.pt_span_length_m) * draw_w;
+                    // Distance below neutral axis
+                    let py = y_na + (pt.e_mm as f32 / rep.y_bot_mm as f32) * (draw_h * (rep.y_bot_mm as f32 / rep.depth_h_mm as f32) * 0.85);
+                    tendon_pts.push(Pos2::new(px, py));
+                }
+
+                if tendon_pts.len() >= 2 {
+                    for i in 0..(tendon_pts.len() - 1) {
+                        painter.line_segment([tendon_pts[i], tendon_pts[i + 1]], Stroke::new(2.5, theme.accent_blue));
+                    }
+                    // Anchorage plates at ends
+                    let p_start = tendon_pts[0];
+                    let p_end = *tendon_pts.last().unwrap();
+                    painter.rect_filled(egui::Rect::from_center_size(p_start, Vec2::new(6.0, 14.0)), CornerRadius::ZERO, theme.accent_green);
+                    painter.rect_filled(egui::Rect::from_center_size(p_end, Vec2::new(6.0, 14.0)), CornerRadius::ZERO, theme.accent_green);
+                }
+
+                // Dimension callouts
+                painter.text(Pos2::new(rect.center().x, bot_right.y + 4.0), Align::Center, format!("Span L = {:.1} m (Drape e_mid = {:.0} mm)", self.pt_span_length_m, self.pt_eccentricity_mid_mm), egui::FontId::proportional(10.0), theme.accent_blue);
+
+                ui.add_space(8.0);
+                ui.separator();
+                ui.label(RichText::new("PRESTRESS LOSSES BREAKDOWN (ACI / AASHTO)").size(11.0).strong().color(theme.accent_blue));
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("• Friction:").size(10.5).color(theme.text_secondary));
+                    ui.label(RichText::new(format!("{:.1} MPa", rep.losses.friction_loss_mpa)).size(10.5).strong().color(theme.text_primary));
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("• Anchorage:").size(10.5).color(theme.text_secondary));
+                    ui.label(RichText::new(format!("{:.1} MPa", rep.losses.anchorage_slip_mpa)).size(10.5).strong().color(theme.text_primary));
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("• Elastic Short.:").size(10.5).color(theme.text_secondary));
+                    ui.label(RichText::new(format!("{:.1} MPa", rep.losses.elastic_shortening_mpa)).size(10.5).strong().color(theme.text_primary));
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("• Creep:").size(10.5).color(theme.text_secondary));
+                    ui.label(RichText::new(format!("{:.1} MPa", rep.losses.concrete_creep_mpa)).size(10.5).strong().color(theme.text_primary));
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("• Shrinkage:").size(10.5).color(theme.text_secondary));
+                    ui.label(RichText::new(format!("{:.1} MPa", rep.losses.concrete_shrinkage_mpa)).size(10.5).strong().color(theme.text_primary));
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("• Relaxation:").size(10.5).color(theme.text_secondary));
+                    ui.label(RichText::new(format!("{:.1} MPa", rep.losses.steel_relaxation_mpa)).size(10.5).strong().color(theme.text_primary));
+                });
+            });
+        });
+
+        ui.add_space(16.0);
+
+        // 3. Concrete Fiber Stresses & Limit States Audit Table
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📋").size(15.0));
+                ui.label(RichText::new("Concrete Fiber Stresses & Code Compliance Audit (ACI 318-19 / SNI 2847:2019)").size(13.0).strong().color(theme.text_primary));
+            });
+            ui.separator();
+            ui.add_space(4.0);
+
+            // Table Header
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Verification Stage / Limit State").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(80.0);
+                ui.label(RichText::new("Standard Ref").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(50.0);
+                ui.label(RichText::new("Top Fiber").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(35.0);
+                ui.label(RichText::new("Bottom Fiber").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(35.0);
+                ui.label(RichText::new("Allowable Limits").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(35.0);
+                ui.label(RichText::new("DCR").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(35.0);
+                ui.label(RichText::new("Status").size(11.0).strong().color(theme.text_secondary));
+            });
+            ui.separator();
+
+            // Row 1: Transfer Stage Stresses
+            let t_dcr = rep.transfer_stress.top_dcr.max(rep.transfer_stress.bot_dcr);
+            let t_col = if t_dcr <= 1.0 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("1. Transfer Stage (Pi + Msw)").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(85.0);
+                ui.label(RichText::new("ACI 318-19 §24.5.3").size(10.5).color(theme.text_muted));
+                ui.add_space(50.0);
+                ui.label(RichText::new(format!("{:6.2} MPa", rep.transfer_stress.sigma_top_mpa)).size(11.0).color(theme.text_primary));
+                ui.add_space(40.0);
+                ui.label(RichText::new(format!("{:6.2} MPa", rep.transfer_stress.sigma_bot_mpa)).size(11.0).color(theme.text_primary));
+                ui.add_space(30.0);
+                ui.label(RichText::new(format!("+{:.2} / -{:.1} MPa", rep.transfer_stress.allowable_tens_mpa, rep.transfer_stress.allowable_comp_mpa.abs())).size(10.5).color(theme.text_secondary));
+                ui.add_space(30.0);
+                ui.label(RichText::new(format!("{:.3}", t_dcr)).size(11.0).strong().color(t_col));
+                ui.add_space(35.0);
+                ui.label(RichText::new(if t_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(t_col));
+            });
+            ui.separator();
+
+            // Row 2: Service Stage Stresses
+            let s_dcr = rep.service_stress.top_dcr.max(rep.service_stress.bot_dcr);
+            let s_col = if s_dcr <= 1.0 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("2. Service Stage (Peff + Mserv)").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(72.0);
+                ui.label(RichText::new("ACI 318-19 §24.5.4").size(10.5).color(theme.text_muted));
+                ui.add_space(50.0);
+                ui.label(RichText::new(format!("{:6.2} MPa", rep.service_stress.sigma_top_mpa)).size(11.0).color(theme.text_primary));
+                ui.add_space(40.0);
+                ui.label(RichText::new(format!("{:6.2} MPa", rep.service_stress.sigma_bot_mpa)).size(11.0).color(theme.text_primary));
+                ui.add_space(30.0);
+                ui.label(RichText::new(format!("+{:.2} / -{:.1} MPa", rep.service_stress.allowable_tens_mpa, rep.service_stress.allowable_comp_mpa.abs())).size(10.5).color(theme.text_secondary));
+                ui.add_space(30.0);
+                ui.label(RichText::new(format!("{:.3}", s_dcr)).size(11.0).strong().color(s_col));
+                ui.add_space(35.0);
+                ui.label(RichText::new(if s_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(s_col));
+            });
+            ui.separator();
+
+            // Row 3: Ultimate Flexural Strength
+            let flex_col = if rep.flexure_dcr <= 1.0 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("3. Ultimate Flexure (φMn ≥ Mu)").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(76.0);
+                ui.label(RichText::new("ACI 318-19 §22.2").size(10.5).color(theme.text_muted));
+                ui.add_space(60.0);
+                ui.label(RichText::new(format!("Mu = {:6.1} kNm", rep.m_ultimate_knm)).size(11.0).color(theme.text_primary));
+                ui.add_space(20.0);
+                ui.label(RichText::new(format!("φMn = {:6.1} kNm", rep.phi_mn_knm)).size(11.0).color(theme.accent_green));
+                ui.add_space(25.0);
+                ui.label(RichText::new(format!("fps = {:.0} MPa", rep.fps_mpa)).size(10.5).color(theme.text_secondary));
+                ui.add_space(40.0);
+                ui.label(RichText::new(format!("{:.3}", rep.flexure_dcr)).size(11.0).strong().color(flex_col));
+                ui.add_space(35.0);
+                ui.label(RichText::new(if rep.flexure_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(flex_col));
+            });
+            ui.separator();
+
+            // Row 4: Minimum Flexure (1.2 Mcr)
+            let mcr_dcr = rep.min_flexure_req_knm / rep.phi_mn_knm;
+            let mcr_col = if mcr_dcr <= 1.0 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("4. Cracking Safety (φMn ≥ 1.2Mcr)").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(60.0);
+                ui.label(RichText::new("ACI 318-19 §18.8.2").size(10.5).color(theme.text_muted));
+                ui.add_space(50.0);
+                ui.label(RichText::new(format!("1.2Mcr = {:5.1} kNm", rep.min_flexure_req_knm)).size(11.0).color(theme.text_primary));
+                ui.add_space(20.0);
+                ui.label(RichText::new(format!("Mcr = {:6.1} kNm", rep.m_cracking_knm)).size(11.0).color(theme.text_secondary));
+                ui.add_space(30.0);
+                ui.label(RichText::new(format!("fr = {:.2} MPa", 0.62 * (self.pt_fc_mpa as f64).sqrt())).size(10.5).color(theme.text_secondary));
+                ui.add_space(40.0);
+                ui.label(RichText::new(format!("{:.3}", mcr_dcr)).size(11.0).strong().color(mcr_col));
+                ui.add_space(35.0);
+                ui.label(RichText::new(if mcr_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(mcr_col));
+            });
+            ui.separator();
+
+            // Row 5: Concrete Shear Resistance
+            let shear_col = if rep.shear_dcr <= 1.0 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("5. Concrete Shear (φVn ≥ Vu)").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(80.0);
+                ui.label(RichText::new("ACI 318-19 §22.5").size(10.5).color(theme.text_muted));
+                ui.add_space(60.0);
+                ui.label(RichText::new(format!("Vu = {:6.1} kN", rep.v_ultimate_kn)).size(11.0).color(theme.text_primary));
+                ui.add_space(25.0);
+                ui.label(RichText::new(format!("φVn = {:6.1} kN", rep.phi_vn_kn)).size(11.0).color(theme.accent_green));
+                ui.add_space(25.0);
+                ui.label(RichText::new(format!("Vc = {:.0} kN, Vs = {:.0} kN", rep.v_c_kn, rep.v_s_kn)).size(10.5).color(theme.text_secondary));
+                ui.add_space(20.0);
+                ui.label(RichText::new(format!("{:.3}", rep.shear_dcr)).size(11.0).strong().color(shear_col));
+                ui.add_space(35.0);
+                ui.label(RichText::new(if rep.shear_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(shear_col));
+            });
+        });
     }
 }
 

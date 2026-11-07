@@ -549,6 +549,34 @@ impl ResultsView {
                                     self.export_status = Some(format!("Spatial Geometry & Section Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🪢 Prestressed PT Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(16, 185, 129))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let rep = crate::core::PrestressedConcreteEngine::evaluate_girder(
+                                    "EigenGraph Viaduct",
+                                    "Span 4 Girder G-03",
+                                    30.0,
+                                    2.4,
+                                    crate::core::GirderSectionArchetype::AashtoTypeIV,
+                                    crate::core::PrestressingMethod::PostTensioned,
+                                    crate::core::TendonProfileKind::Parabolic,
+                                    crate::core::StrandGrade::Grade270LowRelaxation,
+                                    15.24,
+                                    36,
+                                    0.75,
+                                    480.0,
+                                    100.0,
+                                    50.0,
+                                    35.0,
+                                    4.0,
+                                    12.0,
+                                );
+                                let md = rep.generate_markdown_dossier();
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Prestressed_Concrete_Dossier.md", &md) {
+                                    self.export_status = Some(format!("Prestressed Concrete Design Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });

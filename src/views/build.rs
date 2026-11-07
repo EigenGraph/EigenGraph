@@ -17,6 +17,7 @@ pub enum ModelArchetype {
     GeodesicDome3D,          // 3D Schwedler Geodesic Dome
     HyparRuledShell3D,       // 3D Hyperbolic Paraboloid Ruled Shell
     MultiStoryTower3D,       // 3D Multi-Story Building Frame with Core Walls
+    PrestressedGirderBridge3D, // 3D Prestressed Post-Tensioned Concrete Bridge Span
 }
 
 impl ModelArchetype {
@@ -31,6 +32,7 @@ impl ModelArchetype {
             Self::GeodesicDome3D => "🌐 Geodesic Dome (18m Lattice)",
             Self::HyparRuledShell3D => "🎪 Hypar Umbrella (16m Saddle)",
             Self::MultiStoryTower3D => "🏢 12-Story Tower (Core Wall)",
+            Self::PrestressedGirderBridge3D => "🌉 Prestressed Bridge (30m PT Girder)",
         }
     }
 }
@@ -353,6 +355,7 @@ impl BuildView {
 
             let models = [
                 ModelArchetype::BimCraftBuilding3D,
+                ModelArchetype::PrestressedGirderBridge3D,
                 ModelArchetype::DoubleLayerSpaceTruss3D,
                 ModelArchetype::GeodesicDome3D,
                 ModelArchetype::HyparRuledShell3D,
@@ -378,6 +381,12 @@ impl BuildView {
                             self.cam_pan = Vec2::ZERO;
                             self.render_mode = Render3DMode::CsgSolidBrep;
                         }
+                        ModelArchetype::PrestressedGirderBridge3D => {
+                            self.cam_yaw = 0.55;
+                            self.cam_pitch = 0.35;
+                            self.cam_zoom = 1.0;
+                            self.cam_pan = Vec2::ZERO;
+                        }
                         ModelArchetype::DiagridTower3D => {
                             self.cam_yaw = 0.65;
                             self.cam_pitch = 0.35;
@@ -399,6 +408,12 @@ impl BuildView {
                         ModelArchetype::WarrenTruss2D => {
                             self.cam_yaw = 0.0;
                             self.cam_pitch = 0.0;
+                            self.cam_zoom = 1.0;
+                            self.cam_pan = Vec2::ZERO;
+                        }
+                        _ => {
+                            self.cam_yaw = 0.65;
+                            self.cam_pitch = 0.35;
                             self.cam_zoom = 1.0;
                             self.cam_pan = Vec2::ZERO;
                         }
@@ -430,6 +445,7 @@ impl BuildView {
 
                 ui.label(RichText::new("Select Spatial Archetype:").size(10.0).color(theme.text_muted));
                 let wizards = [
+                    (ModelArchetype::PrestressedGirderBridge3D, "🌉 Prestressed PT Bridge Girder"),
                     (ModelArchetype::DoubleLayerSpaceTruss3D, "🕸️ Space Truss (MERO Octet)"),
                     (ModelArchetype::GeodesicDome3D, "🌐 Geodesic Lattice Dome"),
                     (ModelArchetype::HyparRuledShell3D, "🎪 Hypar Inverted Umbrella"),
@@ -888,6 +904,7 @@ impl BuildView {
                         ui.label(RichText::new("Model:").size(11.0).color(theme.text_muted));
                         let models = [
                             ModelArchetype::BimCraftBuilding3D,
+                            ModelArchetype::PrestressedGirderBridge3D,
                             ModelArchetype::DoubleLayerSpaceTruss3D,
                             ModelArchetype::GeodesicDome3D,
                             ModelArchetype::HyparRuledShell3D,
@@ -2216,6 +2233,44 @@ impl BuildView {
                 let cz = (self.wizard_tower_bays_y as f32 * 6.0) * 0.5;
                 let cy = (self.wizard_tower_stories as f32 * self.wizard_tower_story_h as f32) * 0.5;
                 ((cx, cy, cz), 9.0, list)
+            }
+            ModelArchetype::PrestressedGirderBridge3D => {
+                let fem = crate::core::PrestressedConcreteEngine::generate_bridge_archetype_elements(
+                    "30m PT Bridge", 30.0, 4, 2.4, 480.0
+                );
+                let mut list = Vec::with_capacity(fem.elements.len());
+                for (idx, el) in fem.elements.iter().enumerate() {
+                    let n1 = &fem.nodes[el.start_node];
+                    let n2 = &fem.nodes[el.end_node];
+                    // Map FEM (x, y, z) -> Viewport (x, z_up, y)
+                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
+                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
+                    let is_tendon = el.name.starts_with("PT_Tendon");
+                    let is_diaph = el.name.starts_with("Diaphragm");
+                    list.push(Member3D {
+                        id: idx + 1,
+                        p1,
+                        p2,
+                        name: el.name.clone(),
+                        section: if is_tendon {
+                            "36x 0.6\" Low-Relaxation Tendon (1860 MPa)".to_string()
+                        } else if is_diaph {
+                            "RC Diaphragm 300x1000".to_string()
+                        } else {
+                            "AASHTO Type IV Precast Girder (1370mm)".to_string()
+                        },
+                        base_width: if is_tendon { 4.0 } else if is_diaph { 6.0 } else { 9.0 },
+                        force_kn: if is_tendon { 4666.0 } else { -420.0 },
+                        capacity_kn: if is_tendon { 7030.0 } else { 1200.0 },
+                        utilization: if is_tendon { 0.66 } else { 0.35 },
+                        ari: if is_tendon { 0.98 } else { 0.92 },
+                        is_critical: false,
+                    });
+                }
+                let cx = 15.0;
+                let cy = 0.0;
+                let cz = 0.0;
+                ((cx, cy, cz), 22.0, list)
             }
         }
     }

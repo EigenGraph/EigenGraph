@@ -7,6 +7,69 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## 🚀 EigenGraph v0.1.0 — Phase 10: Prestressed & Post-Tensioned Concrete Design Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.0`  
+**Target:** Production Engine
+
+EigenGraph v0.1.0 delivers a comprehensive **Prestressed & Post-Tensioned Concrete Design Engine**, enabling civil & structural engineers to design, analyze, and verify bonded and unbonded prestressed concrete bridge girders and building beams according to **ACI 318-19 Chapter 24**, **SNI 2847:2019 Pasal 24**, **AASHTO LRFD Section 5**, and the **PCI Design Handbook (8th Edition)**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Parametric Tendon Profiling & Geometry
+- **Parabolic Continuous Profile**:
+  $$e(x) = e_{mid} - 4(e_{mid} - e_{end})\left(\frac{x}{L} - 0.5\right)^2$$
+- **Harped 2-Point Depressed Profile**: Constant eccentricity $e_{mid}$ between hold-downs at $L/3$ and $2L/3$, tapering linearly to $e_{end}$ at supports.
+- **Equivalent Balancing Load**:
+  $$w_{bal} = \frac{8 P_{eff} (e_{mid} - e_{end})}{L^2}$$
+
+#### 2. Prestress Losses Calculation
+- **Curvature & Wobble Friction Loss**:
+  $$\Delta f_{pF}(x) = f_{pj} \left[1 - \exp\left(-(\mu \alpha + K x)\right)\right]$$
+  where $\mu = 0.20$ (curvature friction) and $K = 0.0015\text{ /m}$ (wobble friction).
+- **Anchorage Seating Slip**:
+  $$\Delta f_{pA} = \frac{\Delta_{anc} E_p}{L_{set}}$$
+- **Concrete Elastic Shortening**:
+  $$\Delta f_{pES} = \frac{N-1}{2N} \frac{E_p}{E_{ci}} f_{cgp} \quad (\text{post-tensioned sequential})$$
+- **Long-Term Time-Dependent Losses**:
+  $$\Delta f_{pCR} = K_{cr} \frac{E_p}{E_c} (f_{cgp} - f_{cds}) \quad (\text{Creep})$$
+  $$\Delta f_{pSH} = 8.2 \times 10^{-6} K_{sh} E_p (1 - 0.06 V/S)(100 - RH) \quad (\text{Shrinkage})$$
+  $$\Delta f_{pRE} = [K_{re} - J(\Delta f_{pSH} + \Delta f_{pCR} + \Delta f_{pES})] C \quad (\text{Steel Relaxation})$$
+
+#### 3. Concrete Extreme Fiber Stresses & Serviceability
+- **Transfer Stage ($P_i + M_{sw}$)**:
+  $$\sigma_{top,i} = -\frac{P_i}{A} + \frac{P_i e}{S_t} - \frac{M_{sw}}{S_t} \le +0.25 \sqrt{f'_{ci}}$$
+  $$\sigma_{bot,i} = -\frac{P_i}{A} - \frac{P_i e}{S_b} + \frac{M_{sw}}{S_b} \ge -0.60 f'_{ci}$$
+- **Service Stage ($P_{eff} + M_{serv}$)**:
+  $$\sigma_{top,s} = -\frac{P_{eff}}{A} + \frac{P_{eff} e}{S_t} - \frac{M_{serv}}{S_t} \ge -0.45 f'_c$$
+  $$\sigma_{bot,s} = -\frac{P_{eff}}{A} - \frac{P_{eff} e}{S_b} + \frac{M_{serv}}{S_b}$$
+- **ACI 318-19 Table 24.5.2.1 Classification**:
+  - Class U (Uncracked): $\sigma_{bot,s} \le 0.62 \sqrt{f'_c}$
+  - Class T (Transition): $0.62 \sqrt{f'_c} < \sigma_{bot,s} \le 1.0 \sqrt{f'_c}$
+  - Class C (Cracked): $\sigma_{bot,s} > 1.0 \sqrt{f'_c}$
+- **Cracking Moment Safety Margin**:
+  $$M_{cr} = S_b \left( f_r + \frac{P_{eff}}{A} + \frac{P_{eff} e}{S_b} \right), \quad \phi M_n \ge 1.2 M_{cr}$$
+
+#### 4. Ultimate Flexural & Shear Capacities
+- **Prestressing Steel Stress $f_{ps}$ at Nominal Strength**:
+  $$f_{ps} = f_{pu} \left[ 1 - \frac{\gamma_p}{\beta_1} \left( \rho_p \frac{f_{pu}}{f'_c} \right) \right]$$
+- **Whitney Compression Block**:
+  $$a = \frac{A_{ps} f_{ps}}{0.85 f'_c b}, \quad M_n = A_{ps} f_{ps} \left( d_p - \frac{a}{2} \right), \quad \phi M_n = 0.90 M_n$$
+- **Concrete Shear Resistance ($V_{ci}$ & $V_{cw}$)**:
+  $$V_{ci} = 0.05 \sqrt{f'_c} b_w d_p + V_d + \frac{V_i M_{cre}}{M_{\max}}, \quad V_{cw} = (0.29 \sqrt{f'_c} + 0.3 f_{pc}) b_w d_p + V_p$$
+  $$V_n = \min(V_{ci}, V_{cw}) + V_s, \quad \phi V_n = 0.75 V_n$$
+
+#### 5. Interactive Desktop UI Integration
+- **Analyze View Studio (`src/views/analyze.rs`)**:
+  - Subtab `AnalyzeSubTab::PrestressedDesign` ("🪢 PT Concrete (ACI 318)").
+  - 4 Metric cards, Parameter Studio with interactive sliders, 2D vector tendon elevation canvas with neutral axis, and regulatory compliance audit table.
+- **Build View 3D Viewport (`src/views/build.rs`)**:
+  - New Archetype `ModelArchetype::PrestressedGirderBridge3D` with precast girders, diaphragms, and 3D internal parabolic tendon curves.
+- **Results View Exporters (`src/views/results.rs`)**:
+  - Direct export of `EigenGraph_Prestressed_Concrete_Dossier.md`.
+
+---
+
 ## 🚀 EigenGraph v0.0.9 — Phase 9: Modeling & Advanced Computational Geometry Engine
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.9`  

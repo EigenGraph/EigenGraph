@@ -30,6 +30,7 @@ pub mod geotech;
 pub mod wind;
 pub mod composite;
 pub mod geometry_engine;
+pub mod prestressed_concrete;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -121,4 +122,9 @@ pub use composite::{
 pub use geometry_engine::{
     MeshTopologyEngine, ParametricSpatialWizard, PolygonPoint2D, SectionIntegrator,
     SectionPropertiesReport,
+};
+pub use prestressed_concrete::{
+    AciTensionClass, FiberStressCheck, GirderSectionArchetype, PrestressLossBreakdown,
+    PrestressedConcreteEngine, PrestressedGirderReport, PrestressingMethod, StrandGrade,
+    TendonPointCoordinates, TendonProfileKind,
 };
