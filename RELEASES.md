@@ -2,12 +2,12 @@
 
 All official versioned releases of EigenGraph are cataloged here.
 
-Per Section 6 of `AGENTS.md`, versioning strictly follows:
-`v0.0.1` ➔ `v0.0.2` ➔ `v0.0.3` ... ➔ `v0.0.9` ➔ `v0.1.0` ... ➔ `v0.9.9` ➔ `v1.0.0` ... (never skip patch numbers).
+The project strictly adheres to sequential versioning and strict 1-to-1 phase mapping:
+`v0.0.1` (Phase 1) ➔ `v0.0.2` (Phase 2) ➔ `v0.0.3` (Phase 3) ➔ `v0.0.4` (Phase 4) ➔ `v0.0.5` (Phase 5) ➔ `v0.0.6` (Phase 6) ➔ `v0.0.7` (Phase 7) ... (never skip patch numbers).
 
 ---
 
-## 🚀 EigenGraph v0.0.7 — Phase 6: Wind Engineering & Computational Aero-Dynamics per ASCE 7-22 / SNI 1727:2020
+## 🚀 EigenGraph v0.0.7 — Phase 7: Wind Engineering & Computational Aero-Dynamics per ASCE 7-22 / SNI 1727:2020
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.7`  
 **Target:** Production Engine
@@ -45,7 +45,7 @@ EigenGraph v0.0.7 introduces comprehensive **Wind Engineering & Computational Ae
 
 ---
 
-## 🚀 EigenGraph v0.0.6 — Phase 5: Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine
+## 🚀 EigenGraph v0.0.6 — Phase 6: Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.6`  
 **Target:** Production Engine
@@ -80,7 +80,7 @@ EigenGraph v0.0.6 introduces comprehensive **Structural Steel Connection Design 
 
 ---
 
-## 🚀 EigenGraph v0.0.5 — Phase 4: Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI)
+## 🚀 EigenGraph v0.0.5 — Phase 5: Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI)
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.5`  
 **Target:** Production Engine
@@ -121,7 +121,7 @@ EigenGraph v0.0.5 introduces full-stack **Geotechnical Engineering, Deep Foundat
 
 ---
 
-## 🚀 EigenGraph v0.0.4 — Phase 3: Advanced Seismic & Pushover Analysis (ASCE 41-17 / ATC-40)
+## 🚀 EigenGraph v0.0.4 — Phase 4: Advanced Seismic & Pushover Analysis (ASCE 41-17 / ATC-40)
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.4`  
 **Target:** Production Engine
@@ -155,7 +155,7 @@ EigenGraph v0.0.4 introduces the **Non-Linear Static Pushover Engine & Capacity 
 
 ---
 
-## 🚀 EigenGraph v0.0.3 — Phase 2: Core Upgrade (Shell FEA, P-Delta & IFC4 SAM)
+## 🚀 EigenGraph v0.0.3 — Phase 3: Core Upgrade (Shell FEA, P-Delta & IFC4 SAM)
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.3`  
 **Target:** Production Engine
@@ -197,7 +197,7 @@ EigenGraph v0.0.3 delivers three critical core upgrades: Mindlin-Reissner 2D she
 
 ---
 
-## ⚡ EigenGraph v0.0.2 — Phase 1: Quick Wins (ETABS Interop, PBG/SIMBG & Rebar BBS)
+## ⚡ EigenGraph v0.0.2 — Phase 2: Quick Wins (ETABS Interop, PBG/SIMBG & Rebar BBS)
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.2`  
 **Target:** Production Engine
@@ -227,7 +227,7 @@ EigenGraph v0.0.2 introduces critical interoperability and compliance automation
 
 ---
 
-## 🏛️ EigenGraph v0.0.1 — Core Non-Linear Solver & Structural Mechanics Engine
+## 🏛️ EigenGraph v0.0.1 — Phase 1: Structural Mechanics & Non-Linear Core Engine
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.1`  
 **Target:** Initial Release

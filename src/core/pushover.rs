@@ -1,4 +1,4 @@
-//! pushover.rs — Non-Linear Static Pushover Engine & Seismic Performance Evaluation (Fase 3: v0.0.4).
+//! pushover.rs — Non-Linear Static Pushover Engine & Seismic Performance Evaluation (Fase 4: v0.0.4).
 //! Formulates the Capacity Spectrum Method (CSM / ATC-40), ASCE 41-17 / FEMA 356 Performance-Based
 //! Seismic Evaluation, ADRS Transformations, and SNI 1726:2019 Damped Response Spectrum Intersections.
 

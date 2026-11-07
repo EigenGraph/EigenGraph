@@ -1,4 +1,4 @@
-//! wind.rs — Wind Engineering, Computational Aero-Dynamics & Human Comfort per ASCE 7-22 / SNI 1727:2020 (Fase 6: v0.0.7).
+//! wind.rs — Wind Engineering, Computational Aero-Dynamics & Human Comfort per ASCE 7-22 / SNI 1727:2020 (Fase 7: v0.0.7).
 //! Formulates Velocity Pressure Profiles (qz), Exposure Categories (B, C, D), Topographic Factor (Kzt),
 //! Gust Effect Factor (Gf), Main Wind Force Resisting System (MWFRS) Directional Pressure (p),
 //! Along/Cross-Wind Acceleration for Human Comfort (ISO 10137), and Story Shear vs Seismic Envelopes.

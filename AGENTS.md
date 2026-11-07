@@ -73,21 +73,34 @@ For the **Workspace (Main Canvas Area)** across all navigation pillars:
 
 ---
 
-### 6. 🔢 Strict Semantic Versioning Progression Rule:
-To guarantee predictable engineering cadence and transparent release lineage, all repositories (`EigenGraph`, `Website`, `EigenGate`, `EigenFlow`) follow a **mandatory three-tier numerical progression rule**:
+### 6. 🔢 Strict Semantic Versioning & Phase Progression Rule:
+To guarantee predictable engineering cadence and transparent release lineage, all repositories (`EigenGraph`, `Website`, `EigenGate`, `EigenFlow`) follow a **mandatory three-tier numerical progression and 1-to-1 Phase mapping rule**:
 
-1. **Patch Level Progression (Initial Releases):**
+1. **Strict 1-to-1 Phase to Version Mapping:**
+   - Every phase number corresponds exactly to its sequential version patch/minor counter:
+     - `v0.0.1` ➔ **Phase 1 / Fase 1** (Core Non-Linear Mechanics & Structural Solver)
+     - `v0.0.2` ➔ **Phase 2 / Fase 2** (Quick Wins: ETABS Interop, PBG/SIMBG & Rebar BBS)
+     - `v0.0.3` ➔ **Phase 3 / Fase 3** (Shell FEA, Second-Order P-Delta & IFC4 SAM)
+     - `v0.0.4` ➔ **Phase 4 / Fase 4** (Pushover & ASCE 41 CSM Performance Evaluation)
+     - `v0.0.5` ➔ **Phase 5 / Fase 5** (Geotechnical Engineering, Deep Foundations & SSI)
+     - `v0.0.6` ➔ **Phase 6 / Fase 6** (Steel Connection Design & AISC 360-16 / SNI 1729:2020)
+     - `v0.0.7` ➔ **Phase 7 / Fase 7** (Wind Engineering & Aero-Dynamics per ASCE 7-22 / SNI 1727:2020)
+     - `v0.0.8` ➔ **Phase 8 / Fase 8**
+     - `v0.0.9` ➔ **Phase 9 / Fase 9**
+     - `v0.1.0` ➔ **Phase 10 / Fase 10** (and so on).
+
+2. **Patch Level Progression (Initial Releases):**
    - Versioning begins at initial baseline `v0.0.1`.
    - Subsequent incremental releases advance strictly one patch digit at a time:
      `v0.0.1` &rarr; `v0.0.2` &rarr; `v0.0.3` &rarr; `v0.0.4` &rarr; `v0.0.5` &rarr; `v0.0.6` &rarr; `v0.0.7` &rarr; `v0.0.8` &rarr; `v0.0.9`.
    - **Prohibited:** Skipping directly from `v0.0.1` to `v0.1.0` or skipping any intermediate patch version is strictly forbidden.
 
-2. **Minor Level Progression (After v0.0.9):**
+3. **Minor Level Progression (After v0.0.9):**
    - Only after `v0.0.9` has been reached does the version advance to `v0.1.0`.
    - Minor releases then proceed incrementally:
      `v0.1.0` &rarr; `v0.1.1` &rarr; `v0.1.2` &rarr; ... &rarr; `v0.1.9` &rarr; `v0.2.0` &rarr; ... &rarr; `v0.9.9`.
 
-3. **Major Level Progression (Production Milestone v1.0.0):**
+4. **Major Level Progression (Production Milestone v1.0.0):**
    - Only after `v0.9.9` has completed does the version advance to major production milestone `v1.0.0`.
    - Major releases follow the identical incremental rule:
      `v1.0.0` &rarr; `v1.0.1` &rarr; `v1.0.2` &rarr; ...

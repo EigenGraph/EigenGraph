@@ -1,4 +1,4 @@
-//! geotech.rs — Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI) (Fase 4: v0.0.5).
+//! geotech.rs — Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI) (Fase 5: v0.0.5).
 //! Formulates Winkler Subgrade Reaction Springs, Pile Group Converse-Labarre Efficiency,
 //! Biaxial Pile Load Distribution, SNI 2847:2019 / ACI 318-19 Punching Shear Audits,
 //! and Wolf / Veletsos & Meek Soil-Structure Interaction (SSI) Period Lengthening Shifts.

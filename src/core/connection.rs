@@ -1,4 +1,4 @@
-//! connection.rs — Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine (Fase 5: v0.0.6).
+//! connection.rs — Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine (Fase 6: v0.0.6).
 //! Formulates Shear Tab, Extended End-Plate Moment Connections (AISC 358-16 / SNI 7860),
 //! Bolt Shear, Bearing, Tearout, Block Shear Rupture, Column Panel Zone Shear, and Web Crippling.
 

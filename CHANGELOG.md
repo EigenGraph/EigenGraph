@@ -2,12 +2,12 @@
 
 All notable changes to the **EigenGraph** structural analysis and civil engineering platform will be documented in this file.
 
-The project strictly adheres to sequential versioning:
-`v0.0.1` ➔ `v0.0.2` ➔ `v0.0.3` ... ➔ `v0.0.9` ➔ `v0.1.0` ... ➔ `v0.9.9` ➔ `v1.0.0` ... (never skip patch numbers).
+The project strictly adheres to sequential versioning and strict 1-to-1 phase mapping:
+`v0.0.1` (Phase 1) ➔ `v0.0.2` (Phase 2) ➔ `v0.0.3` (Phase 3) ➔ `v0.0.4` (Phase 4) ➔ `v0.0.5` (Phase 5) ➔ `v0.0.6` (Phase 6) ➔ `v0.0.7` (Phase 7) ... (never skip patch numbers).
 
 ---
 
-## [v0.0.7] - 2026-11-06 — Phase 6: Wind Engineering & Computational Aero-Dynamics per ASCE 7-22 / SNI 1727:2020
+## [v0.0.7] - 2026-11-06 — Phase 7: Wind Engineering & Computational Aero-Dynamics per ASCE 7-22 / SNI 1727:2020
 
 ### Added
 - **ASCE 7-22 & SNI 1727:2020 Computational Wind Engineering Engine (`src/core/wind.rs`)**:
@@ -41,7 +41,7 @@ The project strictly adheres to sequential versioning:
 
 ---
 
-## [v0.0.6] - 2026-11-06 — Phase 5: Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine
+## [v0.0.6] - 2026-11-06 — Phase 6: Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine
 
 ### Added
 - **AISC 360-16 & SNI 1729:2020 Steel Connection Limit States Engine (`src/core/connection.rs`)**:
@@ -74,7 +74,7 @@ The project strictly adheres to sequential versioning:
 
 ---
 
-## [v0.0.5] - 2026-11-06 — Phase 4: Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI)
+## [v0.0.5] - 2026-11-06 — Phase 5: Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI)
 
 ### Added
 - **Winkler Subgrade Reaction & 6-DOF Foundation Spring Matrix (`WinklerSpringMatrix`, `SoilLayer`, `SoilType`)**:
@@ -117,7 +117,7 @@ The project strictly adheres to sequential versioning:
 
 ---
 
-## [v0.0.4] - 2026-11-06 — Phase 3: Advanced Seismic & Pushover Analysis (ASCE 41-17 / ATC-40)
+## [v0.0.4] - 2026-11-06 — Phase 4: Advanced Seismic & Pushover Analysis (ASCE 41-17 / ATC-40)
 
 ### Added
 - **Capacity Spectrum Method Engine (`PushoverEngine`, `CapacitySpectrum`, `InelasticDemandSpectrum`)**:
@@ -147,7 +147,7 @@ The project strictly adheres to sequential versioning:
 
 ---
 
-## [v0.0.3] - 2026-11-06 — Phase 2: Core Non-Linear & Geometry Upgrade
+## [v0.0.3] - 2026-11-06 — Phase 3: Core Non-Linear & Geometry Upgrade (Shell FEA, P-Delta & IFC4 SAM)
 
 ### Added
 - **2D Mindlin-Reissner Flat Shell / Plate Finite Elements (`ShellElement4N`)**:
@@ -174,7 +174,7 @@ The project strictly adheres to sequential versioning:
 
 ---
 
-## [v0.0.2] - 2026-11-06 — Phase 1: Quick Wins (ETABS Interop, PBG/SIMBG & Rebar BBS)
+## [v0.0.2] - 2026-11-06 — Phase 2: Quick Wins (ETABS Interop, PBG/SIMBG & Rebar BBS)
 
 ### Added
 - **CSI ETABS `.e2k` Native Importer & Exporter (`EtabsE2kExporter`, `EtabsE2kImporter`)**:
@@ -201,7 +201,7 @@ The project strictly adheres to sequential versioning:
 
 ---
 
-## [v0.0.1] - 2026-11-06 — Initial Structural Core Engine
+## [v0.0.1] - 2026-11-06 — Phase 1: Structural Mechanics & Non-Linear Core Engine
 
 ### Added
 - **Non-Linear Sherman-Morrison & Woodbury Plastic Redistribution Engine (`src/core/nonlinear.rs`)**:
