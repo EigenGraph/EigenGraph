@@ -7,6 +7,53 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## 🚀 EigenGraph v0.1.3 — Phase 13: Nonlinear Dynamic Direct Time-History Analysis (NL-THA) Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.3`  
+**Target:** Production Engine
+
+EigenGraph v0.1.3 introduces a state-of-the-art **Nonlinear Dynamic Direct Time-History Analysis (NL-THA) & Ground Motion Record Scaling Engine**, empowering civil and structural earthquake engineers to perform rigorous performance-based seismic engineering and high-rise structural evaluations in full compliance with **ASCE 7-22 Chapter 16 (Nonlinear Response History Analysis)**, **SNI 1726:2019 Pasal 11 (Prosedur Riwayat Respon Linier dan Non-Linier)**, **NIST GCR 17-917-46 / ATC-114**, and **PEER/TBI Guidelines (2017)**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Canonical Ground Motion Suite & Stochastic Wave Generation (§16.2)
+- Built-in canonical earthquake records:
+  - **1994 Northridge (Sylmar Station)**: PGA 0.843g, $T_{5-95} = 12.5\text{ s}$
+  - **1995 Kobe (Takatori Station)**: PGA 0.671g, $T_{5-95} = 14.8\text{ s}$
+  - **1940 El Centro (Array #9)**: PGA 0.348g, $T_{5-95} = 24.2\text{ s}$
+  - **1999 Chi-Chi Taiwan (TCU068)**: PGA 0.512g, $T_{5-95} = 28.6\text{ s}$
+  - **2004 Sumatra Mega-thrust Subduction**: PGA 0.425g, $T_{5-95} = 52.0\text{ s}$
+- Synthetic acceleration wave generator with non-stationary Gamma modulation:
+  $$e(t) = \tau^2 \exp(-2(\tau - 1)), \quad \tau = \frac{t}{t_{peak}}$$
+- Amplitude scaling factor $SF$ per ASCE 7-22 §16.2.3 over the fundamental period spectrum range $[0.2 T_1, 1.5 T_1]$.
+
+#### 2. Hilber-Hughes-Taylor ($\text{HHT}-\alpha$) Implicit Numerical Solver
+- Unconditionally stable second-order accurate time-stepping algorithm with controllable numerical dissipation:
+  $$\mathbf{M} \ddot{\mathbf{u}}_{n+1} + (1 + \alpha) \mathbf{C} \dot{\mathbf{u}}_{n+1} - \alpha \mathbf{C} \dot{\mathbf{u}}_n + (1 + \alpha) \mathbf{f}_s(\mathbf{u}_{n+1}) - \alpha \mathbf{f}_s(\mathbf{u}_n) = \mathbf{p}_{n+1 + \alpha}$$
+  $$\mathbf{u}_{n+1} = \mathbf{u}_n + \Delta t \dot{\mathbf{u}}_n + \Delta t^2 \left[ \left(\frac{1}{2} - \beta\right) \ddot{\mathbf{u}}_n + \beta \ddot{\mathbf{u}}_{n+1} \right]$$
+  $$\dot{\mathbf{u}}_{n+1} = \dot{\mathbf{u}}_n + \Delta t \left[ (1 - \gamma) \ddot{\mathbf{u}}_n + \gamma \ddot{\mathbf{u}}_{n+1} \right]$$
+  with optimal parameters $\alpha = -0.10$, $\beta = \frac{(1 - \alpha)^2}{4} = 0.3025$, and $\gamma = \frac{1 - 2\alpha}{2} = 0.60$.
+
+#### 3. Bouc-Wen Differential Hysteresis Restoring Force Model
+- Smooth nonlinear inelastic yielding formulation:
+  $$f_s(u, z) = \alpha_p k_0 u + (1 - \alpha_p) k_0 u_y z$$
+  $$\dot{z} = \frac{1}{u_y} \left[ A \dot{u} - \beta_w |\dot{u}| |z|^{n-1} z - \gamma_w \dot{u} |z|^n \right]$$
+- Newton-Raphson tangent stiffness solver ensuring rapid quadratic convergence at each sub-increment.
+
+#### 4. Instantaneous Energy Balance Integration & Conservation (ATC-114)
+- Continuous evaluation of five energetic terms:
+  $$E_I(t) = \int_0^t \mathbf{p}_{eff}(\tau) \cdot \dot{\mathbf{u}}(\tau) d\tau$$
+  $$E_K(t) = \frac{1}{2} M \dot{u}^2, \quad E_D(t) = \int_0^t C \dot{u}^2 d\tau, \quad E_S(t) = \frac{1}{2} K_e u^2, \quad E_H(t) = \int_0^t f_{inelastic} d u_{pl}$$
+- Real-time tracking of residual energy balance error $\epsilon_E \le 2.50\%$ verifying numerical stability.
+
+#### 5. Multi-Story Dynamic Envelope Profiles (§16.4)
+- Evaluation of peak inter-story drift ratio $\theta_i$ along structure elevation:
+  $$\theta_i = \frac{u_i - u_{i-1}}{h_i} \le 0.020 \quad (\text{ASCE 7-22 §16.4.1 Limit})$$
+- Verification of minimum dynamic base shear lower bound:
+  $$V_b \ge 0.85 V_{\text{ELF}} \quad (\text{ASCE 7-22 §16.4.2})$$
+
+---
+
 ## 🚀 EigenGraph v0.1.2 — Phase 12: Seismic Base Isolation & Energy Dissipation Engine
 **Release Date:** 2026-11-07  
 **Git Tag:** `v0.1.2`  

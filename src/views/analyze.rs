@@ -22,6 +22,7 @@ pub enum AnalyzeSubTab {
     PrestressedDesign,
     ShearWallDesign,
     BaseIsolationDesign,
+    TimeHistoryAnalysis,
 }
 
 pub struct AnalyzeView {
@@ -148,6 +149,18 @@ pub struct AnalyzeView {
     pub iso_fvd_alpha: f32,
     pub iso_fvd_stroke_limit_mm: f32,
     pub iso_fvd_count: usize,
+    // Nonlinear Dynamic Time-History Analysis (NL-THA - ASCE 7-22 Ch 16 / SNI 1726 Pasal 11)
+    pub tha_record: crate::core::GroundMotionRecord,
+    pub tha_scale_factor: f32,
+    pub tha_dt: f32,
+    pub tha_duration: f32,
+    pub tha_building_height_m: f32,
+    pub tha_num_stories: usize,
+    pub tha_seismic_weight_kn: f32,
+    pub tha_t1_s: f32,
+    pub tha_damping: f32,
+    pub tha_cy: f32,
+    pub tha_alpha_p: f32,
 }
 
 impl Default for AnalyzeView {
@@ -269,6 +282,17 @@ impl Default for AnalyzeView {
             iso_fvd_alpha: 0.35,
             iso_fvd_stroke_limit_mm: 250.0,
             iso_fvd_count: 16,
+            tha_record: crate::core::GroundMotionRecord::NorthridgeSylmar1994,
+            tha_scale_factor: 1.15,
+            tha_dt: 0.010,
+            tha_duration: 25.0,
+            tha_building_height_m: 60.0,
+            tha_num_stories: 16,
+            tha_seismic_weight_kn: 160_000.0,
+            tha_t1_s: 1.65,
+            tha_damping: 0.025,
+            tha_cy: 0.12,
+            tha_alpha_p: 0.035,
         }
     }
 }
@@ -330,6 +354,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::PrestressedDesign => self.render_prestressed_design(ui, theme),
                     AnalyzeSubTab::ShearWallDesign => self.render_shear_wall_design(ui, theme),
                     AnalyzeSubTab::BaseIsolationDesign => self.render_base_isolation_design(ui, theme),
+                    AnalyzeSubTab::TimeHistoryAnalysis => self.render_time_history_analysis(ui, theme),
                 }
 
                 ui.add_space(64.0);
@@ -487,6 +512,7 @@ impl AnalyzeView {
                     (AnalyzeSubTab::PrestressedDesign, "🪢 PT Concrete (ACI 318)"),
                     (AnalyzeSubTab::ShearWallDesign, "🏢 RC Shear Walls & Coupling Beams"),
                     (AnalyzeSubTab::BaseIsolationDesign, "🛡️ Base Isolation & Dampers"),
+                    (AnalyzeSubTab::TimeHistoryAnalysis, "🌊 NL-THA Time-History"),
                 ];
 
                 for (tab, label) in tabs {
@@ -4950,6 +4976,380 @@ impl AnalyzeView {
                     ui.label(RichText::new(format!("{:.2} {}", item.demand_val, item.unit)).size(10.5).color(theme.text_primary));
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.2} {}", item.capacity_val, item.unit)).size(10.5).color(theme.accent_green));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.3}", item.demand_capacity_ratio)).size(10.5).strong().color(row_col));
+                    ui.add_space(20.0);
+                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                });
+                ui.separator();
+            }
+        });
+    }
+
+    fn render_time_history_analysis(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let input = crate::core::TimeHistoryInput {
+            ground_motion: self.tha_record,
+            scale_factor: self.tha_scale_factor as f64,
+            time_step_dt_s: self.tha_dt as f64,
+            simulation_duration_s: self.tha_duration as f64,
+            building_height_m: self.tha_building_height_m as f64,
+            num_stories: self.tha_num_stories,
+            total_seismic_weight_kn: self.tha_seismic_weight_kn as f64,
+            fundamental_period_t1_s: self.tha_t1_s as f64,
+            damping_ratio: self.tha_damping as f64,
+            yield_shear_coeff_cy: self.tha_cy as f64,
+            post_yield_stiffness_ratio: self.tha_alpha_p as f64,
+            hysteresis_rule: crate::core::HysteresisModel::BoucWenDifferential,
+            integration_scheme: crate::core::TimeIntegrationScheme::HilberHughesTaylorAlpha,
+        };
+
+        let rep = crate::core::TimeHistoryEngine::evaluate(&input);
+
+        // Header & Dossier Export
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("🌊 Nonlinear Dynamic Direct Time-History Analysis (NL-THA) & Ground Motion Scaling").size(13.0).strong().color(theme.accent_blue));
+                    ui.label(RichText::new("ASCE 7-22 Chapter 16 · SNI 1726:2019 Pasal 11 · NIST GCR 17-917-46 / ATC-114 · PEER/TBI (2017)").size(10.5).color(theme.text_secondary));
+                });
+
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.add(egui::Button::new(RichText::new("📥 Export NL-THA Dossier (.md)").size(11.0).color(Color32::WHITE))
+                        .fill(theme.bg_canvas)
+                        .stroke(Stroke::new(1.0, theme.accent_blue))
+                        .corner_radius(CornerRadius::same(7))).clicked() {
+                        let dossier = crate::core::TimeHistoryEngine::generate_markdown_dossier(&input, &rep);
+                        if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_NL_THA_Time_History_Dossier.md", &dossier) {
+                            self.export_status = Some(format!("NL-THA Calculation Dossier saved to: {}", path));
+                        }
+                    }
+                });
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // 4 KPI Summary Cards
+        let card_w = ((ui.available_width() - 30.0) / 4.0).max(120.0);
+        ui.horizontal(|ui| {
+            // Card 1: Roof Displacement & Drift
+            let drift_col = if rep.peak_roof_drift_ratio <= 0.020 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(card_w);
+                ui.label(RichText::new("PEAK ROOF DISP").size(10.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.1} mm", rep.peak_roof_disp_mm)).size(17.0).strong().color(drift_col));
+                ui.label(RichText::new(format!("Roof Drift: {:.2}% (≤ 2.0%)", rep.peak_roof_drift_ratio * 100.0)).size(10.0).color(theme.text_muted));
+            });
+            ui.add_space(6.0);
+
+            // Card 2: Peak Base Shear
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(card_w);
+                ui.label(RichText::new("PEAK BASE SHEAR Vb").size(10.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.0} kN", rep.peak_base_shear_kn)).size(17.0).strong().color(theme.accent_blue));
+                ui.label(RichText::new(format!("{:.1}% W (Cy: {:.2})", rep.base_shear_ratio * 100.0, self.tha_cy)).size(10.0).color(theme.text_muted));
+            });
+            ui.add_space(6.0);
+
+            // Card 3: Inelastic Energy Dissipation
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(card_w);
+                ui.label(RichText::new("ENERGY DISSIPATION").size(10.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.1}% Hysteretic", rep.hysteretic_energy_dissipation_ratio * 100.0)).size(17.0).strong().color(Color32::from_rgb(245, 158, 11)));
+                ui.label(RichText::new(format!("Inelastic: {:.0} kJ", rep.total_hysteretic_energy_kj)).size(10.0).color(theme.text_muted));
+            });
+            ui.add_space(6.0);
+
+            // Card 4: Energy Balance Error
+            let err_col = if rep.max_energy_balance_error_pct <= 2.50 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(card_w);
+                ui.label(RichText::new("ENERGY CONSERVATION").size(10.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.2}% Error", rep.max_energy_balance_error_pct)).size(17.0).strong().color(err_col));
+                ui.label(RichText::new("ATC-114 Residual (≤ 2.5%)").size(10.0).color(theme.text_muted));
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // Parameters Control Card (3 columns)
+        theme.card_frame().show(ui, |ui| {
+            let cols = ui.columns(3, |columns| {
+                // Column 1: Ground Motion & Time Stepping
+                columns[0].vertical(|ui| {
+                    ui.label(RichText::new("1. Ground Motion Record & Scaling").size(11.0).strong().color(theme.text_primary));
+                    ui.horizontal(|ui| {
+                        ui.label("Record:");
+                        egui::ComboBox::from_id_salt("tha_rec_cb")
+                            .selected_text(self.tha_record.label())
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.tha_record, crate::core::GroundMotionRecord::NorthridgeSylmar1994, "1994 Northridge (Sylmar)");
+                                ui.selectable_value(&mut self.tha_record, crate::core::GroundMotionRecord::KobeTakatori1995, "1995 Kobe (Takatori)");
+                                ui.selectable_value(&mut self.tha_record, crate::core::GroundMotionRecord::ImperialValleyElCentro1940, "1940 El Centro (Array #9)");
+                                ui.selectable_value(&mut self.tha_record, crate::core::GroundMotionRecord::ChiChiTaiwan1999, "1999 Chi-Chi Taiwan");
+                                ui.selectable_value(&mut self.tha_record, crate::core::GroundMotionRecord::SumatraSubduction2004, "2004 Sumatra Subduction");
+                            });
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Scale Factor SF:");
+                        ui.add(egui::Slider::new(&mut self.tha_scale_factor, 0.50..=2.50));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Time Step Δt:");
+                        ui.add(egui::Slider::new(&mut self.tha_dt, 0.005..=0.020).suffix(" s"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Duration:");
+                        ui.add(egui::Slider::new(&mut self.tha_duration, 10.0..=40.0).suffix(" s"));
+                    });
+                });
+
+                // Column 2: Building Superstructure Archetype
+                columns[1].vertical(|ui| {
+                    ui.label(RichText::new("2. Superstructure Geometry & Mass").size(11.0).strong().color(theme.text_primary));
+                    ui.horizontal(|ui| {
+                        ui.label("Total Height (H):");
+                        ui.add(egui::Slider::new(&mut self.tha_building_height_m, 20.0..=120.0).suffix(" m"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Number of Stories (N):");
+                        ui.add(egui::Slider::new(&mut self.tha_num_stories, 4..=32));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Seismic Weight (W):");
+                        ui.add(egui::Slider::new(&mut self.tha_seismic_weight_kn, 20000.0..=400000.0).suffix(" kN"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Period (T1):");
+                        ui.add(egui::Slider::new(&mut self.tha_t1_s, 0.50..=3.50).suffix(" s"));
+                    });
+                });
+
+                // Column 3: Inelastic Yield & Numerical Dissipation
+                columns[2].vertical(|ui| {
+                    ui.label(RichText::new("3. Inelastic Yield & Energy Damping").size(11.0).strong().color(theme.text_primary));
+                    ui.horizontal(|ui| {
+                        ui.label("Rayleigh Damping (ξ):");
+                        ui.add(egui::Slider::new(&mut self.tha_damping, 0.010..=0.060));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Yield Shear Coeff (Cy):");
+                        ui.add(egui::Slider::new(&mut self.tha_cy, 0.05..=0.30));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Hardening Ratio (αp):");
+                        ui.add(egui::Slider::new(&mut self.tha_alpha_p, 0.010..=0.100));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Solver Scheme:");
+                        ui.label(RichText::new("HHT-α (α=-0.10)").color(theme.accent_blue).strong());
+                    });
+                });
+            });
+            let _ = cols;
+        });
+
+        ui.add_space(10.0);
+
+        // 2D Vector CAD Canvas: Response Time Traces + Story Height Drift Profile
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📐 2D Vector CAD Dynamic Response Waves & Multi-Story Drift Envelope").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(20.0);
+                ui.label(RichText::new(format!("Scaled PGA: {:.3} g | Peak Roof Disp: {:.1} mm", rep.scaled_pga_g, rep.peak_roof_disp_mm)).size(11.0).color(theme.accent_green));
+            });
+
+            ui.add_space(6.0);
+
+            let (canvas_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 270.0), Sense::hover());
+            let painter = ui.painter_at(canvas_rect);
+
+            painter.rect_filled(canvas_rect, 6.0, Color32::from_rgb(18, 22, 30));
+            painter.rect_stroke(canvas_rect, 6.0, Stroke::new(1.0, Color32::from_rgb(45, 55, 75)));
+
+            let mid_x = canvas_rect.min.x + canvas_rect.width() * 0.58;
+
+            // Divider line between Time Wave and Drift Profile
+            painter.line_segment(
+                [Pos2::new(mid_x, canvas_rect.min.y + 10.0), Pos2::new(mid_x, canvas_rect.max.y - 10.0)],
+                Stroke::new(1.0, Color32::from_rgb(45, 55, 75)),
+            );
+
+            // Left Side: Time-History Response Waves
+            let wave_left = canvas_rect.min.x + 35.0;
+            let wave_right = mid_x - 20.0;
+            let wave_w = (wave_right - wave_left).max(10.0);
+            let wave_center_y = canvas_rect.min.y + 130.0;
+            let wave_h = 100.0;
+
+            // Zero line
+            painter.line_segment(
+                [Pos2::new(wave_left, wave_center_y), Pos2::new(wave_right, wave_center_y)],
+                Stroke::new(1.0, Color32::from_rgb(70, 80, 100)),
+            );
+
+            // Grid lines
+            for t_step in 1..=4 {
+                let gx = wave_left + wave_w * (t_step as f32 / 4.0);
+                painter.line_segment(
+                    [Pos2::new(gx, canvas_rect.min.y + 25.0), Pos2::new(gx, canvas_rect.max.y - 25.0)],
+                    Stroke::new(0.5, Color32::from_rgb(35, 45, 60)),
+                );
+                let time_val = self.tha_duration * (t_step as f32 / 4.0);
+                painter.text(
+                    Pos2::new(gx, canvas_rect.max.y - 20.0),
+                    Align2::CENTER_TOP,
+                    format!("{:.0}s", time_val),
+                    egui::FontId::proportional(9.5),
+                    Color32::from_rgb(130, 140, 160),
+                );
+            }
+
+            if !rep.time_history_trace.is_empty() {
+                let n_pts = rep.time_history_trace.len();
+                let max_u = rep.peak_roof_disp_mm.max(1.0) as f32;
+                let max_ag = (rep.scaled_pga_g.max(0.1) * 9.80665) as f32;
+
+                // 1. Ground acceleration wave (amber)
+                let mut ag_points = Vec::with_capacity(n_pts.min(300));
+                let step = (n_pts / 300).max(1);
+                for i in (0..n_pts).step_by(step) {
+                    let s = &rep.time_history_trace[i];
+                    let px = wave_left + (s.time_s as f32 / self.tha_duration) * wave_w;
+                    let py = wave_center_y - ((s.ground_accel_g as f32 * 9.80665) / max_ag) * (wave_h * 0.40);
+                    ag_points.push(Pos2::new(px, py));
+                }
+                for w in ag_points.windows(2) {
+                    painter.line_segment([w[0], w[1]], Stroke::new(1.0, Color32::from_rgba_unmultiplied(245, 158, 11, 160)));
+                }
+
+                // 2. Roof displacement wave (cyan)
+                let mut u_points = Vec::with_capacity(n_pts.min(300));
+                for i in (0..n_pts).step_by(step) {
+                    let s = &rep.time_history_trace[i];
+                    let px = wave_left + (s.time_s as f32 / self.tha_duration) * wave_w;
+                    let py = wave_center_y - (s.roof_disp_mm as f32 / max_u) * (wave_h * 0.42);
+                    u_points.push(Pos2::new(px, py));
+                }
+                for w in u_points.windows(2) {
+                    painter.line_segment([w[0], w[1]], Stroke::new(1.8, Color32::from_rgb(56, 189, 248)));
+                }
+            }
+
+            // Legend on Left
+            painter.text(
+                Pos2::new(wave_left, canvas_rect.min.y + 12.0),
+                Align2::LEFT_TOP,
+                "Dynamic Response Trace: — ag(t) (Ground)  — u_roof(t) (Displacement)",
+                egui::FontId::proportional(11.0),
+                Color32::from_rgb(56, 189, 248),
+            );
+
+            // Right Side: Multi-Story Drift Ratio Envelope Profile
+            let profile_left = mid_x + 35.0;
+            let profile_right = canvas_rect.max.x - 25.0;
+            let profile_w = (profile_right - profile_left).max(10.0);
+            let profile_bot = canvas_rect.max.y - 30.0;
+            let profile_top = canvas_rect.min.y + 35.0;
+            let profile_h = (profile_bot - profile_top).max(10.0);
+
+            // Vertical axis (Height)
+            painter.line_segment(
+                [Pos2::new(profile_left, profile_bot), Pos2::new(profile_left, profile_top)],
+                Stroke::new(1.2, Color32::from_rgb(70, 80, 100)),
+            );
+
+            // Horizontal axis (Drift 0 to 2.5%)
+            painter.line_segment(
+                [Pos2::new(profile_left, profile_bot), Pos2::new(profile_right, profile_bot)],
+                Stroke::new(1.2, Color32::from_rgb(70, 80, 100)),
+            );
+
+            // Drift limit line (2.0% ASCE 7-22)
+            let drift_limit_x = profile_left + profile_w * (0.020 / 0.025);
+            painter.line_segment(
+                [Pos2::new(drift_limit_x, profile_bot), Pos2::new(drift_limit_x, profile_top)],
+                Stroke::new(1.2, Color32::from_rgb(239, 68, 68)),
+            );
+            painter.text(
+                Pos2::new(drift_limit_x, profile_top - 12.0),
+                Align2::CENTER_TOP,
+                "Limit 2.0%",
+                egui::FontId::proportional(9.0),
+                Color32::from_rgb(239, 68, 68),
+            );
+
+            // Plot drift envelope line
+            if !rep.story_profiles.is_empty() {
+                let n_stories = rep.story_profiles.len();
+                let mut drift_pts = Vec::with_capacity(n_stories + 1);
+                drift_pts.push(Pos2::new(profile_left, profile_bot)); // Ground is 0 drift
+
+                for p in &rep.story_profiles {
+                    let y_frac = p.story_elevation_m as f32 / self.tha_building_height_m;
+                    let py = profile_bot - y_frac * profile_h;
+                    let x_frac = ((p.peak_drift_ratio as f32) / 0.025).clamp(0.0, 1.0);
+                    let px = profile_left + x_frac * profile_w;
+                    drift_pts.push(Pos2::new(px, py));
+                }
+
+                for w in drift_pts.windows(2) {
+                    painter.line_segment([w[0], w[1]], Stroke::new(2.2, Color32::from_rgb(16, 185, 129)));
+                }
+                for pt in &drift_pts {
+                    painter.circle_filled(*pt, 2.5, Color32::from_rgb(52, 211, 153));
+                }
+            }
+
+            painter.text(
+                Pos2::new(profile_left, canvas_rect.min.y + 12.0),
+                Align2::LEFT_TOP,
+                "Inter-Story Drift Profile (θ vs Height)",
+                egui::FontId::proportional(11.0),
+                Color32::from_rgb(16, 185, 129),
+            );
+        });
+
+        ui.add_space(10.0);
+
+        // ASCE 7-22 / SNI 1726 Regulatory Compliance Audit Table
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📋 ASCE 7-22 & SNI 1726:2019 NL-THA Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(20.0);
+                let overall_status = if rep.is_design_acceptable { "🟢 ALL REGULATORY CHECKS SATISFIED" } else { "🔴 DESIGN REVISIONS REQUIRED" };
+                let status_col = if rep.is_design_acceptable { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+            });
+
+            ui.add_space(6.0);
+
+            // Table Header
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Code Clause").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(190.0);
+                ui.label(RichText::new("Engineering Requirement").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(160.0);
+                ui.label(RichText::new("Demand").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(50.0);
+                ui.label(RichText::new("Capacity").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(50.0);
+                ui.label(RichText::new("D/C Ratio").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(30.0);
+                ui.label(RichText::new("Status").size(10.5).strong().color(theme.text_secondary));
+            });
+            ui.separator();
+
+            for item in &rep.regulatory_checks {
+                let row_col = if item.is_passed { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(&item.code_clause).size(10.5).color(theme.accent_blue));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(&item.description).size(10.5).color(theme.text_primary));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(format!("{:.3} {}", item.demand_val, item.unit)).size(10.5).color(theme.text_primary));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.3} {}", item.capacity_val, item.unit)).size(10.5).color(theme.accent_green));
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.3}", item.demand_capacity_ratio)).size(10.5).strong().color(row_col));
                     ui.add_space(20.0);

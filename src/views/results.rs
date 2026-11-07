@@ -602,6 +602,17 @@ impl ResultsView {
                                     self.export_status = Some(format!("Seismic Base Isolation & Energy Dissipation Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🌊 NL-THA Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(14, 165, 233))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let input = crate::core::TimeHistoryInput::default();
+                                let rep = crate::core::TimeHistoryEngine::evaluate(&input);
+                                let md = crate::core::TimeHistoryEngine::generate_markdown_dossier(&input, &rep);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_NL_THA_Time_History_Dossier.md", &md) {
+                                    self.export_status = Some(format!("NL-THA Dynamic Time-History Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });

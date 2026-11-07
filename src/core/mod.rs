@@ -33,6 +33,7 @@ pub mod geometry_engine;
 pub mod prestressed_concrete;
 pub mod shear_wall;
 pub mod isolation;
+pub mod time_history;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -139,4 +140,8 @@ pub use isolation::{
     DamperConfiguration, FluidViscousDamperParams, FrictionPendulumParams, HysteresisPoint,
     IsolatorType, LeadRubberBearingParams, RegulatoryCheckItem, SeismicIsolationEngine,
     SeismicIsolationInput, SeismicIsolationReport,
+};
+pub use time_history::{
+    GroundMotionRecord, HysteresisModel, StoryResponseProfile, TimeHistoryEngine,
+    TimeHistoryInput, TimeHistoryReport, TimeHistorySample, TimeIntegrationScheme,
 };

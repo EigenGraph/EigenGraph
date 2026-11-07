@@ -7,6 +7,52 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.1.3] - 2026-11-07 — Phase 13: Nonlinear Dynamic Direct Time-History Analysis (NL-THA) Engine (ASCE 7-22 / SNI 1726:2019)
+
+### Added
+- **Nonlinear Dynamic Direct Time-History Analysis (NL-THA) Core Engine (`src/core/time_history.rs`)**:
+  - Full compliance with **ASCE 7-22 Chapter 16 (Nonlinear Response History Analysis)**, **SNI 1726:2019 Pasal 11 (Prosedur Riwayat Respon Non-Linier)**, **NIST GCR 17-917-46 / ATC-114**, and **PEER/TBI Guidelines (2017)**.
+  - **Ground Motion Suite & Stochastic Kanai-Tajimi Scaling (§16.2)**:
+    - Built-in canonical earthquake records: 1994 Northridge (Sylmar Station, PGA 0.84g), 1995 Kobe (Takatori Station, PGA 0.67g), 1940 El Centro (Array #9, PGA 0.35g), 1999 Chi-Chi Taiwan (TCU068, PGA 0.51g), and 2004 Sumatra Mega-thrust Interface (PGA 0.42g).
+    - Synthetic non-stationary acceleration wave generation using Gamma-envelope modulated filtered stochastic processes.
+    - Amplitude scale factor $SF$ per ASCE 7-22 §16.2.3 over period range $[0.2 T_1, 1.5 T_1]$.
+  - **Hilber-Hughes-Taylor ($\text{HHT}-\alpha$) Implicit Numerical Solver**:
+    - Unconditionally stable integration scheme with numerical dissipation controlled by parameter $\alpha \in [-1/3, 0]$ (nominal $\alpha = -0.10$, $\beta = \frac{(1-\alpha)^2}{4} = 0.3025$, $\gamma = \frac{1 - 2\alpha}{2} = 0.60$).
+    - Eliminates spurious high-frequency mode chatter while preserving accurate low-frequency structural dynamic response.
+  - **Bouc-Wen Differential Hysteresis Restoring Force Model**:
+    - Smooth inelastic transitions governed by:
+      $$\dot{z} = \dot{u} \left[ A - (\beta_w \operatorname{sgn}(\dot{u}) |z|^n + \gamma_w |z|^n) \right]$$
+    - Tangent stiffness matrix Newton-Raphson nonlinear equilibrium solver with convergence tolerance $\epsilon_r \le 10^{-4}$.
+  - **Instantaneous Dynamic Energy Balance Integration (ATC-114)**:
+    - Simultaneous time integration of Kinetic ($E_K$), Viscous Damping ($E_D$), Elastic Strain ($E_S$), and Inelastic Hysteretic ($E_H$) energy:
+      $$E_I(t) = E_K(t) + E_D(t) + E_S(t) + E_H(t)$$
+    - Continuous tracking of instantaneous energy balance residual error:
+      $$\epsilon_E(t) = \frac{|E_I(t) - (E_K + E_D + E_S + E_H)|}{\max(E_I(t), 1.0)} \le 2.5\%$$
+      strictly satisfying NIST GCR 17-917-46 numerical stability bounds.
+  - **Multi-Story Dynamic Response Profile Envelopes (§16.4)**:
+    - Story-by-story peak lateral displacement, inter-story drift ratio $\theta_i$, story shear $V_{\text{story}}$, and overturning moment $M_{\text{OT}}$ with higher-mode whiplash amplification.
+    - Mean inter-story drift check $\theta_{\max} \le 0.020$ per ASCE 7-22 §16.4.1.
+    - Base shear lower bound verification $V_b \ge 0.85 V_{\text{ELF}}$ per ASCE 7-22 §16.4.2.
+  - **16-Story NL-THA Test Tower Archetype Generator (`generate_nl_tha_tower_archetype`)**:
+    - Synthesizes a 60m 16-story tall building (204 nodes, 432 frame members, 8 inelastic hysteretic link elements across lower stories).
+  - **Markdown Calculation Dossier Generator (`generate_markdown_dossier`)**:
+    - Exports comprehensive professional calculation dossier with code compliance audit matrix, multi-story drift tables, and energy conservation ledger.
+  - **Unit Test Suite**: 4 verified test cases (`test_ground_motion_generation`, `test_nonlinear_time_history_evaluation`, `test_energy_balance_conservation`, `test_nl_tha_tower_archetype_generation`).
+- **Deep Analysis Studio (`src/views/analyze.rs`)**:
+  - Added subtab `AnalyzeSubTab::TimeHistoryAnalysis` ("🌊 NL-THA Time-History").
+  - 4 KPI real-time telemetry cards (Peak Roof Disp & Drift, Peak Base Shear, Inelastic Energy Dissipation, Energy Balance Error).
+  - Multi-parameter interactive controls: Ground motion record selection, scale factor, time step $\Delta t$, duration, tower geometry, seismic weight, period $T_1$, Rayleigh damping $\xi$, yield coefficient $C_y$, and strain hardening $\alpha_p$.
+  - 2D Vector CAD canvas rendering dynamic response traces ($a_g(t)$, $u_{\text{roof}}(t)$) and height vs inter-story drift ratio envelope profile with 2.0% ASCE 7-22 limit line.
+  - Complete ASCE 7-22 Chapter 16 and SNI 1726:2019 Pasal 11 regulatory compliance audit table.
+- **3D Modeling & CAD Viewport (`src/views/build.rs`)**:
+  - Added `ModelArchetype::TimeHistoryTower3D` ("🌊 NL-THA Tower (16-Story)").
+  - Integrated into both model dropdown menus and camera presets (yaw 0.55, pitch 0.30, zoom 0.88).
+  - 3D viewport rendering of 16-story tower frame with highlighted Bouc-Wen inelastic yielding links.
+- **Results & Engineering Dossier View (`src/views/results.rs`)**:
+  - Added button `"🌊 NL-THA Dossier (.md)"` saving `EigenGraph_NL_THA_Time_History_Dossier.md`.
+
+---
+
 ## [v0.1.2] - 2026-11-07 — Phase 12: Seismic Base Isolation & Energy Dissipation Engine (ASCE 7-22 Ch 17 & 18 / SNI 1726:2019 Pasal 12 & 13)
 
 ### Added

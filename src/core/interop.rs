@@ -2098,7 +2098,7 @@ impl EtabsE2kExporter {
 
         // 9. EigenGraph Certified Audit Comments
         s.push_str("; ====================================================================\n");
-        s.push_str("; EIGENGRAPH STRUCTURAL ANALYSIS PLATFORM v0.1.2\n");
+        s.push_str("; EIGENGRAPH STRUCTURAL ANALYSIS PLATFORM v0.1.3\n");
         if let Some(ari) = assessment {
             let ci = 1.0 - ari.min_system_ari;
             let seal = Sha256Hasher::digest_hex(format!("{}:{:.6}", model.name, ari.min_system_ari).as_bytes());
@@ -2464,7 +2464,7 @@ impl PbgReportGenerator {
         html.push_str("<div class=\"seal-box\">\n");
         html.push_str("<strong>HMAC-SHA256 Cryptographic Audit Seal (Anti-Tamper Integrity):</strong><br>\n");
         html.push_str(&seal);
-        html.push_str("<br><br><em>Diverifikasi dan diterbitkan otomatis oleh Core Engine EigenGraph v0.1.2 sesuai standar teknis Kementerian PUPR Republik Indonesia.</em>\n");
+        html.push_str("<br><br><em>Diverifikasi dan diterbitkan otomatis oleh Core Engine EigenGraph v0.1.3 sesuai standar teknis Kementerian PUPR Republik Indonesia.</em>\n");
         html.push_str("</div>\n");
 
         html.push_str("</body>\n</html>\n");

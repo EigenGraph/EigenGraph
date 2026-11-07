@@ -20,6 +20,7 @@ pub enum ModelArchetype {
     PrestressedGirderBridge3D, // 3D Prestressed Post-Tensioned Concrete Bridge Span
     CoupledShearWallCore3D,  // 3D Coupled Special Structural Shear Wall Core Tower
     BaseIsolatedHospital3D,  // 3D Base-Isolated Essential Facility (8-Story Hospital with Base Isolators)
+    TimeHistoryTower3D,      // 3D 16-Story NL-THA Seismic Test Tower Archetype
 }
 
 impl ModelArchetype {
@@ -37,6 +38,7 @@ impl ModelArchetype {
             Self::PrestressedGirderBridge3D => "🌉 Prestressed Bridge (30m PT Girder)",
             Self::CoupledShearWallCore3D => "🏢 Coupled Shear Wall Core (12-Story)",
             Self::BaseIsolatedHospital3D => "🛡️ Base-Isolated Hospital (8-Story)",
+            Self::TimeHistoryTower3D => "🌊 NL-THA Tower (16-Story)",
         }
     }
 }
@@ -360,6 +362,7 @@ impl BuildView {
             let models = [
                 ModelArchetype::BimCraftBuilding3D,
                 ModelArchetype::BaseIsolatedHospital3D,
+                ModelArchetype::TimeHistoryTower3D,
                 ModelArchetype::CoupledShearWallCore3D,
                 ModelArchetype::PrestressedGirderBridge3D,
                 ModelArchetype::DoubleLayerSpaceTruss3D,
@@ -391,6 +394,12 @@ impl BuildView {
                             self.cam_yaw = 0.58;
                             self.cam_pitch = 0.32;
                             self.cam_zoom = 0.92;
+                            self.cam_pan = Vec2::ZERO;
+                        }
+                        ModelArchetype::TimeHistoryTower3D => {
+                            self.cam_yaw = 0.55;
+                            self.cam_pitch = 0.30;
+                            self.cam_zoom = 0.88;
                             self.cam_pan = Vec2::ZERO;
                         }
                         ModelArchetype::CoupledShearWallCore3D => {
@@ -923,6 +932,7 @@ impl BuildView {
                         let models = [
                             ModelArchetype::BimCraftBuilding3D,
                             ModelArchetype::BaseIsolatedHospital3D,
+                            ModelArchetype::TimeHistoryTower3D,
                             ModelArchetype::CoupledShearWallCore3D,
                             ModelArchetype::PrestressedGirderBridge3D,
                             ModelArchetype::DoubleLayerSpaceTruss3D,
@@ -2361,6 +2371,33 @@ impl BuildView {
                 let cy = 8.0;
                 let cz = (8.0 * 3.6) * 0.5;
                 ((cx, cy, cz), 24.0, list)
+            }
+            ModelArchetype::TimeHistoryTower3D => {
+                let (nodes, elements) = crate::core::TimeHistoryEngine::generate_nl_tha_tower_archetype();
+                let mut list = Vec::with_capacity(elements.len());
+                for &(el_id, n1_id, n2_id, is_link) in &elements {
+                    let (_, x1, y1, z1) = nodes[n1_id];
+                    let (_, x2, y2, z2) = nodes[n2_id];
+                    let p1 = (x1 as f32, z1 as f32, y1 as f32);
+                    let p2 = (x2 as f32, z2 as f32, y2 as f32);
+                    list.push(Member3D {
+                        id: el_id + 1,
+                        p1,
+                        p2,
+                        name: if is_link { format!("InelasticLink-{}", el_id + 1) } else { format!("TowerMember-{}", el_id + 1) },
+                        section: if is_link { "Bouc-Wen Inelastic Link".to_string() } else { "Built-Up Box Column 800x800 / W36x150 Beam".to_string() },
+                        base_width: if is_link { 7.0 } else { 4.5 },
+                        force_kn: if is_link { 2800.0 } else { 1500.0 },
+                        capacity_kn: if is_link { 5500.0 } else { 4200.0 },
+                        utilization: if is_link { 0.51 } else { 0.36 },
+                        ari: if is_link { 0.98 } else { 0.94 },
+                        is_critical: false,
+                    });
+                }
+                let cx = 13.5;
+                let cy = 9.0;
+                let cz = (16.0 * 3.75) * 0.5;
+                ((cx, cy, cz), 28.0, list)
             }
         }
     }
