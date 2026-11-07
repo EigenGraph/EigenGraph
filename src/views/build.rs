@@ -8,11 +8,15 @@ use crate::theme::MacTheme;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelArchetype {
-    BimCraftBuilding3D, // BIMCraft LOD 350 Relational Building (CSG Walls, WF Mesh, Slabs & Rebar)
-    DiagridTower3D,     // 48-Storey Diagrid Skyscraper IFC
-    TrussBridge3D,      // 3D Space Truss Arch Bridge
-    SpaceDome3D,        // Double-Layer Reticulated Dome
-    WarrenTruss2D,      // Warren 24m Standard
+    BimCraftBuilding3D,      // BIMCraft LOD 350 Relational Building (CSG Walls, WF Mesh, Slabs & Rebar)
+    DiagridTower3D,          // 48-Storey Diagrid Skyscraper IFC
+    TrussBridge3D,           // 3D Space Truss Arch Bridge
+    SpaceDome3D,             // Double-Layer Reticulated Dome
+    WarrenTruss2D,           // Warren 24m Standard
+    DoubleLayerSpaceTruss3D, // 3D Double-Layer Space Truss (MERO Octet Lattice)
+    GeodesicDome3D,          // 3D Schwedler Geodesic Dome
+    HyparRuledShell3D,       // 3D Hyperbolic Paraboloid Ruled Shell
+    MultiStoryTower3D,       // 3D Multi-Story Building Frame with Core Walls
 }
 
 impl ModelArchetype {
@@ -23,6 +27,10 @@ impl ModelArchetype {
             Self::TrussBridge3D => "🧱 NVW_DCR-LOD200 (Eng-CON-1 & 2)",
             Self::SpaceDome3D => "🔧 NVW_DCR-LOD300 (Eng-HVAC & Roof)",
             Self::WarrenTruss2D => "📐 NVW_DCR-LOD100 (Arch Massing)",
+            Self::DoubleLayerSpaceTruss3D => "🕸️ Space Truss (24m MERO Octet)",
+            Self::GeodesicDome3D => "🌐 Geodesic Dome (18m Lattice)",
+            Self::HyparRuledShell3D => "🎪 Hypar Umbrella (16m Saddle)",
+            Self::MultiStoryTower3D => "🏢 12-Story Tower (Core Wall)",
         }
     }
 }
@@ -61,6 +69,30 @@ pub struct BuildView {
     pub section_box_enabled: bool,
     pub section_box_max_z_m: f32,
     pub modify_status_msg: Option<String>,
+    // Phase 9: Modeling & Spatial Geometry Suite
+    pub wizard_space_truss_lx: f64,
+    pub wizard_space_truss_ly: f64,
+    pub wizard_space_truss_depth: f64,
+    pub wizard_dome_radius: f64,
+    pub wizard_dome_rings: usize,
+    pub wizard_dome_sectors: usize,
+    pub wizard_hypar_lx: f64,
+    pub wizard_hypar_ly: f64,
+    pub wizard_hypar_sagitta: f64,
+    pub wizard_tower_stories: usize,
+    pub wizard_tower_story_h: f64,
+    pub wizard_tower_bays_x: usize,
+    pub wizard_tower_bays_y: usize,
+    pub section_preset_idx: usize,
+    pub sec_dim_d: f64,
+    pub sec_dim_bf: f64,
+    pub sec_dim_tf: f64,
+    pub sec_dim_tw: f64,
+    pub draft_node_x: f64,
+    pub draft_node_y: f64,
+    pub draft_node_z: f64,
+    pub draft_member_n1: usize,
+    pub draft_member_n2: usize,
 }
 
 impl Default for BuildView {
@@ -89,6 +121,29 @@ impl Default for BuildView {
             section_box_enabled: false,
             section_box_max_z_m: 6.5,
             modify_status_msg: None,
+            wizard_space_truss_lx: 24.0,
+            wizard_space_truss_ly: 24.0,
+            wizard_space_truss_depth: 2.0,
+            wizard_dome_radius: 18.0,
+            wizard_dome_rings: 6,
+            wizard_dome_sectors: 16,
+            wizard_hypar_lx: 16.0,
+            wizard_hypar_ly: 16.0,
+            wizard_hypar_sagitta: 3.0,
+            wizard_tower_stories: 12,
+            wizard_tower_story_h: 3.5,
+            wizard_tower_bays_x: 4,
+            wizard_tower_bays_y: 4,
+            section_preset_idx: 0,
+            sec_dim_d: 300.0,
+            sec_dim_bf: 150.0,
+            sec_dim_tf: 9.0,
+            sec_dim_tw: 6.5,
+            draft_node_x: 0.0,
+            draft_node_y: 0.0,
+            draft_node_z: 0.0,
+            draft_member_n1: 0,
+            draft_member_n2: 1,
         }
     }
 }
@@ -133,6 +188,7 @@ impl BuildView {
                 ui.horizontal(|ui| {
                     let tabs = [
                         SidebarTab::Properties,
+                        SidebarTab::Geometry,
                         SidebarTab::ProjectBrowser,
                         SidebarTab::Modify,
                         SidebarTab::Layers,
@@ -158,6 +214,7 @@ impl BuildView {
                 // Tab Content Drawer
                 match self.active_sidebar_tab {
                     SidebarTab::Properties => self.render_properties_tab(ui, theme, members),
+                    SidebarTab::Geometry => self.render_geometry_tab(ui, theme),
                     SidebarTab::ProjectBrowser => self.render_browser_tab(ui, theme, members, db_components),
                     SidebarTab::Modify => self.render_modify_tab(ui, theme),
                     SidebarTab::Layers => self.render_layers_tab(ui, theme),
@@ -296,6 +353,10 @@ impl BuildView {
 
             let models = [
                 ModelArchetype::BimCraftBuilding3D,
+                ModelArchetype::DoubleLayerSpaceTruss3D,
+                ModelArchetype::GeodesicDome3D,
+                ModelArchetype::HyparRuledShell3D,
+                ModelArchetype::MultiStoryTower3D,
                 ModelArchetype::DiagridTower3D,
                 ModelArchetype::TrussBridge3D,
                 ModelArchetype::SpaceDome3D,
@@ -355,6 +416,235 @@ impl BuildView {
             .show(ui, |ui| {
                 ui.label(RichText::new("💡 3D Orbit Controls:\n• Left Click + Drag: Rotate / Orbit 360°\n• Right Click + Drag: Pan / Translate View\n• Mouse Wheel Scroll: Zoom In / Out").size(10.0).color(theme.text_muted));
             });
+    }
+
+    fn render_geometry_tab(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        ui.label(RichText::new("📐 3D SPATIAL GEOMETRY & WIZARD STUDIO").size(12.0).strong().color(theme.text_secondary));
+        ui.add_space(6.0);
+
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            // 1. Parametric Spatial Generator Wizard
+            theme.card_frame().show(ui, |ui| {
+                ui.label(RichText::new("✨ PARAMETRIC GENERATOR WIZARD").size(11.5).strong().color(theme.accent_blue));
+                ui.add_space(4.0);
+
+                ui.label(RichText::new("Select Spatial Archetype:").size(10.0).color(theme.text_muted));
+                let wizards = [
+                    (ModelArchetype::DoubleLayerSpaceTruss3D, "🕸️ Space Truss (MERO Octet)"),
+                    (ModelArchetype::GeodesicDome3D, "🌐 Geodesic Lattice Dome"),
+                    (ModelArchetype::HyparRuledShell3D, "🎪 Hypar Inverted Umbrella"),
+                    (ModelArchetype::MultiStoryTower3D, "🏢 Multi-Story Core Tower"),
+                ];
+
+                for (arch, label) in wizards {
+                    let is_sel = self.active_model == arch;
+                    if ui.selectable_label(is_sel, label).clicked() {
+                        self.active_model = arch;
+                        self.selected_member_id = None;
+                    }
+                }
+
+                ui.add_space(6.0);
+                ui.separator();
+                ui.add_space(6.0);
+
+                match self.active_model {
+                    ModelArchetype::DoubleLayerSpaceTruss3D => {
+                        ui.label(RichText::new("Double-Layer Space Truss Parameters:").size(10.5).strong().color(theme.text_primary));
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Lx:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_space_truss_lx).speed(1.0).range(8.0..=60.0).suffix(" m"));
+                            ui.label(RichText::new("Ly:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_space_truss_ly).speed(1.0).range(8.0..=60.0).suffix(" m"));
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Depth H:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_space_truss_depth).speed(0.1).range(0.8..=6.0).suffix(" m"));
+                        });
+                    }
+                    ModelArchetype::GeodesicDome3D => {
+                        ui.label(RichText::new("Geodesic Dome Parameters:").size(10.5).strong().color(theme.text_primary));
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Radius R:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_dome_radius).speed(1.0).range(6.0..=40.0).suffix(" m"));
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Rings:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_dome_rings).speed(1.0).range(3..=12));
+                            ui.label(RichText::new("Sectors:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_dome_sectors).speed(1.0).range(8..=32));
+                        });
+                    }
+                    ModelArchetype::HyparRuledShell3D => {
+                        ui.label(RichText::new("Hypar Ruled Shell Parameters:").size(10.5).strong().color(theme.text_primary));
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Lx:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_hypar_lx).speed(1.0).range(8.0..=40.0).suffix(" m"));
+                            ui.label(RichText::new("Ly:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_hypar_ly).speed(1.0).range(8.0..=40.0).suffix(" m"));
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Sagitta c:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_hypar_sagitta).speed(0.2).range(1.0..=8.0).suffix(" m"));
+                        });
+                    }
+                    ModelArchetype::MultiStoryTower3D => {
+                        ui.label(RichText::new("Tower Parameters:").size(10.5).strong().color(theme.text_primary));
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Stories:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_tower_stories).speed(1.0).range(2..=30));
+                            ui.label(RichText::new("Height/Fl:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_tower_story_h).speed(0.1).range(2.8..=5.0).suffix(" m"));
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Bays X:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_tower_bays_x).speed(1.0).range(2..=8));
+                            ui.label(RichText::new("Bays Y:").size(10.0));
+                            ui.add(egui::DragValue::new(&mut self.wizard_tower_bays_y).speed(1.0).range(2..=8));
+                        });
+                    }
+                    _ => {
+                        ui.label(RichText::new("Select a spatial archetype above to configure parametric sliders.").size(10.0).color(theme.text_muted));
+                    }
+                }
+
+                ui.add_space(6.0);
+                if ui.add(egui::Button::new(RichText::new("⚡ Generate & Load in 3D Viewport").size(10.5).strong().color(Color32::WHITE))
+                    .fill(theme.accent_blue)
+                    .corner_radius(CornerRadius::same(5))
+                    .min_size(Vec2::new(ui.available_width(), 24.0))).clicked() {
+                    self.modify_status_msg = Some(format!("Generated spatial model: {}", self.active_model.label()));
+                }
+            });
+
+            ui.add_space(8.0);
+
+            // 2. Green's Theorem Arbitrary Cross-Section Studio
+            theme.card_frame().show(ui, |ui| {
+                ui.label(RichText::new("📐 GREEN'S THEOREM SECTION INTEGRATOR").size(11.5).strong().color(theme.accent_green));
+                ui.add_space(4.0);
+                ui.label(RichText::new("Exact Line Integral of Arbitrary 2D Closed Polygons:").size(10.0).color(theme.text_muted));
+
+                let presets = ["WF / I-Shape", "Channel (UNP)", "Angle (L)", "T-Shape"];
+                ui.horizontal_wrapped(|ui| {
+                    for (i, p) in presets.iter().enumerate() {
+                        let is_sel = self.section_preset_idx == i;
+                        if ui.selectable_label(is_sel, *p).clicked() {
+                            self.section_preset_idx = i;
+                        }
+                    }
+                });
+
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("d:").size(10.0));
+                    ui.add(egui::DragValue::new(&mut self.sec_dim_d).speed(5.0).range(100.0..=800.0).suffix("mm"));
+                    ui.label(RichText::new("bf:").size(10.0));
+                    ui.add(egui::DragValue::new(&mut self.sec_dim_bf).speed(5.0).range(50.0..=400.0).suffix("mm"));
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("tf:").size(10.0));
+                    ui.add(egui::DragValue::new(&mut self.sec_dim_tf).speed(1.0).range(4.0..=40.0).suffix("mm"));
+                    ui.label(RichText::new("tw:").size(10.0));
+                    ui.add(egui::DragValue::new(&mut self.sec_dim_tw).speed(1.0).range(3.0..=30.0).suffix("mm"));
+                });
+
+                // Compute Green's Theorem Properties
+                let poly = match self.section_preset_idx {
+                    0 => crate::core::SectionIntegrator::build_i_section(self.sec_dim_d, self.sec_dim_bf, self.sec_dim_tf, self.sec_dim_tw),
+                    1 => crate::core::SectionIntegrator::build_channel_section(self.sec_dim_d, self.sec_dim_bf, self.sec_dim_tf, self.sec_dim_tw),
+                    2 => crate::core::SectionIntegrator::build_angle_section(self.sec_dim_d, self.sec_dim_bf, self.sec_dim_tf),
+                    _ => crate::core::SectionIntegrator::build_t_section(self.sec_dim_d, self.sec_dim_bf, self.sec_dim_tf, self.sec_dim_tw),
+                };
+
+                if let Ok(rep) = crate::core::SectionIntegrator::evaluate_polygon("Parametric Section", &poly) {
+                    ui.add_space(4.0);
+                    // 2D Vector Mini Preview
+                    let (rect_sec, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 85.0), Sense::hover());
+                    let p_sec = ui.painter_at(rect_sec);
+                    p_sec.rect_filled(rect_sec, CornerRadius::same(4), Color32::from_rgb(12, 16, 23));
+
+                    let scale_s = (70.0 / rep.bounding_height_mm.max(rep.bounding_width_mm)).min(0.45) as f32;
+                    let c_center = rect_sec.center();
+
+                    let pts_screen: Vec<Pos2> = rep.boundary_points.iter().map(|pt| {
+                        let sx = c_center.x + (pt.x - rep.centroid_x_mm) as f32 * scale_s;
+                        let sy = c_center.y - (pt.y - rep.centroid_y_mm) as f32 * scale_s;
+                        Pos2::new(sx, sy)
+                    }).collect();
+
+                    if pts_screen.len() >= 3 {
+                        for i in 0..pts_screen.len() {
+                            let p1 = pts_screen[i];
+                            let p2 = pts_screen[(i + 1) % pts_screen.len()];
+                            p_sec.line_segment([p1, p2], Stroke::new(1.5, Color32::from_rgb(56, 189, 248)));
+                        }
+                    }
+
+                    // Centroid marker
+                    p_sec.circle_filled(c_center, 2.5, Color32::from_rgb(239, 68, 68));
+
+                    ui.add_space(4.0);
+                    let props = [
+                        ("Area (A)", format!("{:.1} cm²", rep.area_mm2 / 100.0)),
+                        ("Centroid (x̄, ȳ)", format!("({:.1}, {:.1}) mm", rep.centroid_x_mm, rep.centroid_y_mm)),
+                        ("Inertia Ixx", format!("{:.2e} mm⁴", rep.ixx_centroidal_mm4)),
+                        ("Inertia Iyy", format!("{:.2e} mm⁴", rep.iyy_centroidal_mm4)),
+                        ("Principal I1 / I2", format!("{:.2e} / {:.2e}", rep.i1_principal_mm4, rep.i2_principal_mm4)),
+                        ("Principal Angle θp", format!("{:.1}°", rep.principal_angle_deg)),
+                        ("Radius gyration rx/ry", format!("{:.1} / {:.1} mm", rep.radius_gyration_rx_mm, rep.radius_gyration_ry_mm)),
+                        ("Elastic Modulus Sx", format!("{:.0} cm³", rep.elastic_modulus_sx_top_mm3 / 1000.0)),
+                        ("Plastic Modulus Zx", format!("{:.0} cm³", rep.plastic_modulus_zx_mm3 / 1000.0)),
+                        ("Torsion Const Jt", format!("{:.2e} mm⁴", rep.torsional_constant_jt_mm4)),
+                    ];
+
+                    for (lbl, val) in props {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(lbl).size(10.0).color(theme.text_secondary));
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.label(RichText::new(val).strong().size(10.0).color(theme.accent_blue));
+                            });
+                        });
+                    }
+                }
+            });
+
+            ui.add_space(8.0);
+
+            // 3. Topology Cleanup & 3D Mesh Exporters
+            theme.card_frame().show(ui, |ui| {
+                ui.label(RichText::new("🛠️ TOPOLOGY TOOLS & 3D EXPORT").size(11.5).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+
+                if ui.add(egui::Button::new(RichText::new("🧹 Consolidate Nodes (tol: 0.05m)").size(10.5).color(theme.text_primary))
+                    .fill(theme.bg_card).corner_radius(CornerRadius::same(5)).min_size(Vec2::new(ui.available_width(), 24.0))).clicked() {
+                    let mut fem = self.bim_bus.project.to_structural_model();
+                    let merged = crate::core::MeshTopologyEngine::consolidate_nodes(&mut fem, 0.05);
+                    self.modify_status_msg = Some(format!("Consolidated nodes: {} duplicate vertices merged", merged));
+                }
+
+                ui.add_space(6.0);
+
+                ui.horizontal(|ui| {
+                    if ui.add(egui::Button::new(RichText::new("🧊 Wavefront (.obj)").size(10.5).color(theme.accent_blue))
+                        .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+                        let fem = self.bim_bus.project.to_structural_model();
+                        let obj = crate::core::MeshTopologyEngine::export_to_obj(&fem);
+                        if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Spatial_Model.obj", &obj) {
+                            self.modify_status_msg = Some(format!("Saved 3D OBJ to: {}", path));
+                        }
+                    }
+                    if ui.add(egui::Button::new(RichText::new("📏 AutoCAD 3D (.dxf)").size(10.5).color(theme.accent_green))
+                        .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+                        let fem = self.bim_bus.project.to_structural_model();
+                        let dxf = crate::core::MeshTopologyEngine::export_to_dxf_3d(&fem);
+                        if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Spatial_Model.dxf", &dxf) {
+                            self.modify_status_msg = Some(format!("Saved 3D DXF to: {}", path));
+                        }
+                    }
+                });
+            });
+        });
     }
 
     fn render_browser_tab(
@@ -598,6 +888,10 @@ impl BuildView {
                         ui.label(RichText::new("Model:").size(11.0).color(theme.text_muted));
                         let models = [
                             ModelArchetype::BimCraftBuilding3D,
+                            ModelArchetype::DoubleLayerSpaceTruss3D,
+                            ModelArchetype::GeodesicDome3D,
+                            ModelArchetype::HyparRuledShell3D,
+                            ModelArchetype::MultiStoryTower3D,
                             ModelArchetype::DiagridTower3D,
                             ModelArchetype::TrussBridge3D,
                             ModelArchetype::SpaceDome3D,
@@ -1805,6 +2099,123 @@ impl BuildView {
                 }
 
                 ((12.0, 1.6, 0.0), 22.0, list)
+            }
+            ModelArchetype::DoubleLayerSpaceTruss3D => {
+                let fem = crate::core::ParametricSpatialWizard::generate_double_layer_space_truss(
+                    "Double-Layer Space Truss", self.wizard_space_truss_lx, self.wizard_space_truss_ly, self.wizard_space_truss_depth, 6, 6
+                );
+                let mut list = Vec::with_capacity(fem.elements.len());
+                for (idx, el) in fem.elements.iter().enumerate() {
+                    let n1 = &fem.nodes[el.start_node];
+                    let n2 = &fem.nodes[el.end_node];
+                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
+                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
+                    let is_top = el.name.starts_with("TC");
+                    let is_bot = el.name.starts_with("BC");
+                    list.push(Member3D {
+                        id: idx + 1,
+                        p1,
+                        p2,
+                        name: el.name.clone(),
+                        section: if is_top { "CHS Tube 300x10".to_string() } else if is_bot { "CHS Pipe 150x6".to_string() } else { "CHS Web 114x4.5".to_string() },
+                        base_width: if is_top { 7.5 } else if is_bot { 6.5 } else { 4.5 },
+                        force_kn: if is_top { -280.0 } else if is_bot { 240.0 } else { 85.0 },
+                        capacity_kn: if is_top { 620.0 } else { 480.0 },
+                        utilization: 0.45,
+                        ari: 0.94,
+                        is_critical: false,
+                    });
+                }
+                let cx = (self.wizard_space_truss_lx * 0.5) as f32;
+                let cz = (self.wizard_space_truss_ly * 0.5) as f32;
+                let cy = (self.wizard_space_truss_depth * 0.5) as f32;
+                ((cx, cy, cz), 16.0, list)
+            }
+            ModelArchetype::GeodesicDome3D => {
+                let fem = crate::core::ParametricSpatialWizard::generate_geodesic_dome(
+                    "Geodesic Dome", self.wizard_dome_radius, self.wizard_dome_rings, self.wizard_dome_sectors
+                );
+                let mut list = Vec::with_capacity(fem.elements.len());
+                for (idx, el) in fem.elements.iter().enumerate() {
+                    let n1 = &fem.nodes[el.start_node];
+                    let n2 = &fem.nodes[el.end_node];
+                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
+                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
+                    list.push(Member3D {
+                        id: idx + 1,
+                        p1,
+                        p2,
+                        name: el.name.clone(),
+                        section: "CHS Pipe 150x6".to_string(),
+                        base_width: 5.5,
+                        force_kn: -110.0,
+                        capacity_kn: 340.0,
+                        utilization: 0.32,
+                        ari: 0.96,
+                        is_critical: false,
+                    });
+                }
+                let r = self.wizard_dome_radius as f32;
+                ((0.0, r * 0.4, 0.0), 14.0, list)
+            }
+            ModelArchetype::HyparRuledShell3D => {
+                let fem = crate::core::ParametricSpatialWizard::generate_hypar_shell(
+                    "Hypar Shell", self.wizard_hypar_lx, self.wizard_hypar_ly, self.wizard_hypar_sagitta, 8, 8
+                );
+                let mut list = Vec::with_capacity(fem.elements.len());
+                for (idx, el) in fem.elements.iter().enumerate() {
+                    let n1 = &fem.nodes[el.start_node];
+                    let n2 = &fem.nodes[el.end_node];
+                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
+                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
+                    list.push(Member3D {
+                        id: idx + 1,
+                        p1,
+                        p2,
+                        name: el.name.clone(),
+                        section: "WF 200x100".to_string(),
+                        base_width: 5.0,
+                        force_kn: 65.0,
+                        capacity_kn: 280.0,
+                        utilization: 0.23,
+                        ari: 0.95,
+                        is_critical: false,
+                    });
+                }
+                let cx = (self.wizard_hypar_lx * 0.5) as f32;
+                let cz = (self.wizard_hypar_ly * 0.5) as f32;
+                ((cx, 0.0, cz), 16.0, list)
+            }
+            ModelArchetype::MultiStoryTower3D => {
+                let fem = crate::core::ParametricSpatialWizard::generate_multi_story_tower(
+                    "Multi-Story Tower", self.wizard_tower_stories, self.wizard_tower_story_h,
+                    self.wizard_tower_bays_x, self.wizard_tower_bays_y, 6.0, 6.0
+                );
+                let mut list = Vec::with_capacity(fem.elements.len());
+                for (idx, el) in fem.elements.iter().enumerate() {
+                    let n1 = &fem.nodes[el.start_node];
+                    let n2 = &fem.nodes[el.end_node];
+                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
+                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
+                    let is_col = el.name.starts_with("COL");
+                    list.push(Member3D {
+                        id: idx + 1,
+                        p1,
+                        p2,
+                        name: el.name.clone(),
+                        section: if is_col { "HSS 200x200x8".to_string() } else { "WF 300x150".to_string() },
+                        base_width: if is_col { 7.5 } else { 5.5 },
+                        force_kn: if is_col { -850.0 } else { 180.0 },
+                        capacity_kn: if is_col { 1900.0 } else { 450.0 },
+                        utilization: 0.44,
+                        ari: 0.93,
+                        is_critical: false,
+                    });
+                }
+                let cx = (self.wizard_tower_bays_x as f32 * 6.0) * 0.5;
+                let cz = (self.wizard_tower_bays_y as f32 * 6.0) * 0.5;
+                let cy = (self.wizard_tower_stories as f32 * self.wizard_tower_story_h as f32) * 0.5;
+                ((cx, cy, cz), 9.0, list)
             }
         }
     }

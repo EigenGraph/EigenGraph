@@ -29,6 +29,7 @@ pub mod pushover;
 pub mod geotech;
 pub mod wind;
 pub mod composite;
+pub mod geometry_engine;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -116,4 +117,8 @@ pub use wind::{
 pub use composite::{
     CompositeBeamEngine, CompositeBeamReport, CompositeLimitState, CompositeSlabDeck,
     DeckOrientation, PnaLocation, ShearStud,
+};
+pub use geometry_engine::{
+    MeshTopologyEngine, ParametricSpatialWizard, PolygonPoint2D, SectionIntegrator,
+    SectionPropertiesReport,
 };

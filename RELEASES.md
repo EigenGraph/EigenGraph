@@ -7,6 +7,50 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## 🚀 EigenGraph v0.0.9 — Phase 9: Modeling & Advanced Computational Geometry Engine
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.9`  
+**Target:** Production Engine
+
+EigenGraph v0.0.9 introduces comprehensive **Modeling & Advanced Computational Geometry**, equipping structural engineers with an algorithmic spatial structure generator wizard, exact Green's Theorem boundary line integrals for arbitrary 2D cross-sections, duplicate vertex consolidation, and 3D Wavefront OBJ / AutoCAD DXF mesh exporters.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Green's Theorem Arbitrary Cross-Section Integrator
+- **Exact Line Integrals for Closed Polygons**:
+  $$A = \frac{1}{2} \left| \sum_{i=0}^{n-1} (x_i y_{i+1} - x_{i+1} y_i) \right|$$
+  $$\bar{x} = \frac{1}{6A} \sum_{i=0}^{n-1} (x_i + x_{i+1}) (x_i y_{i+1} - x_{i+1} y_i), \quad \bar{y} = \frac{1}{6A} \sum_{i=0}^{n-1} (y_i + y_{i+1}) (x_i y_{i+1} - x_{i+1} y_i)$$
+- **Centroidal Moments of Inertia via Parallel Axis Theorem**:
+  $$I_{xx} = \frac{1}{12} \sum_{i=0}^{n-1} (y_i^2 + y_i y_{i+1} + y_{i+1}^2) (x_i y_{i+1} - x_{i+1} y_i) - A \bar{y}^2$$
+  $$I_{yy} = \frac{1}{12} \sum_{i=0}^{n-1} (x_i^2 + x_i x_{i+1} + x_{i+1}^2) (x_i y_{i+1} - x_{i+1} y_i) - A \bar{x}^2$$
+  $$I_{xy} = \frac{1}{24} \sum_{i=0}^{n-1} (x_i y_{i+1} + 2 x_i y_i + 2 x_{i+1} y_{i+1} + x_{i+1} y_i) (x_i y_{i+1} - x_{i+1} y_i) - A \bar{x} \bar{y}$$
+- **Principal Inertias & Orientation**:
+  $$I_1, I_2 = \frac{I_{xx} + I_{yy}}{2} \pm \sqrt{\left(\frac{I_{xx} - I_{yy}}{2}\right)^2 + I_{xy}^2}, \quad \theta_p = \frac{1}{2} \operatorname{atan2}(-2 I_{xy}, \; I_{xx} - I_{yy})$$
+- Formulates elastic section moduli ($S_x, S_y$), sliced numerical plastic moduli ($Z_x, Z_y$), polar inertia ($J = I_{xx} + I_{yy}$), and Saint-Venant torsional constant ($J_t$).
+
+#### 2. Parametric Spatial Structure Generator Wizard
+- **3D Double-Layer Space Truss (MERO Octet)**:
+  Generates orthogonal two-way top chord grid, bottom chord offset grid, and diagonal pyramidal web braces with perimeter corner pin supports.
+- **3D Geodesic Lattice Dome (Schwedler Dome)**:
+  Generates spherical surface subdivisions with hoop rings, meridional ribs, and diagonal cross-braces converging to the crown apex.
+- **Hyperbolic Paraboloid Ruled Shell (Hypar Inverted Umbrella)**:
+  Generates doubly-curved ruled surfaces ($z = 4c \cdot \xi \cdot \eta$) with orthogonal straight-line timber/steel framework and 4-node quad shell panel meshing.
+- **Multi-Story 3D Tower with Core Walls**:
+  Generates multi-story frame towers with 3D columns, beams, outrigger links, and central concrete shear wall shell panels.
+
+#### 3. Topological Mesh Operations & Cleaners
+- **Distance-Based Node Consolidation**: Eliminates duplicate spatial nodes within tolerance $\varepsilon_{\text{tol}} = 0.05\text{ m}$, remapping beam and shell connectivity.
+- **Certified 3D Exporters**: Wavefront 3D OBJ (`export_to_obj`) and AutoCAD 3D DXF (`export_to_dxf_3d`).
+
+#### 4. Interactive Desktop UI Integration
+- **`SidebarTab::Geometry` ("📐 Geometry & Wizard")**:
+  - Interactive sliders for dimensions, bays, radius, rings, and stories.
+  - Section studio with live 2D CAD vector cross-section preview, centroid reticle, and properties table.
+- **Top Ribbon Preset Selector**: Seamless 1-click switching between spatial archetypes in 360° interactive turntable viewport.
+- **Results View Exporters**: One-click generation of `EigenGraph_Computational_Geometry_Dossier.md` and `EigenGraph_Spatial_Truss.obj`.
+
+---
+
 ## 🚀 EigenGraph v0.0.8 — Phase 8: Composite Steel-Concrete Beam & Slab Design per AISC 360-16 / SNI 1729:2020
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.8`  

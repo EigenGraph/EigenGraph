@@ -7,6 +7,40 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.0.9] - 2026-11-06 — Phase 9: Modeling & Advanced Computational Geometry Engine
+
+### Added
+- **Green's Theorem Arbitrary Cross-Section Property Integrator (`src/core/geometry_engine.rs`)**:
+  - Exact boundary line integrals for arbitrary 2D closed planar polygons (solid, hollow, asymmetric):
+    - Area: $A = \frac{1}{2} \sum (x_i y_{i+1} - x_{i+1} y_i)$
+    - Centroids: $\bar{x} = \frac{1}{6A} \sum (x_i + x_{i+1}) (x_i y_{i+1} - x_{i+1} y_i), \quad \bar{y} = \frac{1}{6A} \sum (y_i + y_{i+1}) (x_i y_{i+1} - x_{i+1} y_i)$
+    - Moments of Inertia: $I_{xx0} = \frac{1}{12} \sum (y_i^2 + y_i y_{i+1} + y_{i+1}^2) (x_i y_{i+1} - x_{i+1} y_i), \quad I_{yy0} = \frac{1}{12} \sum (x_i^2 + x_i x_{i+1} + x_{i+1}^2) (x_i y_{i+1} - x_{i+1} y_i)$
+    - Product of Inertia: $I_{xy0} = \frac{1}{24} \sum (x_i y_{i+1} + 2 x_i y_i + 2 x_{i+1} y_{i+1} + x_{i+1} y_i) (x_i y_{i+1} - x_{i+1} y_i)$
+    - Parallel axis theorem centroidal transfer: $I_{xx} = I_{xx0} - A \bar{y}^2, \quad I_{yy} = I_{yy0} - A \bar{x}^2, \quad I_{xy} = I_{xy0} - A \bar{x} \bar{y}$
+    - Principal Moments of Inertia ($I_1, I_2$) and Principal Orientation Angle $\theta_p$:
+      $$\theta_p = \frac{1}{2} \operatorname{atan2}(-2 I_{xy}, \; I_{xx} - I_{yy})$$
+    - Radii of gyration ($r_x, r_y$), elastic section moduli ($S_x, S_y$), sliced numerical plastic section moduli ($Z_x, Z_y$), polar moment ($J$), and Saint-Venant torsional constant ($J_t$).
+  - Standard parametric polygon generators for Wide-Flange (I-Shape), Channel (UNP), Angle (L-Shape), and T-Shape profiles.
+- **Parametric Spatial Structure Generator Wizard (`ParametricSpatialWizard`)**:
+  - **3D Double-Layer Space Truss (MERO Octet Lattice)**: Parametric orthogonal two-way top/bottom chord grid with diagonal pyramidal web bracing and perimeter support restraints.
+  - **3D Geodesic Lattice Dome (Schwedler Dome)**: Spherical geometry subdivision generating hoop rings, meridional ribs, and diagonal triangulating ties with crown apex convergence.
+  - **Hyperbolic Paraboloid Ruled Shell (Hypar Saddle / Inverted Umbrella)**: Doubly-curved ruled surface generation ($z = 4c \cdot \xi \cdot \eta$) with orthogonal straight-line structural framing and 4-node quad shell panel meshing.
+  - **Multi-Story Building Frame with Core Walls**: Parametric multi-story 3D building tower with columns, floor beams, and central concrete shear wall shell panels.
+- **Topological Mesh Operations & Cleaners (`MeshTopologyEngine`)**:
+  - Distance-based node consolidation: merges duplicate vertices within $\varepsilon_{\text{tol}}$ tolerance and remaps 1D beam and 2D shell element connectivity.
+  - Certified Wavefront 3D OBJ mesh exporter (`export_to_obj`) and AutoCAD 3D DXF exporter (`export_to_dxf_3d`).
+  - Automated computational geometry markdown dossier generator (`generate_markdown_dossier`).
+- **Interactive 3D Viewport Modeling Studio in Build View (`src/views/build.rs`)**:
+  - Added `SidebarTab::Geometry` ("📐", "Geometry & Wizard") to the CAD activity bar.
+  - Integrated Parametric Generator Wizard with interactive sliders for span dimensions, divisions, radius, rings, and stories.
+  - Integrated Green's Theorem Section Integrator Studio with 2D vector cross-section canvas preview, centroid crosshair reticle, and live structural section properties table.
+  - Added 4 new spatial archetypes to 3D Viewport Top Ribbon and camera presets.
+- **Results View Disk Exporters (`src/views/results.rs`)**:
+  - Added export action `📐 Spatial Geometry Dossier (.md)` generating `EigenGraph_Computational_Geometry_Dossier.md`.
+  - Added export action `🧊 Wavefront 3D (.obj)` generating `EigenGraph_Spatial_Truss.obj`.
+
+---
+
 ## [v0.0.8] - 2026-11-06 — Phase 8: Composite Steel-Concrete Beam & Slab Design (AISC 360-16 / SNI 1729:2020)
 
 ### Added

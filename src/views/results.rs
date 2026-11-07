@@ -537,6 +537,18 @@ impl ResultsView {
                                     self.export_status = Some(format!("AISC 360-16 Composite Beam Audit Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("📐 Spatial Geometry Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(124, 58, 237))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let truss = crate::core::ParametricSpatialWizard::generate_double_layer_space_truss("Spatial Space Truss MERO", 24.0, 24.0, 2.0, 6, 6);
+                                let poly = crate::core::SectionIntegrator::build_i_section(300.0, 150.0, 9.0, 6.5);
+                                let rep = crate::core::SectionIntegrator::evaluate_polygon("WF 300x150", &poly).ok();
+                                let md = crate::core::MeshTopologyEngine::generate_markdown_dossier(&truss, rep.as_ref());
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Computational_Geometry_Dossier.md", &md) {
+                                    self.export_status = Some(format!("Spatial Geometry & Section Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });
@@ -608,6 +620,15 @@ impl ResultsView {
                                     if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Model.dxf", &dxf) {
                                         self.export_status = Some(format!("AutoCAD 3D DXF file saved to: {}", path));
                                     }
+                                }
+                            }
+                            if ui.add(egui::Button::new(RichText::new("🧊 Wavefront 3D (.obj)").size(10.5).color(theme.accent_green))
+                                .fill(theme.bg_card)
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let truss = crate::core::ParametricSpatialWizard::generate_double_layer_space_truss("Spatial Space Truss", 24.0, 24.0, 2.0, 6, 6);
+                                let obj = crate::core::MeshTopologyEngine::export_to_obj(&truss);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Spatial_Truss.obj", &obj) {
+                                    self.export_status = Some(format!("Wavefront 3D OBJ file saved to: {}", path));
                                 }
                             }
                         });
