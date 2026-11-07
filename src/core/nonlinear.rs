@@ -408,7 +408,7 @@ impl NonlinearEngine {
         let intact_force_kn = intact_fea.as_ref().and_then(|fea| {
             let idx = model.elements.iter().position(|e| e.id == element_id)?;
             fea.member_axial_forces.get(idx).map(|f| f.abs() / 1000.0)
-        }).unwrap_or(capacity_kn * 0.45);
+        }).filter(|&f| f > 1e-6).unwrap_or(capacity_kn * 0.45);
 
         // SVD kinematic leverage h_e approximation from element stiffness ratio vs global DOF
         let n_elements = model.elements.len().max(1);
@@ -462,20 +462,20 @@ impl NonlinearEngine {
         // Prescriptive Recommendation matching EigenFlow engine standard
         let recommendation = if is_mechanism || alternate_path.is_empty() {
             format!(
-                "[CRITICAL - Mechanism / Single Load Path] Backup load path P2 is empty when #{element_id} ({el_name}) is disrupted (m_s={m_s:.3f}, RRR={rrr_nl:.2f}). Add diagonal bracing or tie beams to establish an alternate load path P2."
+                "[CRITICAL - Mechanism / Single Load Path] Backup load path P2 is empty when #{element_id} ({el_name}) is disrupted (m_s={m_s:.3}, RRR={rrr_nl:.2}). Add diagonal bracing or tie beams to establish an alternate load path P2."
             )
         } else if ci_nl >= 0.35 || delta_n_kn > capacity_kn * 0.5 {
             let upsize_pct = ((delta_n_kn / capacity_kn.max(1.0)) * 100.0).clamp(15.0, 65.0) as i32;
             format!(
-                "[CRITICAL - Non-Linear Woodbury] Post-yield redistribution ΔN = {delta_n_kn:.2f} kN to load path P2={alternate_path:?} with ductility demand μ = {mu:.2f} (RRR={rrr_nl:.2f}). Upsize cross-section {el_name} ~{upsize_pct}% or strengthen ductile capacity on elements P2={alternate_path:?}."
+                "[CRITICAL - Non-Linear Woodbury] Post-yield redistribution ΔN = {delta_n_kn:.2} kN to load path P2={alternate_path:?} with ductility demand μ = {mu:.2} (RRR={rrr_nl:.2}). Upsize cross-section {el_name} ~{upsize_pct}% or strengthen ductile capacity on elements P2={alternate_path:?}."
             )
         } else if m_s < 0.65 {
             format!(
-                "[TRANSITION - Moderate Redundancy] Kinematic margin m_s={m_s:.3f}, redistribution ΔN = {delta_n_kn:.2f} kN to P2={alternate_path:?} (μ = {mu:.2f}). Ensure connection detailing satisfies moderate ductility."
+                "[TRANSITION - Moderate Redundancy] Kinematic margin m_s={m_s:.3}, redistribution ΔN = {delta_n_kn:.2} kN to P2={alternate_path:?} (μ = {mu:.2}). Ensure connection detailing satisfies moderate ductility."
             )
         } else {
             format!(
-                "[SAFE - Verified Redundancy] Primary load path P1={primary_path:?} has redundant backup P2={alternate_path:?} (m_s={m_s:.3f}, RRR={rrr_nl:.2f}, μ={mu:.2f}). No section upsizing required."
+                "[SAFE - Verified Redundancy] Primary load path P1={primary_path:?} has redundant backup P2={alternate_path:?} (m_s={m_s:.3}, RRR={rrr_nl:.2}, μ={mu:.2}). No section upsizing required."
             )
         };
 

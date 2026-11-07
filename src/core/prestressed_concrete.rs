@@ -787,64 +787,54 @@ impl PrestressedConcreteEngine {
 
         // Concrete material
         let mat_concrete = crate::core::Material {
-            id: 1,
             name: "C50/60 Precast Concrete".to_string(),
             elastic_modulus: 3.3e10, // Pa
-            shear_modulus: 1.4e10,
+            poisson_ratio: 0.20,
             yield_strength: 50.0e6,
             density: 2450.0,
         };
-        model.materials.push(mat_concrete);
 
         // Prestressing strand material
         let mat_strand = crate::core::Material {
-            id: 2,
             name: "Grade 270 Prestressing Strand".to_string(),
             elastic_modulus: 1.965e11, // Pa
-            shear_modulus: 8.0e10,
+            poisson_ratio: 0.30,
             yield_strength: 1860.0e6,
             density: 7850.0,
         };
-        model.materials.push(mat_strand);
 
         // AASHTO Girder section
         let sec_girder = crate::core::CrossSection {
-            id: 1,
             name: "AASHTO-IV-Girder".to_string(),
             area: 0.509,
-            ixx: 1.085e-1,
-            iyy: 1.0e-2,
-            j: 1.0e-2,
+            iy: 1.0e-2,
+            iz: 1.085e-1,
+            j_torsion: 1.0e-2,
             depth: 1.37,
             width: 0.508,
         };
-        model.cross_sections.push(sec_girder);
 
         // Diaphragm beam section
         let sec_diaph = crate::core::CrossSection {
-            id: 2,
             name: "RC-Diaphragm-300x1000".to_string(),
             area: 0.300,
-            ixx: 2.5e-2,
-            iyy: 2.25e-3,
-            j: 5.0e-3,
+            iy: 2.25e-3,
+            iz: 2.5e-2,
+            j_torsion: 5.0e-3,
             depth: 1.0,
             width: 0.3,
         };
-        model.cross_sections.push(sec_diaph);
 
         // Tendon virtual cable section
         let sec_tendon = crate::core::CrossSection {
-            id: 3,
             name: "PT-Tendon-36Strands".to_string(),
             area: 0.00504,
-            ixx: 1.0e-6,
-            iyy: 1.0e-6,
-            j: 1.0e-6,
+            iy: 1.0e-6,
+            iz: 1.0e-6,
+            j_torsion: 1.0e-6,
             depth: 0.08,
             width: 0.08,
         };
-        model.cross_sections.push(sec_tendon);
 
         // Create nodes and elements for each girder
         for g in 0..num_girders {
@@ -896,10 +886,9 @@ impl PrestressedConcreteEngine {
                     name: format!("Girder_G{}_Seg{}", g + 1, s + 1),
                     start_node: girder_node_ids[s],
                     end_node: girder_node_ids[s + 1],
-                    element_type: crate::core::ElementType::Beam,
-                    section_id: 1,
-                    material_id: 1,
-                    releases: Default::default(),
+                    element_type: crate::core::ElementType::Frame3D,
+                    material: mat_concrete.clone(),
+                    section: sec_girder.clone(),
                 });
 
                 // Tendon segment element
@@ -909,10 +898,9 @@ impl PrestressedConcreteEngine {
                     name: format!("PT_Tendon_G{}_Seg{}", g + 1, s + 1),
                     start_node: tendon_node_ids[s],
                     end_node: tendon_node_ids[s + 1],
-                    element_type: crate::core::ElementType::Truss,
-                    section_id: 3,
-                    material_id: 2,
-                    releases: Default::default(),
+                    element_type: crate::core::ElementType::Truss3D,
+                    material: mat_strand.clone(),
+                    section: sec_tendon.clone(),
                 });
             }
         }
@@ -929,10 +917,9 @@ impl PrestressedConcreteEngine {
                     name: format!("Diaphragm_S{}_G{}-G{}", s, g + 1, g + 2),
                     start_node: n1,
                     end_node: n2,
-                    element_type: crate::core::ElementType::Beam,
-                    section_id: 2,
-                    material_id: 1,
-                    releases: Default::default(),
+                    element_type: crate::core::ElementType::Frame3D,
+                    material: mat_concrete.clone(),
+                    section: sec_diaph.clone(),
                 });
             }
         }

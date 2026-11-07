@@ -1993,10 +1993,17 @@ impl EtabsE2kExporter {
         s.push_str("$ LINE CONNECTIVITIES\n");
         for elem in &model.elements {
             let elem_type = match elem.element_type {
-                ElementType::Beam => "BEAM",
-                ElementType::Column => "COLUMN",
-                ElementType::Brace => "BRACE",
-                ElementType::Truss => "TRUSS",
+                ElementType::Truss3D => "TRUSS",
+                ElementType::Frame3D => {
+                    let upper = elem.name.to_uppercase();
+                    if upper.starts_with('C') || upper.contains("COL") {
+                        "COLUMN"
+                    } else if upper.contains("BRACE") {
+                        "BRACE"
+                    } else {
+                        "BEAM"
+                    }
+                }
             };
             s.push_str(&format!(
                 "  LINE \"{}\"  TYPE=\"{}\"  POINT1=\"{}\"  POINT2=\"{}\"\n",
@@ -2091,11 +2098,13 @@ impl EtabsE2kExporter {
 
         // 9. EigenGraph Certified Audit Comments
         s.push_str("; ====================================================================\n");
-        s.push_str("; EIGENGRAPH STRUCTURAL ANALYSIS PLATFORM v0.0.2\n");
+        s.push_str("; EIGENGRAPH STRUCTURAL ANALYSIS PLATFORM v0.1.0\n");
         if let Some(ari) = assessment {
-            s.push_str(&format!("; System Adjusted Redundancy Index (ARI): {:.6}\n", ari.system_ari));
-            s.push_str(&format!("; Governing Collapse Index (CI): {:.6}\n", ari.collapse_index));
-            s.push_str(&format!("; Cryptographic SHA-256 Audit Seal: {}\n", ari.sha256_audit_seal));
+            let ci = 1.0 - ari.min_system_ari;
+            let seal = Sha256Hasher::digest_hex(format!("{}:{:.6}", model.name, ari.min_system_ari).as_bytes());
+            s.push_str(&format!("; System Adjusted Redundancy Index (ARI): {:.6}\n", ari.min_system_ari));
+            s.push_str(&format!("; Governing Collapse Index (CI): {:.6}\n", ci));
+            s.push_str(&format!("; Cryptographic SHA-256 Audit Seal: {}\n", seal));
         }
         s.push_str("; ====================================================================\n");
 
@@ -2185,7 +2194,7 @@ impl EtabsE2kImporter {
         let mut id = None;
         let mut p1 = None;
         let mut p2 = None;
-        let mut elem_type = crate::core::model::ElementType::Beam;
+        let mut elem_type = crate::core::model::ElementType::Frame3D;
 
         for token in line.split_whitespace() {
             if token.starts_with("LINE") {
@@ -2201,14 +2210,10 @@ impl EtabsE2kImporter {
                 p2 = cleaned.parse::<usize>().ok();
             } else if let Some(val) = token.strip_prefix("TYPE=") {
                 let cleaned = val.trim_matches('"').to_uppercase();
-                if cleaned.contains("COLUMN") {
-                    elem_type = crate::core::model::ElementType::Column;
-                } else if cleaned.contains("BRACE") {
-                    elem_type = crate::core::model::ElementType::Brace;
-                } else if cleaned.contains("TRUSS") {
-                    elem_type = crate::core::model::ElementType::Truss;
+                if cleaned.contains("TRUSS") || cleaned.contains("BRACE") {
+                    elem_type = crate::core::model::ElementType::Truss3D;
                 } else {
-                    elem_type = crate::core::model::ElementType::Beam;
+                    elem_type = crate::core::model::ElementType::Frame3D;
                 }
             }
         }
@@ -2346,7 +2351,7 @@ impl PbgReportGenerator {
         meta: &PbgProjectMetadata,
     ) -> String {
         let mut md = String::new();
-        let payload = format!("{}:{}:{:.4}", meta.application_no, model.name, assessment.system_ari);
+        let payload = format!("{}:{}:{:.4}", meta.application_no, model.name, assessment.min_system_ari);
         let seal = Sha256Hasher::digest_hex(payload.as_bytes());
 
         md.push_str("# DOKUMEN PERHITUNGAN STRUKTUR BANGUNAN GEDUNG\n");
@@ -2390,10 +2395,10 @@ impl PbgReportGenerator {
         md.push_str(&format!("- **Total Elemen Batang (Members):** {} Elemen (Balok, Kolom, Pengaku)\n", model.elements.len()));
         md.push_str(&format!("- **Total Titik Beban Gravitasi:** {} Nodal Loads\n", model.loads.len()));
         md.push_str(&format!("- **System Adjusted Redundancy Index (ARI):** **{:.4}** (Status: **{}**)\n",
-            assessment.system_ari,
-            if assessment.system_ari >= 0.80 { "MEMENUHI / REDUNDAN TINGGI" } else { "PERINGATAN REDUNDANSI RENDAH" }
+            assessment.min_system_ari,
+            if assessment.min_system_ari >= 0.80 { "MEMENUHI / REDUNDAN TINGGI" } else { "PERINGATAN REDUNDANSI RENDAH" }
         ));
-        md.push_str(&format!("- **Governing Collapse Index (CI):** **{:.4}** (Batas Izin: $\\le 0.20$)\n\n", assessment.collapse_index));
+        md.push_str(&format!("- **Governing Collapse Index (CI):** **{:.4}** (Batas Izin: $\\le 0.20$)\n\n", 1.0 - assessment.min_system_ari));
 
         md.push_str("### 5. KONTROL PERSYARATAN KINERJA PBG / SNI\n");
         md.push_str("1. **Kontrol Gaya Geser Dasar Dinamis (Pasal 7.9.4.1 SNI 1726:2019):**\n");
@@ -2423,7 +2428,7 @@ impl PbgReportGenerator {
         meta: &PbgProjectMetadata,
     ) -> String {
         let md = Self::generate_markdown_dossier(model, assessment, meta);
-        let payload = format!("{}:{}:{:.4}", meta.application_no, model.name, assessment.system_ari);
+        let payload = format!("{}:{}:{:.4}", meta.application_no, model.name, assessment.min_system_ari);
         let seal = Sha256Hasher::digest_hex(payload.as_bytes());
 
         let mut html = String::new();
@@ -2459,7 +2464,7 @@ impl PbgReportGenerator {
         html.push_str("<div class=\"seal-box\">\n");
         html.push_str("<strong>HMAC-SHA256 Cryptographic Audit Seal (Anti-Tamper Integrity):</strong><br>\n");
         html.push_str(&seal);
-        html.push_str("<br><br><em>Diverifikasi dan diterbitkan otomatis oleh Core Engine EigenGraph v0.0.2 sesuai standar teknis Kementerian PUPR Republik Indonesia.</em>\n");
+        html.push_str("<br><br><em>Diverifikasi dan diterbitkan otomatis oleh Core Engine EigenGraph v0.1.0 sesuai standar teknis Kementerian PUPR Republik Indonesia.</em>\n");
         html.push_str("</div>\n");
 
         html.push_str("</body>\n</html>\n");
@@ -2494,116 +2499,114 @@ impl RebarBbsDetailer {
         for elem in &model.elements {
             let length_m = model.member_length(elem).unwrap_or(4.0);
             let length_mm = length_m * 1000.0;
+            let upper = elem.name.to_uppercase();
+            let is_col = upper.starts_with('C') || upper.contains("COL");
 
-            match elem.element_type {
-                ElementType::Column => {
-                    // Column Longitudinal Bars: 8 x D22
-                    let db = 22.0;
-                    // Standard 90 deg hook per SNI 2847:2019 Pasal 25.3: max(12 * db, 150 mm)
-                    let hook_90_mm = (12.0 * db).max(150.0);
-                    // Lap splice Class B: 1.3 * ld where ld = (fy / (1.1 * sqrt(fc))) * db
-                    let ld_mm = (fy / (1.1 * fc.sqrt())) * db;
-                    let lap_mm = 1.3 * ld_mm;
-                    let cut_len_mm = length_mm + hook_90_mm + lap_mm;
-                    let unit_weight = (db * db) / 162.2;
-                    let count = 8;
-                    let tot_len_m = (cut_len_mm * 1e-3) * count as f64;
+            if is_col {
+                // Column Longitudinal Bars: 8 x D22
+                let db: f64 = 22.0;
+                // Standard 90 deg hook per SNI 2847:2019 Pasal 25.3: max(12 * db, 150 mm)
+                let hook_90_mm = (12.0 * db).max(150.0);
+                // Lap splice Class B: 1.3 * ld where ld = (fy / (1.1 * sqrt(fc))) * db
+                let ld_mm = (fy / (1.1 * fc.sqrt())) * db;
+                let lap_mm = 1.3 * ld_mm;
+                let cut_len_mm = length_mm + hook_90_mm + lap_mm;
+                let unit_weight = (db * db) / 162.2;
+                let count = 8;
+                let tot_len_m = (cut_len_mm * 1e-3) * count as f64;
 
-                    items.push(crate::core::cso::BbsScheduleItem {
-                        mark: format!("C{:02}-V1", elem.id),
-                        element: format!("Column {} ({})", elem.id, elem.section.name),
-                        bar_size_mm: db,
-                        grade: "BJTS 420B".to_string(),
-                        shape_code: "90° End Hook + Lap Splice".to_string(),
-                        count,
-                        cut_length_mm: cut_len_mm,
-                        total_length_m: tot_len_m,
-                        unit_weight_kg_m: unit_weight,
-                        total_weight_kg: tot_len_m * unit_weight,
-                    });
+                items.push(crate::core::cso::BbsScheduleItem {
+                    mark: format!("C{:02}-V1", elem.id),
+                    element: format!("Column {} ({})", elem.id, elem.section.name),
+                    bar_size_mm: db,
+                    grade: "BJTS 420B".to_string(),
+                    shape_code: "90° End Hook + Lap Splice".to_string(),
+                    count,
+                    cut_length_mm: cut_len_mm,
+                    total_length_m: tot_len_m,
+                    unit_weight_kg_m: unit_weight,
+                    total_weight_kg: tot_len_m * unit_weight,
+                });
 
-                    // Column Ties / Stirrups: D10 @ 100mm spacing
-                    let db_tie = 10.0;
-                    // Seismic 135 deg hook per SNI 2847:2019: max(6 * db, 75 mm)
-                    let hook_135_mm = (6.0 * db_tie).max(75.0);
-                    let perimeter_mm = 2.0 * (elem.section.depth * 1000.0 + elem.section.width * 1000.0 - 4.0 * 40.0); // 40mm cover
-                    let tie_cut_len_mm = perimeter_mm + 2.0 * hook_135_mm;
-                    let tie_count = (length_mm / 100.0).ceil() as usize;
-                    let tie_unit_wt = (db_tie * db_tie) / 162.2;
-                    let tie_tot_len_m = (tie_cut_len_mm * 1e-3) * tie_count as f64;
+                // Column Ties / Stirrups: D10 @ 100mm spacing
+                let db_tie: f64 = 10.0;
+                // Seismic 135 deg hook per SNI 2847:2019: max(6 * db, 75 mm)
+                let hook_135_mm = (6.0 * db_tie).max(75.0);
+                let perimeter_mm = 2.0 * (elem.section.depth * 1000.0 + elem.section.width * 1000.0 - 4.0 * 40.0); // 40mm cover
+                let tie_cut_len_mm = perimeter_mm + 2.0 * hook_135_mm;
+                let tie_count = (length_mm / 100.0).ceil() as usize;
+                let tie_unit_wt = (db_tie * db_tie) / 162.2;
+                let tie_tot_len_m = (tie_cut_len_mm * 1e-3) * tie_count as f64;
 
-                    items.push(crate::core::cso::BbsScheduleItem {
-                        mark: format!("C{:02}-T1", elem.id),
-                        element: format!("Column {} Ties", elem.id),
-                        bar_size_mm: db_tie,
-                        grade: "BJTS 280".to_string(),
-                        shape_code: "135° Seismic Hoops (Pasal 25.3)".to_string(),
-                        count: tie_count,
-                        cut_length_mm: tie_cut_len_mm,
-                        total_length_m: tie_tot_len_m,
-                        unit_weight_kg_m: tie_unit_wt,
-                        total_weight_kg: tie_tot_len_m * tie_unit_wt,
-                    });
-                }
-                ElementType::Beam => {
-                    // Beam Top Longitudinal: 4 x D19
-                    let db = 19.0;
-                    let hook_90_mm = (12.0 * db).max(150.0);
-                    let cut_len_mm = length_mm + 2.0 * hook_90_mm;
-                    let unit_weight = (db * db) / 162.2;
-                    let count = 4;
-                    let tot_len_m = (cut_len_mm * 1e-3) * count as f64;
+                items.push(crate::core::cso::BbsScheduleItem {
+                    mark: format!("C{:02}-T1", elem.id),
+                    element: format!("Column {} Ties", elem.id),
+                    bar_size_mm: db_tie,
+                    grade: "BJTS 280".to_string(),
+                    shape_code: "135° Seismic Hoops (Pasal 25.3)".to_string(),
+                    count: tie_count,
+                    cut_length_mm: tie_cut_len_mm,
+                    total_length_m: tie_tot_len_m,
+                    unit_weight_kg_m: tie_unit_wt,
+                    total_weight_kg: tie_tot_len_m * tie_unit_wt,
+                });
+            } else {
+                // Beam Top Longitudinal: 4 x D19
+                let db: f64 = 19.0;
+                let hook_90_mm = (12.0 * db).max(150.0);
+                let cut_len_mm = length_mm + 2.0 * hook_90_mm;
+                let unit_weight = (db * db) / 162.2;
+                let count = 4;
+                let tot_len_m = (cut_len_mm * 1e-3) * count as f64;
 
-                    items.push(crate::core::cso::BbsScheduleItem {
-                        mark: format!("B{:02}-T1", elem.id),
-                        element: format!("Beam {} Top Rebar", elem.id),
-                        bar_size_mm: db,
-                        grade: "BJTS 420B".to_string(),
-                        shape_code: "Standard 90° Anchored Hooks".to_string(),
-                        count,
-                        cut_length_mm: cut_len_mm,
-                        total_length_m: tot_len_m,
-                        unit_weight_kg_m: unit_weight,
-                        total_weight_kg: tot_len_m * unit_weight,
-                    });
+                items.push(crate::core::cso::BbsScheduleItem {
+                    mark: format!("B{:02}-T1", elem.id),
+                    element: format!("Beam {} Top Rebar", elem.id),
+                    bar_size_mm: db,
+                    grade: "BJTS 420B".to_string(),
+                    shape_code: "Standard 90° Anchored Hooks".to_string(),
+                    count,
+                    cut_length_mm: cut_len_mm,
+                    total_length_m: tot_len_m,
+                    unit_weight_kg_m: unit_weight,
+                    total_weight_kg: tot_len_m * unit_weight,
+                });
 
-                    // Beam Bottom Longitudinal: 4 x D19
-                    items.push(crate::core::cso::BbsScheduleItem {
-                        mark: format!("B{:02}-B1", elem.id),
-                        element: format!("Beam {} Bottom Rebar", elem.id),
-                        bar_size_mm: db,
-                        grade: "BJTS 420B".to_string(),
-                        shape_code: "Standard 90° Anchored Hooks".to_string(),
-                        count,
-                        cut_length_mm: cut_len_mm,
-                        total_length_m: tot_len_m,
-                        unit_weight_kg_m: unit_weight,
-                        total_weight_kg: tot_len_m * unit_weight,
-                    });
+                // Beam Bottom Longitudinal: 4 x D19
+                items.push(crate::core::cso::BbsScheduleItem {
+                    mark: format!("B{:02}-B1", elem.id),
+                    element: format!("Beam {} Bottom Rebar", elem.id),
+                    bar_size_mm: db,
+                    grade: "BJTS 420B".to_string(),
+                    shape_code: "Standard 90° Anchored Hooks".to_string(),
+                    count,
+                    cut_length_mm: cut_len_mm,
+                    total_length_m: tot_len_m,
+                    unit_weight_kg_m: unit_weight,
+                    total_weight_kg: tot_len_m * unit_weight,
+                });
 
-                    // Beam Stirrups: D10 @ 150mm
-                    let db_stirrup = 10.0;
-                    let hook_135_mm = (6.0 * db_stirrup).max(75.0);
-                    let perimeter_mm = 2.0 * (elem.section.depth * 1000.0 + elem.section.width * 1000.0 - 4.0 * 40.0);
-                    let stirrup_cut_mm = perimeter_mm + 2.0 * hook_135_mm;
-                    let stirrup_count = (length_mm / 150.0).ceil() as usize;
-                    let stirrup_unit_wt = (db_stirrup * db_stirrup) / 162.2;
-                    let stirrup_tot_m = (stirrup_cut_mm * 1e-3) * stirrup_count as f64;
+                // Beam Stirrups: D10 @ 150mm
+                let db_stirrup: f64 = 10.0;
+                let hook_135_mm = (6.0 * db_stirrup).max(75.0);
+                let perimeter_mm = 2.0 * (elem.section.depth * 1000.0 + elem.section.width * 1000.0 - 4.0 * 40.0);
+                let stirrup_cut_mm = perimeter_mm + 2.0 * hook_135_mm;
+                let stirrup_count = (length_mm / 150.0).ceil() as usize;
+                let stirrup_unit_wt = (db_stirrup * db_stirrup) / 162.2;
+                let stirrup_tot_m = (stirrup_cut_mm * 1e-3) * stirrup_count as f64;
 
-                    items.push(crate::core::cso::BbsScheduleItem {
-                        mark: format!("B{:02}-S1", elem.id),
-                        element: format!("Beam {} Stirrups", elem.id),
-                        bar_size_mm: db_stirrup,
-                        grade: "BJTS 280".to_string(),
-                        shape_code: "135° Closed Stirrups".to_string(),
-                        count: stirrup_count,
-                        cut_length_mm: stirrup_cut_mm,
-                        total_length_m: stirrup_tot_m,
-                        unit_weight_kg_m: stirrup_unit_wt,
-                        total_weight_kg: stirrup_tot_m * stirrup_unit_wt,
-                    });
-                }
-                _ => {}
+                items.push(crate::core::cso::BbsScheduleItem {
+                    mark: format!("B{:02}-S1", elem.id),
+                    element: format!("Beam {} Stirrups", elem.id),
+                    bar_size_mm: db_stirrup,
+                    grade: "BJTS 280".to_string(),
+                    shape_code: "135° Closed Stirrups".to_string(),
+                    count: stirrup_count,
+                    cut_length_mm: stirrup_cut_mm,
+                    total_length_m: stirrup_tot_m,
+                    unit_weight_kg_m: stirrup_unit_wt,
+                    total_weight_kg: stirrup_tot_m * stirrup_unit_wt,
+                });
             }
         }
 
@@ -2698,10 +2701,17 @@ impl IfcSamExporter {
             if let (Some(&start_conn), Some(&_end_conn)) = (node_ifc_ids.get(&elem.start_node), node_ifc_ids.get(&elem.end_node)) {
                 let member_id = next_id; next_id += 1;
                 let curve_type = match elem.element_type {
-                    ElementType::Column => ".COLUMN.",
-                    ElementType::Beam => ".BEAM.",
-                    ElementType::Brace => ".TIE.",
-                    ElementType::Truss => ".TRUSS_MEMBER.",
+                    ElementType::Truss3D => ".TRUSS_MEMBER.",
+                    ElementType::Frame3D => {
+                        let upper = elem.name.to_uppercase();
+                        if upper.starts_with('C') || upper.contains("COL") {
+                            ".COLUMN."
+                        } else if upper.contains("BRACE") {
+                            ".TIE."
+                        } else {
+                            ".BEAM."
+                        }
+                    }
                 };
                 s.push_str(&format!(
                     "#{}= IFCSTRUCTURALCURVEMEMBER('{:022X}',#2,'{}',$,$,$,$,#{},{});\n",
@@ -2910,7 +2920,7 @@ END-ISO-10303-21;"#;
         model.add_node(Node3D::new(0, 0.0, 0.0, 0.0).with_fixity(BoundaryFixity::fixed()));
         model.add_node(Node3D::new(1, 0.0, 0.0, 3.5));
         let mut elem = Element3D::new(1, "Column C1", 0, 1);
-        elem.element_type = ElementType::Column;
+        elem.element_type = ElementType::Frame3D;
         model.add_element(elem);
         model.add_load(NodalLoad::force_z(1, -120_000.0));
 
@@ -2927,7 +2937,7 @@ END-ISO-10303-21;"#;
         assert_eq!(imported.elements.len(), 1);
         assert_eq!(imported.elements[0].start_node, 0);
         assert_eq!(imported.elements[0].end_node, 1);
-        assert_eq!(imported.elements[0].element_type, ElementType::Column);
+        assert_eq!(imported.elements[0].element_type, ElementType::Frame3D);
     }
 
     #[test]
@@ -2937,9 +2947,9 @@ END-ISO-10303-21;"#;
         model.add_node(Node3D::new(1, 6.0, 0.0, 0.0).with_fixity(BoundaryFixity::fixed()));
         model.add_node(Node3D::new(2, 0.0, 0.0, 3.6));
         model.add_node(Node3D::new(3, 6.0, 0.0, 3.6));
-        model.add_element(Element3D::new(1, "C1", 0, 2));
-        model.add_element(Element3D::new(2, "C2", 1, 3));
-        model.add_element(Element3D::new(3, "B1", 2, 3));
+        model.add_element(Element3D::new(1, "C1", 0, 2).with_type(ElementType::Frame3D));
+        model.add_element(Element3D::new(2, "C2", 1, 3).with_type(ElementType::Frame3D));
+        model.add_element(Element3D::new(3, "B1", 2, 3).with_type(ElementType::Frame3D));
         model.add_load(NodalLoad::force_y(2, -25_000.0));
 
         let ari = crate::core::AriEngine::evaluate_redundancy(&model).unwrap();
@@ -2964,9 +2974,9 @@ END-ISO-10303-21;"#;
         model.add_node(Node3D::new(1, 0.0, 0.0, 3.6));
         model.add_node(Node3D::new(2, 6.0, 0.0, 3.6));
         let mut col = Element3D::new(1, "Col-1", 0, 1);
-        col.element_type = ElementType::Column;
+        col.element_type = ElementType::Frame3D;
         let mut beam = Element3D::new(2, "Beam-1", 1, 2);
-        beam.element_type = ElementType::Beam;
+        beam.element_type = ElementType::Frame3D;
         model.add_element(col);
         model.add_element(beam);
 

@@ -36,6 +36,10 @@ impl BoundaryFixity {
         Self { ux: false, uy: true, uz: false, rx: false, ry: false, rz: false }
     }
 
+    pub fn roller_x() -> Self {
+        Self { ux: false, uy: true, uz: true, rx: false, ry: false, rz: false }
+    }
+
     pub fn is_pinned(&self) -> bool {
         self.ux && self.uy && self.uz && !self.rx && !self.ry && !self.rz
     }
@@ -469,6 +473,18 @@ pub struct NodalLoad {
 }
 
 impl NodalLoad {
+    pub fn new(node_id: usize, fx: f64, fy: f64, fz: f64, mx: f64, my: f64, mz: f64) -> Self {
+        Self {
+            node_id,
+            fx,
+            fy,
+            fz,
+            mx,
+            my,
+            mz,
+        }
+    }
+
     pub fn force_z(node_id: usize, fz_newtons: f64) -> Self {
         Self {
             node_id,

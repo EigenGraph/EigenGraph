@@ -1,6 +1,7 @@
 //! analyze.rs — Pillar 4: Structural Health, SVD Guard, BIM 5D (RAB), and BIM 4D (Scheduling).
 
-use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText, ScrollArea, Sense, Stroke, Ui, Vec2};
+use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText, ScrollArea, Sense, Stroke, Ui, Vec2};
+use crate::core::PnaLocation;
 use crate::models::StructuralMember;
 use crate::theme::MacTheme;
 
@@ -1588,7 +1589,7 @@ impl AnalyzeView {
             self.concrete_demand_muy_knm as f64,
         );
 
-        let dcr = pm_report.demand_check.as_ref().map(|d| d.dcr).unwrap_or(0.0);
+        let _dcr = pm_report.demand_check.as_ref().map(|d| d.dcr).unwrap_or(0.0);
         let is_safe = biaxial_rep.is_safe;
 
         // 2. Top Metric Cards
@@ -2210,11 +2211,11 @@ impl AnalyzeView {
 
                     ui.add_space(14.0);
                     ui.label(RichText::new("Pile Grid Nx:").size(11.0).color(theme.text_secondary));
-                    ui.add(egui::DragValue::new(&mut self.geotech_piles_x).speed(1).range(1..=6));
+                    ui.add(egui::DragValue::new(&mut self.geotech_piles_x).speed(1.0).range(1..=6));
 
                     ui.add_space(8.0);
                     ui.label(RichText::new("Ny:").size(11.0).color(theme.text_secondary));
-                    ui.add(egui::DragValue::new(&mut self.geotech_piles_y).speed(1).range(1..=6));
+                    ui.add(egui::DragValue::new(&mut self.geotech_piles_y).speed(1.0).range(1..=6));
                 });
             });
 
@@ -3764,7 +3765,7 @@ impl AnalyzeView {
 
                 // Canvas background
                 painter.rect_filled(rect, CornerRadius::same(6), theme.bg_card);
-                painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, theme.border_subtle));
+                painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, theme.border_subtle), egui::StrokeKind::Inside);
 
                 let margin_x = 35.0;
                 let margin_y = 20.0;
@@ -3775,8 +3776,8 @@ impl AnalyzeView {
                 let top_left = Pos2::new(rect.min.x + margin_x, rect.min.y + margin_y);
                 let bot_right = Pos2::new(rect.min.x + margin_x + draw_w, rect.min.y + margin_y + draw_h);
                 let girder_rect = egui::Rect::from_min_max(top_left, bot_right);
-                painter.rect_filled(girder_rect, CornerRadius::ZERO, theme.bg_base);
-                painter.rect_stroke(girder_rect, CornerRadius::ZERO, Stroke::new(1.5, theme.text_muted));
+                painter.rect_filled(girder_rect, CornerRadius::ZERO, theme.bg_canvas);
+                painter.rect_stroke(girder_rect, CornerRadius::ZERO, Stroke::new(1.5, theme.text_muted), egui::StrokeKind::Inside);
 
                 // Draw Neutral Axis (dashed centerline)
                 let y_na = top_left.y + draw_h * (rep.y_top_mm as f32 / rep.depth_h_mm as f32);
@@ -3786,7 +3787,7 @@ impl AnalyzeView {
                     painter.line_segment([Pos2::new(x_dash, y_na), Pos2::new((x_dash + 6.0).min(bot_right.x), y_na)], na_stroke);
                     x_dash += 12.0;
                 }
-                painter.text(Pos2::new(top_left.x + 4.0, y_na - 10.0), Align::Min, "N.A.", egui::FontId::proportional(9.0), theme.text_secondary);
+                painter.text(Pos2::new(top_left.x + 4.0, y_na - 10.0), Align2::LEFT_TOP, "N.A.", egui::FontId::proportional(9.0), theme.text_secondary);
 
                 // Draw Tendon Profile Curve
                 let mut tendon_pts = Vec::with_capacity(rep.tendon_profile_points.len());
@@ -3809,7 +3810,7 @@ impl AnalyzeView {
                 }
 
                 // Dimension callouts
-                painter.text(Pos2::new(rect.center().x, bot_right.y + 4.0), Align::Center, format!("Span L = {:.1} m (Drape e_mid = {:.0} mm)", self.pt_span_length_m, self.pt_eccentricity_mid_mm), egui::FontId::proportional(10.0), theme.accent_blue);
+                painter.text(Pos2::new(rect.center().x, bot_right.y + 4.0), Align2::CENTER_TOP, format!("Span L = {:.1} m (Drape e_mid = {:.0} mm)", self.pt_span_length_m, self.pt_eccentricity_mid_mm), egui::FontId::proportional(10.0), theme.accent_blue);
 
                 ui.add_space(8.0);
                 ui.separator();

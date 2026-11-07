@@ -106,7 +106,6 @@ jobs:
 
   build-macos:
     name: Build macOS Universal 2 Release (.dmg)
-    needs: test
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     permissions:
@@ -121,6 +120,17 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-apple-darwin, aarch64-apple-darwin
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-cache-v2-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cache-v2-
 
       - name: Build Universal 2 Release Binary (Intel + Apple Silicon)
         env:
@@ -174,7 +184,6 @@ jobs:
 
   build-windows:
     name: Build Windows Release (.zip)
-    needs: test
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
@@ -183,6 +192,17 @@ jobs:
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-cache-v2-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cache-v2-
 
       - name: Build Release Binary
         run: cargo build --release
@@ -232,20 +252,11 @@ jobs:
 
   build-linux:
     name: Build Linux Release (.tar.gz)
-    needs: test
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Configure Linux Swap Memory
-        run: |
-          sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          free -h
 
       - name: Install Linux GUI & EGL Dependencies
         run: |
@@ -262,6 +273,17 @@ jobs:
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-cache-v2-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cache-v2-
 
       - name: Build Release Binary
         shell: bash
@@ -327,7 +349,7 @@ jobs:
   publish-release:
     name: Publish Multi-Platform GitHub Release
     needs: [test, build-macos, build-windows, build-linux]
-    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && !cancelled()
+    if: (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && !cancelled()
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -417,6 +439,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          git config user.name "Harids Irawan"
+          git config user.email "326791992+haridsirawan@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p assets
+          cp -f dist/EigenGraph-* dist/SHA256SUMS.txt assets/ || true
+          git add -f assets/EigenGraph-* assets/SHA256SUMS.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): store macOS .dmg, Windows .zip & Linux .tar.gz release binaries in assets/ (${TAG_NAME}) [skip ci]"
+            git push origin main || true
+          fi
+          git tag -f "${TAG_NAME}"
+          git push -f origin "${TAG_NAME}" || true
+
           if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
             echo "Release ${TAG_NAME} already exists. Uploading all platform assets..."
             gh release upload "${TAG_NAME}" dist/EigenGraph-* dist/SHA256SUMS.txt --clobber
@@ -427,18 +463,3 @@ jobs:
               --title "EigenGraph ${TAG_NAME} — Multi-Platform (macOS, Windows & Linux)" \
               --notes-file dist/RELEASE_NOTES.md
           fi
-
-          mkdir -p assets
-          cp -f dist/EigenGraph-* dist/SHA256SUMS.txt assets/ || true
-          git config user.name "Harids Irawan"
-          git config user.email "326791992+haridsirawan@users.noreply.github.com"
-          git fetch origin main
-          git checkout -B main origin/main
-          cp -f dist/EigenGraph-* dist/SHA256SUMS.txt assets/ || true
-          git add -f assets/EigenGraph-* assets/SHA256SUMS.txt
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(release): store macOS .dmg, Windows .zip & Linux .tar.gz release binaries in assets/ (${TAG_NAME}) [skip ci]"
-            git push origin main || true
-          fi
-
-
