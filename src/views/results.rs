@@ -591,6 +591,17 @@ impl ResultsView {
                                     self.export_status = Some(format!("RC Shear Wall & Coupling Beam Calculation Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🛡️ Base Isolation Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(147, 51, 234))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let input = crate::core::SeismicIsolationInput::default();
+                                let rep = crate::core::SeismicIsolationEngine::evaluate(&input);
+                                let md = crate::core::SeismicIsolationEngine::generate_markdown_dossier(&input, &rep);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Seismic_Base_Isolation_Damper_Dossier.md", &md) {
+                                    self.export_status = Some(format!("Seismic Base Isolation & Energy Dissipation Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });

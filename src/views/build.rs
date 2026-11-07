@@ -19,6 +19,7 @@ pub enum ModelArchetype {
     MultiStoryTower3D,       // 3D Multi-Story Building Frame with Core Walls
     PrestressedGirderBridge3D, // 3D Prestressed Post-Tensioned Concrete Bridge Span
     CoupledShearWallCore3D,  // 3D Coupled Special Structural Shear Wall Core Tower
+    BaseIsolatedHospital3D,  // 3D Base-Isolated Essential Facility (8-Story Hospital with Base Isolators)
 }
 
 impl ModelArchetype {
@@ -35,6 +36,7 @@ impl ModelArchetype {
             Self::MultiStoryTower3D => "🏢 12-Story Tower (Core Wall)",
             Self::PrestressedGirderBridge3D => "🌉 Prestressed Bridge (30m PT Girder)",
             Self::CoupledShearWallCore3D => "🏢 Coupled Shear Wall Core (12-Story)",
+            Self::BaseIsolatedHospital3D => "🛡️ Base-Isolated Hospital (8-Story)",
         }
     }
 }
@@ -357,6 +359,7 @@ impl BuildView {
 
             let models = [
                 ModelArchetype::BimCraftBuilding3D,
+                ModelArchetype::BaseIsolatedHospital3D,
                 ModelArchetype::CoupledShearWallCore3D,
                 ModelArchetype::PrestressedGirderBridge3D,
                 ModelArchetype::DoubleLayerSpaceTruss3D,
@@ -383,6 +386,12 @@ impl BuildView {
                             self.cam_zoom = 1.15;
                             self.cam_pan = Vec2::ZERO;
                             self.render_mode = Render3DMode::CsgSolidBrep;
+                        }
+                        ModelArchetype::BaseIsolatedHospital3D => {
+                            self.cam_yaw = 0.58;
+                            self.cam_pitch = 0.32;
+                            self.cam_zoom = 0.92;
+                            self.cam_pan = Vec2::ZERO;
                         }
                         ModelArchetype::CoupledShearWallCore3D => {
                             self.cam_yaw = 0.50;
@@ -913,6 +922,7 @@ impl BuildView {
                         ui.label(RichText::new("Model:").size(11.0).color(theme.text_muted));
                         let models = [
                             ModelArchetype::BimCraftBuilding3D,
+                            ModelArchetype::BaseIsolatedHospital3D,
                             ModelArchetype::CoupledShearWallCore3D,
                             ModelArchetype::PrestressedGirderBridge3D,
                             ModelArchetype::DoubleLayerSpaceTruss3D,
@@ -2324,6 +2334,33 @@ impl BuildView {
                 let cy = 0.0;
                 let cz = (12.0 * 3.5) * 0.5;
                 ((0.0, cy, cz), 26.0, list)
+            }
+            ModelArchetype::BaseIsolatedHospital3D => {
+                let (nodes, elements) = crate::core::SeismicIsolationEngine::generate_base_isolated_hospital_archetype();
+                let mut list = Vec::with_capacity(elements.len());
+                for &(el_id, n1_id, n2_id, is_isolator) in &elements {
+                    let (_, x1, y1, z1) = nodes[n1_id];
+                    let (_, x2, y2, z2) = nodes[n2_id];
+                    let p1 = (x1 as f32, z1 as f32, y1 as f32);
+                    let p2 = (x2 as f32, z2 as f32, y2 as f32);
+                    list.push(Member3D {
+                        id: el_id + 1,
+                        p1,
+                        p2,
+                        name: if is_isolator { format!("IsolatorBearing-{}", el_id + 1) } else { format!("FrameMember-{}", el_id + 1) },
+                        section: if is_isolator { "Lead-Rubber Bearing LRB Ø850".to_string() } else { "RC Frame Column 700x700 / Beam 400x650".to_string() },
+                        base_width: if is_isolator { 8.5 } else { 5.0 },
+                        force_kn: if is_isolator { 4000.0 } else { 1200.0 },
+                        capacity_kn: if is_isolator { 12000.0 } else { 3500.0 },
+                        utilization: if is_isolator { 0.33 } else { 0.45 },
+                        ari: if is_isolator { 0.99 } else { 0.95 },
+                        is_critical: false,
+                    });
+                }
+                let cx = 12.0;
+                let cy = 8.0;
+                let cz = (8.0 * 3.6) * 0.5;
+                ((cx, cy, cz), 24.0, list)
             }
         }
     }

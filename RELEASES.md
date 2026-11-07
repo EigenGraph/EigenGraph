@@ -7,6 +7,53 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## 🚀 EigenGraph v0.1.2 — Phase 12: Seismic Base Isolation & Energy Dissipation Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.2`  
+**Target:** Production Engine
+
+EigenGraph v0.1.2 introduces a comprehensive **Seismic Base Isolation & Supplementary Energy Dissipation Systems Design Engine**, enabling civil & structural earthquake engineers to analyze, design, and verify base-isolated structures, elastomeric and friction bearings, and viscous damping devices in accordance with **ASCE 7-22 Chapter 17 (Seismic Design of Seismically Isolated Structures)**, **ASCE 7-22 Chapter 18 (Seismic Design of Structures with Damping Systems)**, **SNI 1726:2019 Pasal 12 & 13**, and **FEMA P-1051 Chapter 12**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Lead-Rubber Bearings (LRB) Bilinear Hysteretic Formulation
+- **Characteristic Yield Strength ($Q_d$)**:
+  $$Q_d = \sigma_{pb} \cdot A_{pb}$$
+  where $\sigma_{pb} = 10.2\text{ MPa}$ shear yield stress of lead plug and $A_{pb} = \frac{\pi}{4} d_{pb}^2$.
+- **Post-Yield Stiffness ($k_d$) & Elastic Stiffness ($k_u$)**:
+  $$k_d = \frac{G \cdot A_{bonded}}{T_r}, \quad k_u = 10 \cdot k_d, \quad D_y = \frac{Q_d}{k_u - k_d}$$
+  where $T_r = n_{layers} \cdot t_{layer}$ total bonded rubber thickness.
+- **Haringx Critical Buckling Capacity**:
+  $$P_{cr0} = \sqrt{\frac{1}{3} P_E P_S}, \quad P_{cr}(D_M) = P_{cr0} \left(1 - \frac{D_M}{D_o}\right)$$
+  ensuring stability factor $SF \ge 2.0$ under factored seismic axial demands.
+
+#### 2. Friction Pendulum Systems (FPS)
+- **Restoring Pendulum Kinematics**:
+  $$k_r = \frac{W}{R_{eff}}, \quad K_{eff} = \frac{W}{R_{eff}} + \frac{\mu W}{D}, \quad Q_d = \mu W$$
+- **Natural Isolation Period**:
+  $$T_M = 2\pi \sqrt{\frac{R_{eff}}{g \left(1 + \mu \dfrac{R_{eff}}{D_M}\right)}}$$
+
+#### 3. Fluid Viscous Dampers (FVD) Supplementary Damping
+- **Nonlinear Velocity Power Law**:
+  $$F_D = C \cdot \operatorname{sgn}(\dot{u}) |\dot{u}|^\alpha$$
+  with velocity exponent $0.30 \le \alpha \le 1.0$.
+- **Supplemental Viscous Damping Ratio**:
+  $$\beta_V = \frac{\sum E_{D,j}}{4 \pi E_S}, \quad \beta_{total} = \beta_{inherent} + \beta_V$$
+
+#### 4. MCE_R Iterative Displacement & Accidental Torsion
+- **Maximum Displacement Demand ($D_M$)**:
+  $$D_M = \frac{g S_{M1} T_M}{4 \pi^2 B_M}$$
+- **Total Maximum Displacement ($D_{TM}$)** with accidental eccentricity $e$:
+  $$D_{TM} = D_M \left[ 1 + y \left(\frac{12 e}{b^2 + d^2}\right) \right]$$
+- **Required Seismic Moat Clearance**: $\delta_{\text{moat}} \ge 1.10 D_{TM}$.
+
+#### 5. Interactive Desktop UI Integration
+- **Analyze View Studio (`src/views/analyze.rs`)**: Subtab `AnalyzeSubTab::BaseIsolationDesign` ("🛡️ Base Isolation & Dampers") with 4 KPI cards, parameter sliders, 2D vector CAD blueprint, live force-displacement hysteresis loop canvas, and ASCE 7-22 / SNI 1726 regulatory audit table.
+- **Build View 3D Viewport (`src/views/build.rs`)**: Archetype `ModelArchetype::BaseIsolatedHospital3D` (8-story essential facility with 16 base isolators).
+- **Results View Exporters (`src/views/results.rs`)**: Direct export of `EigenGraph_Seismic_Base_Isolation_Damper_Dossier.md`.
+
+---
+
 ## 🚀 EigenGraph v0.1.1 — Phase 11: Special Structural Concrete Shear Walls & Diagonally Reinforced Coupling Beams Engine
 **Release Date:** 2026-11-07  
 **Git Tag:** `v0.1.1`  

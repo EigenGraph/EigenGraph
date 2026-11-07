@@ -21,6 +21,7 @@ pub enum AnalyzeSubTab {
     CompositeDesign,
     PrestressedDesign,
     ShearWallDesign,
+    BaseIsolationDesign,
 }
 
 pub struct AnalyzeView {
@@ -124,6 +125,29 @@ pub struct AnalyzeView {
     pub sw_cb_demand_vu_kn: f32,
     pub sw_cb_bar_dia_mm: f32,
     pub sw_cb_bars_per_group: usize,
+    // Seismic Base Isolation & Supplementary Energy Dissipation (ASCE 7-22 Ch 17-18 / SNI 1726)
+    pub iso_type: crate::core::IsolatorType,
+    pub iso_seismic_weight_w_kn: f32,
+    pub iso_num_bearings: usize,
+    pub iso_sm1_g: f32,
+    pub iso_sms_g: f32,
+    pub iso_fixed_period_s: f32,
+    pub iso_superstructure_ri: f32,
+    pub iso_plan_b_m: f32,
+    pub iso_plan_d_m: f32,
+    pub iso_eccentricity_e_m: f32,
+    pub iso_lrb_diameter_mm: f32,
+    pub iso_lrb_lead_dia_mm: f32,
+    pub iso_lrb_rubber_layer_mm: f32,
+    pub iso_lrb_num_layers: usize,
+    pub iso_lrb_shear_mod_g: f32,
+    pub iso_fps_radius_mm: f32,
+    pub iso_fps_mu_fast: f32,
+    pub iso_fps_housing_dia_mm: f32,
+    pub iso_fvd_c_kn_s: f32,
+    pub iso_fvd_alpha: f32,
+    pub iso_fvd_stroke_limit_mm: f32,
+    pub iso_fvd_count: usize,
 }
 
 impl Default for AnalyzeView {
@@ -223,6 +247,28 @@ impl Default for AnalyzeView {
             sw_cb_demand_vu_kn: 620.0,
             sw_cb_bar_dia_mm: 25.0,
             sw_cb_bars_per_group: 4,
+            iso_type: crate::core::IsolatorType::LeadRubberBearing,
+            iso_seismic_weight_w_kn: 96000.0,
+            iso_num_bearings: 24,
+            iso_sm1_g: 0.65,
+            iso_sms_g: 1.25,
+            iso_fixed_period_s: 0.85,
+            iso_superstructure_ri: 1.68,
+            iso_plan_b_m: 36.0,
+            iso_plan_d_m: 24.0,
+            iso_eccentricity_e_m: 1.8,
+            iso_lrb_diameter_mm: 850.0,
+            iso_lrb_lead_dia_mm: 160.0,
+            iso_lrb_rubber_layer_mm: 7.0,
+            iso_lrb_num_layers: 28,
+            iso_lrb_shear_mod_g: 0.45,
+            iso_fps_radius_mm: 2200.0,
+            iso_fps_mu_fast: 0.055,
+            iso_fps_housing_dia_mm: 1000.0,
+            iso_fvd_c_kn_s: 240.0,
+            iso_fvd_alpha: 0.35,
+            iso_fvd_stroke_limit_mm: 250.0,
+            iso_fvd_count: 16,
         }
     }
 }
@@ -283,6 +329,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::CompositeDesign => self.render_composite_design(ui, theme),
                     AnalyzeSubTab::PrestressedDesign => self.render_prestressed_design(ui, theme),
                     AnalyzeSubTab::ShearWallDesign => self.render_shear_wall_design(ui, theme),
+                    AnalyzeSubTab::BaseIsolationDesign => self.render_base_isolation_design(ui, theme),
                 }
 
                 ui.add_space(64.0);
@@ -439,6 +486,7 @@ impl AnalyzeView {
                     (AnalyzeSubTab::CompositeDesign, "🥞 AISC Composite"),
                     (AnalyzeSubTab::PrestressedDesign, "🪢 PT Concrete (ACI 318)"),
                     (AnalyzeSubTab::ShearWallDesign, "🏢 RC Shear Walls & Coupling Beams"),
+                    (AnalyzeSubTab::BaseIsolationDesign, "🛡️ Base Isolation & Dampers"),
                 ];
 
                 for (tab, label) in tabs {
@@ -4421,6 +4469,494 @@ impl AnalyzeView {
                 ui.add_space(30.0);
                 ui.label(RichText::new(if rep.coupling_beam.is_coupling_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(cb_stat_col));
             });
+        });
+    }
+
+    fn render_base_isolation_design(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let input = crate::core::SeismicIsolationInput {
+            isolator_type: self.iso_type,
+            seismic_weight_w_kn: self.iso_seismic_weight_w_kn as f64,
+            num_bearings: self.iso_num_bearings,
+            axial_load_per_bearing_kn: (self.iso_seismic_weight_w_kn as f64) / (self.iso_num_bearings as f64).max(1.0),
+            spectral_accel_sm1_g: self.iso_sm1_g as f64,
+            spectral_accel_sms_g: self.iso_sms_g as f64,
+            fixed_base_period_s: self.iso_fixed_period_s as f64,
+            superstructure_r_i: self.iso_superstructure_ri as f64,
+            building_plan_b_m: self.iso_plan_b_m as f64,
+            building_plan_d_m: self.iso_plan_d_m as f64,
+            plan_eccentricity_e_m: self.iso_eccentricity_e_m as f64,
+            lrb_params: crate::core::LeadRubberBearingParams {
+                outer_diameter_mm: self.iso_lrb_diameter_mm as f64,
+                lead_core_diameter_mm: self.iso_lrb_lead_dia_mm as f64,
+                rubber_layer_thick_mm: self.iso_lrb_rubber_layer_mm as f64,
+                num_rubber_layers: self.iso_lrb_num_layers,
+                steel_shim_thick_mm: 3.5,
+                shear_modulus_g_mpa: self.iso_lrb_shear_mod_g as f64,
+                lead_yield_stress_mpa: 10.2,
+                bulk_modulus_mpa: 2000.0,
+            },
+            fps_params: crate::core::FrictionPendulumParams {
+                radius_of_curvature_mm: self.iso_fps_radius_mm as f64,
+                friction_coeff_fast: self.iso_fps_mu_fast as f64,
+                friction_coeff_slow: (self.iso_fps_mu_fast as f64) * 0.55,
+                friction_rate_param: 100.0,
+                slider_diameter_mm: (self.iso_fps_housing_dia_mm as f64) * 0.28,
+                housing_diameter_mm: self.iso_fps_housing_dia_mm as f64,
+            },
+            fvd_params: crate::core::FluidViscousDamperParams {
+                damping_coeff_c: self.iso_fvd_c_kn_s as f64,
+                velocity_exponent_alpha: self.iso_fvd_alpha as f64,
+                stroke_limit_mm: self.iso_fvd_stroke_limit_mm as f64,
+                cylinder_diameter_mm: 220.0,
+                inclination_angle_deg: 26.57,
+                configuration: crate::core::DamperConfiguration::ChevronBrace,
+            },
+            num_dampers: self.iso_fvd_count,
+        };
+
+        let rep = crate::core::SeismicIsolationEngine::evaluate(&input);
+
+        // Header Title
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("🛡️ Seismic Base Isolation & Supplementary Energy Dissipation Studio").size(15.0).strong().color(theme.text_primary));
+            ui.add_space(8.0);
+            ui.label(RichText::new("ASCE 7-22 Ch 17 & 18 / SNI 1726:2019 Pasal 12 & 13").size(11.0).color(theme.accent_blue));
+        });
+        ui.add_space(8.0);
+
+        // 4 Executive KPI Cards
+        ui.columns(4, |cols| {
+            // Card 1: Effective Isolation Period
+            cols[0].group(|ui| {
+                ui.label(RichText::new("EFFECTIVE PERIOD (TM)").size(10.0).color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.2} s", rep.effective_period_tm_s)).size(20.0).strong().color(theme.accent_blue));
+                let period_mult = rep.effective_period_tm_s / (self.iso_fixed_period_s as f64).max(0.1);
+                ui.label(RichText::new(format!("Lengthening: {:.1}x (T1={:.2}s)", period_mult, self.iso_fixed_period_s)).size(10.0).color(theme.text_muted));
+            });
+
+            // Card 2: Maximum Design Displacement
+            cols[1].group(|ui| {
+                ui.label(RichText::new("TOTAL MAX DISP (DTM)").size(10.0).color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.1} mm", rep.total_max_displacement_dtm_mm)).size(20.0).strong().color(Color32::from_rgb(245, 158, 11)));
+                ui.label(RichText::new(format!("CM Disp DM = {:.1} mm (+Torsion)", rep.max_displacement_dm_mm)).size(10.0).color(theme.text_muted));
+            });
+
+            // Card 3: Total System Damping
+            cols[2].group(|ui| {
+                ui.label(RichText::new("EFFECTIVE DAMPING (βeff)").size(10.0).color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.1}%", rep.combined_total_damping * 100.0)).size(20.0).strong().color(Color32::from_rgb(180, 100, 255)));
+                ui.label(RichText::new(format!("Damping Factor BM = {:.2}", rep.damping_reduction_bm)).size(10.0).color(theme.text_muted));
+            });
+
+            // Card 4: Base Shear Reduction
+            let red_col = if rep.base_shear_reduction_ratio <= 0.50 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            cols[3].group(|ui| {
+                ui.label(RichText::new("BASE SHEAR REDUCTION").size(10.0).color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.1}%", rep.base_shear_reduction_ratio * 100.0)).size(20.0).strong().color(red_col));
+                ui.label(RichText::new(format!("Vs = {:.0} kN (Req Moat {:.0}mm)", rep.superstructure_design_base_shear_vs_kn, rep.required_moat_gap_mm)).size(10.0).color(theme.text_muted));
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // Parameter Studio Card
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("⚙️ Isolation & Damping Parameter Studio").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(20.0);
+                ui.selectable_value(&mut self.iso_type, crate::core::IsolatorType::LeadRubberBearing, "Lead-Rubber Bearing (LRB)");
+                ui.selectable_value(&mut self.iso_type, crate::core::IsolatorType::FrictionPendulum, "Friction Pendulum (FPS)");
+                ui.selectable_value(&mut self.iso_type, crate::core::IsolatorType::FluidViscousDamper, "Fluid Viscous Damper (FVD)");
+            });
+
+            ui.separator();
+
+            ui.columns(3, |cols| {
+                // Column 1: Seismic Demand Parameters
+                cols[0].vertical(|ui| {
+                    ui.label(RichText::new("1. Superstructure & Seismic Demands").size(11.0).strong().color(theme.text_primary));
+                    ui.horizontal(|ui| {
+                        ui.label("Total Weight W:");
+                        ui.add(egui::Slider::new(&mut self.iso_seismic_weight_w_kn, 20000.0..=250000.0).suffix(" kN"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Num Bearings:");
+                        ui.add(egui::Slider::new(&mut self.iso_num_bearings, 8..=64));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("MCE_R S_M1 (1.0s):");
+                        ui.add(egui::Slider::new(&mut self.iso_sm1_g, 0.20..=1.50).suffix(" g"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("MCE_R S_MS (0.2s):");
+                        ui.add(egui::Slider::new(&mut self.iso_sms_g, 0.50..=2.50).suffix(" g"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Fixed Period T1:");
+                        ui.add(egui::Slider::new(&mut self.iso_fixed_period_s, 0.30..=2.50).suffix(" s"));
+                    });
+                });
+
+                // Column 2: Plan Geometry & Torsion
+                cols[1].vertical(|ui| {
+                    ui.label(RichText::new("2. Plan Geometry & Torsion").size(11.0).strong().color(theme.text_primary));
+                    ui.horizontal(|ui| {
+                        ui.label("Plan Width (b):");
+                        ui.add(egui::Slider::new(&mut self.iso_plan_b_m, 12.0..=80.0).suffix(" m"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Plan Length (d):");
+                        ui.add(egui::Slider::new(&mut self.iso_plan_d_m, 12.0..=80.0).suffix(" m"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Accidental Ecc. (e):");
+                        ui.add(egui::Slider::new(&mut self.iso_eccentricity_e_m, 0.0..=6.0).suffix(" m"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Reduction Factor R_I:");
+                        ui.add(egui::Slider::new(&mut self.iso_superstructure_ri, 1.0..=2.5));
+                    });
+                });
+
+                // Column 3: Device Specific Properties
+                cols[2].vertical(|ui| {
+                    match self.iso_type {
+                        crate::core::IsolatorType::LeadRubberBearing | crate::core::IsolatorType::HighDampingRubberBearing => {
+                            ui.label(RichText::new("3. Lead-Rubber Bearing Specs").size(11.0).strong().color(theme.text_primary));
+                            ui.horizontal(|ui| {
+                                ui.label("Outer Diameter (Do):");
+                                ui.add(egui::Slider::new(&mut self.iso_lrb_diameter_mm, 500.0..=1300.0).suffix(" mm"));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Lead Plug Dia (dpb):");
+                                ui.add(egui::Slider::new(&mut self.iso_lrb_lead_dia_mm, 80.0..=250.0).suffix(" mm"));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Rubber Layer (tr):");
+                                ui.add(egui::Slider::new(&mut self.iso_lrb_rubber_layer_mm, 4.0..=12.0).suffix(" mm"));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Rubber Layers (N):");
+                                ui.add(egui::Slider::new(&mut self.iso_lrb_num_layers, 12..=48));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Rubber Modulus (G):");
+                                ui.add(egui::Slider::new(&mut self.iso_lrb_shear_mod_g, 0.35..=0.85).suffix(" MPa"));
+                            });
+                        }
+                        crate::core::IsolatorType::FrictionPendulum => {
+                            ui.label(RichText::new("3. Friction Pendulum Specs").size(11.0).strong().color(theme.text_primary));
+                            ui.horizontal(|ui| {
+                                ui.label("Spherical Radius (R):");
+                                ui.add(egui::Slider::new(&mut self.iso_fps_radius_mm, 1500.0..=4500.0).suffix(" mm"));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Dynamic Friction (μ):");
+                                ui.add(egui::Slider::new(&mut self.iso_fps_mu_fast, 0.02..=0.10));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Housing Diameter:");
+                                ui.add(egui::Slider::new(&mut self.iso_fps_housing_dia_mm, 600.0..=1600.0).suffix(" mm"));
+                            });
+                        }
+                        crate::core::IsolatorType::FluidViscousDamper => {
+                            ui.label(RichText::new("3. Fluid Viscous Damper Specs").size(11.0).strong().color(theme.text_primary));
+                            ui.horizontal(|ui| {
+                                ui.label("Damping Coeff C:");
+                                ui.add(egui::Slider::new(&mut self.iso_fvd_c_kn_s, 50.0..=600.0).suffix(" kN·(s/m)^α"));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Velocity Exponent α:");
+                                ui.add(egui::Slider::new(&mut self.iso_fvd_alpha, 0.20..=1.00));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Stroke Limit:");
+                                ui.add(egui::Slider::new(&mut self.iso_fvd_stroke_limit_mm, 100.0..=500.0).suffix(" mm"));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Damper Count:");
+                                ui.add(egui::Slider::new(&mut self.iso_fvd_count, 4..=40));
+                            });
+                        }
+                    }
+                });
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // Vector CAD Blueprint & Hysteresis Canvas
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📐 2D Vector CAD Blueprint & Dynamic Hysteresis Loop Canvas").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(20.0);
+                ui.label(RichText::new(format!("Energy Dissipated per Cycle: {:.1} kJ", rep.energy_dissipated_per_cycle_kj)).size(11.0).color(theme.accent_green));
+            });
+
+            ui.add_space(6.0);
+
+            let (canvas_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 260.0), Sense::hover());
+            let painter = ui.painter_at(canvas_rect);
+
+            painter.rect_filled(canvas_rect, 6.0, Color32::from_rgb(18, 22, 30));
+            painter.rect_stroke(canvas_rect, 6.0, Stroke::new(1.0, Color32::from_rgb(45, 55, 75)));
+
+            let mid_x = canvas_rect.min.x + canvas_rect.width() * 0.48;
+
+            // Divider line between Device CAD and Hysteresis Plot
+            painter.line_segment(
+                [Pos2::new(mid_x, canvas_rect.min.y + 10.0), Pos2::new(mid_x, canvas_rect.max.y - 10.0)],
+                Stroke::new(1.0, Color32::from_rgb(45, 55, 75)),
+            );
+
+            // Left Side: Device Vector CAD Drawing
+            let dev_center = Pos2::new(canvas_rect.min.x + (mid_x - canvas_rect.min.x) * 0.5, canvas_rect.min.y + 130.0);
+
+            match self.iso_type {
+                crate::core::IsolatorType::LeadRubberBearing | crate::core::IsolatorType::HighDampingRubberBearing => {
+                    // Draw LRB Cross-Section
+                    let lrb_w = 160.0;
+                    let lrb_h = 100.0;
+                    let lead_w = (lrb_w * (self.iso_lrb_lead_dia_mm / self.iso_lrb_diameter_mm)).clamp(20.0, 50.0);
+
+                    // Top & Bottom Flange Plates (Steel)
+                    let plate_h = 14.0;
+                    painter.rect_filled(
+                        egui::Rect::from_center_size(Pos2::new(dev_center.x, dev_center.y - lrb_h * 0.5 - plate_h * 0.5), Vec2::new(lrb_w + 30.0, plate_h)),
+                        2.0,
+                        Color32::from_rgb(140, 150, 165),
+                    );
+                    painter.rect_filled(
+                        egui::Rect::from_center_size(Pos2::new(dev_center.x, dev_center.y + lrb_h * 0.5 + plate_h * 0.5), Vec2::new(lrb_w + 30.0, plate_h)),
+                        2.0,
+                        Color32::from_rgb(140, 150, 165),
+                    );
+
+                    // Alternating Rubber Layers & Steel Shims
+                    let num_draw_layers = 12;
+                    let layer_h = lrb_h / (num_draw_layers as f32);
+                    for i in 0..num_draw_layers {
+                        let y_top = dev_center.y - lrb_h * 0.5 + (i as f32) * layer_h;
+                        let is_steel_shim = i % 2 == 1;
+                        let fill_col = if is_steel_shim {
+                            Color32::from_rgb(160, 170, 185)
+                        } else {
+                            Color32::from_rgb(35, 40, 50)
+                        };
+                        painter.rect_filled(
+                            egui::Rect::from_min_max(Pos2::new(dev_center.x - lrb_w * 0.5, y_top), Pos2::new(dev_center.x + lrb_w * 0.5, y_top + layer_h)),
+                            0.0,
+                            fill_col,
+                        );
+                    }
+
+                    // Central Lead Plug (Gold / Silver cylinder)
+                    painter.rect_filled(
+                        egui::Rect::from_center_size(dev_center, Vec2::new(lead_w, lrb_h)),
+                        2.0,
+                        Color32::from_rgb(234, 179, 8),
+                    );
+                    painter.rect_stroke(
+                        egui::Rect::from_center_size(dev_center, Vec2::new(lead_w, lrb_h)),
+                        2.0,
+                        Stroke::new(1.0, Color32::from_rgb(250, 204, 21)),
+                    );
+
+                    // Bearing boundary outline
+                    painter.rect_stroke(
+                        egui::Rect::from_center_size(dev_center, Vec2::new(lrb_w, lrb_h)),
+                        0.0,
+                        Stroke::new(1.5, Color32::WHITE),
+                    );
+
+                    painter.text(
+                        Pos2::new(dev_center.x, dev_center.y + lrb_h * 0.5 + 28.0),
+                        Align2::CENTER_CENTER,
+                        format!("LRB Ø{:.0}mm (Lead Core Ø{:.0}mm, Tr={:.0}mm)", self.iso_lrb_diameter_mm, self.iso_lrb_lead_dia_mm, rep.total_rubber_thick_tr_mm),
+                        egui::FontId::proportional(11.0),
+                        theme.accent_blue,
+                    );
+                }
+                crate::core::IsolatorType::FrictionPendulum => {
+                    // Draw Friction Pendulum Bearing (Concave dish + slider)
+                    let dish_w = 180.0;
+                    let dish_h = 30.0;
+                    let slider_w = 50.0;
+                    let slider_h = 40.0;
+
+                    // Lower Concave Dish (Spherical Curvature)
+                    let dish_rect = egui::Rect::from_center_size(Pos2::new(dev_center.x, dev_center.y + 35.0), Vec2::new(dish_w, dish_h));
+                    painter.rect_filled(dish_rect, 6.0, Color32::from_rgb(100, 115, 135));
+                    painter.rect_stroke(dish_rect, 6.0, Stroke::new(1.5, Color32::from_rgb(180, 195, 215)));
+
+                    // Articulated Slider Puck (Composite PTFE / Bronze)
+                    let slider_rect = egui::Rect::from_center_size(Pos2::new(dev_center.x, dev_center.y + 10.0), Vec2::new(slider_w, slider_h));
+                    painter.rect_filled(slider_rect, 4.0, Color32::from_rgb(245, 158, 11));
+                    painter.rect_stroke(slider_rect, 4.0, Stroke::new(1.5, Color32::WHITE));
+
+                    // Upper Mounting Plate
+                    let top_rect = egui::Rect::from_center_size(Pos2::new(dev_center.x, dev_center.y - 25.0), Vec2::new(dish_w, 20.0));
+                    painter.rect_filled(top_rect, 3.0, Color32::from_rgb(140, 150, 165));
+                    painter.rect_stroke(top_rect, 3.0, Stroke::new(1.0, Color32::WHITE));
+
+                    painter.text(
+                        Pos2::new(dev_center.x, dev_center.y + 65.0),
+                        Align2::CENTER_CENTER,
+                        format!("FPS Radius R={:.0}mm (Housing Ø{:.0}mm, μ={:.3})", self.iso_fps_radius_mm, self.iso_fps_housing_dia_mm, self.iso_fps_mu_fast),
+                        egui::FontId::proportional(11.0),
+                        theme.accent_blue,
+                    );
+                }
+                crate::core::IsolatorType::FluidViscousDamper => {
+                    // Draw Fluid Viscous Damper (Cylinder + Piston + Clevis)
+                    let cyl_w = 110.0;
+                    let cyl_h = 36.0;
+                    let rod_w = 70.0;
+                    let rod_h = 14.0;
+
+                    // Hydraulic Cylinder Barrel
+                    let cyl_rect = egui::Rect::from_min_max(
+                        Pos2::new(dev_center.x - cyl_w * 0.5, dev_center.y - cyl_h * 0.5),
+                        Pos2::new(dev_center.x + cyl_w * 0.5, dev_center.y + cyl_h * 0.5),
+                    );
+                    painter.rect_filled(cyl_rect, 4.0, Color32::from_rgb(30, 41, 59));
+                    painter.rect_stroke(cyl_rect, 4.0, Stroke::new(2.0, Color32::from_rgb(56, 189, 248)));
+
+                    // Piston Rod (Chrome Steel)
+                    let rod_rect = egui::Rect::from_min_max(
+                        Pos2::new(dev_center.x + cyl_w * 0.5, dev_center.y - rod_h * 0.5),
+                        Pos2::new(dev_center.x + cyl_w * 0.5 + rod_w, dev_center.y + rod_h * 0.5),
+                    );
+                    painter.rect_filled(rod_rect, 2.0, Color32::from_rgb(203, 213, 225));
+                    painter.rect_stroke(rod_rect, 2.0, Stroke::new(1.0, Color32::WHITE));
+
+                    // End Clevis Spherical Bearings
+                    painter.circle_filled(Pos2::new(dev_center.x - cyl_w * 0.5 - 12.0, dev_center.y), 10.0, Color32::from_rgb(148, 163, 184));
+                    painter.circle_filled(Pos2::new(dev_center.x + cyl_w * 0.5 + rod_w + 12.0, dev_center.y), 10.0, Color32::from_rgb(148, 163, 184));
+
+                    painter.text(
+                        Pos2::new(dev_center.x, dev_center.y + 45.0),
+                        Align2::CENTER_CENTER,
+                        format!("FVD C={:.0} kN·(s/m)^α (α={:.2}, Fmax={:.0}kN)", self.iso_fvd_c_kn_s, self.iso_fvd_alpha, rep.damper_peak_force_kn),
+                        egui::FontId::proportional(11.0),
+                        theme.accent_blue,
+                    );
+                }
+            }
+
+            // Right Side: Dynamic Hysteresis Loop Canvas
+            let hyst_center = Pos2::new(mid_x + (canvas_rect.max.x - mid_x) * 0.5, canvas_rect.min.y + 130.0);
+            let hyst_w = (canvas_rect.max.x - mid_x) * 0.78;
+            let hyst_h = 180.0;
+
+            // Draw Coordinate Axes
+            painter.line_segment(
+                [Pos2::new(hyst_center.x - hyst_w * 0.5, hyst_center.y), Pos2::new(hyst_center.x + hyst_w * 0.5, hyst_center.y)],
+                Stroke::new(1.0, Color32::from_rgb(70, 80, 105)),
+            );
+            painter.line_segment(
+                [Pos2::new(hyst_center.x, hyst_center.y - hyst_h * 0.5), Pos2::new(hyst_center.x, hyst_center.y + hyst_h * 0.5)],
+                Stroke::new(1.0, Color32::from_rgb(70, 80, 105)),
+            );
+
+            painter.text(
+                Pos2::new(hyst_center.x + hyst_w * 0.5, hyst_center.y + 12.0),
+                Align2::RIGHT_TOP,
+                format!("+DTM ({:.0}mm)", rep.total_max_displacement_dtm_mm),
+                egui::FontId::proportional(9.5),
+                theme.text_secondary,
+            );
+            painter.text(
+                Pos2::new(hyst_center.x + 6.0, hyst_center.y - hyst_h * 0.5),
+                Align2::LEFT_TOP,
+                "+Force (kN)",
+                egui::FontId::proportional(9.5),
+                theme.text_secondary,
+            );
+
+            // Draw Hysteresis Loop Points
+            if !rep.hysteresis_loop.is_empty() {
+                let max_disp = rep.total_max_displacement_dtm_mm.max(50.0);
+                let max_force = rep.hysteresis_loop.iter().map(|p| p.lateral_force_kn.abs()).fold(1.0f64, |a, b| a.max(b));
+
+                let scale_x = (hyst_w * 0.45) / (max_disp as f32);
+                let scale_y = (hyst_h * 0.42) / (max_force as f32);
+
+                let poly_points: Vec<Pos2> = rep
+                    .hysteresis_loop
+                    .iter()
+                    .map(|p| {
+                        Pos2::new(
+                            hyst_center.x + (p.displacement_mm as f32) * scale_x,
+                            hyst_center.y - (p.lateral_force_kn as f32) * scale_y,
+                        )
+                    })
+                    .collect();
+
+                // Shaded Hysteresis Energy Area
+                painter.add(egui::Shape::convex_polygon(
+                    poly_points.clone(),
+                    Color32::from_rgba_unmultiplied(59, 130, 246, 35),
+                    Stroke::new(2.0, Color32::from_rgb(96, 165, 250)),
+                ));
+            }
+
+            painter.text(
+                Pos2::new(hyst_center.x, canvas_rect.min.y + 16.0),
+                Align2::CENTER_TOP,
+                "Dynamic Hysteresis Energy Dissipation Loop (F vs D)",
+                egui::FontId::proportional(11.0),
+                Color32::from_rgb(245, 158, 11),
+            );
+        });
+
+        ui.add_space(10.0);
+
+        // ASCE 7-22 / SNI 1726 Regulatory Compliance Audit Table
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📋 ASCE 7-22 & SNI 1726:2019 Regulatory Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(20.0);
+                let overall_status = if rep.is_design_acceptable { "🟢 ALL CODE CHECKS SATISFIED" } else { "🔴 DESIGN REVISIONS REQUIRED" };
+                let status_col = if rep.is_design_acceptable { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+            });
+
+            ui.add_space(6.0);
+
+            // Table Header
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Code Clause").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(180.0);
+                ui.label(RichText::new("Engineering Requirement").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(170.0);
+                ui.label(RichText::new("Demand").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(50.0);
+                ui.label(RichText::new("Capacity").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(50.0);
+                ui.label(RichText::new("D/C Ratio").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(30.0);
+                ui.label(RichText::new("Status").size(10.5).strong().color(theme.text_secondary));
+            });
+            ui.separator();
+
+            for item in &rep.regulatory_checks {
+                let row_col = if item.is_passed { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(&item.code_clause).size(10.5).color(theme.accent_blue));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(&item.description).size(10.5).color(theme.text_primary));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(format!("{:.2} {}", item.demand_val, item.unit)).size(10.5).color(theme.text_primary));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.2} {}", item.capacity_val, item.unit)).size(10.5).color(theme.accent_green));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.3}", item.demand_capacity_ratio)).size(10.5).strong().color(row_col));
+                    ui.add_space(20.0);
+                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                });
+                ui.separator();
+            }
         });
     }
 }

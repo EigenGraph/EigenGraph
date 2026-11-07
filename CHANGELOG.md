@@ -7,6 +7,56 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.1.2] - 2026-11-07 — Phase 12: Seismic Base Isolation & Energy Dissipation Engine (ASCE 7-22 Ch 17 & 18 / SNI 1726:2019 Pasal 12 & 13)
+
+### Added
+- **Seismic Base Isolation & Supplemental Energy Dissipation Core Engine (`src/core/isolation.rs`)**:
+  - Full compliance with **ASCE 7-22 Chapter 17 (Seismic Design of Seismically Isolated Structures)**, **ASCE 7-22 Chapter 18 (Seismic Design of Structures with Damping Systems)**, **SNI 1726:2019 Pasal 12 & 13**, and **FEMA P-1051 Chapter 12**.
+  - **Lead-Rubber Bearings (LRB) Bilinear Hysteretic Formulation (§17.5)**:
+    - Characteristic yield strength: $Q_d = \sigma_{pb} \cdot A_{pb}$ where $\sigma_{pb} = 10.2\text{ MPa}$ shear yield stress of high-purity lead.
+    - Post-yield stiffness: $k_d = \frac{G \cdot A_{bonded}}{T_r}$ where $T_r = n_{layers} \cdot t_{layer}$ total bonded rubber thickness.
+    - Elastic initial stiffness: $k_u = 10 \cdot k_d$ with yield displacement $D_y = \frac{Q_d}{k_u - k_d}$.
+    - Primary shape factor $S_1 = \frac{D_o - d_{pb}}{4 t_r}$ and secondary shape factor $S_2 = \frac{D_o}{T_r}$.
+    - Compression modulus $E_c = 6 G S_1^2$ and effective compression modulus $E_c' = \frac{E_c K_{bulk}}{E_c + K_{bulk}}$ ($K_{bulk} \approx 2000\text{ MPa}$).
+    - Haringx critical buckling load at zero displacement: $P_{cr0} = \sqrt{\frac{1}{3} P_E P_S}$.
+    - Reduced critical buckling capacity at design displacement $D_M$: $P_{cr}(D_M) = P_{cr0} \cdot \left(1 - \frac{D_M}{D_o}\right)$ with safety factor $SF \ge 2.0$.
+  - **Friction Pendulum System (FPS) Formulation (§17.5)**:
+    - Spherical concave surface kinematics with effective pendulum radius $R_{eff} = R - h_{slider}$.
+    - Velocity-dependent sliding friction $\mu = f_{\max} - (f_{\max} - f_{\min}) e^{-a \dot{u}}$.
+    - Restoring pendulum stiffness $k_r = \frac{W}{R_{eff}}$ and post-sliding stiffness $K_{eff} = \frac{W}{R_{eff}} + \frac{\mu W}{D}$.
+    - Pendulum natural isolation period: $T_M = 2\pi \sqrt{\frac{R_{eff}}{g (1 + \mu \frac{R_{eff}}{D_M})}}$.
+  - **Fluid Viscous Dampers (FVD) Supplementary Damping (§18.2 - §18.4)**:
+    - Constitutive power law: $F_D = C \cdot \operatorname{sgn}(\dot{u}) |\dot{u}|^\alpha$ with velocity exponent $0.30 \le \alpha \le 1.0$.
+    - Energy dissipated per cycle: $E_D = 4 \lambda_m C (\omega D)^\alpha D$ where $\lambda_m = \frac{\sqrt{\pi} \Gamma(1 + \alpha/2)}{\Gamma(1.5 + \alpha/2)}$.
+    - Supplemental viscous damping ratio: $\beta_V = \frac{\sum E_{D,j}}{4 \pi E_S}$ where $E_S = \frac{1}{2} M \omega^2 D^2$.
+    - Total combined damping: $\beta_{total} = \beta_{inherent} + \beta_V$ with damping coefficient $B_M$ (ASCE 7-22 Table 17.5-1).
+  - **MCE_R Iterative Convergence & Accidental Torsion Amplification**:
+    - Newton-Raphson / secant iterative convergence for maximum displacement $D_M = \frac{g S_{M1} T_M}{4 \pi^2 B_M}$.
+    - Total maximum lateral displacement including accidental torsion per ASCE 7-22 Eq. 17.5-3:
+      $$D_{TM} = D_M \left[ 1 + y \left(\frac{12 e}{b^2 + d^2}\right) \right]$$
+    - Minimum required seismic moat clear gap: $\delta_{\text{moat}} \ge 1.10 D_{TM}$.
+  - **Superstructure Base Shear Reduction (§17.5.4)**:
+    - Superstructure factored design base shear: $V_s = \frac{K_M D_M}{R_I}$ (where $R_I \approx 1.5 - 2.0$), yielding over 60-70% base shear reduction compared to conventional fixed-base design.
+  - **3D Base-Isolated Hospital Model Archetype Generator (`generate_base_isolated_hospital_archetype`)**:
+    - Synthesizes an 8-story essential facility (120 nodes, 12 base isolator elements, spatial frame grid 24m x 16m x 28.8m).
+  - **Markdown Calculation Dossier Generator (`generate_markdown_dossier`)**:
+    - Exports comprehensive design verification report with KaTeX mathematical formulas, code citations, and limit state verification matrix.
+- **Deep Analysis Studio (`src/views/analyze.rs`)**:
+  - Added subtab `AnalyzeSubTab::BaseIsolationDesign` ("🛡️ Base Isolation & Dampers").
+  - 4 Executive KPI cards: Effective Period $T_M$, Total Displacement $D_{TM}$, System Damping $\beta_{eff}$, and Base Shear Reduction vs Fixed Base.
+  - Parameter Studio with interactive controls for isolator technology (LRB, FPS, FVD), seismic demands ($W, S_{M1}, S_{MS}, T_1, R_I$), plan dimensions, and device properties.
+  - **2D Vector CAD Blueprint & Dynamic Hysteresis Canvas**:
+    - Device cross-section details: LRB steel laminates, rubber layers, and central lead plug; FPS concave dish and articulated slider puck; FVD cylinder, piston rod, and clevis joints.
+    - Live force-displacement ($F$ vs $D$) hysteretic dissipation loop with shaded energy area $E_D$ and backbone yield limits.
+  - ASCE 7-22 / SNI 1726:2019 regulatory compliance audit table with 6 pass/fail limit checks.
+- **3D Modeling & Geometry Studio (`src/views/build.rs`)**:
+  - Added `ModelArchetype::BaseIsolatedHospital3D` ("🛡️ Base-Isolated Hospital (8-Story)").
+  - Integrated into 3D turntable viewport, camera presets, and element generator.
+- **Results Studio (`src/views/results.rs`)**:
+  - Added export action `"🛡️ Base Isolation Dossier (.md)"` generating `EigenGraph_Seismic_Base_Isolation_Damper_Dossier.md`.
+
+---
+
 ## [v0.1.1] - 2026-11-07 — Phase 11: Special Structural Concrete Shear Walls & Diagonally Reinforced Coupling Beams Engine (ACI 318-19 / SNI 2847:2019)
 
 ### Added

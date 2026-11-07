@@ -32,6 +32,7 @@ pub mod composite;
 pub mod geometry_engine;
 pub mod prestressed_concrete;
 pub mod shear_wall;
+pub mod isolation;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -133,4 +134,9 @@ pub use shear_wall::{
     BoundaryElementApproach, BoundaryElementReport, CouplingBeamReport, CouplingBeamType,
     InPlaneShearReport, ShearWallEngine, ShearWallSystemReport, WallFactoredDemands,
     WallGeometry, WallMaterials, WallSeismicClassification,
+};
+pub use isolation::{
+    DamperConfiguration, FluidViscousDamperParams, FrictionPendulumParams, HysteresisPoint,
+    IsolatorType, LeadRubberBearingParams, RegulatoryCheckItem, SeismicIsolationEngine,
+    SeismicIsolationInput, SeismicIsolationReport,
 };
