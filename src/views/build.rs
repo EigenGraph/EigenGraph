@@ -18,6 +18,7 @@ pub enum ModelArchetype {
     HyparRuledShell3D,       // 3D Hyperbolic Paraboloid Ruled Shell
     MultiStoryTower3D,       // 3D Multi-Story Building Frame with Core Walls
     PrestressedGirderBridge3D, // 3D Prestressed Post-Tensioned Concrete Bridge Span
+    CoupledShearWallCore3D,  // 3D Coupled Special Structural Shear Wall Core Tower
 }
 
 impl ModelArchetype {
@@ -33,6 +34,7 @@ impl ModelArchetype {
             Self::HyparRuledShell3D => "🎪 Hypar Umbrella (16m Saddle)",
             Self::MultiStoryTower3D => "🏢 12-Story Tower (Core Wall)",
             Self::PrestressedGirderBridge3D => "🌉 Prestressed Bridge (30m PT Girder)",
+            Self::CoupledShearWallCore3D => "🏢 Coupled Shear Wall Core (12-Story)",
         }
     }
 }
@@ -355,6 +357,7 @@ impl BuildView {
 
             let models = [
                 ModelArchetype::BimCraftBuilding3D,
+                ModelArchetype::CoupledShearWallCore3D,
                 ModelArchetype::PrestressedGirderBridge3D,
                 ModelArchetype::DoubleLayerSpaceTruss3D,
                 ModelArchetype::GeodesicDome3D,
@@ -380,6 +383,12 @@ impl BuildView {
                             self.cam_zoom = 1.15;
                             self.cam_pan = Vec2::ZERO;
                             self.render_mode = Render3DMode::CsgSolidBrep;
+                        }
+                        ModelArchetype::CoupledShearWallCore3D => {
+                            self.cam_yaw = 0.50;
+                            self.cam_pitch = 0.30;
+                            self.cam_zoom = 0.95;
+                            self.cam_pan = Vec2::ZERO;
                         }
                         ModelArchetype::PrestressedGirderBridge3D => {
                             self.cam_yaw = 0.55;
@@ -904,6 +913,7 @@ impl BuildView {
                         ui.label(RichText::new("Model:").size(11.0).color(theme.text_muted));
                         let models = [
                             ModelArchetype::BimCraftBuilding3D,
+                            ModelArchetype::CoupledShearWallCore3D,
                             ModelArchetype::PrestressedGirderBridge3D,
                             ModelArchetype::DoubleLayerSpaceTruss3D,
                             ModelArchetype::GeodesicDome3D,
@@ -2276,6 +2286,44 @@ impl BuildView {
                 let cy = 0.0;
                 let cz = 0.0;
                 ((cx, cy, cz), 22.0, list)
+            }
+            ModelArchetype::CoupledShearWallCore3D => {
+                let fem = crate::core::ShearWallEngine::generate_coupled_core_archetype(
+                    "12-Story Coupled Core", 12, 3.5, 6.0, 350.0, 2.0
+                );
+                let mut list = Vec::with_capacity(fem.elements.len());
+                for (idx, el) in fem.elements.iter().enumerate() {
+                    let n_start = fem.nodes.iter().find(|n| n.id == el.start_node);
+                    let n_end = fem.nodes.iter().find(|n| n.id == el.end_node);
+                    if let (Some(n1), Some(n2)) = (n_start, n_end) {
+                        let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
+                        let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
+                        let is_coupling = el.name.starts_with("CouplingBeam");
+                        let is_spandrel = el.name.starts_with("Spandrel");
+                        list.push(Member3D {
+                            id: idx + 1,
+                            p1,
+                            p2,
+                            name: el.name.clone(),
+                            section: if is_coupling {
+                                "Diagonally Reinforced Coupling Beam 350x800".to_string()
+                            } else if is_spandrel {
+                                "RC Floor Spandrel 350x600".to_string()
+                            } else {
+                                "Special Structural Wall Pier 6000x350".to_string()
+                            },
+                            base_width: if is_coupling { 7.0 } else if is_spandrel { 5.0 } else { 8.5 },
+                            force_kn: if is_coupling { 620.0 } else { -3600.0 },
+                            capacity_kn: if is_coupling { 950.0 } else { 7200.0 },
+                            utilization: if is_coupling { 0.65 } else { 0.50 },
+                            ari: if is_coupling { 0.96 } else { 0.94 },
+                            is_critical: false,
+                        });
+                    }
+                }
+                let cy = 0.0;
+                let cz = (12.0 * 3.5) * 0.5;
+                ((0.0, cy, cz), 26.0, list)
             }
         }
     }

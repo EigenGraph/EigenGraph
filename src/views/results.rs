@@ -577,6 +577,20 @@ impl ResultsView {
                                     self.export_status = Some(format!("Prestressed Concrete Design Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🏢 RC Shear Wall Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(2, 132, 199))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let rep = crate::core::ShearWallEngine::evaluate_wall(
+                                    "SW-Core-01", 6.0, 36.0, 350.0, 3.5, 35.0, 420.0, 420.0,
+                                    3600.0, 14500.0, 1850.0, 0.012,
+                                    1.8, 0.9, 350.0, 620.0, 25.0, 4,
+                                );
+                                let md = crate::core::ShearWallEngine::generate_markdown_dossier(&rep);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_RC_Shear_Wall_Coupling_Beam_Dossier.md", &md) {
+                                    self.export_status = Some(format!("RC Shear Wall & Coupling Beam Calculation Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });

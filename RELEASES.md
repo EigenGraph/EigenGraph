@@ -7,6 +7,57 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## 🚀 EigenGraph v0.1.1 — Phase 11: Special Structural Concrete Shear Walls & Diagonally Reinforced Coupling Beams Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.1`  
+**Target:** Production Engine
+
+EigenGraph v0.1.1 introduces a comprehensive **Reinforced Concrete Special Structural Shear Walls & Diagonally Reinforced Coupling Beams Design Engine**, enabling civil & earthquake engineers to analyze, design, and verify high-rise shear wall cores, boundary elements, and coupling beams in accordance with **ACI 318-19 Chapter 18 (Section 18.10)**, **SNI 2847:2019 Pasal 18.10**, and **NIST GCR 11-917-11 / NEHRP Seismic Design Technical Brief No. 6**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. In-Plane Web Shear Resistance ($V_n$)
+- **Aspect Ratio Factor $\alpha_c$ (ACI §18.10.4.1)**:
+  $$\alpha_c = \begin{cases} 0.25, & \frac{h_w}{l_w} \le 1.5 \\ 0.25 - 0.16\left(\frac{h_w}{l_w} - 1.5\right), & 1.5 < \frac{h_w}{l_w} < 2.0 \\ 0.17, & \frac{h_w}{l_w} \ge 2.0 \end{cases}$$
+- **Nominal Web Shear Strength**:
+  $$V_n = A_{cv} \left( \alpha_c \lambda \sqrt{f'_c} + \rho_t f_y \right) \le 0.83 A_{cv} \sqrt{f'_c}$$
+  with strength reduction factor $\phi = 0.75$, ensuring $\phi V_n \ge V_u$.
+- **Double Curtain Web Reinforcement (ACI §18.10.2.2)**: Automatically enforced whenever $V_u > 0.17 A_{cv} \lambda \sqrt{f'_c}$ or $h_w / l_w \ge 2.0$.
+
+#### 2. Dual Boundary Element Trigger Assessment
+- **Displacement-Based Trigger (ACI §18.10.6.2 / SNI Pasal 18.10.6.2)**:
+  $$c \ge \frac{l_w}{600 \left(\dfrac{\delta_u}{h_w}\right)}$$
+  where $\delta_u / h_w \ge 0.005$ is the design inelastic lateral drift ratio.
+- **Stress-Based Trigger (ACI §18.10.6.3)**:
+  $$\sigma_{\text{comp}} = \frac{P_u}{A_g} + \frac{M_u (l_w/2)}{I_g} \ge 0.20 f'_c$$
+
+#### 3. Special Boundary Element (SBE) Detailing & Confinement
+- **Boundary Extension Length**: $b_E \ge \max\left(c - 0.1 l_w, \; \frac{c}{2}\right)$.
+- **Boundary Thickness**: $b \ge \max\left(t_w, \; \frac{h_u}{16}\right)$ to eliminate out-of-plane lateral buckling.
+- **Transverse Confinement Reinforcement (ACI Table 18.10.6.4(f))**:
+  $$\frac{A_{sh}}{s \cdot b_c} \ge \max\left( 0.3 \left(\frac{A_g}{A_{ch}} - 1\right) \frac{f'_c}{f_{yt}}, \; 0.09 \frac{f'_c}{f_{yt}} \right)$$
+- **Vertical Tie Spacing**: $s_{\max} = \min\left( \frac{b}{3}, \; 6 d_{b,\text{long}}, \; 150\text{ mm} \right)$.
+
+#### 4. Diagonally Reinforced Coupling Beams
+- **Aspect Ratio Regime Classification (ACI §18.10.7)**:
+  - Deep coupling beams ($l_n / h < 2.0$ and $V_u \ge 0.33 \lambda \sqrt{f'_c} b_w d$): Diagonally reinforced X-cages mandatory.
+  - Slender coupling beams ($l_n / h \ge 4.0$): Special moment frame beam detailing.
+- **Diagonal Bar Inclination**: $\alpha = \arctan\left(\frac{h - 2 d'}{l_n}\right)$.
+- **Diagonal Shear Capacity**:
+  $$V_n = 2 A_{vd} f_y \sin\alpha \le 0.83 \sqrt{f'_c} b_w d, \quad \phi V_n = 0.75 V_n \ge V_u$$
+- **Transverse Confinement**: Full hoop cages enclosing each diagonal group ($A_{sh} \ge 0.09 s b_c \frac{f'_c}{f_{yt}}$).
+
+#### 5. Interactive Desktop UI Integration
+- **Analyze View Studio (`src/views/analyze.rs`)**:
+  - Subtab `AnalyzeSubTab::ShearWallDesign` ("🏢 RC Shear Walls & Coupling Beams (ACI 318 / SNI 2847)").
+  - 4 Metric cards, Parameter Studio with interactive sliders, 2D vector CAD canvas, and regulatory compliance audit table.
+- **Build View 3D Viewport (`src/views/build.rs`)**:
+  - New Archetype `ModelArchetype::CoupledShearWallCore3D` with 12-story coupled shear wall tower, vertical wall piers, floor spandrels, and central coupling beams.
+- **Results View Exporters (`src/views/results.rs`)**:
+  - Direct export of `EigenGraph_RC_Shear_Wall_Coupling_Beam_Dossier.md`.
+
+---
+
 ## 🚀 EigenGraph v0.1.0 — Phase 10: Prestressed & Post-Tensioned Concrete Design Engine
 **Release Date:** 2026-11-07  
 **Git Tag:** `v0.1.0`  

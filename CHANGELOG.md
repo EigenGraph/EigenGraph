@@ -7,6 +7,50 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.1.1] - 2026-11-07 — Phase 11: Special Structural Concrete Shear Walls & Diagonally Reinforced Coupling Beams Engine (ACI 318-19 / SNI 2847:2019)
+
+### Added
+- **RC Special Structural Shear Walls & Coupling Beams Engine (`src/core/shear_wall.rs`)**:
+  - Full compliance with **ACI 318-19 Chapter 18 (Section 18.10)**, **SNI 2847:2019 Pasal 18.10**, and **NIST GCR 11-917-11 / NEHRP Seismic Design Brief No. 6**.
+  - **In-Plane Nominal Shear Strength ($V_n$) (§18.10.4)**:
+    - Aspect ratio factor $\alpha_c$ calculation:
+      $$\alpha_c = \begin{cases} 0.25, & \frac{h_w}{l_w} \le 1.5 \\ 0.25 - 0.16\left(\frac{h_w}{l_w} - 1.5\right), & 1.5 < \frac{h_w}{l_w} < 2.0 \\ 0.17, & \frac{h_w}{l_w} \ge 2.0 \end{cases}$$
+    - Nominal in-plane shear strength: $V_n = A_{cv} \left( \alpha_c \lambda \sqrt{f'_c} + \rho_t f_y \right) \le 0.83 A_{cv} \sqrt{f'_c}$ (with $\phi = 0.75$).
+    - Automated enforcement of double curtain web reinforcement when $V_u > 0.17 A_{cv} \lambda \sqrt{f'_c}$ or $h_w / l_w \ge 2.0$.
+  - **Dual Boundary Element Trigger Analysis (§18.10.6)**:
+    - **Displacement-Based Trigger (§18.10.6.2)**: Evaluates $c \ge \frac{l_w}{600 (\delta_u / h_w)}$ with mandatory minimum design drift ratio $\delta_u / h_w \ge 0.005$.
+    - **Stress-Based Trigger (§18.10.6.3)**: Normal compressive stress check $\sigma_{\text{comp}} = \frac{P_u}{A_g} + \frac{M_u (l_w/2)}{I_g} \ge 0.20 f'_c$.
+  - **Special Boundary Element (SBE) Geometric & Confinement Detailing**:
+    - Horizontal boundary extension length: $b_E \ge \max\left(c - 0.1 l_w, \; \frac{c}{2}\right)$.
+    - Out-of-plane lateral buckling thickness: $b \ge \max\left(t_w, \; \frac{h_u}{16}\right)$.
+    - Transverse confinement reinforcement ratio per Table 18.10.6.4(f):
+      $$\frac{A_{sh}}{s \cdot b_c} \ge \max\left( 0.3 \left(\frac{A_g}{A_{ch}} - 1\right) \frac{f'_c}{f_{yt}}, \; 0.09 \frac{f'_c}{f_{yt}} \right)$$
+    - Maximum vertical tie pitch: $s_{\max} = \min\left( \frac{b}{3}, \; 6 d_{b,\text{long}}, \; 150\text{ mm} \right)$.
+  - **Diagonally Reinforced Coupling Beams (§18.10.7)**:
+    - Classification across aspect ratios: Diagonally Reinforced ($l_n / h < 2.0$ and $V_u \ge 0.33 \lambda \sqrt{f'_c} b_w d$), Conventional Flexural ($l_n / h \ge 4.0$), and Transition ($2.0 \le l_n / h < 4.0$).
+    - Diagonal bar inclination angle: $\alpha = \arctan\left(\frac{h - 2 d'}{l_n}\right)$.
+    - Nominal shear strength: $V_n = 2 A_{vd} f_y \sin\alpha \le 0.83 \sqrt{f'_c} b_w d$.
+    - Confinement hoop cages around individual diagonal bar groups: $A_{sh} \ge 0.09 s b_c \frac{f'_c}{f_{yt}}$.
+  - **Wall Pier Axial-Flexural Capacity**:
+    - Sliced Whitney stress block ($a = \beta_1 c$) with boundary rebar couple and axial force $P_u$ for design moment $\phi M_n$.
+  - **Coupled Core Tower 3D Archetype Generator (`generate_coupled_core_archetype`)**:
+    - Synthesizes 12-story 3D structural model with two C-shaped wall piers, central door openings, and diagonally reinforced coupling beams.
+  - **Engineering Markdown Dossier Generator (`generate_markdown_dossier`)**:
+    - Generates complete calculation report with KaTeX mathematical formulas, code citations, and limit state verification matrix.
+- **Deep Analysis Studio (`src/views/analyze.rs`)**:
+  - Added subtab `AnalyzeSubTab::ShearWallDesign` ("🏢 RC Shear Walls & Coupling Beams (ACI 318 / SNI 2847)").
+  - 4 Executive metric cards: Overall Compliance & Governing DCR, Boundary Element (SBE) Trigger, In-Plane Web Shear $\phi V_n$, and Coupling Beam $\phi V_n$.
+  - Parameter Studio with interactive controls for wall geometry, material strengths, applied demands, and coupling beam parameters.
+  - 2D Vector CAD Canvas displaying wall plan section with SBE boundary zones, confining tie cages, longitudinal rebar dots, double curtain web mesh, neutral axis indicator, and coupling beam elevation with diagonal X-reinforcement.
+  - Comprehensive ACI 318-19 / SNI 2847:2019 regulatory compliance audit table.
+- **CAD Viewport Modeling Studio (`src/views/build.rs`)**:
+  - Added `ModelArchetype::CoupledShearWallCore3D` ("🏢 Coupled Shear Wall Core (12-Story)").
+  - 3D Viewport renders 12-story coupled shear wall tower with vertical wall piers, floor spandrels, and central coupling beams.
+- **Results View Disk Exporters (`src/views/results.rs`)**:
+  - Added export action `🏢 RC Shear Wall Dossier (.md)` generating `EigenGraph_RC_Shear_Wall_Coupling_Beam_Dossier.md`.
+
+---
+
 ## [v0.1.0] - 2026-11-07 — Phase 10: Prestressed & Post-Tensioned Concrete Engine (ACI 318-19 / SNI 2847:2019)
 
 ### Added

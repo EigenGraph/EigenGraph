@@ -20,6 +20,7 @@ pub enum AnalyzeSubTab {
     WindEngineering,
     CompositeDesign,
     PrestressedDesign,
+    ShearWallDesign,
 }
 
 pub struct AnalyzeView {
@@ -105,6 +106,24 @@ pub struct AnalyzeView {
     pub pt_fci_mpa: f32,
     pub pt_sdl_kn_m: f32,
     pub pt_live_load_kn_m: f32,
+    // RC Special Structural Shear Walls & Coupling Beams (ACI 318-19 / SNI 2847:2019)
+    pub sw_length_lw_m: f32,
+    pub sw_height_hw_m: f32,
+    pub sw_thickness_tw_mm: f32,
+    pub sw_story_height_hu_m: f32,
+    pub sw_fc_mpa: f32,
+    pub sw_fy_mpa: f32,
+    pub sw_fyt_mpa: f32,
+    pub sw_demand_pu_kn: f32,
+    pub sw_demand_mu_knm: f32,
+    pub sw_demand_vu_kn: f32,
+    pub sw_drift_ratio: f32,
+    pub sw_cb_clear_span_m: f32,
+    pub sw_cb_depth_m: f32,
+    pub sw_cb_width_mm: f32,
+    pub sw_cb_demand_vu_kn: f32,
+    pub sw_cb_bar_dia_mm: f32,
+    pub sw_cb_bars_per_group: usize,
 }
 
 impl Default for AnalyzeView {
@@ -187,6 +206,23 @@ impl Default for AnalyzeView {
             pt_fci_mpa: 35.0,
             pt_sdl_kn_m: 4.0,
             pt_live_load_kn_m: 12.0,
+            sw_length_lw_m: 6.0,
+            sw_height_hw_m: 36.0,
+            sw_thickness_tw_mm: 350.0,
+            sw_story_height_hu_m: 3.5,
+            sw_fc_mpa: 35.0,
+            sw_fy_mpa: 420.0,
+            sw_fyt_mpa: 420.0,
+            sw_demand_pu_kn: 3600.0,
+            sw_demand_mu_knm: 14500.0,
+            sw_demand_vu_kn: 1850.0,
+            sw_drift_ratio: 0.012,
+            sw_cb_clear_span_m: 1.8,
+            sw_cb_depth_m: 0.9,
+            sw_cb_width_mm: 350.0,
+            sw_cb_demand_vu_kn: 620.0,
+            sw_cb_bar_dia_mm: 25.0,
+            sw_cb_bars_per_group: 4,
         }
     }
 }
@@ -246,6 +282,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::WindEngineering => self.render_wind_engineering(ui, theme),
                     AnalyzeSubTab::CompositeDesign => self.render_composite_design(ui, theme),
                     AnalyzeSubTab::PrestressedDesign => self.render_prestressed_design(ui, theme),
+                    AnalyzeSubTab::ShearWallDesign => self.render_shear_wall_design(ui, theme),
                 }
 
                 ui.add_space(64.0);
@@ -401,6 +438,7 @@ impl AnalyzeView {
                     (AnalyzeSubTab::WindEngineering, "🌪️ ASCE 7 Wind"),
                     (AnalyzeSubTab::CompositeDesign, "🥞 AISC Composite"),
                     (AnalyzeSubTab::PrestressedDesign, "🪢 PT Concrete (ACI 318)"),
+                    (AnalyzeSubTab::ShearWallDesign, "🏢 RC Shear Walls & Coupling Beams"),
                 ];
 
                 for (tab, label) in tabs {
@@ -3964,6 +4002,424 @@ impl AnalyzeView {
                 ui.label(RichText::new(format!("{:.3}", rep.shear_dcr)).size(11.0).strong().color(shear_col));
                 ui.add_space(35.0);
                 ui.label(RichText::new(if rep.shear_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(shear_col));
+            });
+        });
+    }
+
+    fn render_shear_wall_design(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let rep = crate::core::ShearWallEngine::evaluate_wall(
+            "SW-Core-01",
+            self.sw_length_lw_m as f64,
+            self.sw_height_hw_m as f64,
+            self.sw_thickness_tw_mm as f64,
+            self.sw_story_height_hu_m as f64,
+            self.sw_fc_mpa as f64,
+            self.sw_fy_mpa as f64,
+            self.sw_fyt_mpa as f64,
+            self.sw_demand_pu_kn as f64,
+            self.sw_demand_mu_knm as f64,
+            self.sw_demand_vu_kn as f64,
+            self.sw_drift_ratio as f64,
+            self.sw_cb_clear_span_m as f64,
+            self.sw_cb_depth_m as f64,
+            self.sw_cb_width_mm as f64,
+            self.sw_cb_demand_vu_kn as f64,
+            self.sw_cb_bar_dia_mm as f64,
+            self.sw_cb_bars_per_group,
+        );
+
+        // 1. Executive Metric Cards Header
+        ui.columns(4, |cols| {
+            let status_col = if rep.is_fully_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            let status_text = if rep.is_fully_compliant { "🟢 PASS (Code Compliant)" } else { "🔴 FAIL (DCR Exceeded)" };
+            self.metric_card(
+                &mut cols[0],
+                theme,
+                "OVERALL COMPLIANCE",
+                status_text,
+                &format!("Gov. DCR: {:.3} • ACI 318-19 / SNI 2847", rep.governing_dcr),
+                status_col,
+            );
+
+            let sbe_col = if rep.boundary_element.is_sbe_required {
+                if rep.boundary_element.is_confinement_adequate { theme.accent_blue } else { Color32::from_rgb(239, 68, 68) }
+            } else {
+                theme.accent_green
+            };
+            let sbe_status = if rep.boundary_element.is_sbe_required { "⚠️ MANDATORY SBE" } else { "✅ NO SBE NEEDED" };
+            self.metric_card(
+                &mut cols[1],
+                theme,
+                "BOUNDARY ELEMENT (SBE)",
+                sbe_status,
+                &format!("c: {:.0}mm • clim: {:.0}mm • bE: {:.0}mm", rep.boundary_element.neutral_axis_c_mm, rep.boundary_element.c_limit_mm, rep.boundary_element.provided_length_be_mm),
+                sbe_col,
+            );
+
+            let shear_col = if rep.in_plane_shear.is_shear_adequate { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            self.metric_card(
+                &mut cols[2],
+                theme,
+                "IN-PLANE SHEAR (φVn)",
+                &format!("{:.1} kN", rep.in_plane_shear.phi_vn_kn),
+                &format!("DCR: {:.3} • Vu: {:.1} kN • αc: {:.2}", rep.in_plane_shear.shear_dcr, rep.in_plane_shear.factored_shear_vu_kn, rep.in_plane_shear.alpha_c),
+                shear_col,
+            );
+
+            let cb_col = if rep.coupling_beam.is_coupling_adequate { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            self.metric_card(
+                &mut cols[3],
+                theme,
+                "COUPLING BEAM (φVn)",
+                &format!("{:.1} kN", rep.coupling_beam.phi_vn_kn),
+                &format!("DCR: {:.3} • α: {:.1}° • ln/h: {:.2}", rep.coupling_beam.coupling_dcr, rep.coupling_beam.diagonal_angle_deg, rep.coupling_beam.aspect_ratio_ln_over_h),
+                cb_col,
+            );
+        });
+
+        ui.add_space(14.0);
+
+        // 2. Dual Panel Studio: Parameters on Left, 2D Vector Canvas on Right
+        ui.columns(2, |cols| {
+            // LEFT COLUMN: Parameter Controls Studio
+            theme.card_frame().show(&mut cols[0], |ui| {
+                ui.label(RichText::new("🏢 WALL PIER & COUPLING PARAMETERS").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(6.0);
+
+                // Section A: Wall Geometry
+                ui.label(RichText::new("Wall Pier Dimensions (ACI 318-19 §18.10)").size(11.0).strong().color(theme.text_primary));
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Length lw:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_length_lw_m, 3.0..=12.0).suffix(" m"));
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Height hw:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_height_hw_m, 10.0..=80.0).suffix(" m"));
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Thickness tw:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_thickness_tw_mm, 200.0..=600.0).suffix(" mm"));
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Story hu:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_story_height_hu_m, 2.8..=5.0).suffix(" m"));
+                });
+
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(6.0);
+
+                // Section B: Materials & Applied Demands
+                ui.label(RichText::new("Materials & Factored Demands").size(11.0).strong().color(theme.text_primary));
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("f'c:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_fc_mpa, 25.0..=65.0).suffix(" MPa"));
+                    ui.label(RichText::new("fy:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_fy_mpa, 400.0..=500.0).suffix(" MPa"));
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Pu:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_demand_pu_kn, 1000.0..=12000.0).suffix(" kN"));
+                    ui.label(RichText::new("Mu:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_demand_mu_knm, 2000.0..=35000.0).suffix(" kNm"));
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Vu:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_demand_vu_kn, 500.0..=6000.0).suffix(" kN"));
+                    ui.label(RichText::new("Drift δu/hw:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_drift_ratio, 0.005..=0.025));
+                });
+
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(6.0);
+
+                // Section C: Diagonally Reinforced Coupling Beam
+                ui.label(RichText::new("Coupling Beam Parameters (§18.10.7)").size(11.0).strong().color(theme.text_primary));
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Clear Span ln:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_cb_clear_span_m, 1.0..=3.5).suffix(" m"));
+                    ui.label(RichText::new("Depth h:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_cb_depth_m, 0.6..=1.5).suffix(" m"));
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Demand Vu,cb:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_cb_demand_vu_kn, 200.0..=1500.0).suffix(" kN"));
+                    ui.label(RichText::new("Diag Bar Ø:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_cb_bar_dia_mm, 19.0..=32.0).suffix(" mm"));
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Bars per Group:").size(10.5).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.sw_cb_bars_per_group, 2..=8));
+                });
+            });
+
+            // RIGHT COLUMN: 2D Vector CAD Canvas Detailer
+            theme.card_frame().show(&mut cols[1], |ui| {
+                ui.label(RichText::new("📐 2D VECTOR REBAR & BOUNDARY BLUEPRINT").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(4.0);
+
+                let canvas_size = Vec2::new(ui.available_width(), 320.0);
+                let (response, painter) = ui.allocate_painter(canvas_size, Sense::hover());
+                let rect = response.rect;
+
+                // Background
+                painter.rect_filled(rect, CornerRadius::same(6), theme.bg_canvas);
+                painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, theme.border_subtle), egui::StrokeKind::Inside);
+
+                // 1. Draw Wall Pier Horizontal Cross-Section (Top Half)
+                let wall_scale = (rect.width() - 80.0) / (self.sw_length_lw_m * 1000.0);
+                let section_w = (self.sw_length_lw_m * 1000.0) * wall_scale;
+                let section_h = (self.sw_thickness_tw_mm * 1.5) * wall_scale;
+                let sec_x0 = rect.left() + (rect.width() - section_w) * 0.5;
+                let sec_y0 = rect.top() + 35.0;
+
+                // Concrete Web
+                let web_rect = egui::Rect::from_min_size(Pos2::new(sec_x0, sec_y0), Vec2::new(section_w, section_h));
+                painter.rect_filled(web_rect, CornerRadius::same(2), Color32::from_rgb(45, 55, 72));
+                painter.rect_stroke(web_rect, CornerRadius::same(2), Stroke::new(1.5, theme.border_subtle), egui::StrokeKind::Inside);
+
+                // Special Boundary Elements (Left & Right Ends)
+                let be_pixel_w = (rep.boundary_element.provided_length_be_mm * wall_scale as f64) as f32;
+                let be_left_rect = egui::Rect::from_min_size(Pos2::new(sec_x0, sec_y0), Vec2::new(be_pixel_w, section_h));
+                let be_right_rect = egui::Rect::from_min_size(Pos2::new(sec_x0 + section_w - be_pixel_w, sec_y0), Vec2::new(be_pixel_w, section_h));
+
+                let sbe_fill = if rep.boundary_element.is_sbe_required {
+                    Color32::from_rgba_unmultiplied(59, 130, 246, 60)
+                } else {
+                    Color32::from_rgba_unmultiplied(16, 185, 129, 40)
+                };
+                let sbe_stroke = if rep.boundary_element.is_sbe_required {
+                    Stroke::new(1.5, theme.accent_blue)
+                } else {
+                    Stroke::new(1.0, theme.accent_green)
+                };
+
+                painter.rect_filled(be_left_rect, CornerRadius::ZERO, sbe_fill);
+                painter.rect_stroke(be_left_rect, CornerRadius::ZERO, sbe_stroke, egui::StrokeKind::Inside);
+                painter.rect_filled(be_right_rect, CornerRadius::ZERO, sbe_fill);
+                painter.rect_stroke(be_right_rect, CornerRadius::ZERO, sbe_stroke, egui::StrokeKind::Inside);
+
+                // Boundary Element Longitudinal Rebar Dots
+                let dot_r = 3.0;
+                for i in 0..4 {
+                    let frac = (i as f32 + 0.5) / 4.0;
+                    // Left Boundary
+                    painter.circle_filled(Pos2::new(sec_x0 + frac * be_pixel_w, sec_y0 + 4.0), dot_r, Color32::from_rgb(251, 191, 36));
+                    painter.circle_filled(Pos2::new(sec_x0 + frac * be_pixel_w, sec_y0 + section_h - 4.0), dot_r, Color32::from_rgb(251, 191, 36));
+                    // Right Boundary
+                    painter.circle_filled(Pos2::new(sec_x0 + section_w - be_pixel_w + frac * be_pixel_w, sec_y0 + 4.0), dot_r, Color32::from_rgb(251, 191, 36));
+                    painter.circle_filled(Pos2::new(sec_x0 + section_w - be_pixel_w + frac * be_pixel_w, sec_y0 + section_h - 4.0), dot_r, Color32::from_rgb(251, 191, 36));
+                }
+
+                // Neutral Axis Depth Line
+                let c_pixel = (rep.boundary_element.neutral_axis_c_mm * wall_scale as f64) as f32;
+                let na_x = sec_x0 + c_pixel;
+                painter.line_segment(
+                    [Pos2::new(na_x, sec_y0 - 6.0), Pos2::new(na_x, sec_y0 + section_h + 6.0)],
+                    Stroke::new(1.5, Color32::from_rgb(239, 68, 68)),
+                );
+                painter.text(
+                    Pos2::new(na_x, sec_y0 - 10.0),
+                    Align2::CENTER_BOTTOM,
+                    format!("NA c = {:.0}mm", rep.boundary_element.neutral_axis_c_mm),
+                    egui::FontId::proportional(9.0),
+                    Color32::from_rgb(239, 68, 68),
+                );
+
+                // Labels for Wall Pier Section
+                painter.text(
+                    Pos2::new(sec_x0 + be_pixel_w * 0.5, sec_y0 + section_h + 12.0),
+                    Align2::CENTER_TOP,
+                    format!("SBE bE = {:.0}mm", rep.boundary_element.provided_length_be_mm),
+                    egui::FontId::proportional(9.0),
+                    theme.accent_blue,
+                );
+                painter.text(
+                    Pos2::new(sec_x0 + section_w * 0.5, sec_y0 + section_h * 0.5),
+                    Align2::CENTER_CENTER,
+                    format!("Double Curtain Web Rebar (tw = {:.0}mm)", self.sw_thickness_tw_mm),
+                    egui::FontId::proportional(9.0),
+                    theme.text_muted,
+                );
+
+                // 2. Draw Diagonally Reinforced Coupling Beam Elevation (Bottom Half)
+                let cb_y0 = rect.top() + 140.0;
+                let cb_h = 100.0;
+                let pier_w = 60.0;
+                let cb_span = (rect.width() - 2.0 * pier_w - 60.0).min(200.0);
+                let pier_left_x = rect.left() + (rect.width() - (2.0 * pier_w + cb_span)) * 0.5;
+                let beam_left_x = pier_left_x + pier_w;
+                let beam_right_x = beam_left_x + cb_span;
+                let pier_right_x = beam_right_x + pier_w;
+
+                // Wall Piers Left & Right
+                let p_left_rect = egui::Rect::from_min_max(Pos2::new(pier_left_x, cb_y0 - 20.0), Pos2::new(beam_left_x, cb_y0 + cb_h + 20.0));
+                let p_right_rect = egui::Rect::from_min_max(Pos2::new(beam_right_x, cb_y0 - 20.0), Pos2::new(pier_right_x, cb_y0 + cb_h + 20.0));
+                painter.rect_filled(p_left_rect, CornerRadius::ZERO, Color32::from_rgb(30, 41, 59));
+                painter.rect_stroke(p_left_rect, CornerRadius::ZERO, Stroke::new(1.0, theme.border_subtle), egui::StrokeKind::Inside);
+                painter.rect_filled(p_right_rect, CornerRadius::ZERO, Color32::from_rgb(30, 41, 59));
+                painter.rect_stroke(p_right_rect, CornerRadius::ZERO, Stroke::new(1.0, theme.border_subtle), egui::StrokeKind::Inside);
+
+                // Coupling Beam Body
+                let beam_rect = egui::Rect::from_min_max(Pos2::new(beam_left_x, cb_y0), Pos2::new(beam_right_x, cb_y0 + cb_h));
+                painter.rect_filled(beam_rect, CornerRadius::ZERO, Color32::from_rgb(51, 65, 85));
+                painter.rect_stroke(beam_rect, CornerRadius::ZERO, Stroke::new(1.5, theme.accent_blue), egui::StrokeKind::Inside);
+
+                // Diagonally Placed Bar Bundles (X-Pattern)
+                painter.line_segment(
+                    [Pos2::new(beam_left_x - 15.0, cb_y0 + cb_h - 10.0), Pos2::new(beam_right_x + 15.0, cb_y0 + 10.0)],
+                    Stroke::new(3.0, Color32::from_rgb(245, 158, 11)),
+                );
+                painter.line_segment(
+                    [Pos2::new(beam_left_x - 15.0, cb_y0 + 10.0), Pos2::new(beam_right_x + 15.0, cb_y0 + cb_h - 10.0)],
+                    Stroke::new(3.0, Color32::from_rgb(245, 158, 11)),
+                );
+
+                // Diagonal Hoops Tick Marks
+                for i in 1..6 {
+                    let t = i as f32 / 7.0;
+                    let p1 = Pos2::new(beam_left_x + t * cb_span, cb_y0 + cb_h - 10.0 - t * (cb_h - 20.0));
+                    let p2 = Pos2::new(beam_left_x + t * cb_span, cb_y0 + 10.0 + t * (cb_h - 20.0));
+                    painter.circle_filled(p1, 2.0, Color32::WHITE);
+                    painter.circle_filled(p2, 2.0, Color32::WHITE);
+                }
+
+                // Coupling Beam Annotations
+                painter.text(
+                    Pos2::new((beam_left_x + beam_right_x) * 0.5, cb_y0 + cb_h + 10.0),
+                    Align2::CENTER_TOP,
+                    format!("Clear Span ln = {:.1}m (ln/h = {:.2})", self.sw_cb_clear_span_m, rep.coupling_beam.aspect_ratio_ln_over_h),
+                    egui::FontId::proportional(9.5),
+                    theme.text_primary,
+                );
+                painter.text(
+                    Pos2::new((beam_left_x + beam_right_x) * 0.5, cb_y0 - 8.0),
+                    Align2::CENTER_BOTTOM,
+                    format!("Diagonal Reinforcement: {}x Ø{:.0}mm (α = {:.1}°)", self.sw_cb_bars_per_group, self.sw_cb_bar_dia_mm, rep.coupling_beam.diagonal_angle_deg),
+                    egui::FontId::proportional(9.5),
+                    Color32::from_rgb(245, 158, 11),
+                );
+            });
+        });
+
+        ui.add_space(14.0);
+
+        // 3. Full Regulatory Code Compliance Audit Table
+        theme.card_frame().show(ui, |ui| {
+            ui.label(RichText::new("📋 ACI 318-19 CHAPTER 18 / SNI 2847:2019 PASAL 18 REGULATORY AUDIT").size(12.0).strong().color(theme.accent_blue));
+            ui.add_space(4.0);
+
+            // Table Header
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Code Check & Limit State").size(11.0).strong().color(theme.text_primary));
+                ui.add_space(140.0);
+                ui.label(RichText::new("Clause Citation").size(10.5).color(theme.text_muted));
+                ui.add_space(60.0);
+                ui.label(RichText::new("Factored Demand").size(10.5).color(theme.text_secondary));
+                ui.add_space(35.0);
+                ui.label(RichText::new("Design Capacity").size(10.5).color(theme.accent_green));
+                ui.add_space(35.0);
+                ui.label(RichText::new("Parameters & Notes").size(10.5).color(theme.text_secondary));
+                ui.add_space(35.0);
+                ui.label(RichText::new("DCR").size(11.0).strong().color(theme.text_primary));
+                ui.add_space(25.0);
+                ui.label(RichText::new("Status").size(11.0).strong().color(theme.text_primary));
+            });
+            ui.separator();
+
+            // Row 1: In-Plane Web Shear Resistance
+            let shear_col = if rep.in_plane_shear.is_shear_adequate { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("1. In-Plane Web Shear (φVn ≥ Vu)").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(55.0);
+                ui.label(RichText::new("ACI 318-19 §18.10.4").size(10.5).color(theme.text_muted));
+                ui.add_space(45.0);
+                ui.label(RichText::new(format!("Vu = {:6.1} kN", rep.in_plane_shear.factored_shear_vu_kn)).size(11.0).color(theme.text_primary));
+                ui.add_space(25.0);
+                ui.label(RichText::new(format!("φVn = {:6.1} kN", rep.in_plane_shear.phi_vn_kn)).size(11.0).color(theme.accent_green));
+                ui.add_space(25.0);
+                ui.label(RichText::new(format!("αc = {:.2}, Vc = {:.0}kN, Vs = {:.0}kN", rep.in_plane_shear.alpha_c, rep.in_plane_shear.concrete_shear_vc_kn, rep.in_plane_shear.steel_shear_vs_kn)).size(10.5).color(theme.text_secondary));
+                ui.add_space(15.0);
+                ui.label(RichText::new(format!("{:.3}", rep.in_plane_shear.shear_dcr)).size(11.0).strong().color(shear_col));
+                ui.add_space(30.0);
+                ui.label(RichText::new(if rep.in_plane_shear.is_shear_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(shear_col));
+            });
+            ui.separator();
+
+            // Row 2: Displacement-Based Boundary Element Trigger
+            let sbe_stat_col = if rep.boundary_element.is_geometry_adequate { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("2. SBE Displacement Trigger").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(80.0);
+                ui.label(RichText::new("ACI 318-19 §18.10.6.2").size(10.5).color(theme.text_muted));
+                ui.add_space(35.0);
+                ui.label(RichText::new(format!("c = {:5.0} mm", rep.boundary_element.neutral_axis_c_mm)).size(11.0).color(theme.text_primary));
+                ui.add_space(30.0);
+                ui.label(RichText::new(format!("clim = {:5.0} mm", rep.boundary_element.c_limit_mm)).size(11.0).color(theme.accent_green));
+                ui.add_space(30.0);
+                ui.label(RichText::new(if rep.boundary_element.is_sbe_required { "Mandatory SBE Triggered" } else { "Boundary Element Not Required" }).size(10.5).color(theme.text_secondary));
+                ui.add_space(20.0);
+                ui.label(RichText::new(format!("{:.3}", rep.boundary_element.neutral_axis_c_mm / rep.boundary_element.c_limit_mm)).size(11.0).strong().color(sbe_stat_col));
+                ui.add_space(30.0);
+                ui.label(RichText::new(if rep.boundary_element.is_geometry_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(sbe_stat_col));
+            });
+            ui.separator();
+
+            // Row 3: Special Boundary Element Confinement
+            let conf_col = if rep.boundary_element.is_confinement_adequate { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("3. SBE Confinement (Ash/s)").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(85.0);
+                ui.label(RichText::new("ACI Table 18.10.6.4(f)").size(10.5).color(theme.text_muted));
+                ui.add_space(25.0);
+                ui.label(RichText::new(format!("Req = {:4.2} mm²/mm", rep.boundary_element.req_ash_over_s_mm2_per_mm)).size(11.0).color(theme.text_primary));
+                ui.add_space(15.0);
+                ui.label(RichText::new(format!("Prov = {:4.2} mm²/mm", rep.boundary_element.provided_ash_over_s_mm2_per_mm)).size(11.0).color(theme.accent_green));
+                ui.add_space(15.0);
+                ui.label(RichText::new(format!("s = {:.0}mm (max {:.0}mm), bE = {:.0}mm", rep.boundary_element.provided_tie_spacing_s_mm, rep.boundary_element.max_tie_spacing_s_mm, rep.boundary_element.provided_length_be_mm)).size(10.5).color(theme.text_secondary));
+                ui.add_space(15.0);
+                ui.label(RichText::new(format!("{:.3}", rep.boundary_element.dcr_confinement)).size(11.0).strong().color(conf_col));
+                ui.add_space(30.0);
+                ui.label(RichText::new(if rep.boundary_element.is_confinement_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(conf_col));
+            });
+            ui.separator();
+
+            // Row 4: Wall Pier Flexural Capacity
+            let flex_col = if rep.is_flexure_adequate { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("4. Wall Pier Flexure (φMn ≥ Mu)").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(60.0);
+                ui.label(RichText::new("ACI 318-19 §22.2").size(10.5).color(theme.text_muted));
+                ui.add_space(60.0);
+                ui.label(RichText::new(format!("Mu = {:6.1} kNm", rep.demands.mu_knm)).size(11.0).color(theme.text_primary));
+                ui.add_space(20.0);
+                ui.label(RichText::new(format!("φMn = {:6.1} kNm", rep.flexure_phi_mn_knm)).size(11.0).color(theme.accent_green));
+                ui.add_space(25.0);
+                ui.label(RichText::new(format!("Pu = {:.0} kN, As,sbe = {:.0} mm²", rep.demands.pu_kn, rep.boundary_element.sbe_rebar_area_mm2)).size(10.5).color(theme.text_secondary));
+                ui.add_space(20.0);
+                ui.label(RichText::new(format!("{:.3}", rep.flexure_dcr)).size(11.0).strong().color(flex_col));
+                ui.add_space(30.0);
+                ui.label(RichText::new(if rep.is_flexure_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(flex_col));
+            });
+            ui.separator();
+
+            // Row 5: Diagonally Reinforced Coupling Beam
+            let cb_stat_col = if rep.coupling_beam.is_coupling_adequate { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("5. Diag. Coupling Beam (φVn ≥ Vu)").size(11.0).strong().color(theme.accent_blue));
+                ui.add_space(45.0);
+                ui.label(RichText::new("ACI 318-19 §18.10.7").size(10.5).color(theme.text_muted));
+                ui.add_space(45.0);
+                ui.label(RichText::new(format!("Vu = {:6.1} kN", rep.coupling_beam.factored_shear_vu_kn)).size(11.0).color(theme.text_primary));
+                ui.add_space(25.0);
+                ui.label(RichText::new(format!("φVn = {:6.1} kN", rep.coupling_beam.phi_vn_kn)).size(11.0).color(theme.accent_green));
+                ui.add_space(25.0);
+                ui.label(RichText::new(format!("Vn = 2·Avd·fy·sinα (α = {:.1}°)", rep.coupling_beam.diagonal_angle_deg)).size(10.5).color(theme.text_secondary));
+                ui.add_space(30.0);
+                ui.label(RichText::new(format!("{:.3}", rep.coupling_beam.coupling_dcr)).size(11.0).strong().color(cb_stat_col));
+                ui.add_space(30.0);
+                ui.label(RichText::new(if rep.coupling_beam.is_coupling_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(cb_stat_col));
             });
         });
     }

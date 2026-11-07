@@ -31,6 +31,7 @@ pub mod wind;
 pub mod composite;
 pub mod geometry_engine;
 pub mod prestressed_concrete;
+pub mod shear_wall;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -127,4 +128,9 @@ pub use prestressed_concrete::{
     AciTensionClass, FiberStressCheck, GirderSectionArchetype, PrestressLossBreakdown,
     PrestressedConcreteEngine, PrestressedGirderReport, PrestressingMethod, StrandGrade,
     TendonPointCoordinates, TendonProfileKind,
+};
+pub use shear_wall::{
+    BoundaryElementApproach, BoundaryElementReport, CouplingBeamReport, CouplingBeamType,
+    InPlaneShearReport, ShearWallEngine, ShearWallSystemReport, WallFactoredDemands,
+    WallGeometry, WallMaterials, WallSeismicClassification,
 };

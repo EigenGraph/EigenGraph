@@ -31,7 +31,7 @@
           <div class="titlebar-title">
             <img src="assets/icon.png" alt="EigenGraph" width="22" height="22" style="border-radius:4px;">
             <span>EigenGraph Workstation</span>
-            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.0-release</span>
+            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.1-release</span>
           </div>
         </div>
 
@@ -41,8 +41,8 @@
         </div>
 
         <div class="titlebar-right">
-          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.0" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
-            📥 Download v0.1.0
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.1" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v0.1.1
           </a>
           <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             🏷️ Releases
@@ -186,8 +186,8 @@
 
           <div class="sidebar-footer">
             <div><strong>Engine:</strong> Rust 1.80+ Core Engine</div>
-            <div><strong>Status:</strong> 62/62 Verified Tests (100%)</div>
-            <div style="color:var(--accent-green);">● Desktop Release v0.1.0 Active</div>
+            <div><strong>Status:</strong> 66/66 Verified Tests (100%)</div>
+            <div style="color:var(--accent-green);">● Desktop Release v0.1.1 Active</div>
           </div>
         </aside>
 
@@ -1515,15 +1515,49 @@ pub struct BiaxialPmReport {
               </p>
               
               <div style="display:flex; flex-direction:column; gap:12px;">
-                <!-- v0.1.0 -->
+                <!-- v0.1.1 -->
                 <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16, 185, 129, 0.4); border-radius:8px; padding:14px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);">
                   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <div>
                       <span class="dossier-tag green" style="font-size:0.7rem; font-weight:700;">LATEST PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.1</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 11: Special Structural Shear Walls & Coupling Beams Engine)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.1" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Assets ↗
+                    </a>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/download/v0.1.1/EigenGraph-macOS.dmg" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                      🍎 EigenGraph-macOS.dmg (Universal 2)
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/download/v0.1.1/EigenGraph-Windows-x64.zip" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      🪟 EigenGraph-Windows-x64.zip
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/download/v0.1.1/EigenGraph-Linux-x86_64.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      🐧 EigenGraph-Linux-x86_64.tar.gz
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/download/v0.1.1/SHA256SUMS.txt" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      🔐 SHA256SUMS.txt
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>ACI 318-19 §18.10 / SNI 2847:2019 Pasal 18.10 Formulations:</strong> Complete computational design engine for Special Reinforced Concrete Structural Walls and Diagonally Reinforced Coupling Beams.</li>
+                    <li><strong>Dual Boundary Element Trigger Analysis:</strong> Displacement-based trigger \(c \ge l_w / [600 (\delta_u / h_w)]\) and extreme fiber stress trigger \(\sigma_{\text{comp}} \ge 0.20 f'_c\).</li>
+                    <li><strong>Special Boundary Element (SBE) Confinement:</strong> Dimensional limits \(b_E \ge \max(c - 0.1 l_w, c/2)\), thickness \(b \ge \max(t_w, h_u/16)\), and transverse hoop confinement \(A_{sh}/(s b_c)\) per Table 18.10.6.4(f).</li>
+                    <li><strong>In-Plane Web Shear & Diagonally Reinforced Coupling Beams:</strong> Aspect ratio \(\alpha_c\) transition (\(0.25 \to 0.17\)), double curtain web reinforcement enforcement, and diagonal coupling beam X-reinforcement \(V_n = 2 A_{vd} f_y \sin\alpha\).</li>
+                  </ul>
+                </div>
+
+                <!-- v0.1.0 -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(59, 130, 246, 0.3); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                      <span class="dossier-tag blue" style="font-size:0.7rem; font-weight:700;">PRODUCTION</span>
                       <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.0</span>
                       <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 10: Prestressed & Post-Tensioned Concrete Design Engine)</span>
                     </div>
-                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.0" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.0" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px;">
                       Release Notes & Assets ↗
                     </a>
                   </div>
