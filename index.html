@@ -31,7 +31,7 @@
           <div class="titlebar-title">
             <img src="assets/icon.png" alt="EigenGraph" width="22" height="22" style="border-radius:4px;">
             <span>EigenGraph Workstation</span>
-            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.2-release</span>
+            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.3-release</span>
           </div>
         </div>
 
@@ -41,8 +41,8 @@
         </div>
 
         <div class="titlebar-right">
-          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.2" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
-            📥 Download v0.1.2
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.3" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v0.1.3
           </a>
           <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             🏷️ Releases
@@ -186,8 +186,8 @@
 
           <div class="sidebar-footer">
             <div><strong>Engine:</strong> Rust 1.80+ Core Engine</div>
-            <div><strong>Status:</strong> 70/70 Verified Tests (100%)</div>
-            <div style="color:var(--accent-green);">● Desktop Release v0.1.2 Active</div>
+            <div><strong>Status:</strong> 74/74 Verified Tests (100%)</div>
+            <div style="color:var(--accent-green);">● Desktop Release v0.1.3 Active</div>
           </div>
         </aside>
 
@@ -1515,11 +1515,39 @@ pub struct BiaxialPmReport {
               </p>
               
               <div style="display:flex; flex-direction:column; gap:12px;">
-                <!-- v0.1.2 -->
+                <!-- v0.1.3 -->
                 <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16, 185, 129, 0.4); border-radius:8px; padding:14px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);">
                   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <div>
                       <span class="dossier-tag green" style="font-size:0.7rem; font-weight:700;">LATEST PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.3</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 13: Nonlinear Dynamic Direct Time-History Analysis Engine)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.3" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Source ↗
+                    </a>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.3.zip" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (zip)
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.3.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (tar.gz)
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>ASCE 7-22 Chapter 16 & SNI 1726:2019 Pasal 11:</strong> Rigorous direct time-history analysis (NL-THA) solver using Hilber-Hughes-Taylor (\(\text{HHT}-\alpha\), \(\alpha=-0.10\)) implicit scheme with numerical dissipation.</li>
+                    <li><strong>Bouc-Wen Differential Restoring Force Model:</strong> Smooth inelastic yielding kinematics \(\dot{z} = \dot{u}[A - (\beta_w \operatorname{sgn}(\dot{u})|z|^n + \gamma_w|z|^n)]\) with Newton-Raphson tangent stiffness solver.</li>
+                    <li><strong>Instantaneous Dynamic Energy Balance (ATC-114):</strong> Direct time-stepping integration of Kinetic (\(E_K\)), Viscous Damping (\(E_D\)), Strain (\(E_S\)), and Hysteretic (\(E_H\)) energy with residual error \(\epsilon_E \le 2.5\%\).</li>
+                    <li><strong>Multi-Story Envelope Profiles:</strong> Story displacement, inter-story drift ratio check (\(\theta \le 0.020\)), story shear, and overturning moment with 16-story tall building test archetype.</li>
+                  </ul>
+                </div>
+
+                <!-- v0.1.2 -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(59, 130, 246, 0.3); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                      <span class="dossier-tag blue" style="font-size:0.7rem; font-weight:700;">PRODUCTION</span>
                       <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.2</span>
                       <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 12: Seismic Base Isolation & Energy Dissipation Engine)</span>
                     </div>
