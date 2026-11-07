@@ -36,6 +36,7 @@ pub mod isolation;
 pub mod time_history;
 pub mod fema_p58;
 pub mod blast;
+pub mod fire;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -155,5 +156,9 @@ pub use blast::{
     BlastAnalysisInput, BlastAnalysisReport, BlastComponentKind, BlastComplianceItem, BlastEngine,
     BlastResponseRegime, BlastWaveParameters, BurstType, ExplosiveType, PiCurvePoint,
     SdofSystemParameters, SdofTimeStep, SupportCondition, UfcDamageLevel,
+};
+pub use fire::{
+    ConcreteAggregateKind, FireAnalysisInput, FireAnalysisReport, FireComplianceItem, FireCurveKind,
+    FireEngine, FireMemberKind, FireProtectionKind, FireTimeStep, ThermalRestraintKind,
 };
 

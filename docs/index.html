@@ -31,7 +31,7 @@
           <div class="titlebar-title">
             <img src="assets/icon.png" alt="EigenGraph" width="22" height="22" style="border-radius:4px;">
             <span>EigenGraph Workstation</span>
-            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.5-release</span>
+            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.6-release</span>
           </div>
         </div>
 
@@ -41,8 +41,8 @@
         </div>
 
         <div class="titlebar-right">
-          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.5" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
-            📥 Download v0.1.5
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.6" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v0.1.6
           </a>
           <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             🏷️ Releases
@@ -186,8 +186,8 @@
 
           <div class="sidebar-footer">
             <div><strong>Engine:</strong> Rust 1.80+ Core Engine</div>
-            <div><strong>Status:</strong> 82/82 Verified Tests (100%)</div>
-            <div style="color:var(--accent-green);">● Desktop Release v0.1.5 Active</div>
+            <div><strong>Status:</strong> 86/86 Verified Tests (100%)</div>
+            <div style="color:var(--accent-green);">● Desktop Release v0.1.6 Active</div>
           </div>
         </aside>
 
@@ -1515,20 +1515,48 @@ pub struct BiaxialPmReport {
               </p>
               
               <div style="display:flex; flex-direction:column; gap:12px;">
-                <!-- v0.1.5 -->
+                <!-- v0.1.6 -->
                 <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16, 185, 129, 0.4); border-radius:8px; padding:14px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);">
                   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <div>
                       <span class="dossier-tag green" style="font-size:0.7rem; font-weight:700;">LATEST PRODUCTION</span>
-                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.5</span>
-                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 15: Blast Resistant Design & Explosive Dynamics Engine)</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.6</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 16: Structural Fire Engineering & Coupled Thermo-Mechanical Response Engine)</span>
                     </div>
-                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.5" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.6" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
                       Release Notes & Source ↗
                     </a>
                   </div>
                   <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.5.zip" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.6.zip" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (zip)
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.6.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (tar.gz)
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>AISC 360-16 Appendix 4 & Eurocode 1/2/3:</strong> Comprehensive fire engineering suite covering ISO 834-1, ASTM E119, Eurocode Hydrocarbon (\(1100^\circ\text{C}\)), External facade fire, and Parametric natural burnout curves.</li>
+                    <li><strong>Transient Heat Conduction & Fireproofing Sizing:</strong> Finite difference thermal evolution for 3-sided beam and 4-sided column section factors (\(A_m/V\)) with multi-material passive insulation (SFRM, Intumescent, Calcium Silicate, Concrete encasement) and automated thickness sizing.</li>
+                    <li><strong>Elevated-Temperature Constitutive Material Retention:</strong> AISC 360 / EC3 steel yield retention \(k_y(T)\), elastic modulus \(k_E(T)\), Eurocode 2 siliceous & calcareous concrete compressive retention \(k_c(T)\), and buckling capacity \(P_n(T)\).</li>
+                    <li><strong>Coupled Thermal Expansion & Axial Restraint Thrust:</strong> Thermal elongation strain \(\epsilon_{th}(T)\), frame longitudinal restraint thrust force \(P_{th}(T)\), and combined P-M cross-section demand-to-capacity verification.</li>
+                  </ul>
+                </div>
+
+                <!-- v0.1.5 -->
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                      <span class="dossier-tag blue" style="font-size:0.7rem;">PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.5</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 15: Blast Resistant Design & Explosive Dynamics Engine)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.5" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Source ↗
+                    </a>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.5.zip" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
                       📦 Source code (zip)
                     </a>
                     <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.5.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">

@@ -23,12 +23,14 @@ pub enum ModelArchetype {
     TimeHistoryTower3D,      // 3D 16-Story NL-THA Seismic Test Tower Archetype
     FemaP58HospitalArchetype, // 3D 10-Story FEMA P-58 Resilience & Loss Assessment Archetype
     BlastResistantBunker3D,  // 3D Hardened Protective Blast Bunker & Standoff Barrier Archetype (UFC 3-340-02)
+    FireCompartmentFrame3D,  // 3D Multi-Bay Steel Frame with Localized Fire Compartment (AISC 360-16 / EN 1993-1-2)
 }
 
 impl ModelArchetype {
     pub fn label(&self) -> &'static str {
         match self {
             Self::BimCraftBuilding3D => "🏗️ BIMCraft LOD350 (CSG + Rebar)",
+            Self::FireCompartmentFrame3D => "🔥 Fire Compartment Steel Frame (AISC/EC3)",
             Self::BlastResistantBunker3D => "🛡️ Blast Protective Bunker (UFC 3-340-02)",
             Self::FemaP58HospitalArchetype => "🏥 FEMA P-58 Hospital (10-Story)",
             Self::BaseIsolatedHospital3D => "🛡️ Base-Isolated Hospital (8-Story)",
@@ -368,6 +370,7 @@ impl BuildView {
 
             let models = [
                 ModelArchetype::BimCraftBuilding3D,
+                ModelArchetype::FireCompartmentFrame3D,
                 ModelArchetype::BlastResistantBunker3D,
                 ModelArchetype::FemaP58HospitalArchetype,
                 ModelArchetype::BaseIsolatedHospital3D,
@@ -398,6 +401,12 @@ impl BuildView {
                             self.cam_zoom = 1.15;
                             self.cam_pan = Vec2::ZERO;
                             self.render_mode = Render3DMode::CsgSolidBrep;
+                        }
+                        ModelArchetype::FireCompartmentFrame3D => {
+                            self.cam_yaw = 0.58;
+                            self.cam_pitch = 0.32;
+                            self.cam_zoom = 0.95;
+                            self.cam_pan = Vec2::ZERO;
                         }
                         ModelArchetype::BlastResistantBunker3D => {
                             self.cam_yaw = 0.68;
@@ -952,6 +961,7 @@ impl BuildView {
                         ui.label(RichText::new("Model:").size(11.0).color(theme.text_muted));
                         let models = [
                             ModelArchetype::BimCraftBuilding3D,
+                            ModelArchetype::FireCompartmentFrame3D,
                             ModelArchetype::BlastResistantBunker3D,
                             ModelArchetype::FemaP58HospitalArchetype,
                             ModelArchetype::BaseIsolatedHospital3D,
@@ -2476,6 +2486,34 @@ impl BuildView {
                 let cy = -3.5;
                 let cz = 2.1;
                 ((cx, cy, cz), 16.0, list)
+            }
+            ModelArchetype::FireCompartmentFrame3D => {
+                let (nodes, elements) = crate::core::FireEngine::generate_fire_compartment_archetype();
+                let mut list = Vec::with_capacity(elements.len());
+                for el in &elements {
+                    let n1 = nodes.iter().find(|n| n.id == el.node_start).unwrap();
+                    let n2 = nodes.iter().find(|n| n.id == el.node_end).unwrap();
+                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
+                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
+                    let is_fire_zone = n1.x <= 7.5 && n1.y <= 7.5 && n2.x <= 7.5 && n2.y <= 7.5;
+                    list.push(Member3D {
+                        id: el.id,
+                        p1,
+                        p2,
+                        name: if is_fire_zone { format!("FireZone-{}", el.id) } else { format!("ColdFrame-{}", el.id) },
+                        section: el.section.name.clone(),
+                        base_width: if is_fire_zone { 6.0 } else { 4.5 },
+                        force_kn: if is_fire_zone { 350.0 } else { 180.0 },
+                        capacity_kn: if is_fire_zone { 480.0 } else { 850.0 },
+                        utilization: if is_fire_zone { 0.73 } else { 0.21 },
+                        ari: 0.97,
+                        is_critical: is_fire_zone,
+                    });
+                }
+                let cx = 7.5;
+                let cy = 7.5;
+                let cz = 1.9;
+                ((cx, cy, cz), 20.0, list)
             }
         }
     }

@@ -7,6 +7,47 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.1.6] - 2026-11-07 — Phase 16: Structural Fire Engineering & Coupled Thermo-Mechanical Response Engine (AISC 360-16 / EN 1993-1-2)
+
+### Added
+- **Structural Fire Engineering & Coupled Thermo-Mechanical Engine (`src/core/fire.rs`)**:
+  - Full compliance with **AISC 360-16 Appendix 4 (Structural Design for Fire Conditions)**, **Eurocode 1 (EN 1991-1-2)**, **Eurocode 2 (EN 1992-1-2)**, **Eurocode 3 (EN 1993-1-2)**, **ASTM E119 / UL 263**, **ISO 834-1**, and **ACI 216.1-14 / TMS 0216**.
+  - **Standard & Parametric Design Fire Curves**:
+    - **ISO 834-1 / EN 1991-1-2**: $T_g(t) = 20 + 345 \log_{10}(8t + 1)$ ($t$ in min, $T_g$ in $^\circ\text{C}$).
+    - **ASTM E119 / UL 263**: Closed-form approximation modeling furnace heating.
+    - **Eurocode Hydrocarbon (HC)**: Rapid rise curve modeling fuel spills reaching $1100^\circ\text{C}$ within 30 minutes.
+    - **External Exposure & Parametric Natural Fire Curves**: Natural fire load decay modeling.
+  - **Transient Cross-Section Heat Conduction**:
+    - Unprotected structural members with combined convection ($h_c = 25\text{ W/m}^2\text{K}$) and Stefan-Boltzmann radiation ($\epsilon_{\text{res}} = 0.70, \sigma = 5.67 \times 10^{-8}\text{ W/m}^2\text{K}^4$).
+    - Passive fire protection modeling for Spray-Applied Fire Resistive Material (SFRM / Gypsum), Thin-Film Intumescent Coatings, Board Encasement, and Solid Concrete Encasement.
+    - Sizing tool for required insulation coating thickness $d_p$ (mm) to achieve target Fire Resistance Rating (FRR).
+    - Section factor computation ($A_m / V$ in $\text{m}^{-1}$) for 3-sided beam and 4-sided column exposures.
+  - **High-Temperature Material Constitutive Degradation**:
+    - Structural steel yield strength retention factor $k_y(T) = f_{y,T} / f_y$ and elastic modulus factor $k_E(T) = E_T / E$ per AISC 360-16 Table A-4.2.1 and Eurocode 3 §3.2.
+    - Concrete compressive strength degradation $k_c(T) = f_{c,T}' / f_c'$ for Siliceous vs Calcareous aggregates per Eurocode 2 §3.2.2.
+    - Structural steel nonlinear thermal expansion strain: $\epsilon_{th}(T)$ modeling phase transformation plateaus.
+    - Thermal restraint axial force generation: $P_{th} = \alpha_{\text{restr}} \cdot k_E(T) E A \cdot \epsilon_{th}$ accounting for multi-bay cold boundary continuity.
+  - **Fire Endurance Rating (FRR) & Critical Temperature Evaluation**:
+    - Automated evaluation of achieved fire rating period (e.g., R60, R90, R120, R180) tracking plastic capacity reduction $M_{n,T}(t) = Z_x f_{y,T}$ and column elevated buckling.
+    - Identification of critical steel core runaway temperature $T_{\text{crit}} \approx 500^\circ\text{C} \sim 550^\circ\text{C}$.
+  - **3D Fire Compartment Structural Frame Archetype (`generate_fire_compartment_archetype`)**:
+    - Synthesizes an 18-node, 21-element structural steel frame isolating localized corner fire compartments with intumescent-coated W18x50 beams and W14x90 columns.
+  - **Automated Calculation Dossier Generator (`generate_markdown_dossier`)**:
+    - Professional calculation report detailing furnace exposure curves, member heat conduction, material degradation factors, and regulatory compliance matrix.
+  - **Unit Testing Suite**: 4 verified test cases (`test_fire_gas_temperature_curves`, `test_high_temperature_material_degradation`, `test_structural_fire_assessment_pipeline`, `test_fire_compartment_archetype_generation`), expanding verified suite to **86/86 tests (100%)**.
+- **Deep Analysis Studio (`src/views/analyze.rs`)**:
+  - Added subtab `AnalyzeSubTab::StructuralFireEngineering` ("🔥 Structural Fire (AISC/EC3)").
+  - 4 Executive KPI cards: Fire Exposure & Gas Temp ($T_g, T_s, A_m/V$), Fire Resistance Rating ($R_{\min}$ achieved vs target), Degraded Elevated Capacity ($D/C$ ratio, cold vs hot capacity), and Passive Insulation Sizing ($d_p$ applied vs required).
+  - Interactive parameter controls: Fire curve combo, duration slider, target FRR slider, thermal restraint combo, section geometry dimensions (depth, width, web/flange thk, cover), passive protection systems, and material strengths.
+  - 2D Vector CAD Canvas: Left side Gas Temp $T_g(t)$ vs Member Core Temp $T_s(t)$ with $T_{\text{crit}}$ threshold line; Right side elevated moment capacity $M_{n,T}(t)$ degradation curve with demand line and failure marker.
+  - Complete AISC 360-16 & Eurocode 1/2/3 compliance audit matrix.
+- **3D Modeling & CAD Viewport (`src/views/build.rs`)**:
+  - Added `ModelArchetype::FireCompartmentFrame3D` ("🔥 Fire Compartment Steel Frame (AISC/EC3)").
+  - Integrated into model selectors and dedicated camera preset (yaw 0.58, pitch 0.32, zoom 0.95).
+  - 3D rendering of structural frame highlighting fire zone elements in orange/red with cold frame boundary members.
+- **Results & Engineering Dossier View (`src/views/results.rs`)**:
+  - Added action button `"🔥 Structural Fire Dossier (.md)"` saving `EigenGraph_Structural_Fire_AISC360_Dossier.md`.
+
 ## [v0.1.5] - 2026-11-07 — Phase 15: Blast Resistant Design & Explosive Impulse Dynamics Engine (UFC 3-340-02 / ASCE 59-11)
 
 ### Added

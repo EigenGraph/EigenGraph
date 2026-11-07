@@ -25,6 +25,7 @@ pub enum AnalyzeSubTab {
     TimeHistoryAnalysis,
     FemaP58LossAssessment,
     BlastResistantDesign,
+    StructuralFireEngineering,
 }
 
 pub struct AnalyzeView {
@@ -189,6 +190,26 @@ pub struct AnalyzeView {
     pub blast_fy_mpa: f32,
     pub blast_rebar_percent: f32,
     pub blast_target_damage: crate::core::UfcDamageLevel,
+    // Structural Fire Engineering & Coupled Thermo-Mechanical Response (AISC 360-16 / EN 1993-1-2)
+    pub fire_project_name: String,
+    pub fire_curve_kind: crate::core::FireCurveKind,
+    pub fire_member_kind: crate::core::FireMemberKind,
+    pub fire_protection_kind: crate::core::FireProtectionKind,
+    pub fire_protection_thickness_mm: f32,
+    pub fire_duration_minutes: f32,
+    pub fire_target_frr_minutes: f32,
+    pub fire_span_m: f32,
+    pub fire_depth_mm: f32,
+    pub fire_width_mm: f32,
+    pub fire_web_thk_mm: f32,
+    pub fire_flange_thk_mm: f32,
+    pub fire_cover_mm: f32,
+    pub fire_aggregate_kind: crate::core::ConcreteAggregateKind,
+    pub fire_steel_fy_mpa: f32,
+    pub fire_concrete_fc_mpa: f32,
+    pub fire_moment_demand_knm: f32,
+    pub fire_axial_demand_kn: f32,
+    pub fire_thermal_restraint: crate::core::ThermalRestraintKind,
 }
 
 impl Default for AnalyzeView {
@@ -345,6 +366,25 @@ impl Default for AnalyzeView {
             blast_fy_mpa: 420.0,
             blast_rebar_percent: 1.20,
             blast_target_damage: crate::core::UfcDamageLevel::Low,
+            fire_project_name: "Metropolitan Commercial Center Multi-Story Frame".to_string(),
+            fire_curve_kind: crate::core::FireCurveKind::Iso834Standard,
+            fire_member_kind: crate::core::FireMemberKind::SteelBeam,
+            fire_protection_kind: crate::core::FireProtectionKind::SprayedMineralFiber,
+            fire_protection_thickness_mm: 20.0,
+            fire_duration_minutes: 120.0,
+            fire_target_frr_minutes: 90.0,
+            fire_span_m: 7.50,
+            fire_depth_mm: 457.0,
+            fire_width_mm: 190.0,
+            fire_web_thk_mm: 9.0,
+            fire_flange_thk_mm: 14.5,
+            fire_cover_mm: 40.0,
+            fire_aggregate_kind: crate::core::ConcreteAggregateKind::Siliceous,
+            fire_steel_fy_mpa: 355.0,
+            fire_concrete_fc_mpa: 35.0,
+            fire_moment_demand_knm: 240.0,
+            fire_axial_demand_kn: 600.0,
+            fire_thermal_restraint: crate::core::ThermalRestraintKind::ModeratelyRestrained,
         }
     }
 }
@@ -409,6 +449,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::TimeHistoryAnalysis => self.render_time_history_analysis(ui, theme),
                     AnalyzeSubTab::FemaP58LossAssessment => self.render_fema_p58_assessment(ui, theme),
                     AnalyzeSubTab::BlastResistantDesign => self.render_blast_resistant_design(ui, theme),
+                    AnalyzeSubTab::StructuralFireEngineering => self.render_fire_engineering(ui, theme),
                 }
 
                 ui.add_space(64.0);
@@ -569,6 +610,7 @@ impl AnalyzeView {
                     (AnalyzeSubTab::TimeHistoryAnalysis, "🌊 NL-THA Time-History"),
                     (AnalyzeSubTab::FemaP58LossAssessment, "🏛️ FEMA P-58 Loss & REDi"),
                     (AnalyzeSubTab::BlastResistantDesign, "💣 Blast & Explosive Dynamics (UFC/ASCE)"),
+                    (AnalyzeSubTab::StructuralFireEngineering, "🔥 Structural Fire (AISC/EC3)"),
                 ];
 
                 for (tab, label) in tabs {
@@ -6199,6 +6241,438 @@ impl AnalyzeView {
                     ui.label(RichText::new(format!("{:.2} {}", item.demand_val, item.unit)).size(10.5).color(theme.text_primary));
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.2} {}", item.permissible_limit, item.unit)).size(10.5).color(theme.accent_green));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.3}", item.utilization_ratio)).size(10.5).strong().color(row_col));
+                    ui.add_space(20.0);
+                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                });
+                ui.separator();
+            }
+        });
+    }
+
+    fn render_fire_engineering(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let input = crate::core::FireAnalysisInput {
+            project_name: self.fire_project_name.clone(),
+            fire_curve: self.fire_curve_kind,
+            member_kind: self.fire_member_kind,
+            protection_kind: self.fire_protection_kind,
+            protection_thickness_mm: self.fire_protection_thickness_mm as f64,
+            fire_duration_minutes: self.fire_duration_minutes as f64,
+            target_frr_minutes: self.fire_target_frr_minutes as f64,
+            clear_span_m: self.fire_span_m as f64,
+            section_depth_mm: self.fire_depth_mm as f64,
+            section_width_mm: self.fire_width_mm as f64,
+            web_thickness_mm: self.fire_web_thk_mm as f64,
+            flange_thickness_mm: self.fire_flange_thk_mm as f64,
+            concrete_cover_mm: self.fire_cover_mm as f64,
+            aggregate_kind: self.fire_aggregate_kind,
+            steel_fy_mpa: self.fire_steel_fy_mpa as f64,
+            concrete_fc_mpa: self.fire_concrete_fc_mpa as f64,
+            service_moment_demand_knm: self.fire_moment_demand_knm as f64,
+            service_axial_demand_kn: self.fire_axial_demand_kn as f64,
+            thermal_restraint: self.fire_thermal_restraint,
+        };
+
+        let rep = crate::core::FireEngine::run_assessment(&input);
+
+        // 4 Executive KPI Cards
+        ui.horizontal(|ui| {
+            // Card 1: Fire Exposure & Gas Temp
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(260.0);
+                ui.label(RichText::new("🔥 Fire Exposure & Temperatures").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("{:.0} °C", rep.final_member_temp_c))
+                        .size(19.0)
+                        .strong()
+                        .color(Color32::from_rgb(239, 68, 68)),
+                );
+                ui.label(
+                    RichText::new(format!(
+                        "Gas Tg = {:.0} °C | Am/V = {:.1} m⁻¹\nCurve: {}",
+                        rep.peak_gas_temp_c,
+                        rep.section_factor_m_inv,
+                        rep.input.fire_curve.label()
+                    ))
+                    .size(10.5)
+                    .color(theme.text_secondary),
+                );
+            });
+
+            ui.add_space(8.0);
+
+            // Card 2: Fire Resistance Rating (FRR)
+            let frr_col = if rep.is_target_frr_achieved { theme.accent_green } else { Color32::from_rgb(245, 158, 11) };
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(260.0);
+                ui.label(RichText::new("🛡️ Fire Endurance Rating").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("R{:.0} ({:.0} min)", rep.fire_endurance_rating_minutes, rep.fire_endurance_rating_minutes))
+                        .size(19.0)
+                        .strong()
+                        .color(frr_col),
+                );
+                let achieved_str = if rep.is_target_frr_achieved {
+                    "🟢 Target FRR Satisfied"
+                } else {
+                    "🔴 Target FRR Deficit"
+                };
+                ui.label(
+                    RichText::new(format!(
+                        "{}\nTarget: R{:.0} | Tcrit = {:.0} °C",
+                        achieved_str,
+                        rep.input.target_frr_minutes,
+                        rep.critical_temperature_c
+                    ))
+                    .size(10.5)
+                    .color(theme.text_secondary),
+                );
+            });
+
+            ui.add_space(8.0);
+
+            // Card 3: Degraded Elevated Capacity
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(260.0);
+                ui.label(RichText::new("📉 Elevated Structural Capacity").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("D/C = {:.2}", rep.max_utilization_ratio))
+                        .size(19.0)
+                        .strong()
+                        .color(if rep.max_utilization_ratio <= 1.0 { theme.accent_blue } else { Color32::from_rgb(239, 68, 68) }),
+                );
+                ui.label(
+                    RichText::new(format!(
+                        "Cold: {:.0} | Elevated: {:.0}\nRetained: {:.1}%",
+                        rep.ambient_capacity,
+                        rep.residual_capacity_at_duration,
+                        (rep.residual_capacity_at_duration / rep.ambient_capacity.max(0.1)) * 100.0
+                    ))
+                    .size(10.5)
+                    .color(theme.text_secondary),
+                );
+            });
+
+            ui.add_space(8.0);
+
+            // Card 4: Passive Fire Insulation Sizing
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(260.0);
+                ui.label(RichText::new("🧱 Passive Protection Sizing").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("{:.1} mm", rep.input.protection_thickness_mm))
+                        .size(19.0)
+                        .strong()
+                        .color(Color32::from_rgb(168, 85, 247)),
+                );
+                ui.label(
+                    RichText::new(format!(
+                        "Req for Target: {:.1} mm\nSystem: {}",
+                        rep.required_insulation_thickness_mm,
+                        rep.input.protection_kind.label()
+                    ))
+                    .size(10.5)
+                    .color(theme.text_secondary),
+                );
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // Parameter Controls Panel (3 Columns)
+        theme.card_frame().show(ui, |ui| {
+            ui.label(RichText::new("⚙️ Fire Exposure, Member Section Geometry & Passive Protection Controls").size(12.5).strong().color(theme.accent_blue));
+            ui.add_space(8.0);
+
+            ui.columns(3, |cols| {
+                // Column 1: Fire Exposure & Targets
+                cols[0].vertical(|ui| {
+                    ui.label(RichText::new("1. Fire Curve & Target Endurance").strong().size(11.0).color(theme.accent_blue));
+                    ui.add_space(4.0);
+
+                    ui.label(RichText::new("Design Fire Exposure Curve:").size(10.5));
+                    egui::ComboBox::from_id_salt("fire_curve_combo")
+                        .selected_text(self.fire_curve_kind.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.fire_curve_kind, crate::core::FireCurveKind::Iso834Standard, "ISO 834 / EN 1991-1-2 Standard Fire");
+                            ui.selectable_value(&mut self.fire_curve_kind, crate::core::FireCurveKind::AstmE119, "ASTM E119 / UL 263 Standard Fire");
+                            ui.selectable_value(&mut self.fire_curve_kind, crate::core::FireCurveKind::EurocodeHydrocarbon, "Eurocode Hydrocarbon (HC) Rapid Fire");
+                            ui.selectable_value(&mut self.fire_curve_kind, crate::core::FireCurveKind::ExternalFireCurve, "External Exposure Fire Curve");
+                            ui.selectable_value(&mut self.fire_curve_kind, crate::core::FireCurveKind::ParametricNaturalFire, "Parametric Natural Fire with Decay");
+                        });
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Fire Duration Time (min):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.fire_duration_minutes, 15.0..=240.0).suffix(" min"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Target Fire Rating FRR (min):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.fire_target_frr_minutes, 30.0..=180.0).suffix(" min"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Thermal Restraint Boundary:").size(10.5));
+                    egui::ComboBox::from_id_salt("fire_restr_combo")
+                        .selected_text(self.fire_thermal_restraint.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.fire_thermal_restraint, crate::core::ThermalRestraintKind::Unrestrained, "Unrestrained (Free Expansion)");
+                            ui.selectable_value(&mut self.fire_thermal_restraint, crate::core::ThermalRestraintKind::ModeratelyRestrained, "Moderately Restrained (Multi-Bay Frame)");
+                            ui.selectable_value(&mut self.fire_thermal_restraint, crate::core::ThermalRestraintKind::RigidlyRestrained, "Rigidly Restrained (Stiff Shaft / Bunker)");
+                        });
+                });
+
+                // Column 2: Member Archetype & Section Dimensions
+                cols[1].vertical(|ui| {
+                    ui.label(RichText::new("2. Member Archetype & Section Dimensions").strong().size(11.0).color(theme.accent_blue));
+                    ui.add_space(4.0);
+
+                    ui.label(RichText::new("Member Archetype:").size(10.5));
+                    egui::ComboBox::from_id_salt("fire_member_combo")
+                        .selected_text(self.fire_member_kind.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.fire_member_kind, crate::core::FireMemberKind::SteelBeam, "Structural Steel W-Beam (Flexure)");
+                            ui.selectable_value(&mut self.fire_member_kind, crate::core::FireMemberKind::SteelColumn, "Structural Steel W-Column (Compression)");
+                            ui.selectable_value(&mut self.fire_member_kind, crate::core::FireMemberKind::RcBeam, "RC Rectangular Beam (Flexure)");
+                            ui.selectable_value(&mut self.fire_member_kind, crate::core::FireMemberKind::RcColumn, "RC Square Column (Biaxial Compression)");
+                        });
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Clear Span Length L (m):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.fire_span_m, 3.0..=15.0).suffix(" m"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Section Depth D (mm):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.fire_depth_mm, 200.0..=900.0).suffix(" mm"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Section Width B (mm):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.fire_width_mm, 150.0..=500.0).suffix(" mm"));
+
+                    if matches!(self.fire_member_kind, crate::core::FireMemberKind::RcBeam | crate::core::FireMemberKind::RcColumn) {
+                        ui.add_space(4.0);
+                        ui.label(RichText::new("Clear Concrete Cover (mm):").size(10.5));
+                        ui.add(egui::Slider::new(&mut self.fire_cover_mm, 20.0..=70.0).suffix(" mm"));
+                    } else {
+                        ui.add_space(4.0);
+                        ui.label(RichText::new("Flange Thickness tf (mm):").size(10.5));
+                        ui.add(egui::Slider::new(&mut self.fire_flange_thk_mm, 8.0..=35.0).suffix(" mm"));
+                    }
+                });
+
+                // Column 3: Material Strengths & Passive Protection
+                cols[2].vertical(|ui| {
+                    ui.label(RichText::new("3. Protection & Material Demands").strong().size(11.0).color(theme.accent_blue));
+                    ui.add_space(4.0);
+
+                    ui.label(RichText::new("Passive Protection System:").size(10.5));
+                    egui::ComboBox::from_id_salt("fire_prot_combo")
+                        .selected_text(self.fire_protection_kind.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.fire_protection_kind, crate::core::FireProtectionKind::SprayedMineralFiber, "Sprayed Fire Resistive (SFRM / Gypsum)");
+                            ui.selectable_value(&mut self.fire_protection_kind, crate::core::FireProtectionKind::IntumescentCoating, "Thin-Film Solvent Intumescent Coating");
+                            ui.selectable_value(&mut self.fire_protection_kind, crate::core::FireProtectionKind::BoardEncasement, "Calcium Silicate Board Encasement");
+                            ui.selectable_value(&mut self.fire_protection_kind, crate::core::FireProtectionKind::ConcreteEncasement, "Solid Structural Concrete Encasement");
+                            ui.selectable_value(&mut self.fire_protection_kind, crate::core::FireProtectionKind::Unprotected, "Unprotected Bare Structural Steel");
+                        });
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Insulation Thickness dp (mm):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.fire_protection_thickness_mm, 5.0..=50.0).suffix(" mm"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Steel Yield Strength fy (MPa):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.fire_steel_fy_mpa, 235.0..=460.0).suffix(" MPa"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Applied Moment / Axial Service Load:").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.fire_moment_demand_knm, 50.0..=600.0).suffix(" kNm"));
+                });
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // 2D Vector CAD Canvas: Temperature Histories (Left) & Capacity Degradation (Right)
+        theme.card_frame().show(ui, |ui| {
+            ui.label(RichText::new("📈 Transient Heat Conduction & Elevated Temperature Structural Degradation").size(12.5).strong().color(theme.accent_blue));
+            ui.add_space(6.0);
+
+            let (canvas_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 260.0), Sense::hover());
+            let painter = ui.painter_with_clip(canvas_rect);
+
+            painter.rect_filled(canvas_rect, CornerRadius::same(6), Color32::from_rgb(18, 22, 28));
+            painter.rect_stroke(canvas_rect, CornerRadius::same(6), Stroke::new(1.0, theme.border_subtle), egui::StrokeKind::Inside);
+
+            let half_w = canvas_rect.width() * 0.5 - 10.0;
+            let left_rect = egui::Rect::from_min_size(canvas_rect.min + Vec2::new(5.0, 5.0), Vec2::new(half_w, canvas_rect.height() - 10.0));
+            let right_rect = egui::Rect::from_min_size(Pos2::new(canvas_rect.min.x + half_w + 15.0, canvas_rect.min.y + 5.0), Vec2::new(half_w, canvas_rect.height() - 10.0));
+
+            // Grid lines on both canvases
+            for r in &[left_rect, right_rect] {
+                for i in 1..5 {
+                    let y_line = r.min.y + (r.height() / 5.0) * (i as f32);
+                    painter.line_segment([Pos2::new(r.min.x, y_line), Pos2::new(r.max.x, y_line)], Stroke::new(0.5, Color32::from_rgb(35, 42, 54)));
+                }
+            }
+
+            // === LEFT CANVAS: Gas Temp Tg(t) and Member Core Temp Ts(t) ===
+            let samples = &rep.time_history_samples;
+            if !samples.is_empty() {
+                let max_temp_canvas = 1200.0_f32;
+                let t_end = rep.input.fire_duration_minutes as f32;
+
+                // Critical steel temperature horizontal line (Tcrit = 550 C)
+                let crit_y = left_rect.max.y - 30.0 - (rep.critical_temperature_c as f32 / max_temp_canvas) * (left_rect.height() - 60.0);
+                painter.line_segment(
+                    [Pos2::new(left_rect.min.x + 35.0, crit_y), Pos2::new(left_rect.max.x - 15.0, crit_y)],
+                    Stroke::new(1.0, Color32::from_rgb(239, 68, 68)),
+                );
+                painter.text(
+                    Pos2::new(left_rect.max.x - 18.0, crit_y - 2.0),
+                    Align2::RIGHT_BOTTOM,
+                    format!("Critical Tcrit = {:.0} °C", rep.critical_temperature_c),
+                    egui::FontId::proportional(9.5),
+                    Color32::from_rgb(239, 68, 68),
+                );
+
+                // Gas Temp curve
+                let mut tg_pts = Vec::new();
+                let mut ts_pts = Vec::new();
+                for pt in samples {
+                    let sx = left_rect.min.x + 35.0 + (pt.time_minutes as f32 / t_end) * (left_rect.width() - 50.0);
+                    let sy_g = left_rect.max.y - 30.0 - (pt.gas_temp_c as f32 / max_temp_canvas) * (left_rect.height() - 60.0);
+                    let sy_s = left_rect.max.y - 30.0 - (pt.member_temp_c as f32 / max_temp_canvas) * (left_rect.height() - 60.0);
+                    tg_pts.push(Pos2::new(sx, sy_g));
+                    ts_pts.push(Pos2::new(sx, sy_s));
+                }
+
+                for w in 0..(tg_pts.len().saturating_sub(1)) {
+                    painter.line_segment([tg_pts[w], tg_pts[w + 1]], Stroke::new(1.8, Color32::from_rgb(245, 158, 11)));
+                }
+                for w in 0..(ts_pts.len().saturating_sub(1)) {
+                    painter.line_segment([ts_pts[w], ts_pts[w + 1]], Stroke::new(2.4, Color32::from_rgb(239, 68, 68)));
+                }
+
+                // Final temperature marker
+                if let Some(last_pt) = ts_pts.last() {
+                    painter.circle_filled(*last_pt, 4.5, Color32::from_rgb(239, 68, 68));
+                    painter.text(
+                        Pos2::new(last_pt.x - 5.0, last_pt.y - 8.0),
+                        Align2::RIGHT_BOTTOM,
+                        format!("{:.0} °C", rep.final_member_temp_c),
+                        egui::FontId::proportional(10.0),
+                        Color32::from_rgb(239, 68, 68),
+                    );
+                }
+            }
+
+            painter.text(
+                Pos2::new(left_rect.min.x + 10.0, left_rect.min.y + 10.0),
+                Align2::LEFT_TOP,
+                "Gas Temp Tg(t) [Amber] vs Member Core Temp Ts(t) [Red]",
+                egui::FontId::proportional(11.0),
+                Color32::from_rgb(245, 158, 11),
+            );
+
+            // === RIGHT CANVAS: Capacity Degradation & Demand D/C ===
+            if !samples.is_empty() {
+                let max_cap_canvas = (rep.ambient_capacity as f32 * 1.15).max(10.0);
+                let t_end = rep.input.fire_duration_minutes as f32;
+
+                // Demand horizontal line
+                let applied_demand = rep.input.service_moment_demand_knm as f32;
+                let demand_y = right_rect.max.y - 30.0 - (applied_demand / max_cap_canvas) * (right_rect.height() - 60.0);
+                painter.line_segment(
+                    [Pos2::new(right_rect.min.x + 35.0, demand_y), Pos2::new(right_rect.max.x - 15.0, demand_y)],
+                    Stroke::new(1.0, Color32::from_rgb(245, 158, 11)),
+                );
+                painter.text(
+                    Pos2::new(right_rect.max.x - 18.0, demand_y - 2.0),
+                    Align2::RIGHT_BOTTOM,
+                    format!("Demand = {:.0} kNm", applied_demand),
+                    egui::FontId::proportional(9.5),
+                    Color32::from_rgb(245, 158, 11),
+                );
+
+                let mut cap_pts = Vec::new();
+                for pt in samples {
+                    let sx = right_rect.min.x + 35.0 + (pt.time_minutes as f32 / t_end) * (right_rect.width() - 50.0);
+                    let sy = right_rect.max.y - 30.0 - (pt.elevated_capacity as f32 / max_cap_canvas) * (right_rect.height() - 60.0);
+                    cap_pts.push(Pos2::new(sx, sy));
+                }
+
+                for w in 0..(cap_pts.len().saturating_sub(1)) {
+                    painter.line_segment([cap_pts[w], cap_pts[w + 1]], Stroke::new(2.4, theme.accent_blue));
+                }
+
+                // Fire endurance failure marker (if failed)
+                let fail_x = right_rect.min.x + 35.0 + (rep.fire_endurance_rating_minutes as f32 / t_end) * (right_rect.width() - 50.0);
+                painter.line_segment(
+                    [Pos2::new(fail_x, right_rect.min.y + 20.0), Pos2::new(fail_x, right_rect.max.y - 30.0)],
+                    Stroke::new(1.2, Color32::from_rgb(168, 85, 247)),
+                );
+                painter.text(
+                    Pos2::new(fail_x + 4.0, right_rect.min.y + 25.0),
+                    Align2::LEFT_TOP,
+                    format!("FRR = R{:.0}", rep.fire_endurance_rating_minutes),
+                    egui::FontId::proportional(10.0),
+                    Color32::from_rgb(168, 85, 247),
+                );
+            }
+
+            painter.text(
+                Pos2::new(right_rect.min.x + 10.0, right_rect.min.y + 10.0),
+                Align2::LEFT_TOP,
+                "Elevated Plastic Capacity Mn,T(t) & Fire Endurance Rating",
+                egui::FontId::proportional(11.0),
+                theme.accent_blue,
+            );
+        });
+
+        ui.add_space(10.0);
+
+        // Regulatory & Code Compliance Audit Table (AISC 360-16 / Eurocode 2 & 3)
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📋 AISC 360-16 & Eurocode 1/2/3 Fire Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(20.0);
+                let overall_status = if rep.is_target_frr_achieved { "🟢 TARGET FIRE ENDURANCE ACHIEVED" } else { "🔴 TARGET FIRE ENDURANCE DEFICIT" };
+                let status_col = if rep.is_target_frr_achieved { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+            });
+
+            ui.add_space(6.0);
+
+            // Table Header
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Performance Check").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(220.0);
+                ui.label(RichText::new("Governing Standard").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(150.0);
+                ui.label(RichText::new("Demand").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(45.0);
+                ui.label(RichText::new("Limit").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(45.0);
+                ui.label(RichText::new("D/C Ratio").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(30.0);
+                ui.label(RichText::new("Status").size(10.5).strong().color(theme.text_secondary));
+            });
+            ui.separator();
+
+            for item in &rep.compliance_audit {
+                let row_col = if item.is_passed { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(&item.parameter_name).size(10.5).color(theme.accent_blue));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(&item.code_reference).size(10.5).color(theme.text_primary));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(format!("{:.1} {}", item.demand_val, item.unit)).size(10.5).color(theme.text_primary));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.1} {}", item.permissible_limit, item.unit)).size(10.5).color(theme.accent_green));
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.3}", item.utilization_ratio)).size(10.5).strong().color(row_col));
                     ui.add_space(20.0);

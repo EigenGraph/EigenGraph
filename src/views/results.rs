@@ -635,6 +635,17 @@ impl ResultsView {
                                     self.export_status = Some(format!("Blast Dynamics UFC 3-340-02 Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🔥 Structural Fire Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(249, 115, 22))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let input = crate::core::FireAnalysisInput::default();
+                                let rep = crate::core::FireEngine::run_assessment(&input);
+                                let md = crate::core::FireEngine::generate_markdown_dossier(&rep);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Structural_Fire_AISC360_Dossier.md", &md) {
+                                    self.export_status = Some(format!("Structural Fire AISC 360-16 Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });

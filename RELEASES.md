@@ -7,6 +7,66 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## 🚀 EigenGraph v0.1.6 — Phase 16: Structural Fire Engineering & Coupled Thermo-Mechanical Response Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.6`  
+**Target:** Production Engine
+
+EigenGraph v0.1.6 introduces an industry-grade **Structural Fire Engineering & Coupled Thermo-Mechanical Response Engine**, delivering comprehensive transient heat transfer, elevated-temperature material constitutive degradation, thermal expansion restraint forces, and Fire Resistance Rating (FRR) endurance verification in full compliance with **AISC 360-16 Appendix 4**, **Eurocode 1 (EN 1991-1-2)**, **Eurocode 2 (EN 1992-1-2)**, **Eurocode 3 (EN 1993-1-2)**, **ISO 834-1**, and **ASTM E119**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Standard & Parametric Compartment Fire Dynamics
+- **Standard Cellulosic Fire Curves**:
+  - ISO 834-1 / EN 1991-1-2:
+    $$T_g(t) = 20 + 345 \log_{10}(8t + 1) \quad (^\circ\text{C})$$
+  - ASTM E119 closed-form formulation.
+- **Hydrocarbon & External Fires**:
+  - Eurocode Hydrocarbon Curve reaching $1100^\circ\text{C}$ within 30 minutes for petrochemical and offshore hazards.
+  - External Fire Curve ($T_{\max} \approx 660^\circ\text{C}$) for exterior building facades.
+- **Parametric Natural Fire**:
+  - Heating phase coupled with linear decay cooling rates simulating real compartment fuel burnout.
+
+#### 2. Transient Cross-Section Heat Conduction & Section Factors
+- **Section Factor ($A_m / V$) Calculation**:
+  - Automated evaluation for 3-sided beam (composite deck protected top flange) and 4-sided column exposures.
+- **Unprotected Steel Temperature Evolution**:
+  - Incremental finite difference heat balance incorporating convective and non-linear radiative fluxes:
+    $$\Delta T_s = \frac{A_m / V}{c_s \rho_s} \left[ h_c (T_g - T_s) + \sigma \epsilon_{\text{res}} ((T_g + 273.15)^4 - (T_s + 273.15)^4) \right] \Delta t$$
+    where $h_c = 25\text{ W/m}^2\text{K}$, $\epsilon_{\text{res}} = 0.70$, and $\sigma = 5.67 \times 10^{-8}\text{ W/m}^2\text{K}^4$.
+- **Protected Steel Insulation Heat Conduction**:
+  - Multi-material passive fire protection modeling (Sprayed Gypsum SFRM, Intumescent Coatings, Calcium Silicate Boards, and Concrete Encasement):
+    $$\Delta T_s = \frac{k_p d_p^{-1} (A_m / V)}{c_s \rho_s (1 + \phi / 2)} (T_g - T_s) \Delta t$$
+- **Automated Passive Fireproofing Sizing**:
+  - Direct inverse solver determining required insulation thickness $d_p$ (mm) to achieve specified Fire Resistance Ratings (FRR 60, 90, 120, 180 min) under design demand ratios.
+
+#### 3. Elevated-Temperature Constitutive Material Degradation
+- **AISC 360-16 / Eurocode 3 Structural Steel**:
+  - High-temperature yield strength retention factor $k_y(T)$ and elastic modulus factor $k_E(T)$:
+    $$F_y(T) = k_y(T) \cdot F_y, \quad E(T) = k_E(T) \cdot E_0$$
+- **Eurocode 2 Concrete Degradation**:
+  - Compressive strength retention factor $k_c(T)$ calibrated for both siliceous and calcareous aggregate types.
+- **Elevated-Temperature Member Capacities**:
+  - Compression column buckling capacity $P_n(T)$ via AISC 360 Chapter E with high-temperature $F_{cr}(T)$.
+  - Flexural beam moment capacity $M_n(T) = k_y(T) M_{px}$.
+  - Shear capacity $V_n(T) = 0.60 k_y(T) F_y A_w$.
+
+#### 4. Thermal Expansion & Structural Restraint Axial Forces
+- **Thermal Elongation Strain $\epsilon_{th}(T)$**:
+  - Temperature-dependent thermal expansion integrating differential thermal expansion coefficients $\alpha(T)$.
+- **Coupled Thermal Restraint Forces**:
+  - Axial compressive forces generated under longitudinal boundary restraint (pinned-pinned, rigid continuous frames):
+    $$P_{th}(T) = K_{ax,restraint} \cdot \Delta L_{th} = \left(\frac{k_{ax} \cdot E(T) A}{k_{ax} L + E(T) A}\right) \cdot (\epsilon_{th} L)$$
+  - Combined P-M interaction check under simultaneous gravity load and thermal thrust:
+    $$\frac{P_u + P_{th}(T)}{\phi_c P_n(T)} + \frac{8}{9} \frac{M_u}{\phi_b M_n(T)} \le 1.0$$
+
+#### 5. 3D Fire Compartment Archetype & Comprehensive Calculation Dossier
+- **3D Archetype Model**: Parametric 3-bay, 2-story steel building frame (`generate_fire_compartment_archetype`) featuring an active ground-floor fire compartment with localized elevated-temperature thermal zones, heated beams, and boundary restraints.
+- **Automated Calculation Dossier**: Complete engineering verification report exportable to Markdown (`EigenGraph_Structural_Fire_AISC360_Dossier.md`).
+- **Interactive UI Sub-Tab**: Dedicated `"🔥 Structural Fire (AISC/EC3)"` panel featuring interactive 2D vector CAD temperature history charts, capacity retention curves, real-time parametric controllers, and code compliance audit tables.
+
+---
+
 ## 🚀 EigenGraph v0.1.5 — Phase 15: Blast Resistant Design & Explosive Impulse Dynamics Engine
 **Release Date:** 2026-11-07  
 **Git Tag:** `v0.1.5`  
