@@ -169,46 +169,46 @@ impl Default for ParametricView {
                     unit: "profile".to_string(),
                 },
                 ParametricVariable {
-                    name: "bahan_density".to_string(),
+                    name: "density".to_string(),
                     expression: "7850".to_string(),
                     evaluated_value: 7850.0,
                     unit: "kg/m³ (BJ41)".to_string(),
                 },
                 ParametricVariable {
-                    name: "kekakuan_E".to_string(),
+                    name: "stiffness_E".to_string(),
                     expression: "200000".to_string(),
                     evaluated_value: 200000.0,
                     unit: "MPa (Stiffness)".to_string(),
                 },
                 ParametricVariable {
-                    name: "harga_baja".to_string(),
+                    name: "price_steel".to_string(),
                     expression: "24500".to_string(),
                     evaluated_value: 24500.0,
-                    unit: "Rp/kg".to_string(),
+                    unit: "IDR/kg".to_string(),
                 },
                 ParametricVariable {
-                    name: "harga_fabrikasi".to_string(),
+                    name: "price_fab".to_string(),
                     expression: "8500".to_string(),
                     evaluated_value: 8500.0,
-                    unit: "Rp/kg".to_string(),
+                    unit: "IDR/kg".to_string(),
                 },
                 ParametricVariable {
-                    name: "harga_ereksi".to_string(),
+                    name: "price_erect".to_string(),
                     expression: "4500000".to_string(),
                     evaluated_value: 4500000.0,
-                    unit: "Rp/ton".to_string(),
+                    unit: "IDR/ton".to_string(),
                 },
                 ParametricVariable {
-                    name: "harga_coating".to_string(),
+                    name: "price_coating".to_string(),
                     expression: "145000".to_string(),
                     evaluated_value: 145000.0,
-                    unit: "Rp/m²".to_string(),
+                    unit: "IDR/m²".to_string(),
                 },
                 ParametricVariable {
-                    name: "harga_pondasi".to_string(),
+                    name: "price_concrete".to_string(),
                     expression: "1950000".to_string(),
                     evaluated_value: 1950000.0,
-                    unit: "Rp/m³".to_string(),
+                    unit: "IDR/m³".to_string(),
                 },
             ],
             command_line_input: String::new(),
@@ -292,7 +292,7 @@ impl ParametricView {
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     // Row 1: CAD Tools + Undo/Redo + Save/DB
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(
                             RichText::new("📐 2D CAD & BIM")
                                 .size(12.5)
@@ -381,7 +381,7 @@ impl ParametricView {
                     ui.add_space(4.0);
 
                     // Row 2: BIMCraft Authoring Ribbon (Wall, Beam, Column, Door, Window, Rebar, View Mode, Sheet Export)
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(
                             RichText::new("🏛️ BIMCRAFT:")
                                 .size(11.0)
@@ -484,7 +484,7 @@ impl ParametricView {
                     // Sheet Composer 2D Control Bar
                     if self.view_mode == DraftingViewMode::SheetLayoutA101 {
                         ui.add_space(4.0);
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new("📐 Sheet Config:").size(11.0).strong().color(theme.accent_blue));
                             
                             // Paper size selector
@@ -811,7 +811,7 @@ impl ParametricView {
                 ui.add_space(4.0);
             }
 
-            let available_height = (ui.available_height() - 102.0).max(360.0);
+            let available_height = (ui.available_height() - 135.0).max(360.0);
             let available_width = ui.available_width().max(480.0);
 
             Frame::new()

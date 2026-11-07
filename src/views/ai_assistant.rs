@@ -48,10 +48,10 @@ impl AiAssistantView {
         }
 
         // Anchor at bottom-center of the main content area:
-        // Offset X = 105.0 to center over the content area (accounting for the 210px left sidebar)
-        // Offset Y = -36.0 to sit cleanly right above the bottom status bar
+        // Offset X = 120.0 to center over the content area (accounting for the 240px left sidebar)
+        // Offset Y = -18.0 to float cleanly above the bottom window edge
         Area::new(Id::new("global_floating_dynamic_island"))
-            .anchor(Align2::CENTER_BOTTOM, Vec2::new(105.0, -36.0))
+            .anchor(Align2::CENTER_BOTTOM, Vec2::new(120.0, -18.0))
             .show(ctx, |ui| {
                 if self.expanded {
                     self.render_expanded(ui, theme, active_pillar, members, projects, db_components);

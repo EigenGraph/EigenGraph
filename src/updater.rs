@@ -85,13 +85,13 @@ impl AppUpdater {
             let mut state = shared.lock().unwrap();
             state.is_checking = true;
             state.error = None;
-            state.status_message = Some("Memeriksa rilis terbaru ke GitHub...".to_string());
+            state.status_message = Some("Checking GitHub for the latest release...".to_string());
         }
 
         self.show_modal = true;
 
         thread::spawn(move || {
-            let api_url = "https://api.github.com/repos/haridsirawan/EigenGraph/releases/latest";
+            let api_url = "https://api.github.com/repos/EigenGraph/EigenGraph/releases/latest";
 
             let mut cmd = Command::new("curl");
             cmd.arg("-s")
@@ -164,7 +164,7 @@ impl AppUpdater {
                                 } else {
                                     "EigenGraph-macOS.dmg"
                                 };
-                                dmg_download_url = format!("https://github.com/haridsirawan/EigenGraph/releases/download/{}/{}", tag_name, fallback_asset);
+                                dmg_download_url = format!("https://github.com/EigenGraph/EigenGraph/releases/download/{}/{}", tag_name, fallback_asset);
                             }
 
                             let mut state = shared.lock().unwrap();

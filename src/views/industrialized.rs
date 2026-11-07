@@ -43,7 +43,7 @@ impl IndustrializedView {
                     ui.add_space(10.0);
                     theme.card_frame().show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("📦 10D EXPORT SIAP:").size(11.5).strong().color(theme.accent_green));
+                            ui.label(RichText::new("📦 10D EXPORT READY:").size(11.5).strong().color(theme.accent_green));
                             ui.label(RichText::new(status_msg).size(11.5).color(theme.text_primary));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 if ui.add(egui::Button::new(RichText::new("✕").size(11.0).color(theme.text_muted))
@@ -69,7 +69,7 @@ impl IndustrializedView {
                     IndustrializedSubTab::Industry4Bridge => self.render_industry4_bridge(ui, theme),
                 }
 
-                ui.add_space(24.0);
+                ui.add_space(64.0);
             });
         });
     }
@@ -82,9 +82,9 @@ impl IndustrializedView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 let tabs = [
-                    (IndustrializedSubTab::ModularDfma, "🏭 Prefabrikasi & DfMA Modular"),
-                    (IndustrializedSubTab::RoboticAutomation, "🦾 Robotik & Pengelasan Otomatis"),
-                    (IndustrializedSubTab::AutomatedErection, "🏗️ Crane Otonom & Drone Lidar"),
+                    (IndustrializedSubTab::ModularDfma, "🏭 Prefabrication & Modular DfMA"),
+                    (IndustrializedSubTab::RoboticAutomation, "🦾 Robotics & Automated Welding"),
+                    (IndustrializedSubTab::AutomatedErection, "🏗️ Autonomous Crane & LiDAR Drone"),
                     (IndustrializedSubTab::Industry4Bridge, "🌐 OpenBIM IFC 4.3 & IoT Bridge"),
                 ];
 
@@ -108,10 +108,10 @@ impl IndustrializedView {
 
     fn render_modular_dfma(&mut self, ui: &mut Ui, theme: &MacTheme) {
         ui.columns(4, |cols| {
-            self.render_stat_card(&mut cols[0], theme, "OFF-SITE FABRICATION RATIO", "82.5%", "Mayoritas Dirakit Presisi di Pabrik", theme.accent_green);
-            self.render_stat_card(&mut cols[1], theme, "STANDARDIZATION INDEX", "91.5%", "Repetisi Sambungan Buhul Modular", theme.accent_blue);
-            self.render_stat_card(&mut cols[2], theme, "DIMENSI MODUL TRANSPORT", "12.0 x 2.4 m", "Sesuai Regulasi Trailer Jalan Raya", theme.text_primary);
-            self.render_stat_card(&mut cols[3], theme, "ASSEMBLY TIME AT SITE", "-60% Hari", "Perakitan Cepat Sistem Baut HTB", theme.accent_green);
+            self.render_stat_card(&mut cols[0], theme, "OFF-SITE FABRICATION RATIO", "82.5%", "Precision Factory Pre-Assembly", theme.accent_green);
+            self.render_stat_card(&mut cols[1], theme, "STANDARDIZATION INDEX", "91.5%", "Modular Gusset Node Repetition", theme.accent_blue);
+            self.render_stat_card(&mut cols[2], theme, "TRANSPORT MODULE ENVELOPE", "12.0 x 2.4 m", "Highway Trailer Gauge Compliant", theme.text_primary);
+            self.render_stat_card(&mut cols[3], theme, "ON-SITE ASSEMBLY TIME", "-60% Days", "Rapid HTB High-Strength Bolting", theme.accent_green);
         });
 
         ui.add_space(16.0);

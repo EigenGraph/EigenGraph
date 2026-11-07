@@ -63,9 +63,9 @@ impl FacilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 let tabs = [
-                    (FacilitySubTab::DigitalTwinShm, "📡 Digital Twin & Sensor SHM"),
-                    (FacilitySubTab::AssetRegistry, "📑 Registri Aset COBie"),
-                    (FacilitySubTab::PredictiveMaintenance, "🛠️ Pemeliharaan Prediktif (ARI Alert)"),
+                    (FacilitySubTab::DigitalTwinShm, "📡 Digital Twin & SHM Sensors"),
+                    (FacilitySubTab::AssetRegistry, "📑 COBie Asset Registry"),
+                    (FacilitySubTab::PredictiveMaintenance, "🛠️ Predictive Maintenance (ARI Alert)"),
                     (FacilitySubTab::LifecycleCosting, "💵 30-Year Lifecycle Cost (LCC)"),
                 ];
 

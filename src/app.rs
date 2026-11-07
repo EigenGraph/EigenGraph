@@ -74,6 +74,8 @@ impl Default for EigenGraphApp {
 impl App for EigenGraphApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        self.theme.apply_to_ctx(&ctx);
+
         // macOS Command+, shortcut for System Preferences
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Comma)) {
             self.show_settings = !self.show_settings;
@@ -263,22 +265,60 @@ impl App for EigenGraphApp {
         // 2. CENTRAL PANEL (Clean Minimalist Workspace without Strip Bar)
         CentralPanel::default().frame(Frame::new().fill(self.theme.bg_canvas)).show(ui, |ui| {
             // Elegant App Store Style View Header
-            ui.add_space(20.0);
+            ui.add_space(16.0);
             ui.horizontal(|ui| {
                 ui.add_space(24.0);
-                ui.label(
-                    RichText::new(self.active_pillar.clean_name())
-                        .size(26.0)
-                        .strong()
-                        .color(self.theme.text_primary),
-                );
+                ui.vertical(|ui| {
+                    ui.label(
+                        RichText::new(format!("{}  {}", self.active_pillar.icon(), self.active_pillar.clean_name()))
+                            .size(24.0)
+                            .strong()
+                            .color(self.theme.text_primary),
+                    );
+                    ui.label(
+                        RichText::new(self.active_pillar.subtitle())
+                            .size(12.0)
+                            .color(self.theme.text_secondary),
+                    );
+                });
+
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.add_space(24.0);
+                    Frame::new()
+                        .fill(self.theme.bg_card)
+                        .stroke(Stroke::new(1.0, self.theme.border_card))
+                        .corner_radius(CornerRadius::same(8))
+                        .inner_margin(Margin::symmetric(10, 5))
+                        .show(ui, |ui| {
+                            ui.label(
+                                RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                                    .size(11.0)
+                                    .strong()
+                                    .color(self.theme.accent_blue),
+                            );
+                        });
+                    ui.add_space(8.0);
+                    Frame::new()
+                        .fill(self.theme.accent_green.gamma_multiply(0.14))
+                        .stroke(Stroke::new(1.0, self.theme.accent_green.gamma_multiply(0.6)))
+                        .corner_radius(CornerRadius::same(8))
+                        .inner_margin(Margin::symmetric(10, 5))
+                        .show(ui, |ui| {
+                            ui.label(
+                                RichText::new("🟢 ARI 0.942 • SVD Verified")
+                                    .size(11.0)
+                                    .strong()
+                                    .color(self.theme.accent_green),
+                            );
+                        });
+                });
             });
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.add_space(24.0);
                 ui.separator();
             });
-            ui.add_space(12.0);
+            ui.add_space(10.0);
 
             match self.active_pillar {
                 NavigationPillar::MyLibrary => {

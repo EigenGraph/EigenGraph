@@ -76,6 +76,7 @@ jobs:
             ${{ runner.os }}-cargo-cache-v2-
 
       - name: Cargo Check
+        shell: bash
         run: |
           cargo check --verbose 2>&1 | tee cargo_check.log || {
             echo "### ❌ Cargo Check Failed on ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
@@ -86,6 +87,7 @@ jobs:
           }
 
       - name: Run Core Mechanics & Solver Tests
+        shell: bash
         run: |
           cargo test --verbose 2>&1 | tee cargo_test.log || {
             echo "### ❌ Cargo Test Failed on ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
@@ -97,6 +99,7 @@ jobs:
 
       - name: Core Tests Summary
         if: success()
+        shell: bash
         run: |
           echo "### ✅ Test Suite Succeeded on ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
           echo "All core FEM, SVD Kinematic Guard, CPM, and LCA unit tests verified." >> $GITHUB_STEP_SUMMARY
@@ -190,10 +193,13 @@ jobs:
           $VERSION = (Select-String -Path Cargo.toml -Pattern '^version = "(.*?)"').Matches.Groups[1].Value
           Write-Host "Packaging Windows Release v$VERSION..."
           $stage = "staging/EigenGraph-Windows-x64"
-          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          New-Item -ItemType Directory -Force -Path "$stage/assets" | Out-Null
           Copy-Item target/release/eigengraph.exe -Destination $stage/
-          if (Test-Path "assets") {
-            Copy-Item -Recurse assets -Destination $stage/
+          if (Test-Path "assets/icon.png") {
+            Copy-Item "assets/icon.png" -Destination "$stage/assets/"
+          }
+          if (Test-Path "assets/Info.plist") {
+            Copy-Item "assets/Info.plist" -Destination "$stage/assets/"
           }
           if (Test-Path "InternalVault") {
             Copy-Item -Recurse InternalVault -Destination $stage/
@@ -205,13 +211,13 @@ jobs:
             " Version:  v$VERSION",
             "============================================================",
             "",
-            "Cara Menjalankan:",
-            "1. Ekstrak seluruh isi arsip ZIP ini ke direktori pilihan Anda.",
-            "2. Klik ganda pada 'eigengraph.exe' untuk menjalankan aplikasi.",
-            "3. Database komponen parametrik dan vault proyek akan otomatis",
-            "   tersinkronisasi secara real-time.",
+            "Quick Start Instructions:",
+            "1. Extract all contents of this ZIP archive to your preferred directory.",
+            "2. Double-click 'eigengraph.exe' to launch the desktop workstation.",
+            "3. The parametric component database and InternalVault synchronize",
+            "   automatically in real time.",
             "",
-            "Dokumentasi & Dukungan: https://github.com/haridsirawan/EigenGraph"
+            "Documentation & Releases: https://github.com/EigenGraph/EigenGraph"
           ) -Encoding utf8
 
           New-Item -ItemType Directory -Force -Path target/release | Out-Null
@@ -258,6 +264,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build Release Binary
+        shell: bash
         run: |
           cargo build --release --bin eigengraph --verbose 2>&1 | tee cargo_build.log || {
             echo "### ❌ Linux Cargo Build Failed" >> $GITHUB_STEP_SUMMARY
@@ -268,15 +275,19 @@ jobs:
           }
 
       - name: Package Linux Tarball & Desktop Entry
+        shell: bash
         run: |
           VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d '"' -f 2)
           echo "Packaging Linux Release v${VERSION}..."
           STAGE_DIR="staging/EigenGraph-Linux-x86_64"
-          mkdir -p "${STAGE_DIR}"
+          mkdir -p "${STAGE_DIR}/assets"
           cp target/release/eigengraph "${STAGE_DIR}/"
           chmod +x "${STAGE_DIR}/eigengraph"
-          if [ -d "assets" ]; then
-            cp -r assets "${STAGE_DIR}/"
+          if [ -f "assets/icon.png" ]; then
+            cp "assets/icon.png" "${STAGE_DIR}/assets/"
+          fi
+          if [ -f "assets/Info.plist" ]; then
+            cp "assets/Info.plist" "${STAGE_DIR}/assets/"
           fi
           if [ -d "InternalVault" ]; then
             cp -r InternalVault "${STAGE_DIR}/"
@@ -346,6 +357,7 @@ jobs:
           path: dist
 
       - name: Generate Checksums & Multi-Platform Release Notes
+        shell: bash
         run: |
           mkdir -p dist
           cd dist
@@ -361,37 +373,38 @@ jobs:
 
           python3 -c '
           import os
-          version = os.environ.get("VERSION", "1.2.0")
-          tag = os.environ.get("TAG_NAME", "v1.2.0")
+          version = os.environ.get("VERSION", "0.1.0")
+          tag = os.environ.get("TAG_NAME", "v0.1.0")
 
           with open("dist/SHA256SUMS.txt", "r") as f:
               checksums = f.read().strip()
 
           notes = f"""### 🚀 EigenGraph {tag} — Universal Multi-Platform Release (macOS, Windows & Linux)
 
-          Rilis resmi aplikasi **EigenGraph** kini tersedia lengkap untuk seluruh sistem operasi desktop: **macOS (Universal 2: Apple Silicon & Intel)**, **Windows 10/11 (64-bit)**, dan **Linux (Ubuntu, Debian, Fedora, Arch)**.
+          Official desktop workstation release of **EigenGraph** for **macOS (Universal 2: Apple Silicon & Intel)**, **Windows 10/11 (64-bit)**, and **Linux (x86_64)**.
 
           ---
 
-          #### 📦 Paket Unduhan Resmi:
+          #### 📦 Official Multi-Platform Release Packages
 
-          | Platform / Sistem Operasi | File Rilis | Deskripsi & Petunjuk Instalasi |
+          | Operating System / Platform | Release Asset | Installation Instructions |
           | :--- | :--- | :--- |
-          | 🍎 **macOS (Universal 2)** | [`EigenGraph-macOS.dmg`](https://github.com/haridsirawan/EigenGraph/releases/download/{tag}/EigenGraph-macOS.dmg) | Kompatibel native dengan **Apple Silicon (M1/M2/M3/M4)** dan **Intel x86_64** (macOS 11+). Buka file DMG lalu seret ke folder `/Applications`. |
-          | 🪟 **Windows (64-bit)** | [`EigenGraph-Windows-x64.zip`](https://github.com/haridsirawan/EigenGraph/releases/download/{tag}/EigenGraph-Windows-x64.zip) | Kompatibel dengan **Windows 10 & Windows 11**. Ekstrak ZIP dan jalankan `eigengraph.exe`. |
-          | 🐧 **Linux (x86_64)** | [`EigenGraph-Linux-x86_64.tar.gz`](https://github.com/haridsirawan/EigenGraph/releases/download/{tag}/EigenGraph-Linux-x86_64.tar.gz) | Kompatibel dengan **Ubuntu 20.04+, Debian, Fedora, Arch**. Ekstrak lalu jalankan `./install.sh` atau langsung `./eigengraph`. |
+          | 🍎 **macOS (Universal 2)** | [`EigenGraph-macOS.dmg`](https://github.com/EigenGraph/EigenGraph/releases/download/{tag}/EigenGraph-macOS.dmg) | Native **Apple Silicon (M1/M2/M3/M4)** & **Intel x86_64** (macOS 11+). Open the DMG disk image and drag `EigenGraph.app` to `/Applications`. |
+          | 🪟 **Windows (64-bit)** | [`EigenGraph-Windows-x64.zip`](https://github.com/EigenGraph/EigenGraph/releases/download/{tag}/EigenGraph-Windows-x64.zip) | Native **Windows 10 & Windows 11 (x64)**. Extract the ZIP archive and run `eigengraph.exe`. |
+          | 🐧 **Linux (x86_64)** | [`EigenGraph-Linux-x86_64.tar.gz`](https://github.com/EigenGraph/EigenGraph/releases/download/{tag}/EigenGraph-Linux-x86_64.tar.gz) | Native **Ubuntu 20.04+, Debian, Fedora, Arch (x86_64)**. Extract the tarball and run `./install.sh` or `./eigengraph`. |
+          | 🔐 **SHA-256 Checksums** | [`SHA256SUMS.txt`](https://github.com/EigenGraph/EigenGraph/releases/download/{tag}/SHA256SUMS.txt) | NIST FIPS 180-4 SHA-256 integrity manifest for all release archives. |
 
           ---
 
-          #### 🌟 Fitur Unggulan Terbaru:
-          - **🖥️ Antarmuka Native Minimalis (Gaya macOS App Store)**: Sidebar menyatu penuh dari atas ke bawah (*full-height*), kolom pencarian native (`🔍 Search`), profil pengguna di bawah, dan canvas kerja minimalis bersih tanpa strip bar.
-          - **📐 2D Sheet Composer & Blueprints**: Cetak gambar kerja skala resmi (A4, A3, A2, A1) multi-viewport (Denah, Potongan Core A-A, BoQ Schedule, Kop Gambar) ke **PDF Vektor 1.4** dan **SVG**.
-          - **⚡ Kekakuan Geometris $K_g(P)$ pada ARI Linier**: Perlindungan tekuk Euler elastis & amplifikasi $B_1$ orde kedua AISC 360-16 dalam kecepatan $O(N^2)$ Sherman-Morrison.
-          - **🗄️ Obsidian Auto-Taxonomy Internal Vault**: Autosave reaktif otomatis tanpa tombol simpan manual, terintegrasi penuh ke AI Assistant Copilot.
+          #### 🌟 Key Architectural & Engineering Highlights
+          - **🖥️ Native macOS HIG Dark UI & Responsive Multi-Row Toolbars**: Full-height unified 13-pillar sidebar (`🔍 Search`), live ARI/SVD header telemetry badges, wrapped 8D verification sub-tab pill bar, and compact 3D Model Archetype selector with zero horizontal clipping.
+          - **📐 2D Sheet Composer & Blueprints**: Scaled engineering drawing sheets (A4, A3, A2, A1) with multi-viewport Floor Plan, Section Cut (Poché), BoQ Schedule, and ISO 7200 Title Block exported to **Vector PDF 1.4**, **SVG**, and **IFC4**.
+          - **⚡ Geometric Stiffness $K_g(P)$ & Linear ARI Screening**: Sherman-Morrison $O(N^2)$ rank-1 and Woodbury rank-2 ($N-2$) disruption screening with SVD Kinematic Mechanism Guard ($m_e = 1 - h_e$) and Euler/AISC 360-16 $B_1$ stability verification.
+          - **🗄️ Obsidian Auto-Taxonomy Internal Vault**: Zero-click reactive autosave integrated with the Floating Dynamic Island AI Copilot (`⌘K`).
 
           ---
 
-          #### 🔐 Verifikasi Integritas SHA-256:
+          #### 🔐 SHA-256 Cryptographic Checksums
           ```text
           {checksums}
           ```
@@ -400,7 +413,7 @@ jobs:
               f.write(notes.strip())
           '
 
-      - name: Publish to GitHub Releases
+      - name: Publish to GitHub Releases & Sync to assets/ Directory
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -414,3 +427,18 @@ jobs:
               --title "EigenGraph ${TAG_NAME} — Multi-Platform (macOS, Windows & Linux)" \
               --notes-file dist/RELEASE_NOTES.md
           fi
+
+          mkdir -p assets
+          cp -f dist/EigenGraph-* dist/SHA256SUMS.txt assets/ || true
+          git config user.name "Harids Irawan"
+          git config user.email "326791992+haridsirawan@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          cp -f dist/EigenGraph-* dist/SHA256SUMS.txt assets/ || true
+          git add -f assets/EigenGraph-* assets/SHA256SUMS.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): store macOS .dmg, Windows .zip & Linux .tar.gz release binaries in assets/ (${TAG_NAME}) [skip ci]"
+            git push origin main || true
+          fi
+
+

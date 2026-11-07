@@ -188,7 +188,7 @@ impl SettingsView {
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("Repository:").strong().size(11.5).color(theme.text_primary));
-                    ui.hyperlink_to("github.com/haridsirawan/EigenGraph", "https://github.com/haridsirawan/EigenGraph");
+                    ui.hyperlink_to("github.com/EigenGraph/EigenGraph", "https://github.com/EigenGraph/EigenGraph");
                 });
             });
 

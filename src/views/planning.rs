@@ -252,57 +252,64 @@ impl PlanningView {
                     PlanningSubTab::StagedErectionSvd => self.render_staged_erection_svd(ui, theme, &takeoff),
                 }
 
-                ui.add_space(24.0);
+                ui.add_space(64.0);
             });
         });
     }
 
     fn render_header_bar(&mut self, ui: &mut Ui, theme: &MacTheme, takeoff: &Parametric5DTakeoff) {
-        ui.horizontal(|ui| {
-            let tabs = [
-                (PlanningSubTab::DynamicRab, "💰 5D BoQ / Cost"),
-                (PlanningSubTab::TakeoffQto, "📊 QTO"),
-                (PlanningSubTab::Schedule4d, "⏱️ 4D S-Curve"),
-                (PlanningSubTab::CostAriTradeoff, "📈 Cost vs ARI"),
-                (PlanningSubTab::StagedErectionSvd, "🏗️ Staged Erection Guard"),
-            ];
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::symmetric(12, 8))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    let tabs = [
+                        (PlanningSubTab::DynamicRab, "💰 5D BoQ / Cost"),
+                        (PlanningSubTab::TakeoffQto, "📊 QTO"),
+                        (PlanningSubTab::Schedule4d, "⏱️ 4D S-Curve"),
+                        (PlanningSubTab::CostAriTradeoff, "📈 Cost vs ARI"),
+                        (PlanningSubTab::StagedErectionSvd, "🏗️ Staged Erection Guard"),
+                    ];
 
-            for (tab, label) in tabs {
-                let is_active = self.active_subtab == tab;
-                let bg = if is_active { theme.accent_blue } else { theme.bg_card };
-                let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
+                    for (tab, label) in tabs {
+                        let is_active = self.active_subtab == tab;
+                        let bg = if is_active { theme.accent_blue } else { theme.bg_canvas };
+                        let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
 
-                let btn = egui::Button::new(RichText::new(label).size(12.0).strong().color(fg))
-                    .fill(bg)
-                    .corner_radius(CornerRadius::same(8));
+                        let btn = egui::Button::new(RichText::new(label).size(12.0).strong().color(fg))
+                            .fill(bg)
+                            .corner_radius(CornerRadius::same(8));
 
-                if ui.add(btn).clicked() {
-                    self.active_subtab = tab;
-                }
-            }
+                        if ui.add(btn).clicked() {
+                            self.active_subtab = tab;
+                        }
+                    }
 
-            // Right Side Actions
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                // Publish to Dossier
-                let pub_text = if self.published_to_dossier { "✅ Saved to Dossier" } else { "📁 Save to MY PROJECT" };
-                let pub_bg = if self.published_to_dossier { theme.accent_green } else { theme.accent_blue.gamma_multiply(0.8) };
-                if ui.add(egui::Button::new(RichText::new(pub_text).size(11.5).strong().color(Color32::WHITE))
-                    .fill(pub_bg)
-                    .corner_radius(CornerRadius::same(8))).clicked() {
-                    self.published_to_dossier = true;
-                    self.export_status = Some("5D BoQ & Schedule synchronized to Project Dossier!".to_string());
-                }
+                    // Right Side Actions
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        // Publish to Dossier
+                        let pub_text = if self.published_to_dossier { "✅ Saved to Dossier" } else { "📁 Save to MY PROJECT" };
+                        let pub_bg = if self.published_to_dossier { theme.accent_green } else { theme.accent_blue.gamma_multiply(0.8) };
+                        if ui.add(egui::Button::new(RichText::new(pub_text).size(11.5).strong().color(Color32::WHITE))
+                            .fill(pub_bg)
+                            .corner_radius(CornerRadius::same(8))).clicked() {
+                            self.published_to_dossier = true;
+                            self.export_status = Some("5D BoQ & Schedule synchronized to Project Dossier!".to_string());
+                        }
 
-                ui.add_space(6.0);
+                        ui.add_space(6.0);
 
-                // Export CSV / Excel Button
-                if ui.add(egui::Button::new(RichText::new("📄 Export BoQ (CSV)").size(11.5).color(theme.text_primary))
-                    .fill(theme.bg_card)
-                    .corner_radius(CornerRadius::same(8))).clicked() {
-                    self.export_status = Some(format!("File BoQ-5D_L{:.0}m.csv exported successfully!", takeoff.span_m));
-                }
+                        // Export CSV / Excel Button
+                        if ui.add(egui::Button::new(RichText::new("📄 Export BoQ (CSV)").size(11.5).color(theme.text_primary))
+                            .fill(theme.bg_canvas)
+                            .corner_radius(CornerRadius::same(8))).clicked() {
+                            self.export_status = Some(format!("File BoQ-5D_L{:.0}m.csv exported successfully!", takeoff.span_m));
+                        }
+                    });
+                });
             });
-        });
 
         if let Some(msg) = &self.export_status {
             ui.add_space(6.0);

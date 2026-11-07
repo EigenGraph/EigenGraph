@@ -247,94 +247,186 @@ impl AnalyzeView {
                     AnalyzeSubTab::PrestressedDesign => self.render_prestressed_design(ui, theme),
                 }
 
-                ui.add_space(24.0);
+                ui.add_space(64.0);
             });
         });
     }
 
     fn render_subtabs_header(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        ui.horizontal(|ui| {
-            let tabs = [
-                (AnalyzeSubTab::RedundancySvd, "⚡ SVD Guard & Redundancy"),
-                (AnalyzeSubTab::MemberCriticality, "🎯 ARI Sensitivity Matrix"),
-                (AnalyzeSubTab::DisplacementForces, "📊 Forces & Deflection"),
-                (AnalyzeSubTab::Frame3dInteraction, "📐 3D Frame P-M-V"),
-                (AnalyzeSubTab::ConcretePmInteraction, "🧱 Concrete P-M (SNI/ACI)"),
-                (AnalyzeSubTab::CascadingCollapse, "💥 Cascading Collapse"),
-                (AnalyzeSubTab::NonlinearPushover, "📉 Pushover P-Δ"),
-                (AnalyzeSubTab::ModalDynamics, "🌊 SNI 1726 Modal"),
-                (AnalyzeSubTab::GeotechSsi, "🌱 Geotech & SSI"),
-                (AnalyzeSubTab::SteelConnection, "🔩 Steel Connections"),
-                (AnalyzeSubTab::WindEngineering, "🌪️ ASCE 7 Wind"),
-                (AnalyzeSubTab::CompositeDesign, "🥞 AISC Composite"),
-                (AnalyzeSubTab::PrestressedDesign, "🪢 PT Concrete (ACI 318)"),
-            ];
+        theme.card_frame().show(ui, |ui| {
+            // Top Row: Suite Title & Interop / Dossier Export Actions
+            ui.horizontal_wrapped(|ui| {
+                ui.label(
+                    RichText::new("🛡️ 8D Structural Resilience & Multi-Code Verification Suite")
+                        .size(12.5)
+                        .strong()
+                        .color(theme.accent_blue),
+                );
 
-            for (tab, label) in tabs {
-                let is_active = self.active_subtab == tab;
-                let bg = if is_active { theme.accent_blue } else { theme.bg_card };
-                let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let publish_text = if self.published_to_dossier {
+                        "✅ Synced to MY PROJECT"
+                    } else {
+                        "📤 Publish to MY PROJECT Dossier"
+                    };
+                    let publish_bg = if self.published_to_dossier {
+                        theme.accent_green
+                    } else {
+                        theme.accent_blue.gamma_multiply(0.85)
+                    };
 
-                let btn = egui::Button::new(RichText::new(label).size(12.0).strong().color(fg))
-                    .fill(bg)
-                    .corner_radius(CornerRadius::same(8));
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new(publish_text)
+                                    .size(11.5)
+                                    .strong()
+                                    .color(Color32::WHITE),
+                            )
+                            .fill(publish_bg)
+                            .corner_radius(CornerRadius::same(7)),
+                        )
+                        .clicked()
+                    {
+                        self.published_to_dossier = true;
+                        self.export_status =
+                            Some("Model & ARI Analytics synced to MY PROJECT Dossier".to_string());
+                    }
 
-                if ui.add(btn).clicked() {
-                    self.active_subtab = tab;
-                }
-            }
-
-            // Right Side Action: Sync/Publish to MY PROJECT Dossier & Interop
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let publish_text = if self.published_to_dossier { "✅ Synced to MY PROJECT" } else { "📤 Publish to MY PROJECT Dossier" };
-                let publish_bg = if self.published_to_dossier { theme.accent_green } else { theme.accent_blue.gamma_multiply(0.8) };
-
-                if ui.add(egui::Button::new(RichText::new(publish_text).size(12.0).strong().color(Color32::WHITE))
-                    .fill(publish_bg)
-                    .corner_radius(CornerRadius::same(8))).clicked() {
-                    self.published_to_dossier = true;
-                    self.export_status = Some("Model & ARI Analytics synced to MY PROJECT Dossier".to_string());
-                }
-
-                if ui.add(egui::Button::new(RichText::new("📥 SAP2000 (.s2k)").size(11.5).color(Color32::WHITE))
-                    .fill(theme.bg_card)
-                    .stroke(Stroke::new(1.0, theme.accent_blue))
-                    .corner_radius(CornerRadius::same(8))).clicked() {
-                    let mut engine = crate::core::ParametricEngine::new();
-                    if let Ok(model) = engine.generate_warren_truss() {
-                        let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
-                        let s2k = crate::core::Sap2000Exporter::export_to_s2k(&model, ari.as_ref());
-                        if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_SAP2000.s2k", &s2k) {
-                            self.export_status = Some(format!("CSI SAP2000 .s2k saved to: {}", path));
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("📥 SAP2000 (.s2k)")
+                                    .size(11.0)
+                                    .color(Color32::WHITE),
+                            )
+                            .fill(theme.bg_canvas)
+                            .stroke(Stroke::new(1.0, theme.accent_blue))
+                            .corner_radius(CornerRadius::same(7)),
+                        )
+                        .clicked()
+                    {
+                        let mut engine = crate::core::ParametricEngine::new();
+                        if let Ok(model) = engine.generate_warren_truss() {
+                            let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
+                            let s2k =
+                                crate::core::Sap2000Exporter::export_to_s2k(&model, ari.as_ref());
+                            if let Ok(path) = crate::core::DiskExporter::write_export_file(
+                                "EigenGraph_SAP2000.s2k",
+                                &s2k,
+                            ) {
+                                self.export_status =
+                                    Some(format!("CSI SAP2000 .s2k saved to: {}", path));
+                            }
                         }
                     }
-                }
 
-                if ui.add(egui::Button::new(RichText::new("📥 DXF 3D (.dxf)").size(11.5).color(Color32::WHITE))
-                    .fill(theme.bg_card)
-                    .stroke(Stroke::new(1.0, theme.accent_green))
-                    .corner_radius(CornerRadius::same(8))).clicked() {
-                    let mut engine = crate::core::ParametricEngine::new();
-                    if let Ok(model) = engine.generate_warren_truss() {
-                        let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
-                        let dxf = crate::core::DxfExporter::export_to_dxf(&model, ari.as_ref());
-                        if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_3D.dxf", &dxf) {
-                            self.export_status = Some(format!("AutoCAD 3D DXF saved to: {}", path));
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("📥 DXF 3D (.dxf)")
+                                    .size(11.0)
+                                    .color(Color32::WHITE),
+                            )
+                            .fill(theme.bg_canvas)
+                            .stroke(Stroke::new(1.0, theme.accent_green))
+                            .corner_radius(CornerRadius::same(7)),
+                        )
+                        .clicked()
+                    {
+                        let mut engine = crate::core::ParametricEngine::new();
+                        if let Ok(model) = engine.generate_warren_truss() {
+                            let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
+                            let dxf =
+                                crate::core::DxfExporter::export_to_dxf(&model, ari.as_ref());
+                            if let Ok(path) = crate::core::DiskExporter::write_export_file(
+                                "EigenGraph_3D.dxf",
+                                &dxf,
+                            ) {
+                                self.export_status =
+                                    Some(format!("AutoCAD 3D DXF saved to: {}", path));
+                            }
                         }
                     }
-                }
 
-                if ui.add(egui::Button::new(RichText::new("🌐 OpenBIM (.ifc)").size(11.5).color(Color32::WHITE))
-                    .fill(theme.bg_card)
-                    .stroke(Stroke::new(1.0, Color32::from_rgb(180, 100, 255)))
-                    .corner_radius(CornerRadius::same(8))).clicked() {
-                    let mut engine = crate::core::ParametricEngine::new();
-                    if let Ok(model) = engine.generate_warren_truss() {
-                        let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
-                        let ifc = crate::core::IfcExporter::export_to_ifc(&model, ari.as_ref());
-                        if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_OpenBIM.ifc", &ifc) {
-                            self.export_status = Some(format!("OpenBIM IFC 4.3 saved to: {}", path));
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("🌐 OpenBIM (.ifc)")
+                                    .size(11.0)
+                                    .color(Color32::WHITE),
+                            )
+                            .fill(theme.bg_canvas)
+                            .stroke(Stroke::new(1.0, Color32::from_rgb(180, 100, 255)))
+                            .corner_radius(CornerRadius::same(7)),
+                        )
+                        .clicked()
+                    {
+                        let mut engine = crate::core::ParametricEngine::new();
+                        if let Ok(model) = engine.generate_warren_truss() {
+                            let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
+                            let ifc =
+                                crate::core::IfcExporter::export_to_ifc(&model, ari.as_ref());
+                            if let Ok(path) = crate::core::DiskExporter::write_export_file(
+                                "EigenGraph_OpenBIM.ifc",
+                                &ifc,
+                            ) {
+                                self.export_status =
+                                    Some(format!("OpenBIM IFC 4.3 saved to: {}", path));
+                            }
                         }
+                    }
+                });
+            });
+
+            ui.add_space(6.0);
+            ui.separator();
+            ui.add_space(6.0);
+
+            // Second Row: Wrapped Sub-Tab Selector Pills (Zero Horizontal Overflow)
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
+                let tabs = [
+                    (AnalyzeSubTab::RedundancySvd, "⚡ SVD Guard & Redundancy"),
+                    (AnalyzeSubTab::MemberCriticality, "🎯 ARI Sensitivity Matrix"),
+                    (AnalyzeSubTab::DisplacementForces, "📊 Forces & Deflection"),
+                    (AnalyzeSubTab::Frame3dInteraction, "📐 3D Frame P-M-V"),
+                    (AnalyzeSubTab::ConcretePmInteraction, "🧱 Concrete P-M (SNI/ACI)"),
+                    (AnalyzeSubTab::CascadingCollapse, "💥 Cascading Collapse"),
+                    (AnalyzeSubTab::NonlinearPushover, "📉 Pushover P-Δ"),
+                    (AnalyzeSubTab::ModalDynamics, "🌊 SNI 1726 Modal"),
+                    (AnalyzeSubTab::GeotechSsi, "🌱 Geotech & SSI"),
+                    (AnalyzeSubTab::SteelConnection, "🔩 Steel Connections"),
+                    (AnalyzeSubTab::WindEngineering, "🌪️ ASCE 7 Wind"),
+                    (AnalyzeSubTab::CompositeDesign, "🥞 AISC Composite"),
+                    (AnalyzeSubTab::PrestressedDesign, "🪢 PT Concrete (ACI 318)"),
+                ];
+
+                for (tab, label) in tabs {
+                    let is_active = self.active_subtab == tab;
+                    let bg = if is_active {
+                        theme.accent_blue
+                    } else {
+                        theme.bg_canvas
+                    };
+                    let fg = if is_active {
+                        Color32::WHITE
+                    } else {
+                        theme.text_secondary
+                    };
+                    let stroke = if is_active {
+                        Stroke::new(1.0, theme.accent_blue)
+                    } else {
+                        Stroke::new(1.0, theme.border_subtle)
+                    };
+
+                    let btn = egui::Button::new(RichText::new(label).size(11.5).strong().color(fg))
+                        .fill(bg)
+                        .stroke(stroke)
+                        .corner_radius(CornerRadius::same(7));
+
+                    if ui.add(btn).clicked() {
+                        self.active_subtab = tab;
                     }
                 }
             });
@@ -342,7 +434,7 @@ impl AnalyzeView {
     }
 
     // -------------------------------------------------------------
-    // SUB-TAB 1: Stabilitas SVD Guard & Redundansi ARI
+    // SUB-TAB 1: SVD Guard Stability & ARI Redundancy
     // -------------------------------------------------------------
     fn render_redundancy_and_svd(&self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         // 4 KPI Metric Cards

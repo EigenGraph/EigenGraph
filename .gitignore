@@ -11,6 +11,10 @@ Icon
 
 # Disk images & temporary staging
 *.dmg
+!assets/*.dmg
+!assets/*.zip
+!assets/*.tar.gz
+!assets/SHA256SUMS.txt
 *.app/
 EigenGraph.app/
 InternalVault/

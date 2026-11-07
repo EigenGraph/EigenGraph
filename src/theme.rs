@@ -117,4 +117,49 @@ impl MacTheme {
             .stroke(Stroke::new(1.5, self.accent_blue.gamma_multiply(0.7)))
             .inner_margin(Margin::same(14))
     }
+
+    /// Apply macOS Human Interface Guidelines Dark Visuals to the global egui Context
+    pub fn apply_to_ctx(&self, ctx: &egui::Context) {
+        let mut visuals = egui::Visuals::dark();
+        visuals.panel_fill = self.bg_canvas;
+        visuals.window_fill = self.bg_card;
+        visuals.extreme_bg_color = Color32::from_rgb(16, 18, 24);
+        visuals.faint_bg_color = Color32::from_rgb(30, 30, 35);
+
+        visuals.selection.bg_fill = self.accent_blue.gamma_multiply(0.35);
+        visuals.selection.stroke = Stroke::new(1.0, self.accent_blue);
+
+        visuals.widgets.noninteractive.bg_fill = self.bg_card;
+        visuals.widgets.noninteractive.weak_bg_fill = self.bg_card;
+        visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, self.border_subtle);
+        visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, self.text_secondary);
+        visuals.widgets.noninteractive.corner_radius = CornerRadius::same(7);
+
+        visuals.widgets.inactive.bg_fill = Color32::from_rgb(44, 44, 50);
+        visuals.widgets.inactive.weak_bg_fill = Color32::from_rgb(38, 38, 44);
+        visuals.widgets.inactive.bg_stroke = Stroke::new(1.0, self.border_card);
+        visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, self.text_primary);
+        visuals.widgets.inactive.corner_radius = CornerRadius::same(7);
+
+        visuals.widgets.hovered.bg_fill = self.bg_card_hover;
+        visuals.widgets.hovered.weak_bg_fill = self.bg_card_hover;
+        visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, self.accent_blue);
+        visuals.widgets.hovered.fg_stroke = Stroke::new(1.2, Color32::WHITE);
+        visuals.widgets.hovered.corner_radius = CornerRadius::same(7);
+
+        visuals.widgets.active.bg_fill = self.accent_blue;
+        visuals.widgets.active.weak_bg_fill = self.accent_blue;
+        visuals.widgets.active.bg_stroke = Stroke::new(1.0, Color32::WHITE);
+        visuals.widgets.active.fg_stroke = Stroke::new(1.5, Color32::WHITE);
+        visuals.widgets.active.corner_radius = CornerRadius::same(7);
+
+        visuals.widgets.open.bg_fill = self.bg_card_hover;
+        visuals.widgets.open.weak_bg_fill = self.bg_card_hover;
+        visuals.widgets.open.bg_stroke = Stroke::new(1.0, self.accent_blue);
+        visuals.widgets.open.fg_stroke = Stroke::new(1.2, Color32::WHITE);
+        visuals.widgets.open.corner_radius = CornerRadius::same(7);
+
+        ctx.set_visuals(visuals);
+    }
 }
+

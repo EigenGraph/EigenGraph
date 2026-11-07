@@ -34,7 +34,7 @@ impl Default for LeanView {
             saw_kerf_mm: 5.0,
             min_reusable_offcut_m: 1.5,
             steel_price_idr_per_kg: 17500.0,
-            selected_profile: "Semua Profil".to_string(),
+            selected_profile: "All Profiles".to_string(),
             export_status: None,
         }
     }
@@ -57,7 +57,7 @@ impl LeanView {
                                 ui.label(RichText::new("✅").size(14.0));
                                 ui.label(RichText::new(status).size(12.0).color(theme.text_primary));
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    if ui.button(RichText::new("Tutup").size(11.0)).clicked() {
+                                    if ui.button(RichText::new("Dismiss").size(11.0)).clicked() {
                                         dismiss_toast = true;
                                     }
                                 });
@@ -82,7 +82,7 @@ impl LeanView {
                     LeanSubTab::JitDelivery => self.render_jit_delivery(ui, theme),
                 }
 
-                ui.add_space(24.0);
+                ui.add_space(64.0);
             });
         });
     }
@@ -124,14 +124,14 @@ impl LeanView {
         let items = CuttingStockOptimizer::extract_items_from_members(members);
 
         // Get unique profiles list
-        let mut profiles = vec!["Semua Profil".to_string()];
+        let mut profiles = vec!["All Profiles".to_string()];
         for it in &items {
             if !profiles.contains(&it.profile) && !it.profile.is_empty() {
                 profiles.push(it.profile.clone());
             }
         }
 
-        let filter_opt = if self.selected_profile == "Semua Profil" {
+        let filter_opt = if self.selected_profile == "All Profiles" {
             None
         } else {
             Some(self.selected_profile.as_str())

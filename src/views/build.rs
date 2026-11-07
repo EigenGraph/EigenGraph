@@ -244,7 +244,7 @@ impl BuildView {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("🔍 ELEMENT INSPECTOR").size(11.0).strong().color(theme.accent_blue));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new(RichText::new("✕ Tutup / Kembali ke KPI").size(10.0).color(theme.text_secondary))
+                    if ui.add(egui::Button::new(RichText::new("✕ Close / Return to KPI").size(10.0).color(theme.text_secondary))
                         .fill(theme.bg_card)
                         .corner_radius(CornerRadius::same(4))).clicked() {
                         self.selected_member_id = None;
@@ -875,7 +875,7 @@ impl BuildView {
                 .inner_margin(Margin::symmetric(14, 8))
                 .stroke(Stroke::new(1.0, theme.border_subtle))
                 .show(ui, |ui| {
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         // Render Style & Internal Force Diagrams Toggle
                         if ui.selectable_label(self.render_mode == Render3DMode::CsgSolidBrep, "🧊 CSG B-Rep").on_hover_text("True 3D CSG Boolean Mesh (Openings, WF Flanges & Rebar)").clicked() {
                             self.render_mode = Render3DMode::CsgSolidBrep;
@@ -900,7 +900,7 @@ impl BuildView {
                         ui.separator();
                         ui.add_space(6.0);
 
-                        // Model Preset Selector
+                        // Compact Model Preset Selector Dropdown (Prevents Horizontal Overflow)
                         ui.label(RichText::new("Model:").size(11.0).color(theme.text_muted));
                         let models = [
                             ModelArchetype::BimCraftBuilding3D,
@@ -914,17 +914,22 @@ impl BuildView {
                             ModelArchetype::SpaceDome3D,
                             ModelArchetype::WarrenTruss2D,
                         ];
-                        for m in models {
-                            let is_m_sel = self.active_model == m;
-                            if ui.selectable_label(is_m_sel, m.label()).clicked() {
-                                self.active_model = m;
-                                self.selected_member_id = None;
-                                self.simulated_eliminated_ids.clear();
-                                if m == ModelArchetype::BimCraftBuilding3D {
-                                    self.render_mode = Render3DMode::CsgSolidBrep;
+                        egui::ComboBox::from_id_salt("model_archetype_combo")
+                            .selected_text(RichText::new(self.active_model.label()).size(11.5).strong().color(theme.text_primary))
+                            .width(235.0)
+                            .show_ui(ui, |ui| {
+                                for m in models {
+                                    let is_m_sel = self.active_model == m;
+                                    if ui.selectable_label(is_m_sel, m.label()).clicked() {
+                                        self.active_model = m;
+                                        self.selected_member_id = None;
+                                        self.simulated_eliminated_ids.clear();
+                                        if m == ModelArchetype::BimCraftBuilding3D {
+                                            self.render_mode = Render3DMode::CsgSolidBrep;
+                                        }
+                                    }
                                 }
-                            }
-                        }
+                            });
 
                         ui.add_space(6.0);
                         ui.separator();

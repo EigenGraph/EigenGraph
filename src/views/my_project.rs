@@ -110,7 +110,7 @@ impl MyProjectView {
 
                         ui.add_space(6.0);
 
-                        if ui.add(egui::Button::new(RichText::new("📜 Sertifikat Audit EigenGraph").size(12.5).strong().color(Color32::WHITE))
+                        if ui.add(egui::Button::new(RichText::new("📜 EigenGraph Audit Certificate").size(12.5).strong().color(Color32::WHITE))
                             .fill(theme.accent_green)
                             .corner_radius(CornerRadius::same(8))
                             .min_size(egui::Vec2::new(190.0, 32.0))).clicked() {
@@ -119,7 +119,7 @@ impl MyProjectView {
 
                         ui.add_space(6.0);
 
-                        if ui.add(egui::Button::new(RichText::new("🔐 Autosave ke InternalVault (.eigen)").size(12.0).strong().color(theme.text_primary))
+                        if ui.add(egui::Button::new(RichText::new("🔐 Autosave to InternalVault (.eigen)").size(12.0).strong().color(theme.text_primary))
                             .fill(theme.bg_card)
                             .stroke(Stroke::new(1.0, theme.border_subtle))
                             .corner_radius(CornerRadius::same(8))
@@ -281,7 +281,7 @@ impl MyProjectView {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("📈 MULTI-LOD REDUNDANCY CONVERGENCE AUDIT (LOD 100 ➔ LOD 200 ➔ LOD 300)").size(11.5).strong().color(theme.accent_green));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new(format!("ΔARI: +{:.1}% • Reduksi κ(K): {:.1}x", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)).size(11.0).strong().color(theme.accent_blue));
+                    ui.label(RichText::new(format!("ΔARI: +{:.1}% • κ(K) Reduction: {:.1}x", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)).size(11.0).strong().color(theme.accent_blue));
                 });
             });
             ui.add_space(4.0);
@@ -322,7 +322,7 @@ impl MyProjectView {
             "Eng-CON (Structural)",
             "Arch & HVAC",
         ];
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new("Collections:").strong().size(13.0).color(theme.text_secondary));
             ui.add_space(8.0);
             for cat in categories {
@@ -440,7 +440,7 @@ impl MyProjectView {
     }
 
     fn render_dossier_modal(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        egui::Window::new("📜 SERTIFIKAT AUDIT REDUNDANSI STRUKTURAL (EIGENGRAPH OFFICIAL)")
+        egui::Window::new("📜 OFFICIAL STRUCTURAL REDUNDANCY AUDIT CERTIFICATE (EIGENGRAPH)")
             .collapsible(false)
             .resizable(true)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::new(0.0, 0.0))
@@ -456,7 +456,7 @@ impl MyProjectView {
                             ui.label(RichText::new("EIGENGRAPH STRUCTURAL PLATFORM").size(12.0).strong().color(theme.accent_blue));
                             ui.label(RichText::new("ADVANCED STRUCTURAL INTEGRITY & RESILIENCE ENGINE").size(11.0).color(theme.text_secondary));
                             ui.add_space(4.0);
-                            ui.heading(RichText::new("SURAT HASIL AUDIT REDUNDANSI STRUKTURAL & KETAHANAN RUNTUH PROGRESIF").size(14.0).strong().color(Color32::WHITE));
+                            ui.heading(RichText::new("CERTIFICATE OF STRUCTURAL REDUNDANCY & PROGRESSIVE COLLAPSE RESILIENCE").size(14.0).strong().color(Color32::WHITE));
                             ui.label(RichText::new("Verification based on Adjusted Redundancy Index (ARI) & SVD Kinematic Mechanism Guard").size(11.0).color(theme.accent_green));
                             ui.add_space(10.0);
                             ui.separator();
