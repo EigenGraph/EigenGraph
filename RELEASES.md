@@ -7,6 +7,69 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## 🚀 EigenGraph v0.0.8 — Phase 8: Composite Steel-Concrete Beam & Slab Design per AISC 360-16 / SNI 1729:2020
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.8`  
+**Target:** Production Engine
+
+EigenGraph v0.0.8 introduces comprehensive **Composite Steel-Concrete Beam & Slab Design**, delivering an automated code-compliance and plastic stress distribution engine per AISC 360-16 Chapter I and SNI 1729:2020 Pasal I for composite floor systems, headed shear stud connectors, ribbed metal decks, unshored construction stages, and long-term creep deflections.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Headed Shear Stud Nominal Shear Strength ($Q_n$)
+- **AISC 360-16 Eq. I8-1**:
+  $$Q_n = \min\left(0.5 A_{sa} \sqrt{f'_c E_c}, \; R_g R_p A_{sa} F_u\right)$$
+  where $A_{sa}$ is the stud cross-sectional area ($\frac{\pi d_{sa}^2}{4}$), $f'_c$ is the concrete compressive strength, $E_c = 4700 \sqrt{f'_c}$ (MPa), and $F_u$ is the stud tensile strength (450 MPa for ASTM A108).
+- **Deck Rib Geometry Reduction Factors**:
+  - Perpendicular ribs: $R_g = 1.0$ (single stud per rib) or $0.85$ (multiple studs); $R_p = 0.75$ (for rib height $h_r \le 75\text{ mm}$ with $e_{mid-ht} \ge 50\text{ mm}$).
+  - Parallel ribs: $R_g = 1.0, R_p = 0.75$.
+  - Flat solid slab: $R_g = 1.0, R_p = 1.0$.
+
+#### 2. Effective Slab Flange Width ($b_{\text{eff}}$) & Concrete Compression
+- **AISC 360-16 Section I3.1.1**:
+  $$b_{\text{eff}} = \min\left(\frac{L}{4}, \; S\right)$$
+  where $L$ is the beam span and $S$ is the center-to-center beam spacing.
+- **Maximum Concrete Compression Capacity**:
+  $$C_{\text{max}} = 0.85 f'_c b_{\text{eff}} t_c$$
+  where $t_c$ is the slab cover thickness above the metal deck ribs.
+
+#### 3. Plastic Neutral Axis (PNA) Tracking & Flexural Resistance ($\phi M_n$)
+- Total horizontal shear transfer $V' = \min(T_s, C_{\text{max}}, \sum Q_n)$, where $T_s = A_s F_y$.
+- Plastic stress distribution evaluates three distinct equilibrium regimes:
+  - **Case 1 (PNA in concrete slab)**: When $\sum Q_n \ge T_s$ and $a = \frac{T_s}{0.85 f'_c b_{\text{eff}}} \le t_c$.
+    $$M_n = T_s \left( \frac{d}{2} + h_r + t_c - \frac{a}{2} \right)$$
+  - **Case 2 (PNA in top steel flange)**: When $C_c < T_s$ but $C_c + 2 F_y b_f t_f \ge T_s$.
+    $$y_p = \frac{T_s - C_c}{2 F_y b_f}, \quad M_n = C_c y_{c} + M_{\text{steel, PNA}}$$
+  - **Case 3 (PNA in steel web)**: When PNA descends into the web.
+    $$y_w = \frac{T_s - C_c - 2 F_y b_f t_f}{2 F_y t_w}, \quad M_n = C_c y_c + M_{\text{steel, PNA}}$$
+- LRFD flexural design strength: $\phi M_n = 0.90 M_n$.
+
+#### 4. Minimum Composite Action Verification
+- AISC 360-16 requires at least 25% composite action:
+  $$\text{Degree of Composite Action} = \frac{\sum Q_n}{C_{\text{max}}} \times 100\% \ge 25\%$$
+  Prevents excessive slip and ductility loss at steel-concrete interface.
+
+#### 5. Unshored Construction Stage Stability
+- Evaluates wet concrete dead load ($w_{\text{conc}} = 24\text{ kN/m}^3 \times [t_c + 0.5 h_r] \times S$) + construction live load ($1.0\text{ kPa}$).
+- Verifies bare steel section capacity $\phi M_n \ge M_{u,\text{const}}$ to prevent lateral-torsional or plastic failure during pouring prior to concrete curing.
+
+#### 6. Lower-Bound Effective Moment of Inertia ($I_{\text{eff}}$) & Creep Deflection
+- **AISC 360-16 Commentary Eq. C-I3-1**:
+  $$I_{\text{eff}} = I_s + \sqrt{\frac{\sum Q_n}{C_{\text{max}}}} \left(I_{\text{tr}} - I_s\right)$$
+  where $I_s$ is bare steel moment of inertia and $I_{\text{tr}}$ is elastic transformed section inertia.
+- Serviceability checks:
+  - Immediate live load deflection: $\Delta_{\text{LL}} = \frac{5 w_{\text{LL}} L^4}{384 E_s I_{\text{eff}}} \le \frac{L}{360}$.
+  - Total sustained deflection including concrete creep ($k_{\text{creep}} = 1.35$): $\Delta_{\text{total}} \le \frac{L}{240}$.
+
+#### 7. Interactive Analyze View Studio & Dossier Export
+- **Sub-Tab `🥞 AISC Composite`**:
+  - Real-time parameter controls for span, beam spacing, wide flange section, slab thickness, deck ribs, shear studs, and loads.
+  - Dual vector graphics rendering 2D cross-section detailing (hatch, ribs, studs, W-beam, PNA elevation) + plastic stress block diagram and deflection gauge.
+  - Limit states verification table with DCR indicators.
+- **Export Action**: One-click generation of `AISC360_Composite_Beam_Audit.md` in Results View.
+
+---
+
 ## 🚀 EigenGraph v0.0.7 — Phase 7: Wind Engineering & Computational Aero-Dynamics per ASCE 7-22 / SNI 1727:2020
 **Release Date:** 2026-11-06  
 **Git Tag:** `v0.0.7`  

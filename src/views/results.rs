@@ -521,6 +521,22 @@ impl ResultsView {
                                     self.export_status = Some(format!("ASCE 7-22 Wind Engineering Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🥞 AISC Composite Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(13, 148, 136))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let slab = crate::core::CompositeSlabDeck::default();
+                                let stud = crate::core::ShearStud::default();
+                                let rep = crate::core::CompositeBeamEngine::evaluate_composite_beam(
+                                    "Composite Floor Framing B12",
+                                    9.0, 3.0, "W18x35", 450.0, 152.0, 10.8, 7.6, 6645.0, 345.0, 21200.0, 1100.0,
+                                    &slab, &stud, 36, true, 280.0, 12.0,
+                                );
+                                let md = crate::core::CompositeBeamEngine::generate_markdown_dossier(&rep);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("AISC360_Composite_Beam_Audit.md", &md) {
+                                    self.export_status = Some(format!("AISC 360-16 Composite Beam Audit Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });

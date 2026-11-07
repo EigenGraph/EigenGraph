@@ -17,6 +17,7 @@ pub enum AnalyzeSubTab {
     GeotechSsi,
     SteelConnection,
     WindEngineering,
+    CompositeDesign,
 }
 
 pub struct AnalyzeView {
@@ -72,6 +73,22 @@ pub struct AnalyzeView {
     pub wind_num_stories: usize,
     pub wind_t1_s: f32,
     pub wind_damping: f32,
+    // Composite Beam Parameters (AISC 360-16 / SNI 1729:2020)
+    pub comp_span_l_m: f32,
+    pub comp_beam_spacing_s_m: f32,
+    pub comp_steel_depth_mm: f32,
+    pub comp_steel_bf_mm: f32,
+    pub comp_steel_tf_mm: f32,
+    pub comp_steel_tw_mm: f32,
+    pub comp_steel_fy_mpa: f32,
+    pub comp_slab_tc_mm: f32,
+    pub comp_deck_hr_mm: f32,
+    pub comp_concrete_fc_mpa: f32,
+    pub comp_stud_dia_mm: f32,
+    pub comp_studs_count: usize,
+    pub comp_unshored: bool,
+    pub comp_demand_mu_knm: f32,
+    pub comp_live_load_kn_m: f32,
 }
 
 impl Default for AnalyzeView {
@@ -126,6 +143,21 @@ impl Default for AnalyzeView {
             wind_num_stories: 12,
             wind_t1_s: 1.20,
             wind_damping: 0.02,
+            comp_span_l_m: 9.0,
+            comp_beam_spacing_s_m: 3.0,
+            comp_steel_depth_mm: 450.0,
+            comp_steel_bf_mm: 152.0,
+            comp_steel_tf_mm: 10.8,
+            comp_steel_tw_mm: 7.6,
+            comp_steel_fy_mpa: 345.0,
+            comp_slab_tc_mm: 85.0,
+            comp_deck_hr_mm: 75.0,
+            comp_concrete_fc_mpa: 30.0,
+            comp_stud_dia_mm: 19.0,
+            comp_studs_count: 36,
+            comp_unshored: true,
+            comp_demand_mu_knm: 280.0,
+            comp_live_load_kn_m: 12.0,
         }
     }
 }
@@ -183,6 +215,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::GeotechSsi => self.render_geotech_ssi(ui, theme),
                     AnalyzeSubTab::SteelConnection => self.render_steel_connection(ui, theme),
                     AnalyzeSubTab::WindEngineering => self.render_wind_engineering(ui, theme),
+                    AnalyzeSubTab::CompositeDesign => self.render_composite_design(ui, theme),
                 }
 
                 ui.add_space(24.0);
@@ -204,6 +237,7 @@ impl AnalyzeView {
                 (AnalyzeSubTab::GeotechSsi, "🌱 Geotech & SSI"),
                 (AnalyzeSubTab::SteelConnection, "🔩 Steel Connections"),
                 (AnalyzeSubTab::WindEngineering, "🌪️ ASCE 7 Wind"),
+                (AnalyzeSubTab::CompositeDesign, "🥞 AISC Composite"),
             ];
 
             for (tab, label) in tabs {
@@ -3074,6 +3108,357 @@ impl AnalyzeView {
                         ui.label(RichText::new(format!("{:6.1}", story.tributary_force_fx_kn)).size(11.0).strong().color(theme.accent_orange));
                         ui.add_space(60.0);
                         ui.label(RichText::new(format!("{:6.1}", story.cumulative_shear_vx_kn)).size(11.0).strong().color(theme.accent_green));
+                    });
+                    ui.separator();
+                }
+            });
+    }
+
+    fn render_composite_design(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let slab = crate::core::CompositeSlabDeck {
+            deck_rib_height_hr_mm: self.comp_deck_hr_mm as f64,
+            deck_rib_width_wr_mm: 150.0,
+            slab_thickness_above_deck_tc_mm: self.comp_slab_tc_mm as f64,
+            total_slab_thickness_h_mm: (self.comp_deck_hr_mm + self.comp_slab_tc_mm) as f64,
+            concrete_fc_mpa: self.comp_concrete_fc_mpa as f64,
+            concrete_density_kg_m3: 2400.0,
+            deck_orientation: crate::core::DeckOrientation::Perpendicular,
+            studs_per_rib: 1,
+        };
+        let stud = crate::core::ShearStud {
+            diameter_ds_mm: self.comp_stud_dia_mm as f64,
+            length_hs_mm: self.comp_deck_hr_mm as f64 + 40.0,
+            tensile_strength_fu_mpa: 450.0,
+        };
+        let rep = crate::core::CompositeBeamEngine::evaluate_composite_beam(
+            "Composite Floor Framing B12",
+            self.comp_span_l_m as f64,
+            self.comp_beam_spacing_s_m as f64,
+            "W18x35",
+            self.comp_steel_depth_mm as f64,
+            self.comp_steel_bf_mm as f64,
+            self.comp_steel_tf_mm as f64,
+            self.comp_steel_tw_mm as f64,
+            6645.0,
+            self.comp_steel_fy_mpa as f64,
+            21200.0,
+            1100.0,
+            &slab,
+            &stud,
+            self.comp_studs_count,
+            self.comp_unshored,
+            self.comp_demand_mu_knm as f64,
+            self.comp_live_load_kn_m as f64,
+        );
+
+        // 1. Metric Cards Header
+        ui.columns(4, |cols| {
+            let flex_col = if rep.flexure_dcr <= 1.0 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            self.metric_card(
+                &mut cols[0],
+                theme,
+                "FLEXURAL STRENGTH (φMn)",
+                &format!("{:.1} kN·m", rep.design_flexural_strength_phi_mn_knm),
+                &format!("DCR: {:.3} • Mu = {:.1} kNm", rep.flexure_dcr, rep.applied_factored_moment_mu_knm),
+                flex_col,
+            );
+            let comp_col = if rep.is_composite_action_adequate { theme.accent_blue } else { Color32::from_rgb(245, 158, 11) };
+            let comp_tag = if rep.is_full_composite { "Full Composite (100%)" } else { "Partial Composite (≥25%)" };
+            self.metric_card(
+                &mut cols[1],
+                theme,
+                "COMPOSITE ACTION",
+                &format!("{:.1}%", rep.degree_of_composite_action_pct),
+                comp_tag,
+                comp_col,
+            );
+            self.metric_card(
+                &mut cols[2],
+                theme,
+                "SHEAR STUDS (Qn)",
+                &format!("{:.1} kN/stud", rep.stud_single_shear_capacity_qn_kn),
+                &format!("Total: {} Studs • D{:.0}mm", rep.total_studs_provided, self.comp_stud_dia_mm),
+                theme.accent_orange,
+            );
+            let def_col = if rep.is_deflection_ll_ok { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            self.metric_card(
+                &mut cols[3],
+                theme,
+                "DEFLECTION (Δ_LL)",
+                &format!("{:.1} mm", rep.live_load_deflection_delta_ll_mm),
+                &format!("Limit L/360 = {:.1} mm", rep.live_load_deflection_limit_mm),
+                def_col,
+            );
+        });
+
+        ui.add_space(12.0);
+
+        // 2. Control Toolbar
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::same(10))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Span (L):").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_span_l_m).speed(0.1).range(4.0..=24.0).suffix(" m"));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Spacing (S):").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_beam_spacing_s_m).speed(0.1).range(1.5..=6.0).suffix(" m"));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Steel Depth:").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_steel_depth_mm).speed(5.0).range(200.0..=900.0).suffix(" mm"));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Flange Width:").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_steel_bf_mm).speed(5.0).range(100.0..=400.0).suffix(" mm"));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Fy:").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_steel_fy_mpa).speed(5.0).range(240.0..=500.0).suffix(" MPa"));
+                });
+
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Slab Thickness (tc):").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_slab_tc_mm).speed(2.0).range(50.0..=200.0).suffix(" mm"));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Deck Rib Height (hr):").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_deck_hr_mm).speed(2.0).range(38.0..=100.0).suffix(" mm"));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Concrete f'c:").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_concrete_fc_mpa).speed(1.0).range(20.0..=60.0).suffix(" MPa"));
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Studs Count:").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_studs_count).speed(2.0).range(10..=120));
+
+                    ui.add_space(10.0);
+                    ui.checkbox(&mut self.comp_unshored, "Unshored Construction");
+
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Demand Mu:").size(11.0).strong().color(theme.text_secondary));
+                    ui.add(egui::DragValue::new(&mut self.comp_demand_mu_knm).speed(10.0).range(50.0..=2000.0).suffix(" kNm"));
+                });
+            });
+
+        ui.add_space(12.0);
+
+        // 3. DUAL VECTOR VISUALIZER
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::same(16))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("🥞 AISC 360-16 / SNI 1729:2020 Composite Section Blueprint & Stress State").size(13.5).strong().color(theme.text_primary));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let tag = if rep.is_overall_compliant { "🟢 COMPOSITE BEAM APPROVED" } else { "⚠️ SECTION UPGRADE REQUIRED" };
+                        let tag_col = if rep.is_overall_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                        ui.label(RichText::new(tag).size(11.5).strong().color(tag_col));
+                    });
+                });
+
+                ui.add_space(10.0);
+
+                ui.columns(2, |cols| {
+                    // LEFT: 2D Section Blueprint
+                    cols[0].label(RichText::new("1. Cross-Section Detailing (Concrete Slab, Steel Deck Ribs & Studs)").size(11.0).strong().color(theme.text_secondary));
+                    let desired_left = Vec2::new(cols[0].available_width(), 220.0);
+                    let (rect_l, _) = cols[0].allocate_exact_size(desired_left, Sense::hover());
+                    let painter_l = cols[0].painter_at(rect_l);
+                    painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+                    let center_x = rect_l.center().x;
+                    let top_y = rect_l.top() + 20.0;
+
+                    // Concrete slab
+                    let slab_w_px = 240.0;
+                    let tc_px = (self.comp_slab_tc_mm * 0.35).clamp(18.0, 35.0);
+                    let hr_px = (self.comp_deck_hr_mm * 0.35).clamp(16.0, 30.0);
+
+                    let slab_rect = egui::Rect::from_min_max(
+                        Pos2::new(center_x - slab_w_px * 0.5, top_y),
+                        Pos2::new(center_x + slab_w_px * 0.5, top_y + tc_px),
+                    );
+                    painter_l.rect_filled(slab_rect, CornerRadius::same(2), Color32::from_rgb(71, 85, 105));
+                    painter_l.rect_stroke(slab_rect, CornerRadius::same(2), Stroke::new(1.0, Color32::from_rgb(148, 163, 184)), egui::StrokeKind::Inside);
+                    painter_l.text(slab_rect.center(), egui::Align2::CENTER_CENTER, format!("Concrete Slab tc = {:.0}mm (f'c = {:.0})", self.comp_slab_tc_mm, self.comp_concrete_fc_mpa), egui::FontId::proportional(9.0), Color32::from_rgb(226, 232, 240));
+
+                    // Metal deck flutes
+                    let flute_w = 40.0;
+                    let flute_top = top_y + tc_px;
+                    let flute_bot = flute_top + hr_px;
+                    for i in -2..=2 {
+                        let fx = center_x + i as f32 * 50.0;
+                        painter_l.rect_filled(
+                            egui::Rect::from_min_max(Pos2::new(fx - flute_w * 0.5, flute_top), Pos2::new(fx + flute_w * 0.5, flute_bot)),
+                            CornerRadius::same(1),
+                            Color32::from_rgb(51, 65, 85),
+                        );
+                    }
+
+                    // Shear stud in center flute
+                    let stud_top = flute_top - 12.0;
+                    let stud_rect = egui::Rect::from_min_max(Pos2::new(center_x - 4.0, stud_top), Pos2::new(center_x + 4.0, flute_bot));
+                    painter_l.rect_filled(stud_rect, CornerRadius::same(1), Color32::from_rgb(245, 158, 11));
+                    // Stud head
+                    painter_l.rect_filled(
+                        egui::Rect::from_min_max(Pos2::new(center_x - 9.0, stud_top - 4.0), Pos2::new(center_x + 9.0, stud_top)),
+                        CornerRadius::same(1),
+                        Color32::from_rgb(245, 158, 11),
+                    );
+
+                    // Steel Beam (W-shape)
+                    let beam_top = flute_bot;
+                    let d_px = (self.comp_steel_depth_mm * 0.22).clamp(55.0, 100.0);
+                    let bf_px = (self.comp_steel_bf_mm * 0.22).clamp(35.0, 75.0);
+                    let tf_px = 6.0;
+                    let tw_px = 4.0;
+
+                    // Top Flange
+                    painter_l.rect_filled(
+                        egui::Rect::from_min_max(Pos2::new(center_x - bf_px * 0.5, beam_top), Pos2::new(center_x + bf_px * 0.5, beam_top + tf_px)),
+                        CornerRadius::same(1),
+                        Color32::from_rgb(56, 189, 248),
+                    );
+                    // Web
+                    painter_l.rect_filled(
+                        egui::Rect::from_min_max(Pos2::new(center_x - tw_px * 0.5, beam_top + tf_px), Pos2::new(center_x + tw_px * 0.5, beam_top + d_px - tf_px)),
+                        CornerRadius::same(0),
+                        Color32::from_rgb(30, 41, 59),
+                    );
+                    painter_l.rect_stroke(
+                        egui::Rect::from_min_max(Pos2::new(center_x - tw_px * 0.5, beam_top + tf_px), Pos2::new(center_x + tw_px * 0.5, beam_top + d_px - tf_px)),
+                        CornerRadius::same(0),
+                        Stroke::new(1.0, Color32::from_rgb(56, 189, 248)),
+                        egui::StrokeKind::Inside,
+                    );
+                    // Bottom Flange
+                    painter_l.rect_filled(
+                        egui::Rect::from_min_max(Pos2::new(center_x - bf_px * 0.5, beam_top + d_px - tf_px), Pos2::new(center_x + bf_px * 0.5, beam_top + d_px)),
+                        CornerRadius::same(1),
+                        Color32::from_rgb(56, 189, 248),
+                    );
+
+                    // Plastic Neutral Axis (PNA) Reticle Line
+                    let pna_ratio = (rep.pna_depth_from_slab_top_mm / (self.comp_slab_tc_mm as f64 + self.comp_deck_hr_mm as f64 + self.comp_steel_depth_mm as f64)).clamp(0.05, 0.95);
+                    let pna_y = top_y + pna_ratio as f32 * (tc_px + hr_px + d_px);
+
+                    painter_l.line_segment(
+                        [Pos2::new(rect_l.left() + 15.0, pna_y), Pos2::new(rect_l.right() - 15.0, pna_y)],
+                        Stroke::new(1.5, Color32::from_rgb(239, 68, 68)),
+                    );
+                    painter_l.text(Pos2::new(rect_l.right() - 20.0, pna_y - 2.0), egui::Align2::RIGHT_BOTTOM, format!("PNA: {:.1}mm ({})", rep.pna_depth_from_slab_top_mm, match rep.pna_location { PnaLocation::InConcreteSlab => "Slab", PnaLocation::InSteelFlange => "Flange", PnaLocation::InSteelWeb => "Web" }), egui::FontId::proportional(9.0), Color32::from_rgb(239, 68, 68));
+
+                    // RIGHT: Plastic Stress Distribution & Deflections
+                    cols[1].label(RichText::new("2. Plastic Stress Distribution & Serviceability Deflection").size(11.0).strong().color(theme.text_secondary));
+                    let desired_right = Vec2::new(cols[1].available_width(), 220.0);
+                    let (rect_r, _) = cols[1].allocate_exact_size(desired_right, Sense::hover());
+                    let painter_r = cols[1].painter_at(rect_r);
+                    painter_r.rect_filled(rect_r, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
+
+                    let chart_left = rect_r.left() + 16.0;
+                    let chart_top = rect_r.top() + 20.0;
+                    let bar_w = rect_r.width() - 32.0;
+
+                    // Stress Block Diagram: C in Concrete, T in Steel
+                    painter_r.text(Pos2::new(chart_left, chart_top), egui::Align2::LEFT_TOP, "Plastic Internal Force Equilibrium:", egui::FontId::proportional(10.5), Color32::from_rgb(226, 232, 240));
+
+                    let y_c = chart_top + 22.0;
+                    painter_r.text(Pos2::new(chart_left, y_c), egui::Align2::LEFT_TOP, format!("Concrete Compressive Force (Cc): {:.1} kN", rep.total_shear_transfer_v_kn), egui::FontId::proportional(9.5), Color32::from_rgb(56, 189, 248));
+                    let w_c = ((rep.total_shear_transfer_v_kn / rep.max_steel_tensile_t_max_kn.max(1.0)) * bar_w as f64).clamp(10.0, bar_w as f64) as f32;
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y_c + 14.0), Vec2::new(w_c, 10.0)), CornerRadius::same(2), Color32::from_rgb(56, 189, 248));
+
+                    let y_t = y_c + 32.0;
+                    painter_r.text(Pos2::new(chart_left, y_t), egui::Align2::LEFT_TOP, format!("Steel Tensile Yield Force (Ts): {:.1} kN", rep.max_steel_tensile_t_max_kn), egui::FontId::proportional(9.5), Color32::from_rgb(249, 115, 22));
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y_t + 14.0), Vec2::new(bar_w, 10.0)), CornerRadius::same(2), Color32::from_rgb(249, 115, 22));
+
+                    // Deflection bars
+                    let y_def = y_t + 36.0;
+                    painter_r.text(Pos2::new(chart_left, y_def), egui::Align2::LEFT_TOP, format!("Live Load Deflection: {:.2} mm (Limit: {:.1} mm)", rep.live_load_deflection_delta_ll_mm, rep.live_load_deflection_limit_mm), egui::FontId::proportional(9.5), if rep.is_deflection_ll_ok { Color32::from_rgb(34, 197, 94) } else { Color32::from_rgb(239, 68, 68) });
+                    let def_ratio = (rep.live_load_deflection_delta_ll_mm / rep.live_load_deflection_limit_mm.max(1.0)).clamp(0.05, 1.5) as f32;
+                    let w_def = (def_ratio * bar_w * 0.7).clamp(8.0, bar_w);
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y_def + 14.0), Vec2::new(bar_w, 9.0)), CornerRadius::same(2), Color32::from_rgb(30, 41, 59));
+                    painter_r.rect_filled(egui::Rect::from_min_size(Pos2::new(chart_left, y_def + 14.0), Vec2::new(w_def, 9.0)), CornerRadius::same(2), if rep.is_deflection_ll_ok { Color32::from_rgb(34, 197, 94) } else { Color32::from_rgb(239, 68, 68) });
+
+                    let y_stage = y_def + 30.0;
+                    let stage_text = if rep.is_unshored_construction {
+                        format!("Construction Stage (Unshored Wet Concrete DCR: {:.3} - {})", rep.construction_stage_dcr, if rep.is_construction_stage_safe { "PASS" } else { "FAIL" })
+                    } else {
+                        "Construction Stage: Shored (Temporary shores provided)".to_string()
+                    };
+                    painter_r.text(Pos2::new(chart_left, y_stage), egui::Align2::LEFT_TOP, stage_text, egui::FontId::proportional(9.5), if rep.is_construction_stage_safe { Color32::from_rgb(148, 163, 184) } else { Color32::from_rgb(245, 158, 11) });
+                });
+            });
+
+        ui.add_space(14.0);
+
+        // 4. Limit States Verification Table
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::same(12))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("📊 AISC 360-16 / SNI 1729:2020 Limit States Verification Table").size(12.5).strong().color(theme.text_primary));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(RichText::new(format!("Effective Inertia Ieff: {:.0} cm⁴", rep.lower_bound_effective_inertia_ieff_cm4)).size(11.0).strong().color(theme.accent_blue));
+                    });
+                });
+
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Limit State Description").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(140.0);
+                    ui.label(RichText::new("Code Ref").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(70.0);
+                    ui.label(RichText::new("Nominal").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(40.0);
+                    ui.label(RichText::new("φ").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(35.0);
+                    ui.label(RichText::new("Design").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(45.0);
+                    ui.label(RichText::new("Demand").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(40.0);
+                    ui.label(RichText::new("DCR").size(11.0).strong().color(theme.text_secondary));
+                    ui.add_space(40.0);
+                    ui.label(RichText::new("Status").size(11.0).strong().color(theme.text_secondary));
+                });
+                ui.separator();
+
+                for ls in &rep.limit_states {
+                    let dcr_col = if ls.demand_capacity_ratio <= 0.75 {
+                        theme.accent_green
+                    } else if ls.demand_capacity_ratio <= 1.00 {
+                        theme.accent_orange
+                    } else {
+                        Color32::from_rgb(239, 68, 68)
+                    };
+
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(&ls.limit_state_name).size(11.0).strong().color(theme.accent_blue));
+                        ui.add_space(20.0);
+                        ui.label(RichText::new(&ls.standard_code_ref).size(10.5).color(theme.text_muted));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new(format!("{:7.1}", ls.nominal_capacity)).size(11.0).color(theme.text_primary));
+                        ui.add_space(40.0);
+                        ui.label(RichText::new(format!("{:.2}", ls.phi_factor)).size(11.0).color(theme.text_secondary));
+                        ui.add_space(35.0);
+                        ui.label(RichText::new(format!("{:7.1}", ls.design_capacity)).size(11.0).color(theme.accent_green));
+                        ui.add_space(40.0);
+                        ui.label(RichText::new(format!("{:7.1}", ls.factored_demand)).size(11.0).color(theme.text_primary));
+                        ui.add_space(40.0);
+                        ui.label(RichText::new(format!("{:.3}", ls.demand_capacity_ratio)).size(11.0).strong().color(dcr_col));
+                        ui.add_space(40.0);
+                        ui.label(RichText::new(if ls.is_safe { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(dcr_col));
                     });
                     ui.separator();
                 }

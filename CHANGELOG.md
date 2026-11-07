@@ -7,6 +7,46 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.0.8] - 2026-11-06 — Phase 8: Composite Steel-Concrete Beam & Slab Design (AISC 360-16 / SNI 1729:2020)
+
+### Added
+- **AISC 360-16 Chapter I & SNI 1729:2020 Pasal I Composite Beam Design Engine (`src/core/composite.rs`)**:
+  - **Headed Shear Stud Nominal Strength ($Q_n$)**:
+    $$Q_n = \min\left(0.5 A_{sa} \sqrt{f'_c E_c}, \; R_g R_p A_{sa} F_u\right)$$
+    Accounting for deck geometry reduction factors $R_g$ and $R_p$ across perpendicular and parallel ribs per AISC Eq. I8-1.
+  - **Effective Slab Flange Width ($b_{\text{eff}}$)**:
+    $$b_{\text{eff}} = \min\left(\frac{L}{4}, \; S\right)$$
+    Per AISC 360-16 Section I3.1.1 for interior beams with span $L$ and beam center-to-center spacing $S$.
+  - **Plastic Neutral Axis (PNA) Tracking & Plastic Moment Strength ($M_n$)**:
+    - Complete plastic stress distribution analysis across concrete compression zone $C_c = 0.85 f'_c b_{\text{eff}} a$, shear stud force $\sum Q_n$, and steel tensile/compressive zones.
+    - Automated detection and equilibrium calculation across 3 distinct cases:
+      - **Case 1 (PNA in concrete slab)**: $a \le t_c$, entire steel section in pure tension.
+      - **Case 2 (PNA in top steel flange)**: Concrete in compression, portion of top flange in compression, rest in tension.
+      - **Case 3 (PNA in steel web)**: Concrete and top flange in compression, web depth in tension/compression equilibrium.
+    - Design flexural capacity $\phi M_n$ with LRFD resistance factor $\phi_b = 0.90$.
+  - **Degree of Composite Action Check**:
+    $$\text{Composite Action} = \frac{\sum Q_n}{C_{\text{max}}} \times 100\% \ge 25\%$$
+    Enforces AISC 360-16 minimum threshold of 25% composite interaction.
+  - **Unshored Construction Stage Wet Concrete Stability**:
+    - Evaluates wet concrete dead load and construction live load prior to concrete curing.
+    - Verifies bare steel section flexural resistance $\phi M_n \ge M_{u,\text{const}}$ to prevent lateral-torsional buckling or plastic failure during pouring.
+  - **Lower-Bound Effective Moment of Inertia ($I_{\text{eff}}$) & Serviceability Deflections**:
+    $$I_{\text{eff}} = I_s + \sqrt{\frac{\sum Q_n}{C_{\text{max}}}} \left(I_{\text{tr}} - I_s\right)$$
+    - Live load deflection check: $\Delta_{\text{LL}} \le L/360$.
+    - Long-term creep deflection check (accounting for sustained slab dead load): $\Delta_{\text{total}} \le L/240$.
+- **Interactive AISC Composite Beam Studio in Analyze View (`src/views/analyze.rs`)**:
+  - Added new sub-tab `AnalyzeSubTab::CompositeDesign` (`🥞 AISC Composite`).
+  - 4 Executive Metric Cards: Design Capacity ($\phi M_n$), DCR Flexure ratio, Composite Action percentage, and Live Load Deflection ($\Delta_{\text{LL}}$ vs. $L/360$).
+  - Control Toolbar: Interactive configuration for span length $L$, beam spacing $S$, wide-flange steel dimensions ($d, b_f, t_f, t_w, F_y$), concrete slab thickness $t_c$, deck rib height $h_r$, $f'_c$, shear stud diameter/quantity, unshored construction toggle, and applied moment/live loads.
+  - Dual Vector Visualizer:
+    1. *Left*: 2D CAD cross-section detailing showing hatched concrete slab, trapezoidal metal deck ribs, headed shear studs, W-beam profile, and colored dashed line tracking the exact PNA elevation.
+    2. *Right*: Plastic Stress Distribution block diagram and Deflection Gauge comparing $\Delta_{\text{LL}}$ against $L/360$.
+  - Comprehensive AISC limit states verification table auditing flexure, shear stud capacity, minimum composite action, unshored construction stage, and serviceability creep deflection.
+- **AISC 360-16 Composite Beam Markdown Dossier Export (`generate_markdown_dossier`)**:
+  - Added one-click export button `🥞 AISC Composite Dossier (.md)` in Results View generating `AISC360_Composite_Beam_Audit.md`.
+
+---
+
 ## [v0.0.7] - 2026-11-06 — Phase 7: Wind Engineering & Computational Aero-Dynamics per ASCE 7-22 / SNI 1727:2020
 
 ### Added

@@ -28,6 +28,7 @@ pub mod concrete;
 pub mod pushover;
 pub mod geotech;
 pub mod wind;
+pub mod composite;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -111,4 +112,8 @@ pub use concrete::{
 pub use wind::{
     EnclosureClassification, ExposureCategory, RiskCategory, StoryWindLevel, WindAnalysisReport,
     WindComfortAudit, WindEngine,
+};
+pub use composite::{
+    CompositeBeamEngine, CompositeBeamReport, CompositeLimitState, CompositeSlabDeck,
+    DeckOrientation, PnaLocation, ShearStud,
 };
