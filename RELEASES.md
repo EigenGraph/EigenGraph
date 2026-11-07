@@ -7,6 +7,46 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## 🚀 EigenGraph v0.1.5 — Phase 15: Blast Resistant Design & Explosive Impulse Dynamics Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.5`  
+**Target:** Production Engine
+
+EigenGraph v0.1.5 introduces an advanced **Blast Resistant Design & Explosive Impulse Dynamics Engine**, delivering state-of-the-art computational mechanics for antiterrorism perimeter protection, hardened bunker facilities, and critical infrastructure defense in full compliance with **DoD UFC 3-340-02**, **ASCE 59-11**, **USACE PDC-TR-06-08**, and **GSA PBS-P100 / ISC Physical Security Criteria**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Kingery-Bulmash Empirical Blast Wave Characterization
+- **Threat Equivalence & Scaling**: Multi-explosive TNT equivalency (TNT, ANFO, C-4, PETN, Dynamite) with surface burst reflection enhancement factor ($\alpha = 1.80$):
+  $$Z = \frac{R}{W_{\text{effective}}^{1/3}} \quad (\text{m/kg}^{1/3})$$
+- **High-Order Rankine-Hugoniot Reflection**:
+  $$P_r = 2 P_{so} \left(\frac{7 P_0 + 4 P_{so}}{7 P_0 + P_{so}}\right)$$
+- **Calibrated Friedlander Waveform**: Positive phase exponential decay calibrated via numerical Newton-Raphson:
+  $$P(t) = P_r \left(1 - \frac{t}{t_d}\right) e^{-b \cdot t / t_d}$$
+- **Clearing Relief**: Stagnation pressure relaxation on finite facade envelopes ($t_c = 3 S / C_r$).
+
+#### 2. Equivalent SDOF Dynamic Transformation (Biggs Method)
+- Load-mass transformation factors $K_M, K_L, K_{LM}$ across simply supported, clamped, propped cantilever, and cantilever boundaries.
+- Dynamic Material Strengths with Dynamic Increase Factors (DIF): $\text{DIF}_c = 1.25$ for concrete compression, $\text{DIF}_y = 1.20$ with $\text{SIF} = 1.10$ for flexural rebar and steel sections.
+- Cracked section stiffness $k_E$, ultimate plastic resistance $R_u$, and response regime categorization (Impulsive, Dynamic, Quasi-Static).
+
+#### 3. Central Difference Elastoplastic Numerical Dynamics
+- Time-history integration of $M_e \ddot{y} + C \dot{y} + R(y) = F_e(t)$ solving dynamic displacement $y(t)$, dynamic resistance $R(t)$, and support reactions $V(t)$.
+- Ductility ratio $\mu = y_{\max} / y_e$ and support rotation $\theta = \arctan(y_{\max} / (L/2))$.
+- Direct dynamic shear capacity verification ($V_u \le \phi V_{c,\text{dyn}}$).
+
+#### 4. PDC-TR-06-08 / UFC 3-340-02 Damage Classification
+- Automated classification into **B1: Superficial**, **B2: Low Damage**, **B3: Medium Damage**, **B4: High Damage**, and **B5: Hazardous Failure**.
+
+#### 5. Pressure-Impulse (P-I) Iso-Damage Diagrams
+- Analytical generation of asymptotic P-I curves delineating impulsive and quasi-static damage thresholds with live operating threat point.
+
+#### 6. 3D Protective Blast Bunker Archetype & Calculation Dossier
+- Parametric 3D model generator (`generate_blast_bunker_archetype`) with 450mm blast shear walls, roof diaphragms, and perimeter standoff deflector revetments.
+- Professional Markdown dossier generator (`generate_markdown_dossier`) ready for defense and security certification.
+
+---
+
 ## 🚀 EigenGraph v0.1.4 — Phase 14: FEMA P-58 Seismic Performance Assessment & Probabilistic Loss Engine
 **Release Date:** 2026-11-07  
 **Git Tag:** `v0.1.4`  

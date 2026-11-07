@@ -31,7 +31,7 @@
           <div class="titlebar-title">
             <img src="assets/icon.png" alt="EigenGraph" width="22" height="22" style="border-radius:4px;">
             <span>EigenGraph Workstation</span>
-            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.4-release</span>
+            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.5-release</span>
           </div>
         </div>
 
@@ -41,8 +41,8 @@
         </div>
 
         <div class="titlebar-right">
-          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.4" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
-            📥 Download v0.1.4
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.5" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v0.1.5
           </a>
           <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             🏷️ Releases
@@ -186,8 +186,8 @@
 
           <div class="sidebar-footer">
             <div><strong>Engine:</strong> Rust 1.80+ Core Engine</div>
-            <div><strong>Status:</strong> 78/78 Verified Tests (100%)</div>
-            <div style="color:var(--accent-green);">● Desktop Release v0.1.4 Active</div>
+            <div><strong>Status:</strong> 82/82 Verified Tests (100%)</div>
+            <div style="color:var(--accent-green);">● Desktop Release v0.1.5 Active</div>
           </div>
         </aside>
 
@@ -1515,20 +1515,48 @@ pub struct BiaxialPmReport {
               </p>
               
               <div style="display:flex; flex-direction:column; gap:12px;">
-                <!-- v0.1.4 -->
+                <!-- v0.1.5 -->
                 <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16, 185, 129, 0.4); border-radius:8px; padding:14px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);">
                   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <div>
                       <span class="dossier-tag green" style="font-size:0.7rem; font-weight:700;">LATEST PRODUCTION</span>
-                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.4</span>
-                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 14: FEMA P-58 Seismic Performance & REDi™ Loss Engine)</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.5</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 15: Blast Resistant Design & Explosive Dynamics Engine)</span>
                     </div>
-                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.4" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.5" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
                       Release Notes & Source ↗
                     </a>
                   </div>
                   <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.4.zip" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.5.zip" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (zip)
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.5.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (tar.gz)
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>DoD UFC 3-340-02 & ASCE 59-11:</strong> Comprehensive antiterrorism blast dynamics methodology evaluating Kingery-Bulmash empirical blast wave parameters, TNT equivalencies, and ground reflection enhancement.</li>
+                    <li><strong>Rankine-Hugoniot & Friedlander Waveform:</strong> Normally reflected overpressure \(P_r = 2 P_{so} \frac{7 P_0 + 4 P_{so}}{7 P_0 + P_{so}}\), calibrated exponential decay coefficient \(b\), and finite target clearing relief effects.</li>
+                    <li><strong>Biggs SDOF Elastoplastic Dynamics:</strong> Load-mass transformation factors \(K_{LM}\), Dynamic Increase Factors (\(\text{DIF}_c = 1.25\), \(\text{DIF}_y = 1.20\)), central difference time-history integration, ductility \(\mu = y_{\max}/y_e\), and support rotation angle \(\theta\).</li>
+                    <li><strong>PDC-TR-06-08 Damage Classification & P-I Contours:</strong> Automated categorization into B1 Superficial through B5 Hazardous failure, coupled with Pressure-Impulse iso-damage threshold curves.</li>
+                  </ul>
+                </div>
+
+                <!-- v0.1.4 -->
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                      <span class="dossier-tag blue" style="font-size:0.7rem;">PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.4</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 14: FEMA P-58 Seismic Performance & REDi™ Loss Engine)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.4" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Source ↗
+                    </a>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.4.zip" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
                       📦 Source code (zip)
                     </a>
                     <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.4.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">

@@ -7,6 +7,52 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.1.5] - 2026-11-07 — Phase 15: Blast Resistant Design & Explosive Impulse Dynamics Engine (UFC 3-340-02 / ASCE 59-11)
+
+### Added
+- **Blast Resistant Design & Explosive Dynamics Core Engine (`src/core/blast.rs`)**:
+  - Full compliance with **DoD UFC 3-340-02 (Structures to Resist the Effects of Accidental Explosions)**, **ASCE 59-11 (Blast Protection of Buildings)**, **USACE PDC-TR-06-08 (SDOF Structural Response Limits)**, **GSA PBS-P100 / ISC Physical Security Standards**, and **ACI 318-19 / AISC 360-16**.
+  - **Kingery-Bulmash Empirical Blast Wave Characterization**:
+    - TNT equivalence conversion across high explosives (TNT: 1.00, ANFO: 0.82, Composition C-4: 1.30, PETN: 1.27, Commercial Dynamite: 0.92).
+    - Surface burst ground reflection enhancement ($\alpha = 1.80$) and free-air spherical burst modeling.
+    - Scaled distance formulation: $Z = \frac{R}{W_{\text{effective}}^{1/3}}$ ($\text{m/kg}^{1/3}$).
+    - High-order Kingery-Bulmash polynomials for peak incident overpressure $P_{so}$ (kPa) and normally reflected overpressure $P_r$:
+      $$P_r = 2 P_{so} \left(\frac{7 P_0 + 4 P_{so}}{7 P_0 + P_{so}}\right)$$
+    - Shock front velocity $U_s$, arrival time $t_a$, positive phase duration $t_d$, and reflected specific impulse $i_r$.
+    - Modified Friedlander waveform decay calibration with numerical Newton-Raphson solver for $b$:
+      $$P(t) = P_r \left(1 - \frac{t}{t_d}\right) e^{-b \cdot t / t_d}$$
+    - Target clearing relief effects on finite facade panels: clearing time $t_c = \frac{3 S}{C_r}$ reducing effective impulse.
+  - **Single-Degree-of-Freedom (SDOF) Dynamic Transformation (Biggs Method)**:
+    - Load-mass transformation factors $K_M, K_L, K_{LM}$ for simply supported, fixed-fixed, propped cantilever, and cantilever boundary conditions.
+    - Dynamic Increase Factors (DIF) for high strain rates: $\text{DIF}_c = 1.25$ for concrete, $\text{DIF}_y = 1.20$ with $\text{SIF} = 1.10$ for steel reinforcement and structural steel.
+    - Cracked section stiffness $k_E$ and dynamic ultimate plastic resistance $R_u$ derived from yield line and collapse mechanisms.
+    - Response regime classification: Impulsive ($t_d / T_n < 0.10$), Dynamic ($0.10 \le t_d / T_n \le 2.0$), and Quasi-Static ($t_d / T_n > 2.0$).
+  - **Central Difference Elastoplastic Numerical Time-History Integration**:
+    - Step-by-step integration of $M_e \ddot{y} + C \dot{y} + R(y) = F_e(t)$ tracking displacement $y(t)$, velocity $\dot{y}(t)$, dynamic resistance $R(t)$, and support reaction forces $V(t)$.
+    - Dynamic ductility ratio $\mu = \frac{y_{\max}}{y_e}$ and support rotation angle $\theta = \arctan\left(\frac{y_{\max}}{L/2}\right)$ (degrees).
+    - Permanent plastic offset $y_{\text{perm}}$ and dynamic direct shear capacity checks ($V_u \le \phi V_{c,\text{dyn}}$).
+  - **UFC 3-340-02 / PDC-TR-06-08 Damage Classification**:
+    - Rigorous categorization into **B1: Superficial** ($\mu \le 1.0, \theta \le 0.5^\circ$), **B2: Low Damage** ($\mu \le 3.0, \theta \le 1.0^\circ$), **B3: Medium Damage** ($\mu \le 6.0, \theta \le 2.0^\circ$), **B4: High Damage** ($\mu \le 10.0, \theta \le 6.0^\circ$), and **B5: Hazardous Failure**.
+  - **Pressure-Impulse (P-I) Iso-Damage Contours**:
+    - Asymptotic analytical generation of P-I curves across impulsive and quasi-static regimes for all UFC damage tiers.
+  - **3D High-Security Protective Blast Bunker Archetype (`generate_blast_bunker_archetype`)**:
+    - Synthesizes a reinforced command bunker with 450mm shear walls, heavy roof diaphragm girders, and perimeter blast deflector revetments at standoff distance.
+  - **Automated Calculation Dossier Generator (`generate_markdown_dossier`)**:
+    - Markdown calculation report with Kingery-Bulmash parameters, SDOF dynamics, damage state audit, and regulatory compliance tables.
+  - **Unit Testing Suite**: 4 verified test cases (`test_kingery_bulmash_blast_wave_parameters`, `test_sdof_system_and_plastic_resistance`, `test_blast_assessment_pipeline`, `test_blast_bunker_archetype_generation`), expanding verified suite to **82/82 tests (100%)**.
+- **Deep Analysis Studio (`src/views/analyze.rs`)**:
+  - Added subtab `AnalyzeSubTab::BlastResistantDesign` ("💣 Blast & Explosive Dynamics (UFC/ASCE)").
+  - 4 Executive KPI cards: Threat Intensity ($W, R, Z, P_{so}$), Reflected Shock & Impulse ($P_r, t_d, i_r, U_s$), Dynamic SDOF Demands ($\mu, y_{\max}, y_e, \theta$), and UFC Damage Tier (B1-B5).
+  - Interactive parameter controls: Charge mass, explosive type, burst type, standoff distance, component archetype, support condition, geometry dimensions, concrete $f_c'$, steel $f_y$, rebar ratio, and target damage level.
+  - 2D Vector CAD Canvas: Left side Friedlander blast pressure waveform $P(t)$ with shaded impulse; Right side dynamic SDOF displacement history $y(t)$ with elastic yield limit $y_e$ and peak deflection marker.
+  - Complete UFC 3-340-02 & ASCE 59-11 compliance audit matrix.
+- **3D Modeling & CAD Viewport (`src/views/build.rs`)**:
+  - Added `ModelArchetype::BlastResistantBunker3D` ("🛡️ Blast Protective Bunker (UFC 3-340-02)").
+  - Integrated into model selectors and dedicated camera preset (yaw 0.68, pitch 0.36, zoom 1.05).
+  - 3D rendering of blast bunker frame, roof diaphragm, and perimeter standoff deflector revetment.
+- **Results & Engineering Dossier View (`src/views/results.rs`)**:
+  - Added action button `"💣 Blast Dynamics Dossier (.md)"` saving `EigenGraph_Blast_Dynamics_UFC340_Dossier.md`.
+
 ## [v0.1.4] - 2026-11-07 — Phase 14: FEMA P-58 Seismic Performance Assessment & Probabilistic Loss Engine (FEMA P-58 / REDi)
 
 ### Added

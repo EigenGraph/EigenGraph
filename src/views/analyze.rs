@@ -24,6 +24,7 @@ pub enum AnalyzeSubTab {
     BaseIsolationDesign,
     TimeHistoryAnalysis,
     FemaP58LossAssessment,
+    BlastResistantDesign,
 }
 
 pub struct AnalyzeView {
@@ -173,6 +174,21 @@ pub struct AnalyzeView {
     pub fema_workers_per_floor: usize,
     pub fema_daily_revenue_usd: f64,
     pub fema_target_redi_tier: crate::core::REDiResilienceTier,
+    // Blast Resistant Design & Explosive Dynamics (UFC 3-340-02 / ASCE 59-11)
+    pub blast_project_name: String,
+    pub blast_charge_kg: f32,
+    pub blast_explosive_type: crate::core::ExplosiveType,
+    pub blast_burst_type: crate::core::BurstType,
+    pub blast_standoff_m: f32,
+    pub blast_component_kind: crate::core::BlastComponentKind,
+    pub blast_support_condition: crate::core::SupportCondition,
+    pub blast_span_length_m: f32,
+    pub blast_tributary_width_m: f32,
+    pub blast_thickness_m: f32,
+    pub blast_fc_mpa: f32,
+    pub blast_fy_mpa: f32,
+    pub blast_rebar_percent: f32,
+    pub blast_target_damage: crate::core::UfcDamageLevel,
 }
 
 impl Default for AnalyzeView {
@@ -315,6 +331,20 @@ impl Default for AnalyzeView {
             fema_workers_per_floor: 12,
             fema_daily_revenue_usd: 120_000.0,
             fema_target_redi_tier: crate::core::REDiResilienceTier::Gold,
+            blast_project_name: "Strategic Embassy Perimeter Blast Gate & Bunker Wall".to_string(),
+            blast_charge_kg: 250.0,
+            blast_explosive_type: crate::core::ExplosiveType::C4,
+            blast_burst_type: crate::core::BurstType::SurfaceBurst,
+            blast_standoff_m: 15.0,
+            blast_component_kind: crate::core::BlastComponentKind::RcWall,
+            blast_support_condition: crate::core::SupportCondition::FixedFixed,
+            blast_span_length_m: 4.20,
+            blast_tributary_width_m: 1.00,
+            blast_thickness_m: 0.40,
+            blast_fc_mpa: 40.0,
+            blast_fy_mpa: 420.0,
+            blast_rebar_percent: 1.20,
+            blast_target_damage: crate::core::UfcDamageLevel::Low,
         }
     }
 }
@@ -378,6 +408,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::BaseIsolationDesign => self.render_base_isolation_design(ui, theme),
                     AnalyzeSubTab::TimeHistoryAnalysis => self.render_time_history_analysis(ui, theme),
                     AnalyzeSubTab::FemaP58LossAssessment => self.render_fema_p58_assessment(ui, theme),
+                    AnalyzeSubTab::BlastResistantDesign => self.render_blast_resistant_design(ui, theme),
                 }
 
                 ui.add_space(64.0);
@@ -537,6 +568,7 @@ impl AnalyzeView {
                     (AnalyzeSubTab::BaseIsolationDesign, "🛡️ Base Isolation & Dampers"),
                     (AnalyzeSubTab::TimeHistoryAnalysis, "🌊 NL-THA Time-History"),
                     (AnalyzeSubTab::FemaP58LossAssessment, "🏛️ FEMA P-58 Loss & REDi"),
+                    (AnalyzeSubTab::BlastResistantDesign, "💣 Blast & Explosive Dynamics (UFC/ASCE)"),
                 ];
 
                 for (tab, label) in tabs {
@@ -5724,6 +5756,449 @@ impl AnalyzeView {
                     ui.label(RichText::new(format!("{:.1} {}", item.demand_val, item.unit)).size(10.5).color(theme.text_primary));
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.1} {}", item.permissible_limit, item.unit)).size(10.5).color(theme.accent_green));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.3}", item.utilization_ratio)).size(10.5).strong().color(row_col));
+                    ui.add_space(20.0);
+                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                });
+                ui.separator();
+            }
+        });
+    }
+
+    fn render_blast_resistant_design(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let input = crate::core::BlastAnalysisInput {
+            project_name: self.blast_project_name.clone(),
+            explosive_mass_kg: self.blast_charge_kg as f64,
+            explosive_type: self.blast_explosive_type,
+            burst_type: self.blast_burst_type,
+            standoff_distance_m: self.blast_standoff_m as f64,
+            component_kind: self.blast_component_kind,
+            support_condition: self.blast_support_condition,
+            span_length_m: self.blast_span_length_m as f64,
+            tributary_width_m: self.blast_tributary_width_m as f64,
+            thickness_m: self.blast_thickness_m as f64,
+            f_c_mpa: self.blast_fc_mpa as f64,
+            f_y_mpa: self.blast_fy_mpa as f64,
+            rebar_ratio_percent: self.blast_rebar_percent as f64,
+            damping_ratio: 0.02,
+            target_damage_level: self.blast_target_damage,
+        };
+
+        let rep = crate::core::BlastEngine::run_assessment(&input);
+
+        // 4 Executive KPI Cards
+        ui.horizontal(|ui| {
+            // Card 1: Threat Intensity
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(260.0);
+                ui.label(RichText::new("💣 Blast Threat Intensity").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("{:.1} kg TNT", rep.blast_wave.effective_tnt_mass_kg))
+                        .size(19.0)
+                        .strong()
+                        .color(Color32::from_rgb(239, 68, 68)),
+                );
+                ui.label(
+                    RichText::new(format!(
+                        "Standoff R = {:.1} m | Z = {:.2} m/kg⅓\nPso = {:.1} kPa ({:.2} bar)",
+                        rep.blast_wave.standoff_distance_m,
+                        rep.blast_wave.scaled_distance_z,
+                        rep.blast_wave.peak_incident_overpressure_kpa,
+                        rep.blast_wave.peak_incident_overpressure_kpa / 100.0
+                    ))
+                    .size(10.5)
+                    .color(theme.text_secondary),
+                );
+            });
+
+            ui.add_space(8.0);
+
+            // Card 2: Reflected Impulse & Duration
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(260.0);
+                ui.label(RichText::new("⚡ Reflected Shock & Impulse").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("{:.1} kPa", rep.blast_wave.peak_reflected_overpressure_kpa))
+                        .size(19.0)
+                        .strong()
+                        .color(Color32::from_rgb(245, 158, 11)),
+                );
+                ui.label(
+                    RichText::new(format!(
+                        "Reflected ir = {:.1} kPa·ms\nDuration td = {:.2} ms | Us = {:.0} m/s",
+                        rep.blast_wave.reflected_impulse_kpa_ms,
+                        rep.blast_wave.positive_phase_duration_ms,
+                        rep.blast_wave.shock_velocity_m_s
+                    ))
+                    .size(10.5)
+                    .color(theme.text_secondary),
+                );
+            });
+
+            ui.add_space(8.0);
+
+            // Card 3: Dynamic Structural Deformation
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(260.0);
+                ui.label(RichText::new("📐 Dynamic SDOF Demands").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("μ = {:.2}", rep.dynamic_ductility_ratio))
+                        .size(19.0)
+                        .strong()
+                        .color(theme.accent_blue),
+                );
+                ui.label(
+                    RichText::new(format!(
+                        "Deflection ymax = {:.1} mm (ye = {:.1} mm)\nSupport Rotation θ = {:.2}°",
+                        rep.max_displacement_mm,
+                        rep.sdof_system.yield_displacement_mm,
+                        rep.support_rotation_deg
+                    ))
+                    .size(10.5)
+                    .color(theme.text_secondary),
+                );
+            });
+
+            ui.add_space(8.0);
+
+            // Card 4: UFC Damage Level & Compliance
+            let (r, g, b) = rep.evaluated_damage_level.color_rgb();
+            let status_badge_col = Color32::from_rgb(r, g, b);
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(260.0);
+                ui.label(RichText::new("🛡️ UFC 3-340-02 Damage Tier").size(11.0).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("{:?}", rep.evaluated_damage_level))
+                        .size(19.0)
+                        .strong()
+                        .color(status_badge_col),
+                );
+                let achieved_str = if rep.is_target_damage_achieved {
+                    "🟢 Target Limit Satisfied"
+                } else {
+                    "🔴 Target Limit Deficit"
+                };
+                ui.label(
+                    RichText::new(format!(
+                        "{}\nRegime: {}",
+                        achieved_str,
+                        rep.sdof_system.response_regime.label()
+                    ))
+                    .size(10.5)
+                    .color(theme.text_secondary),
+                );
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // Parameter Controls Panel (3 Columns)
+        theme.card_frame().show(ui, |ui| {
+            ui.label(RichText::new("⚙️ Blast Threat, Structural Geometry & Antiterrorism Design Parameters").size(12.5).strong().color(theme.accent_blue));
+            ui.add_space(8.0);
+
+            ui.columns(3, |cols| {
+                // Column 1: Threat Characterization
+                cols[0].vertical(|ui| {
+                    ui.label(RichText::new("1. Threat & Standoff Definition").strong().size(11.0).color(theme.accent_blue));
+                    ui.add_space(4.0);
+
+                    ui.label(RichText::new("Explosive Charge Mass (kg):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.blast_charge_kg, 10.0..=1000.0).suffix(" kg"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Explosive Type:").size(10.5));
+                    egui::ComboBox::from_id_salt("blast_exp_combo")
+                        .selected_text(self.blast_explosive_type.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.blast_explosive_type, crate::core::ExplosiveType::Tnt, "TNT (Trinitrotoluene)");
+                            ui.selectable_value(&mut self.blast_explosive_type, crate::core::ExplosiveType::Anfo, "ANFO (Ammonium Nitrate/Fuel Oil)");
+                            ui.selectable_value(&mut self.blast_explosive_type, crate::core::ExplosiveType::C4, "Composition C-4 (Military RDX)");
+                            ui.selectable_value(&mut self.blast_explosive_type, crate::core::ExplosiveType::Petn, "PETN (High Brisance)");
+                            ui.selectable_value(&mut self.blast_explosive_type, crate::core::ExplosiveType::Dynamite, "Commercial Dynamite");
+                        });
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Detonation Burst Type:").size(10.5));
+                    egui::ComboBox::from_id_salt("blast_burst_combo")
+                        .selected_text(self.blast_burst_type.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.blast_burst_type, crate::core::BurstType::SurfaceBurst, "Surface Burst (Ground Reflection 1.8x)");
+                            ui.selectable_value(&mut self.blast_burst_type, crate::core::BurstType::FreeAirBurst, "Free-Air Burst (Spherical 1.0x)");
+                        });
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Standoff Distance R (m):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.blast_standoff_m, 3.0..=60.0).suffix(" m"));
+                });
+
+                // Column 2: Structural Component Geometry
+                cols[1].vertical(|ui| {
+                    ui.label(RichText::new("2. Component Archetype & Dimensions").strong().size(11.0).color(theme.accent_blue));
+                    ui.add_space(4.0);
+
+                    ui.label(RichText::new("Component Archetype:").size(10.5));
+                    egui::ComboBox::from_id_salt("blast_comp_combo")
+                        .selected_text(self.blast_component_kind.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.blast_component_kind, crate::core::BlastComponentKind::RcWall, "RC Hardened Blast Wall");
+                            ui.selectable_value(&mut self.blast_component_kind, crate::core::BlastComponentKind::RcSlab, "RC Roof / Floor Slab Diaphragm");
+                            ui.selectable_value(&mut self.blast_component_kind, crate::core::BlastComponentKind::SteelColumn, "Structural Steel W-Column");
+                            ui.selectable_value(&mut self.blast_component_kind, crate::core::BlastComponentKind::SteelBarrier, "Steel Plate Blast Barrier Gate");
+                            ui.selectable_value(&mut self.blast_component_kind, crate::core::BlastComponentKind::BlastGlazing, "Laminated Anti-Shatter Glazing");
+                        });
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Support Boundary Condition:").size(10.5));
+                    egui::ComboBox::from_id_salt("blast_supp_combo")
+                        .selected_text(self.blast_support_condition.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.blast_support_condition, crate::core::SupportCondition::FixedFixed, "Fixed - Fixed (Clamped)");
+                            ui.selectable_value(&mut self.blast_support_condition, crate::core::SupportCondition::SimplySupported, "Simply Supported (Pinned - Pinned)");
+                            ui.selectable_value(&mut self.blast_support_condition, crate::core::SupportCondition::ProppedCantilever, "Propped Cantilever (Fixed - Pinned)");
+                            ui.selectable_value(&mut self.blast_support_condition, crate::core::SupportCondition::Cantilever, "Cantilever (Fixed - Free)");
+                        });
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Clear Span Length L (m):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.blast_span_length_m, 2.0..=8.0).suffix(" m"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Tributary Width B (m):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.blast_tributary_width_m, 0.5..=3.0).suffix(" m"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Component Thickness h (m):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.blast_thickness_m, 0.15..=0.80).suffix(" m"));
+                });
+
+                // Column 3: Materials & Antiterrorism Target
+                cols[2].vertical(|ui| {
+                    ui.label(RichText::new("3. Material Capacities & Target Damage").strong().size(11.0).color(theme.accent_blue));
+                    ui.add_space(4.0);
+
+                    ui.label(RichText::new("Concrete f'c (MPa):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.blast_fc_mpa, 25.0..=80.0).suffix(" MPa"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Steel Rebar / Profile fy (MPa):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.blast_fy_mpa, 280.0..=550.0).suffix(" MPa"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Rebar Flexural Ratio ρ (%):").size(10.5));
+                    ui.add(egui::Slider::new(&mut self.blast_rebar_percent, 0.40..=2.50).suffix(" %"));
+
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Target PDC/UFC Damage Level:").size(10.5));
+                    egui::ComboBox::from_id_salt("blast_target_combo")
+                        .selected_text(self.blast_target_damage.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.blast_target_damage, crate::core::UfcDamageLevel::Superficial, "B1: Superficial (Elastic, Reusable)");
+                            ui.selectable_value(&mut self.blast_target_damage, crate::core::UfcDamageLevel::Low, "B2: Low Damage (Minor Yielding, Occupiable)");
+                            ui.selectable_value(&mut self.blast_target_damage, crate::core::UfcDamageLevel::Medium, "B3: Medium Damage (Moderate Plasticity)");
+                            ui.selectable_value(&mut self.blast_target_damage, crate::core::UfcDamageLevel::High, "B4: High Damage (Life Safety)");
+                        });
+
+                    ui.add_space(6.0);
+                    ui.label(
+                        RichText::new(format!(
+                            "SDOF Mass Me = {:.1} kg | Tn = {:.1} ms\nUltimate Ru = {:.1} kN | ye = {:.2} mm",
+                            rep.sdof_system.equivalent_mass_kg,
+                            rep.sdof_system.natural_period_ms,
+                            rep.sdof_system.ultimate_resistance_kn,
+                            rep.sdof_system.yield_displacement_mm
+                        ))
+                        .size(10.0)
+                        .color(theme.text_secondary),
+                    );
+                });
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // 2D Vector CAD Canvas: Blast Waveform P(t) (Left) & SDOF Response y(t) with P-I Contour (Right)
+        theme.card_frame().show(ui, |ui| {
+            ui.label(RichText::new("📈 Dynamic Waveform & SDOF Elastoplastic Response Trajectory (UFC 3-340-02)").size(12.5).strong().color(theme.accent_blue));
+            ui.add_space(6.0);
+
+            let (canvas_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 260.0), Sense::hover());
+            let painter = ui.painter_with_clip(canvas_rect);
+
+            painter.rect_filled(canvas_rect, CornerRadius::same(6), Color32::from_rgb(18, 22, 28));
+            painter.rect_stroke(canvas_rect, CornerRadius::same(6), Stroke::new(1.0, theme.border_subtle), egui::StrokeKind::Inside);
+
+            let half_w = canvas_rect.width() * 0.5 - 10.0;
+            let left_rect = egui::Rect::from_min_size(canvas_rect.min + Vec2::new(5.0, 5.0), Vec2::new(half_w, canvas_rect.height() - 10.0));
+            let right_rect = egui::Rect::from_min_size(Pos2::new(canvas_rect.min.x + half_w + 15.0, canvas_rect.min.y + 5.0), Vec2::new(half_w, canvas_rect.height() - 10.0));
+
+            // Grid lines on both canvases
+            for r in &[left_rect, right_rect] {
+                for i in 1..5 {
+                    let y_line = r.min.y + (r.height() / 5.0) * (i as f32);
+                    painter.line_segment([Pos2::new(r.min.x, y_line), Pos2::new(r.max.x, y_line)], Stroke::new(0.5, Color32::from_rgb(35, 42, 54)));
+                }
+            }
+
+            // === LEFT CANVAS: Friedlander Blast Waveform P(t) ===
+            let td = rep.blast_wave.positive_phase_duration_ms as f32;
+            let pr = rep.blast_wave.peak_reflected_overpressure_kpa as f32;
+            let b = rep.blast_wave.friedlander_decay_coeff as f32;
+            let t_window = (td * 2.5).max(30.0);
+
+            // Shaded positive impulse area
+            let mut wave_pts = Vec::new();
+            let steps = 60;
+            for s in 0..=steps {
+                let t = (s as f32 / steps as f32) * td;
+                let tau = (t / td).clamp(0.0, 1.0);
+                let p = pr * (1.0 - tau) * (-b * tau).exp();
+                let sx = left_rect.min.x + 35.0 + (t / t_window) * (left_rect.width() - 50.0);
+                let sy = left_rect.max.y - 30.0 - (p / pr.max(1.0)) * (left_rect.height() - 60.0);
+                wave_pts.push(Pos2::new(sx, sy));
+            }
+
+            // Draw shaded positive phase impulse
+            if wave_pts.len() >= 2 {
+                let mut poly_pts = wave_pts.clone();
+                let baseline_y = left_rect.max.y - 30.0;
+                poly_pts.push(Pos2::new(wave_pts.last().unwrap().x, baseline_y));
+                poly_pts.push(Pos2::new(wave_pts.first().unwrap().x, baseline_y));
+                painter.add(egui::Shape::convex_polygon(
+                    poly_pts,
+                    Color32::from_rgba_unmultiplied(239, 68, 68, 45),
+                    Stroke::NONE,
+                ));
+
+                for w in 0..(wave_pts.len() - 1) {
+                    painter.line_segment([wave_pts[w], wave_pts[w + 1]], Stroke::new(2.2, Color32::from_rgb(239, 68, 68)));
+                }
+            }
+
+            // Arrival time line
+            let arrival_x = left_rect.min.x + 35.0;
+            let base_y = left_rect.max.y - 30.0;
+            painter.line_segment([Pos2::new(arrival_x, left_rect.min.y + 20.0), Pos2::new(arrival_x, base_y)], Stroke::new(1.0, theme.accent_blue));
+
+            painter.text(
+                Pos2::new(left_rect.min.x + 10.0, left_rect.min.y + 10.0),
+                Align2::LEFT_TOP,
+                "Normally Reflected Blast Waveform P(t) [Friedlander Profile]",
+                egui::FontId::proportional(11.0),
+                Color32::from_rgb(239, 68, 68),
+            );
+            painter.text(
+                Pos2::new(left_rect.min.x + 40.0, left_rect.min.y + 35.0),
+                Align2::LEFT_TOP,
+                format!("Pr = {:.1} kPa | td = {:.2} ms | ir = {:.1} kPa·ms", pr, td, rep.blast_wave.reflected_impulse_kpa_ms),
+                egui::FontId::proportional(10.0),
+                Color32::from_rgb(245, 158, 11),
+            );
+
+            // === RIGHT CANVAS: SDOF Dynamic Displacement History y(t) ===
+            let samples = &rep.time_history_samples;
+            if !samples.is_empty() {
+                let max_disp_canvas = (rep.max_displacement_mm as f32 * 1.30).max(rep.sdof_system.yield_displacement_mm as f32 * 1.5).max(1.0);
+                let t_end_samples = samples.last().map(|s| s.time_ms as f32).unwrap_or(50.0);
+
+                let ye_y = right_rect.max.y - 30.0 - (rep.sdof_system.yield_displacement_mm as f32 / max_disp_canvas) * (right_rect.height() - 60.0);
+                painter.line_segment(
+                    [Pos2::new(right_rect.min.x + 35.0, ye_y), Pos2::new(right_rect.max.x - 15.0, ye_y)],
+                    Stroke::new(1.0, Color32::from_rgb(16, 185, 129)),
+                );
+                painter.text(
+                    Pos2::new(right_rect.max.x - 18.0, ye_y - 2.0),
+                    Align2::RIGHT_BOTTOM,
+                    format!("Yield ye = {:.1} mm", rep.sdof_system.yield_displacement_mm),
+                    egui::FontId::proportional(9.5),
+                    Color32::from_rgb(16, 185, 129),
+                );
+
+                let mut disp_pts = Vec::new();
+                for pt in samples {
+                    let sx = right_rect.min.x + 35.0 + (pt.time_ms as f32 / t_end_samples) * (right_rect.width() - 50.0);
+                    let sy = right_rect.max.y - 30.0 - (pt.displacement_mm as f32 / max_disp_canvas) * (right_rect.height() - 60.0);
+                    disp_pts.push(Pos2::new(sx, sy));
+                }
+
+                for w in 0..(disp_pts.len().saturating_sub(1)) {
+                    painter.line_segment([disp_pts[w], disp_pts[w + 1]], Stroke::new(2.2, theme.accent_blue));
+                }
+
+                // Peak displacement marker
+                let peak_x = right_rect.min.x + 35.0 + (rep.time_at_max_disp_ms as f32 / t_end_samples) * (right_rect.width() - 50.0);
+                let peak_y = right_rect.max.y - 30.0 - (rep.max_displacement_mm as f32 / max_disp_canvas) * (right_rect.height() - 60.0);
+                painter.circle_filled(Pos2::new(peak_x, peak_y), 4.5, Color32::from_rgb(249, 115, 22));
+                painter.text(
+                    Pos2::new(peak_x + 6.0, peak_y - 8.0),
+                    Align2::LEFT_BOTTOM,
+                    format!("ymax = {:.1} mm (μ={:.2})", rep.max_displacement_mm, rep.dynamic_ductility_ratio),
+                    egui::FontId::proportional(10.0),
+                    Color32::from_rgb(249, 115, 22),
+                );
+            }
+
+            painter.text(
+                Pos2::new(right_rect.min.x + 10.0, right_rect.min.y + 10.0),
+                Align2::LEFT_TOP,
+                "Dynamic Elastoplastic Displacement History y(t) & Resistance",
+                egui::FontId::proportional(11.0),
+                theme.accent_blue,
+            );
+            painter.text(
+                Pos2::new(right_rect.min.x + 35.0, right_rect.min.y + 35.0),
+                Align2::LEFT_TOP,
+                format!("Support Rotation θ = {:.2}° | Perm Offset = {:.1} mm", rep.support_rotation_deg, rep.permanent_displacement_mm),
+                egui::FontId::proportional(10.0),
+                theme.text_secondary,
+            );
+        });
+
+        ui.add_space(10.0);
+
+        // Regulatory & UFC 3-340-02 / ASCE 59-11 Compliance Audit Table
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📋 UFC 3-340-02 & ASCE 59-11 Antiterrorism Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(20.0);
+                let overall_status = if rep.is_target_damage_achieved { "🟢 TARGET DAMAGE LEVEL ACHIEVED" } else { "🔴 TARGET DAMAGE DEFICIT" };
+                let status_col = if rep.is_target_damage_achieved { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+            });
+
+            ui.add_space(6.0);
+
+            // Table Header
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Performance Check").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(220.0);
+                ui.label(RichText::new("Code / Standard Reference").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(150.0);
+                ui.label(RichText::new("Demand").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(45.0);
+                ui.label(RichText::new("Limit").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(45.0);
+                ui.label(RichText::new("D/C Ratio").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(30.0);
+                ui.label(RichText::new("Status").size(10.5).strong().color(theme.text_secondary));
+            });
+            ui.separator();
+
+            for item in &rep.compliance_audit {
+                let row_col = if item.is_passed { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(&item.parameter_name).size(10.5).color(theme.accent_blue));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(&item.code_reference).size(10.5).color(theme.text_primary));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(format!("{:.2} {}", item.demand_val, item.unit)).size(10.5).color(theme.text_primary));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.2} {}", item.permissible_limit, item.unit)).size(10.5).color(theme.accent_green));
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.3}", item.utilization_ratio)).size(10.5).strong().color(row_col));
                     ui.add_space(20.0);

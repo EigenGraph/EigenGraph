@@ -35,6 +35,7 @@ pub mod shear_wall;
 pub mod isolation;
 pub mod time_history;
 pub mod fema_p58;
+pub mod blast;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -149,5 +150,10 @@ pub use time_history::{
 pub use fema_p58::{
     ComponentFragility, DamageStateDef, EdpKind, FemaComponentCategory, FemaComplianceItem,
     FemaP58Engine, FemaP58Input, FemaP58Report, REDiResilienceTier, StoryLossSummary,
+};
+pub use blast::{
+    BlastAnalysisInput, BlastAnalysisReport, BlastComponentKind, BlastComplianceItem, BlastEngine,
+    BlastResponseRegime, BlastWaveParameters, BurstType, ExplosiveType, PiCurvePoint,
+    SdofSystemParameters, SdofTimeStep, SupportCondition, UfcDamageLevel,
 };
 

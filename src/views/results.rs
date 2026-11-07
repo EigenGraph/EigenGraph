@@ -624,6 +624,17 @@ impl ResultsView {
                                     self.export_status = Some(format!("FEMA P-58 Seismic Loss Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("💣 Blast Dynamics Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(239, 68, 68))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let input = crate::core::BlastAnalysisInput::default();
+                                let rep = crate::core::BlastEngine::run_assessment(&input);
+                                let md = crate::core::BlastEngine::generate_markdown_dossier(&rep);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Blast_Dynamics_UFC340_Dossier.md", &md) {
+                                    self.export_status = Some(format!("Blast Dynamics UFC 3-340-02 Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });

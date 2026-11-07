@@ -22,12 +22,17 @@ pub enum ModelArchetype {
     BaseIsolatedHospital3D,  // 3D Base-Isolated Essential Facility (8-Story Hospital with Base Isolators)
     TimeHistoryTower3D,      // 3D 16-Story NL-THA Seismic Test Tower Archetype
     FemaP58HospitalArchetype, // 3D 10-Story FEMA P-58 Resilience & Loss Assessment Archetype
+    BlastResistantBunker3D,  // 3D Hardened Protective Blast Bunker & Standoff Barrier Archetype (UFC 3-340-02)
 }
 
 impl ModelArchetype {
     pub fn label(&self) -> &'static str {
         match self {
             Self::BimCraftBuilding3D => "🏗️ BIMCraft LOD350 (CSG + Rebar)",
+            Self::BlastResistantBunker3D => "🛡️ Blast Protective Bunker (UFC 3-340-02)",
+            Self::FemaP58HospitalArchetype => "🏥 FEMA P-58 Hospital (10-Story)",
+            Self::BaseIsolatedHospital3D => "🛡️ Base-Isolated Hospital (8-Story)",
+            Self::TimeHistoryTower3D => "🌊 NL-THA Tower (16-Story)",
             Self::DiagridTower3D => "🏢 NVW_DCR-LOD300 (Eng-CON Frame)",
             Self::TrussBridge3D => "🧱 NVW_DCR-LOD200 (Eng-CON-1 & 2)",
             Self::SpaceDome3D => "🔧 NVW_DCR-LOD300 (Eng-HVAC & Roof)",
@@ -363,9 +368,10 @@ impl BuildView {
 
             let models = [
                 ModelArchetype::BimCraftBuilding3D,
+                ModelArchetype::BlastResistantBunker3D,
+                ModelArchetype::FemaP58HospitalArchetype,
                 ModelArchetype::BaseIsolatedHospital3D,
                 ModelArchetype::TimeHistoryTower3D,
-                ModelArchetype::FemaP58HospitalArchetype,
                 ModelArchetype::CoupledShearWallCore3D,
                 ModelArchetype::PrestressedGirderBridge3D,
                 ModelArchetype::DoubleLayerSpaceTruss3D,
@@ -392,6 +398,12 @@ impl BuildView {
                             self.cam_zoom = 1.15;
                             self.cam_pan = Vec2::ZERO;
                             self.render_mode = Render3DMode::CsgSolidBrep;
+                        }
+                        ModelArchetype::BlastResistantBunker3D => {
+                            self.cam_yaw = 0.68;
+                            self.cam_pitch = 0.36;
+                            self.cam_zoom = 1.05;
+                            self.cam_pan = Vec2::ZERO;
                         }
                         ModelArchetype::BaseIsolatedHospital3D => {
                             self.cam_yaw = 0.58;
@@ -940,9 +952,10 @@ impl BuildView {
                         ui.label(RichText::new("Model:").size(11.0).color(theme.text_muted));
                         let models = [
                             ModelArchetype::BimCraftBuilding3D,
+                            ModelArchetype::BlastResistantBunker3D,
+                            ModelArchetype::FemaP58HospitalArchetype,
                             ModelArchetype::BaseIsolatedHospital3D,
                             ModelArchetype::TimeHistoryTower3D,
-                            ModelArchetype::FemaP58HospitalArchetype,
                             ModelArchetype::CoupledShearWallCore3D,
                             ModelArchetype::PrestressedGirderBridge3D,
                             ModelArchetype::DoubleLayerSpaceTruss3D,
@@ -2435,6 +2448,34 @@ impl BuildView {
                 let cy = 8.0;
                 let cz = (10.0 * 3.8) * 0.5;
                 ((cx, cy, cz), 22.0, list)
+            }
+            ModelArchetype::BlastResistantBunker3D => {
+                let (nodes, elements) = crate::core::BlastEngine::generate_blast_bunker_archetype();
+                let mut list = Vec::with_capacity(elements.len());
+                for el in &elements {
+                    let n1 = nodes.iter().find(|n| n.id == el.node_start).unwrap();
+                    let n2 = nodes.iter().find(|n| n.id == el.node_end).unwrap();
+                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
+                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
+                    let is_barrier = n1.y < -5.0 || n2.y < -5.0;
+                    list.push(Member3D {
+                        id: el.id,
+                        p1,
+                        p2,
+                        name: if is_barrier { format!("BlastBarrier-{}", el.id) } else { format!("BunkerWallGirder-{}", el.id) },
+                        section: el.section.name.clone(),
+                        base_width: if is_barrier { 4.5 } else { 7.0 },
+                        force_kn: if is_barrier { 480.0 } else { 2100.0 },
+                        capacity_kn: if is_barrier { 1200.0 } else { 5800.0 },
+                        utilization: if is_barrier { 0.40 } else { 0.36 },
+                        ari: 0.98,
+                        is_critical: false,
+                    });
+                }
+                let cx = 6.0;
+                let cy = -3.5;
+                let cz = 2.1;
+                ((cx, cy, cz), 16.0, list)
             }
         }
     }
