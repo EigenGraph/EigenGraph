@@ -613,6 +613,17 @@ impl ResultsView {
                                     self.export_status = Some(format!("NL-THA Dynamic Time-History Dossier saved to: {}", path));
                                 }
                             }
+
+                            if ui.add(egui::Button::new(RichText::new("🏛️ FEMA P-58 Dossier (.md)").size(10.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(168, 85, 247))
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                let input = crate::core::FemaP58Input::default();
+                                let rep = crate::core::FemaP58Engine::evaluate(&input);
+                                let md = crate::core::FemaP58Engine::generate_markdown_dossier(&input, &rep);
+                                if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_FEMA_P58_Seismic_Loss_Dossier.md", &md) {
+                                    self.export_status = Some(format!("FEMA P-58 Seismic Loss Dossier saved to: {}", path));
+                                }
+                            }
                         });
                     });
                 });

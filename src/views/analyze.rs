@@ -23,6 +23,7 @@ pub enum AnalyzeSubTab {
     ShearWallDesign,
     BaseIsolationDesign,
     TimeHistoryAnalysis,
+    FemaP58LossAssessment,
 }
 
 pub struct AnalyzeView {
@@ -161,6 +162,17 @@ pub struct AnalyzeView {
     pub tha_damping: f32,
     pub tha_cy: f32,
     pub tha_alpha_p: f32,
+    // FEMA P-58 Seismic Performance Assessment & REDi Loss Engine
+    pub fema_project_name: String,
+    pub fema_asset_value_usd: f64,
+    pub fema_floor_area_m2: f64,
+    pub fema_num_stories: usize,
+    pub fema_story_height_m: f64,
+    pub fema_site_pga_g: f64,
+    pub fema_spectral_sa1_g: f64,
+    pub fema_workers_per_floor: usize,
+    pub fema_daily_revenue_usd: f64,
+    pub fema_target_redi_tier: crate::core::REDiResilienceTier,
 }
 
 impl Default for AnalyzeView {
@@ -293,6 +305,16 @@ impl Default for AnalyzeView {
             tha_damping: 0.025,
             tha_cy: 0.12,
             tha_alpha_p: 0.035,
+            fema_project_name: "Metropolitan Medical Center Tower".to_string(),
+            fema_asset_value_usd: 85_000_000.0,
+            fema_floor_area_m2: 24_000.0,
+            fema_num_stories: 10,
+            fema_story_height_m: 3.80,
+            fema_site_pga_g: 0.45,
+            fema_spectral_sa1_g: 0.72,
+            fema_workers_per_floor: 12,
+            fema_daily_revenue_usd: 120_000.0,
+            fema_target_redi_tier: crate::core::REDiResilienceTier::Gold,
         }
     }
 }
@@ -355,6 +377,7 @@ impl AnalyzeView {
                     AnalyzeSubTab::ShearWallDesign => self.render_shear_wall_design(ui, theme),
                     AnalyzeSubTab::BaseIsolationDesign => self.render_base_isolation_design(ui, theme),
                     AnalyzeSubTab::TimeHistoryAnalysis => self.render_time_history_analysis(ui, theme),
+                    AnalyzeSubTab::FemaP58LossAssessment => self.render_fema_p58_assessment(ui, theme),
                 }
 
                 ui.add_space(64.0);
@@ -513,6 +536,7 @@ impl AnalyzeView {
                     (AnalyzeSubTab::ShearWallDesign, "🏢 RC Shear Walls & Coupling Beams"),
                     (AnalyzeSubTab::BaseIsolationDesign, "🛡️ Base Isolation & Dampers"),
                     (AnalyzeSubTab::TimeHistoryAnalysis, "🌊 NL-THA Time-History"),
+                    (AnalyzeSubTab::FemaP58LossAssessment, "🏛️ FEMA P-58 Loss & REDi"),
                 ];
 
                 for (tab, label) in tabs {
@@ -5352,6 +5376,356 @@ impl AnalyzeView {
                     ui.label(RichText::new(format!("{:.3} {}", item.capacity_val, item.unit)).size(10.5).color(theme.accent_green));
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.3}", item.demand_capacity_ratio)).size(10.5).strong().color(row_col));
+                    ui.add_space(20.0);
+                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                });
+                ui.separator();
+            }
+        });
+    }
+
+    fn render_fema_p58_assessment(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let input = crate::core::FemaP58Input {
+            project_name: self.fema_project_name.clone(),
+            building_replacement_value_usd: self.fema_asset_value_usd,
+            total_floor_area_m2: self.fema_floor_area_m2,
+            num_stories: self.fema_num_stories,
+            story_height_m: self.fema_story_height_m,
+            site_pga_g: self.fema_site_pga_g,
+            spectral_accel_sa1_g: self.fema_spectral_sa1_g,
+            max_laborers_per_story: self.fema_workers_per_floor,
+            daily_business_revenue_usd: self.fema_daily_revenue_usd,
+            target_redi_tier: self.fema_target_redi_tier,
+        };
+
+        let rep = crate::core::FemaP58Engine::evaluate(&input);
+
+        // Header & Quick Export Banner
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("🏛️ FEMA P-58 Seismic Performance & REDi™ Resilience Engine").size(13.0).strong().color(theme.accent_blue));
+                    ui.label(RichText::new("FEMA P-58-1 / ATC-58 · Arup REDi™ Rating System · ASCE 7-22 / ASCE 41-17 · ISO 14040 Embodied Carbon").size(10.5).color(theme.text_secondary));
+                });
+
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.add(egui::Button::new(RichText::new("📥 Export FEMA P-58 Dossier (.md)").size(11.0).color(Color32::WHITE))
+                        .fill(theme.bg_canvas)
+                        .stroke(Stroke::new(1.0, theme.accent_blue))
+                        .corner_radius(CornerRadius::same(7))).clicked() {
+                        let dossier = crate::core::FemaP58Engine::generate_markdown_dossier(&input, &rep);
+                        if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_FEMA_P58_Seismic_Loss_Dossier.md", &dossier) {
+                            self.export_status = Some(format!("FEMA P-58 Calculation Dossier saved to: {}", path));
+                        }
+                    }
+                });
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // 4 KPI Summary Cards
+        let card_w = ((ui.available_width() - 30.0) / 4.0).max(120.0);
+        ui.horizontal(|ui| {
+            // Card 1: Direct Repair Loss
+            let cost_col = if rep.repair_cost_ratio <= 0.10 { theme.accent_green } else { theme.accent_orange };
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(card_w);
+                ui.label(RichText::new("DIRECT REPAIR LOSS").size(10.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new(format!("${:,.0}", rep.total_repair_cost_usd)).size(16.5).strong().color(cost_col));
+                ui.label(RichText::new(format!("{:.1}% Asset | EAL: {:.2}%/yr", rep.repair_cost_ratio * 100.0, rep.expected_annual_loss_ratio * 100.0)).size(10.0).color(theme.text_muted));
+            });
+            ui.add_space(6.0);
+
+            // Card 2: Facility Downtime & BI
+            let dt_col = if rep.downtime_days <= 30.0 { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(card_w);
+                ui.label(RichText::new("RECOVERY DOWNTIME").size(10.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.0} Days", rep.downtime_days)).size(16.5).strong().color(dt_col));
+                ui.label(RichText::new(format!("BI Loss: ${:,.0}", rep.business_interruption_loss_usd)).size(10.0).color(theme.text_muted));
+            });
+            ui.add_space(6.0);
+
+            // Card 3: Embodied Carbon Footprint
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(card_w);
+                ui.label(RichText::new("EMBODIED CARBON").size(10.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:.1} kg/m²", rep.embodied_carbon_per_m2)).size(16.5).strong().color(Color32::from_rgb(20, 184, 166)));
+                ui.label(RichText::new(format!("Total: {:,.0} kg CO2e", rep.total_embodied_carbon_kg_co2e)).size(10.0).color(theme.text_muted));
+            });
+            ui.add_space(6.0);
+
+            // Card 4: REDi Resilience Tier
+            let redi_col = match rep.achieved_redi_tier {
+                crate::core::REDiResilienceTier::Platinum => Color32::from_rgb(220, 220, 240),
+                crate::core::REDiResilienceTier::Gold => Color32::from_rgb(245, 158, 11),
+                crate::core::REDiResilienceTier::Silver => Color32::from_rgb(156, 163, 175),
+                crate::core::REDiResilienceTier::StandardCode => Color32::from_rgb(239, 68, 68),
+            };
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(card_w);
+                ui.label(RichText::new("REDi™ RATING").size(10.0).strong().color(theme.text_secondary));
+                ui.label(RichText::new(format!("{:?}", rep.achieved_redi_tier)).size(16.5).strong().color(redi_col));
+                ui.label(RichText::new(if rep.is_target_redi_achieved { "✅ Target Tier Achieved" } else { "⚠️ Below Target Tier" }).size(10.0).color(theme.text_muted));
+            });
+        });
+
+        ui.add_space(10.0);
+
+        // Parameters Control Card (3 columns)
+        theme.card_frame().show(ui, |ui| {
+            let cols = ui.columns(3, |columns| {
+                // Column 1: Asset Valuation & Geometry
+                columns[0].vertical(|ui| {
+                    ui.label(RichText::new("1. Asset Valuation & Floor Area").size(11.0).strong().color(theme.text_primary));
+                    ui.horizontal(|ui| {
+                        ui.label("Asset Value ($):");
+                        ui.add(egui::Slider::new(&mut self.fema_asset_value_usd, 10_000_000.0..=250_000_000.0).prefix("$"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Floor Area (m²):");
+                        ui.add(egui::Slider::new(&mut self.fema_floor_area_m2, 5_000.0..=60_000.0).suffix(" m²"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Stories (N):");
+                        ui.add(egui::Slider::new(&mut self.fema_num_stories, 3..=25));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Story Height:");
+                        ui.add(egui::Slider::new(&mut self.fema_story_height_m, 3.0..=5.0).suffix(" m"));
+                    });
+                });
+
+                // Column 2: Seismic Hazard & Business Revenue
+                columns[1].vertical(|ui| {
+                    ui.label(RichText::new("2. Seismic Demand & Business Exposure").size(11.0).strong().color(theme.text_primary));
+                    ui.horizontal(|ui| {
+                        ui.label("Site PGA (g):");
+                        ui.add(egui::Slider::new(&mut self.fema_site_pga_g, 0.15..=1.00).suffix(" g"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Sa(T1) (g):");
+                        ui.add(egui::Slider::new(&mut self.fema_spectral_sa1_g, 0.20..=1.80).suffix(" g"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Daily Revenue ($):");
+                        ui.add(egui::Slider::new(&mut self.fema_daily_revenue_usd, 20_000.0..=300_000.0).prefix("$"));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Demolition Risk:");
+                        ui.label(RichText::new(format!("{:.1}% (Residual Drift)", rep.demolition_probability * 100.0)).color(theme.accent_orange).strong());
+                    });
+                });
+
+                // Column 3: REDi Target & Labor Allocation
+                columns[2].vertical(|ui| {
+                    ui.label(RichText::new("3. REDi™ Resilience & Labor Constraints").size(11.0).strong().color(theme.text_primary));
+                    ui.horizontal(|ui| {
+                        ui.label("Target Tier:");
+                        egui::ComboBox::from_id_salt("fema_redi_cb")
+                            .selected_text(format!("{:?}", self.fema_target_redi_tier))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.fema_target_redi_tier, crate::core::REDiResilienceTier::Platinum, "Platinum (≤ 7 Days)");
+                                ui.selectable_value(&mut self.fema_target_redi_tier, crate::core::REDiResilienceTier::Gold, "Gold (≤ 30 Days)");
+                                ui.selectable_value(&mut self.fema_target_redi_tier, crate::core::REDiResilienceTier::Silver, "Silver (≤ 60 Days)");
+                                ui.selectable_value(&mut self.fema_target_redi_tier, crate::core::REDiResilienceTier::StandardCode, "Baseline Code (> 180 Days)");
+                            });
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Workers / Story:");
+                        ui.add(egui::Slider::new(&mut self.fema_workers_per_floor, 4..=24));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Total Labor Days:");
+                        ui.label(RichText::new(format!("{:.0} person-days", rep.total_repair_labor_days)).color(theme.accent_blue).strong());
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Collapse Risk:");
+                        ui.label(RichText::new(format!("{:.2}% (MCE)", rep.collapse_probability * 100.0)).color(theme.accent_green).strong());
+                    });
+                });
+            });
+            let _ = cols;
+        });
+
+        ui.add_space(10.0);
+
+        // 2D Vector CAD Canvas: Fragility Curves Plot + Story-by-Story Loss Distribution
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📐 2D Vector CAD Component Fragility Curves & Story Loss Breakdown").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(20.0);
+                ui.label(RichText::new(format!("Direct Loss: ${:,.0} | Total Exposure: ${:,.0}", rep.total_repair_cost_usd, rep.total_economic_loss_usd)).size(11.0).color(theme.accent_green));
+            });
+
+            ui.add_space(6.0);
+
+            let (canvas_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 270.0), Sense::hover());
+            let painter = ui.painter_at(canvas_rect);
+
+            painter.rect_filled(canvas_rect, 6.0, Color32::from_rgb(18, 22, 30));
+            painter.rect_stroke(canvas_rect, 6.0, Stroke::new(1.0, Color32::from_rgb(45, 55, 75)));
+
+            let mid_x = canvas_rect.min.x + canvas_rect.width() * 0.52;
+
+            // Divider line between Fragility Curves and Story Losses
+            painter.line_segment(
+                [Pos2::new(mid_x, canvas_rect.min.y + 10.0), Pos2::new(mid_x, canvas_rect.max.y - 10.0)],
+                Stroke::new(1.0, Color32::from_rgb(45, 55, 75)),
+            );
+
+            // Left Side: Lognormal Component Fragility Curves
+            let frag_left = canvas_rect.min.x + 35.0;
+            let frag_right = mid_x - 20.0;
+            let frag_w = (frag_right - frag_left).max(10.0);
+            let frag_bot = canvas_rect.max.y - 30.0;
+            let frag_top = canvas_rect.min.y + 35.0;
+            let frag_h = (frag_bot - frag_top).max(10.0);
+
+            // Axes
+            painter.line_segment([Pos2::new(frag_left, frag_bot), Pos2::new(frag_right, frag_bot)], Stroke::new(1.2, Color32::from_rgb(70, 80, 100)));
+            painter.line_segment([Pos2::new(frag_left, frag_bot), Pos2::new(frag_left, frag_top)], Stroke::new(1.2, Color32::from_rgb(70, 80, 100)));
+
+            // Horizontal Probability Grid Lines (0.25, 0.50, 0.75, 1.0)
+            for p_step in 1..=4 {
+                let py = frag_bot - (p_step as f32 / 4.0) * frag_h;
+                painter.line_segment([Pos2::new(frag_left, py), Pos2::new(frag_right, py)], Stroke::new(0.5, Color32::from_rgb(35, 45, 60)));
+                painter.text(Pos2::new(frag_left - 4.0, py), Align2::RIGHT_CENTER, format!("{:.0}%", p_step * 25), egui::FontId::proportional(8.5), Color32::from_rgb(130, 140, 160));
+            }
+
+            // Draw component fragility curves
+            let colors = [
+                Color32::from_rgb(56, 189, 248),  // RC Frame (cyan)
+                Color32::from_rgb(245, 158, 11),  // Partitions (amber)
+                Color32::from_rgb(168, 85, 247),  // Curtain Wall (purple)
+                Color32::from_rgb(16, 185, 129),  // Ceilings (emerald)
+                Color32::from_rgb(239, 68, 68),   // MEP Piping (red)
+            ];
+
+            for (c_idx, (_, pts)) in rep.fragility_sample_curves.iter().enumerate() {
+                let col = colors[c_idx % colors.len()];
+                if pts.len() >= 2 {
+                    let mut screen_pts = Vec::with_capacity(pts.len());
+                    for (i, &(_, p)) in pts.iter().enumerate() {
+                        let px = frag_left + (i as f32 / (pts.len() - 1) as f32) * frag_w;
+                        let py = frag_bot - (p as f32) * frag_h;
+                        screen_pts.push(Pos2::new(px, py));
+                    }
+                    for w in screen_pts.windows(2) {
+                        painter.line_segment([w[0], w[1]], Stroke::new(1.8, col));
+                    }
+                }
+            }
+
+            painter.text(
+                Pos2::new(frag_left, canvas_rect.min.y + 12.0),
+                Align2::LEFT_TOP,
+                "FEMA P-58 Component Fragilities: P(DS ≥ ds | EDP)",
+                egui::FontId::proportional(11.0),
+                Color32::from_rgb(56, 189, 248),
+            );
+
+            // Right Side: Story-by-Story Loss Distribution
+            let story_left = mid_x + 35.0;
+            let story_right = canvas_rect.max.x - 25.0;
+            let story_w = (story_right - story_left).max(10.0);
+            let story_bot = canvas_rect.max.y - 30.0;
+            let story_top = canvas_rect.min.y + 35.0;
+            let story_h = (story_bot - story_top).max(10.0);
+
+            // Vertical axis (Stories)
+            painter.line_segment([Pos2::new(story_left, story_bot), Pos2::new(story_left, story_top)], Stroke::new(1.2, Color32::from_rgb(70, 80, 100)));
+            painter.line_segment([Pos2::new(story_left, story_bot), Pos2::new(story_right, story_bot)], Stroke::new(1.2, Color32::from_rgb(70, 80, 100)));
+
+            let n_stories = rep.story_losses.len();
+            if n_stories > 0 {
+                let bar_gap = story_h / (n_stories as f32);
+                let bar_h = (bar_gap * 0.70).clamp(4.0, 18.0);
+                let max_story_cost = rep.story_losses.iter().map(|s| s.repair_cost_usd).fold(1.0f64, |a, b| a.max(b));
+
+                for (idx, s) in rep.story_losses.iter().enumerate() {
+                    let py = story_bot - (idx as f32 + 0.5) * bar_gap;
+                    let bar_len = ((s.repair_cost_usd / max_story_cost) as f32 * story_w).clamp(4.0, story_w);
+
+                    // Horizontal story loss bar
+                    let bar_rect = egui::Rect::from_min_max(
+                        Pos2::new(story_left, py - bar_h * 0.5),
+                        Pos2::new(story_left + bar_len, py + bar_h * 0.5),
+                    );
+                    painter.rect_filled(bar_rect, CornerRadius::same(3), Color32::from_rgba_unmultiplied(245, 158, 11, 200));
+
+                    // Story label
+                    painter.text(
+                        Pos2::new(story_left - 4.0, py),
+                        Align2::RIGHT_CENTER,
+                        format!("L{:02}", s.story_number),
+                        egui::FontId::proportional(8.5),
+                        Color32::from_rgb(160, 170, 190),
+                    );
+
+                    // Value label on bar
+                    painter.text(
+                        Pos2::new(story_left + bar_len + 4.0, py),
+                        Align2::LEFT_CENTER,
+                        format!("${:,.0} ({:.1}d)", s.repair_cost_usd, s.repair_labor_person_days),
+                        egui::FontId::proportional(8.5),
+                        Color32::from_rgb(220, 225, 235),
+                    );
+                }
+            }
+
+            painter.text(
+                Pos2::new(story_left, canvas_rect.min.y + 12.0),
+                Align2::LEFT_TOP,
+                "Story Repair Cost Breakdown & Labor Days",
+                egui::FontId::proportional(11.0),
+                Color32::from_rgb(245, 158, 11),
+            );
+        });
+
+        ui.add_space(10.0);
+
+        // Regulatory & REDi Compliance Audit Table
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📋 FEMA P-58 / REDi™ Performance Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                ui.add_space(20.0);
+                let overall_status = if rep.is_target_redi_achieved { "🟢 TARGET REDi™ RESILIENCE TIER ACHIEVED" } else { "🔴 TARGET RESILIENCE TIER DEFICIT" };
+                let status_col = if rep.is_target_redi_achieved { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+            });
+
+            ui.add_space(6.0);
+
+            // Table Header
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Performance Metric").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(220.0);
+                ui.label(RichText::new("Code / Rating Reference").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(150.0);
+                ui.label(RichText::new("Demand").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(45.0);
+                ui.label(RichText::new("Limit").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(45.0);
+                ui.label(RichText::new("D/C Ratio").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(30.0);
+                ui.label(RichText::new("Status").size(10.5).strong().color(theme.text_secondary));
+            });
+            ui.separator();
+
+            for item in &rep.compliance_audit {
+                let row_col = if item.is_passed { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(&item.metric_name).size(10.5).color(theme.accent_blue));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(&item.code_reference).size(10.5).color(theme.text_primary));
+                    ui.add_space(10.0);
+                    ui.label(RichText::new(format!("{:.1} {}", item.demand_val, item.unit)).size(10.5).color(theme.text_primary));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.1} {}", item.permissible_limit, item.unit)).size(10.5).color(theme.accent_green));
+                    ui.add_space(15.0);
+                    ui.label(RichText::new(format!("{:.3}", item.utilization_ratio)).size(10.5).strong().color(row_col));
                     ui.add_space(20.0);
                     ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
                 });

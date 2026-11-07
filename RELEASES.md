@@ -7,6 +7,43 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## 🚀 EigenGraph v0.1.4 — Phase 14: FEMA P-58 Seismic Performance Assessment & Probabilistic Loss Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.4`  
+**Target:** Production Engine
+
+EigenGraph v0.1.4 introduces a groundbreaking **FEMA P-58 Next-Generation Seismic Performance Assessment & Probabilistic Loss Engine**, enabling structural engineers, facility owners, and risk analysts to quantify the seismic resilience of buildings in terms of tangible economic and societal metrics: direct repair costs, business interruption downtime, environmental carbon footprint, and collapse/demolition risks in compliance with **FEMA P-58 / ATC-58**, **Arup REDi™ Rating System**, and **ISO 14040/EN 15978**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Component Lognormal Fragility Functions
+- Probability of damage state exceedance:
+  $$P(DS \ge ds | EDP) = \Phi\left(\frac{\ln(EDP / \theta)}{\beta}\right)$$
+  where $\theta$ is the median demand capacity, $\beta$ is the composite lognormal dispersion ($0.35 \le \beta \le 0.45$), and $EDP$ is the Engineering Demand Parameter (Peak Inter-Story Drift Ratio $PIDR$ or Peak Floor Acceleration $PFA$).
+- Extensive standard component library covering ductile RC moment frame connections, metal stud gypsum drywall partitions, silicone glazed curtain wall facades, suspended acoustic ceilings, and seismically braced chilled water MEP piping.
+
+#### 2. Sequential Damage State Partitioning & Consequence Modeling
+- Discrete damage state probability:
+  $$P(DS = i) = P(DS \ge ds_i) - P(DS \ge ds_{i+1})$$
+- Consequence integration across stories:
+  $$C_{\text{repair}} = \sum_{s=1}^N \sum_{c} \sum_i P(DS = i) \cdot \text{Cost}_i \cdot \text{Quantity}_c$$
+
+#### 3. Downtime & Business Interruption (REDi™ Methodology)
+- Critical-path labor synthesis modeling parallel vs serial labor allocation per story:
+  $$T_{\text{downtime}} = \max\left(\frac{\text{Labor Person-Days}}{\text{Max Workers per Story}}\right) \cdot 1.35 + T_{\text{permitting/inspection}}$$
+- Indirect financial exposure: $\text{Loss}_{\text{BI}} = T_{\text{downtime}} \cdot \text{Daily Revenue}$.
+
+#### 4. Post-Earthquake Embodied Carbon Footprint (ISO 14040 / EN 15978)
+- Quantification of greenhouse gas emissions ($\text{kg CO}_2e$) resulting from structural/non-structural component demolition, replacement materials, transport, and site construction.
+
+#### 5. REDi™ Resilience Tier Classification
+- Benchmarks building resilience against international resilience standards:
+  - **REDi™ Platinum**: $\le 7$ days downtime, $\le 5\%$ loss ratio.
+  - **REDi™ Gold**: $\le 30$ days downtime, $\le 10\%$ loss ratio.
+  - **REDi™ Silver**: $\le 60$ days downtime, $\le 20\%$ loss ratio.
+
+---
+
 ## 🚀 EigenGraph v0.1.3 — Phase 13: Nonlinear Dynamic Direct Time-History Analysis (NL-THA) Engine
 **Release Date:** 2026-11-07  
 **Git Tag:** `v0.1.3`  

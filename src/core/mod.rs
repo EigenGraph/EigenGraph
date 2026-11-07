@@ -34,6 +34,7 @@ pub mod prestressed_concrete;
 pub mod shear_wall;
 pub mod isolation;
 pub mod time_history;
+pub mod fema_p58;
 
 pub use linalg::{CsrMatrix, Matrix};
 pub use model::{
@@ -145,3 +146,8 @@ pub use time_history::{
     GroundMotionRecord, HysteresisModel, StoryResponseProfile, TimeHistoryEngine,
     TimeHistoryInput, TimeHistoryReport, TimeHistorySample, TimeIntegrationScheme,
 };
+pub use fema_p58::{
+    ComponentFragility, DamageStateDef, EdpKind, FemaComponentCategory, FemaComplianceItem,
+    FemaP58Engine, FemaP58Input, FemaP58Report, REDiResilienceTier, StoryLossSummary,
+};
+

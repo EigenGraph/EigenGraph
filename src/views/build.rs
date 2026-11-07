@@ -21,6 +21,7 @@ pub enum ModelArchetype {
     CoupledShearWallCore3D,  // 3D Coupled Special Structural Shear Wall Core Tower
     BaseIsolatedHospital3D,  // 3D Base-Isolated Essential Facility (8-Story Hospital with Base Isolators)
     TimeHistoryTower3D,      // 3D 16-Story NL-THA Seismic Test Tower Archetype
+    FemaP58HospitalArchetype, // 3D 10-Story FEMA P-58 Resilience & Loss Assessment Archetype
 }
 
 impl ModelArchetype {
@@ -39,6 +40,7 @@ impl ModelArchetype {
             Self::CoupledShearWallCore3D => "🏢 Coupled Shear Wall Core (12-Story)",
             Self::BaseIsolatedHospital3D => "🛡️ Base-Isolated Hospital (8-Story)",
             Self::TimeHistoryTower3D => "🌊 NL-THA Tower (16-Story)",
+            Self::FemaP58HospitalArchetype => "🏥 FEMA P-58 Hospital (10-Story)",
         }
     }
 }
@@ -363,6 +365,7 @@ impl BuildView {
                 ModelArchetype::BimCraftBuilding3D,
                 ModelArchetype::BaseIsolatedHospital3D,
                 ModelArchetype::TimeHistoryTower3D,
+                ModelArchetype::FemaP58HospitalArchetype,
                 ModelArchetype::CoupledShearWallCore3D,
                 ModelArchetype::PrestressedGirderBridge3D,
                 ModelArchetype::DoubleLayerSpaceTruss3D,
@@ -400,6 +403,12 @@ impl BuildView {
                             self.cam_yaw = 0.55;
                             self.cam_pitch = 0.30;
                             self.cam_zoom = 0.88;
+                            self.cam_pan = Vec2::ZERO;
+                        }
+                        ModelArchetype::FemaP58HospitalArchetype => {
+                            self.cam_yaw = 0.62;
+                            self.cam_pitch = 0.34;
+                            self.cam_zoom = 0.94;
                             self.cam_pan = Vec2::ZERO;
                         }
                         ModelArchetype::CoupledShearWallCore3D => {
@@ -933,6 +942,7 @@ impl BuildView {
                             ModelArchetype::BimCraftBuilding3D,
                             ModelArchetype::BaseIsolatedHospital3D,
                             ModelArchetype::TimeHistoryTower3D,
+                            ModelArchetype::FemaP58HospitalArchetype,
                             ModelArchetype::CoupledShearWallCore3D,
                             ModelArchetype::PrestressedGirderBridge3D,
                             ModelArchetype::DoubleLayerSpaceTruss3D,
@@ -2398,6 +2408,33 @@ impl BuildView {
                 let cy = 9.0;
                 let cz = (16.0 * 3.75) * 0.5;
                 ((cx, cy, cz), 28.0, list)
+            }
+            ModelArchetype::FemaP58HospitalArchetype => {
+                let (nodes, elements) = crate::core::FemaP58Engine::generate_fema_resilience_archetype();
+                let mut list = Vec::with_capacity(elements.len());
+                for &(el_id, n1_id, n2_id, is_structural) in &elements {
+                    let (_, x1, y1, z1) = nodes[n1_id];
+                    let (_, x2, y2, z2) = nodes[n2_id];
+                    let p1 = (x1 as f32, z1 as f32, y1 as f32);
+                    let p2 = (x2 as f32, z2 as f32, y2 as f32);
+                    list.push(Member3D {
+                        id: el_id + 1,
+                        p1,
+                        p2,
+                        name: if is_structural { format!("FrameBeamCol-{}", el_id + 1) } else { format!("FacadeTie-{}", el_id + 1) },
+                        section: if is_structural { "RC Column 650x650 / Beam 400x600".to_string() } else { "Silicone Glazed Curtain Wall Facade".to_string() },
+                        base_width: if is_structural { 6.5 } else { 3.5 },
+                        force_kn: if is_structural { 1650.0 } else { 120.0 },
+                        capacity_kn: if is_structural { 4200.0 } else { 350.0 },
+                        utilization: if is_structural { 0.39 } else { 0.34 },
+                        ari: if is_structural { 0.96 } else { 0.99 },
+                        is_critical: false,
+                    });
+                }
+                let cx = 12.0;
+                let cy = 8.0;
+                let cz = (10.0 * 3.8) * 0.5;
+                ((cx, cy, cz), 22.0, list)
             }
         }
     }

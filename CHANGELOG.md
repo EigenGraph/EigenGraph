@@ -7,6 +7,46 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.1.4] - 2026-11-07 — Phase 14: FEMA P-58 Seismic Performance Assessment & Probabilistic Loss Engine (FEMA P-58 / REDi)
+
+### Added
+- **FEMA P-58 Next-Generation Seismic Performance & Probabilistic Loss Core Engine (`src/core/fema_p58.rs`)**:
+  - Full compliance with **FEMA P-58-1 / ATC-58 (Seismic Performance Assessment of Buildings)**, **Arup REDi™ Rating System**, **ASCE 7-22 / ASCE 41-17**, and **ISO 14040/14044 & EN 15978 (Embodied Carbon CO2e)**.
+  - **Component Vulnerability & Lognormal Fragility Functions**:
+    - Rigorous lognormal fragility evaluation: $P(DS \ge ds | EDP) = \Phi\left(\frac{\ln(EDP/\theta)}{\beta}\right)$ with median demand capacity $\theta$ and composite dispersion $\beta$.
+    - Standard FEMA P-58 component library covering drift-sensitive structural frames (RC special moment joints), drift-sensitive non-structural enclosures (drywall partitions, structural silicone glazed curtain walls), acceleration-sensitive MEP systems (suspended acoustic ceiling grids, seismically braced chilled water piping), and building contents.
+  - **Sequential Damage State & Consequence Integration**:
+    - Exact damage state probability partitioning: $P(DS = i) = P(DS \ge ds_i) - P(DS \ge ds_{i+1})$.
+    - Consequence calculation for Direct Repair Costs ($ USD), Repair Labor (Person-Days), and Embodied Carbon ($kg\text{ CO}_2e$).
+  - **Downtime & Business Interruption (BI) Timeline (REDi™ Methodology)**:
+    - Critical-path labor synthesis modeling parallel vs serial labor allocation per story:
+      $$T_{\text{downtime}} = \max\left(\frac{\text{Labor}}{\text{Workers}_{\text{story}}}\right) \cdot 1.35 + T_{\text{permitting/inspection}}$$
+    - Business interruption financial exposure: $\text{Loss}_{\text{BI}} = T_{\text{downtime}} \cdot \text{Revenue}_{\text{daily}}$.
+  - **Residual Drift Demolition & Global Collapse Risk (§7.3)**:
+    - Demolition probability due to excessive residual drift ($RDR > 0.010\text{ rad}$) per Ramirez & Miranda.
+    - Global dynamic collapse fragility under Maximum Considered Earthquake (MCE).
+  - **REDi™ Resilience Tier Classification**:
+    - Automatic classification into **REDi™ Platinum** ($\le 7$ days downtime, $\le 5\%$ loss), **REDi™ Gold** ($\le 30$ days, $\le 10\%$ loss), **REDi™ Silver** ($\le 60$ days, $\le 20\%$ loss), or **Baseline Code**.
+  - **10-Story FEMA P-58 Hospital & Resilience Archetype Generator (`generate_fema_resilience_archetype`)**:
+    - Synthesizes a 10-story medical center (132 nodes, 280 frame members, perimeter curtain wall ties).
+  - **Markdown Calculation Dossier Generator (`generate_markdown_dossier`)**:
+    - Exports comprehensive calculation report detailing REDi compliance, story-by-story loss breakdowns, labor Gantt paths, and carbon footprint.
+  - **Unit Testing Suite**: 4 verified test cases (`test_normal_cdf_approximation`, `test_fragility_evaluation`, `test_fema_p58_loss_evaluation`, `test_fema_resilience_archetype`).
+- **Deep Analysis Studio (`src/views/analyze.rs`)**:
+  - Added subtab `AnalyzeSubTab::FemaP58LossAssessment` ("🏛️ FEMA P-58 Loss & REDi").
+  - 4 KPI real-time telemetry cards (Direct Repair Loss, Recovery Downtime, Embodied Carbon, REDi Rating Tier).
+  - Multi-parameter interactive controls: Asset replacement value, floor area, story count, story height, site PGA, spectral acceleration $S_a(T_1)$, daily revenue, target REDi tier, and labor limits.
+  - 2D Vector CAD canvas: Component fragility curves plot ($P(DS \ge ds | EDP)$ vs EDP) and story repair cost breakdown & labor days horizontal bar chart.
+  - Complete FEMA P-58 and REDi performance compliance audit table.
+- **3D Modeling & CAD Viewport (`src/views/build.rs`)**:
+  - Added `ModelArchetype::FemaP58HospitalArchetype` ("🏥 FEMA P-58 Hospital (10-Story)").
+  - Integrated into both model dropdown menus and camera presets (yaw 0.62, pitch 0.34, zoom 0.94).
+  - 3D viewport rendering of 10-story hospital frame with highlighted structural elements and perimeter facade ties.
+- **Results & Engineering Dossier View (`src/views/results.rs`)**:
+  - Added button `"🏛️ FEMA P-58 Dossier (.md)"` saving `EigenGraph_FEMA_P58_Seismic_Loss_Dossier.md`.
+
+---
+
 ## [v0.1.3] - 2026-11-07 — Phase 13: Nonlinear Dynamic Direct Time-History Analysis (NL-THA) Engine (ASCE 7-22 / SNI 1726:2019)
 
 ### Added
