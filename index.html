@@ -31,7 +31,7 @@
           <div class="titlebar-title">
             <img src="assets/icon.png" alt="EigenGraph" width="22" height="22" style="border-radius:4px;">
             <span>EigenGraph Workstation</span>
-            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.0.9-release</span>
+            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.0-release</span>
           </div>
         </div>
 
@@ -41,8 +41,8 @@
         </div>
 
         <div class="titlebar-right">
-          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.0.9" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
-            📥 Download v0.0.9
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.0" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v0.1.0
           </a>
           <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             🏷️ Releases
@@ -187,7 +187,7 @@
           <div class="sidebar-footer">
             <div><strong>Engine:</strong> Rust 1.80+ Core Engine</div>
             <div><strong>Status:</strong> 62/62 Verified Tests (100%)</div>
-            <div style="color:var(--accent-green);">● Desktop Release v0.0.9 Active</div>
+            <div style="color:var(--accent-green);">● Desktop Release v0.1.0 Active</div>
           </div>
         </aside>
 
@@ -1515,15 +1515,35 @@ pub struct BiaxialPmReport {
               </p>
               
               <div style="display:flex; flex-direction:column; gap:12px;">
-                <!-- v0.0.9 -->
+                <!-- v0.1.0 -->
                 <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16, 185, 129, 0.4); border-radius:8px; padding:14px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);">
                   <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                       <span class="dossier-tag green" style="font-size:0.7rem; font-weight:700;">LATEST PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.0</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 10: Prestressed & Post-Tensioned Concrete Design Engine)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.0" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Assets ↗
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>ACI 318-19 / SNI 2847:2019 / AASHTO Formulations:</strong> Complete computational engine for bonded and unbonded prestressed concrete bridge girders and building elements.</li>
+                    <li><strong>Parametric Tendon Profiling & Balancing:</strong> Parabolic draped, 2-point harped, and straight eccentric tendon trajectories with exact upward balancing load \(w_{\text{bal}} = 8 P_{\text{eff}} e_{\text{mid}} / L^2\).</li>
+                    <li><strong>Comprehensive Prestress Losses:</strong> Curvature & wobble friction (\(\mu=0.20, K=0.0015\)), anchorage seating draw-in slip (\(\Delta_{\text{anc}} = 6\text{mm}\)), concrete elastic shortening (\(\Delta f_{pES}\)), creep (\(\Delta f_{pCR}\)), shrinkage (\(\Delta f_{pSH}\)), and steel strand relaxation (\(\Delta f_{pRE}\)).</li>
+                    <li><strong>Serviceability & Ultimate Strength:</strong> Concrete fiber stress envelopes at transfer and service limit states, ACI 318-19 Class U/T/C classification, cracking moment \(M_{cr}\) check (\(\phi M_n \ge 1.2 M_{cr}\)), flexural capacity \(\phi M_n\), and concrete shear resistance (\(V_{ci}, V_{cw}, V_s, \phi V_n\)).</li>
+                  </ul>
+                </div>
+
+                <!-- v0.0.9 -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(59, 130, 246, 0.3); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                      <span class="dossier-tag blue" style="font-size:0.7rem; font-weight:700;">PRODUCTION</span>
                       <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.0.9</span>
                       <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 9: Modeling & Advanced Computational Geometry)</span>
                     </div>
-                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.0.9" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.0.9" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px;">
                       Release Notes & Assets ↗
                     </a>
                   </div>
