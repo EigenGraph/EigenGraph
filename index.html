@@ -31,7 +31,7 @@
           <div class="titlebar-title">
             <img src="assets/icon.png" alt="EigenGraph" width="22" height="22" style="border-radius:4px;">
             <span>EigenGraph Workstation</span>
-            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.9-release</span>
+            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.2.0-release</span>
           </div>
         </div>
 
@@ -41,8 +41,8 @@
         </div>
 
         <div class="titlebar-right">
-          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.9" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
-            📥 Download v0.1.9
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.2.0" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v0.2.0
           </a>
           <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             🏷️ Releases
@@ -186,8 +186,8 @@
 
           <div class="sidebar-footer">
             <div><strong>Engine:</strong> Rust 1.80+ Core Engine</div>
-            <div><strong>Status:</strong> 102/102 Verified Tests (100%)</div>
-            <div style="color:var(--accent-green);">● Desktop Release v0.1.9 Active</div>
+            <div><strong>Status:</strong> 107/107 Verified Tests (100%)</div>
+            <div style="color:var(--accent-green);">● Desktop Release v0.2.0 Active</div>
           </div>
         </aside>
 
@@ -1515,20 +1515,48 @@ pub struct BiaxialPmReport {
               </p>
               
               <div style="display:flex; flex-direction:column; gap:12px;">
-                <!-- v0.1.9 -->
+                <!-- v0.2.0 -->
                 <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16, 185, 129, 0.4); border-radius:8px; padding:14px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);">
                   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <div>
                       <span class="dossier-tag green" style="font-size:0.7rem; font-weight:700;">LATEST PRODUCTION</span>
-                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.9</span>
-                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 19: OpenBIM IFC Geometric Topology, Swept Solid Extrusion & Element Synthesis Engine)</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.2.0</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 20: OpenBIM IFC Spatial Clash Detection, Model Diff, IDS Validation & Multi-Format Exporter)</span>
                     </div>
-                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.9" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.2.0" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
                       Release Notes & Source ↗
                     </a>
                   </div>
                   <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.9.zip" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.2.0.zip" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (zip)
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.2.0.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (tar.gz)
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>3D Spatial Clash Detection Engine:</strong> Multi-axis AABB collision tests with clearance buffers, detecting \(Duplicate\), \(HardClash\), and \(ClearanceViolation\) severity levels with precise 3D intersection volume \(V_{\text{intersect}}\).</li>
+                    <li><strong>BIM Differential & Revision Tracking:</strong> Bi-model comparative audit classifying elements into \(Added\), \(Deleted\), \(Modified\), or \(Unchanged\), tracking property deltas, translations \([dX, dY, dZ]\), volume shifts, and SHA-256 cryptographic hashes.</li>
+                    <li><strong>buildingSMART IDS Validation:</strong> Automated rule compliance checking against naming, 22-char GlobalId GUIDs, material bindings, spatial storey containment, and non-zero bounding dimensions.</li>
+                    <li><strong>Multi-Format Exporters (BCF XML & ifcJSON-4):</strong> One-click generation of buildingSMART BCF 2.1 XML topics with automated 3D collision camera viewpoints, ifcJSON-4 serialization, and structural FEM model synchronization.</li>
+                  </ul>
+                </div>
+
+                <!-- v0.1.9 -->
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                      <span class="dossier-tag blue" style="font-size:0.7rem;">PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.9</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 19: OpenBIM IFC Geometric Topology, Swept Solid Extrusion & Element Synthesis Engine)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.9" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Source ↗
+                    </a>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.9.zip" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
                       📦 Source code (zip)
                     </a>
                     <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.9.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
