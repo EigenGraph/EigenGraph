@@ -31,7 +31,7 @@
           <div class="titlebar-title">
             <img src="assets/icon.png" alt="EigenGraph" width="22" height="22" style="border-radius:4px;">
             <span>EigenGraph Workstation</span>
-            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.7-release</span>
+            <span class="dossier-tag green" style="padding:2px 8px; font-size:0.68rem;">v0.1.8-release</span>
           </div>
         </div>
 
@@ -41,8 +41,8 @@
         </div>
 
         <div class="titlebar-right">
-          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.7" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
-            📥 Download v0.1.7
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.8" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v0.1.8
           </a>
           <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             🏷️ Releases
@@ -186,8 +186,8 @@
 
           <div class="sidebar-footer">
             <div><strong>Engine:</strong> Rust 1.80+ Core Engine</div>
-            <div><strong>Status:</strong> 92/92 Verified Tests (100%)</div>
-            <div style="color:var(--accent-green);">● Desktop Release v0.1.7 Active</div>
+            <div><strong>Status:</strong> 97/97 Verified Tests (100%)</div>
+            <div style="color:var(--accent-green);">● Desktop Release v0.1.8 Active</div>
           </div>
         </aside>
 
@@ -1515,20 +1515,48 @@ pub struct BiaxialPmReport {
               </p>
               
               <div style="display:flex; flex-direction:column; gap:12px;">
-                <!-- v0.1.7 -->
+                <!-- v0.1.8 -->
                 <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16, 185, 129, 0.4); border-radius:8px; padding:14px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);">
                   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <div>
                       <span class="dossier-tag green" style="font-size:0.7rem; font-weight:700;">LATEST PRODUCTION</span>
-                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.7</span>
-                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 17: OpenBIM IFC Fundamental Reader, Spatial Tree & Inspection Engine)</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.8</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 18: OpenBIM IFC Interactive Editing & Property/Metadata Mutation Engine)</span>
                     </div>
-                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.7" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.8" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
                       Release Notes & Source ↗
                     </a>
                   </div>
                   <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.7.zip" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.8.zip" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (zip)
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.8.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (tar.gz)
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>In-Place Identity & Attribute Mutation:</strong> Direct editing of \(Name\), \(Description\), \(ObjectType\), and \(PredefinedType\) with automatic low-level STEP entity parameter array synchronization.</li>
+                    <li><strong>Dynamic Property Sets (Psets) Manager:</strong> Key-value insertion, modification, and removal within \(IfcPropertySet\) containers (\(IfcPropertySingleValue\)), plus container addition and deletion.</li>
+                    <li><strong>Material Reassignment & Storey Relocation:</strong> Live binding of structural materials (\(IfcMaterial\), \(IfcRelAssociatesMaterial\)) and spatial movement between building levels (\(IfcBuildingStorey\), \(IfcRelContainedInSpatialStructure\)).</li>
+                    <li><strong>ISO 10303-21 STEP Serializer & Transactional Undo/Redo:</strong> Native STEP SPF code generator and robust command pattern (\(IfcEditCommand\), \(IfcEditSession\)) with bidirectional inverses and rollback integrity.</li>
+                  </ul>
+                </div>
+
+                <!-- v0.1.7 -->
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                      <span class="dossier-tag blue" style="font-size:0.7rem;">PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.1.7</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 17: OpenBIM IFC Fundamental Reader, Spatial Tree & Inspection Engine)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.1.7" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Source ↗
+                    </a>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.7.zip" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
                       📦 Source code (zip)
                     </a>
                     <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.1.7.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
