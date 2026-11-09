@@ -41,8 +41,8 @@
         </div>
 
         <div class="titlebar-right">
-          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.2.2" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
-            📥 Download v0.2.2
+          <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.2.3" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:0.78rem;">
+            📥 Download v0.2.3
           </a>
           <a href="https://github.com/EigenGraph/EigenGraph/releases" target="_blank" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;">
             🏷️ Releases
@@ -1515,11 +1515,51 @@ pub struct BiaxialPmReport {
               </p>
               
               <div style="display:flex; flex-direction:column; gap:12px;">
-                <!-- v0.2.2 -->
+                <!-- v0.2.3 -->
                 <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16, 185, 129, 0.4); border-radius:8px; padding:14px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);">
                   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <div>
                       <span class="dossier-tag green" style="font-size:0.7rem; font-weight:700;">LATEST PRODUCTION</span>
+                      <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.2.3</span>
+                      <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 23: walkers & Slippy Map Engine Integration — Web Mercator Quadtree)</span>
+                    </div>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/tag/v0.2.3" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px;">
+                      Release Notes & Source ↗
+                    </a>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/download/v0.2.3/EigenGraph-macOS.dmg" target="_blank" class="btn btn-primary" style="font-size:0.75rem; padding:5px 10px;">
+                      🍎 EigenGraph-macOS.dmg (Universal 2)
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/download/v0.2.3/EigenGraph-Windows-x64.zip" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      🪟 EigenGraph-Windows-x64.zip
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/download/v0.2.3/EigenGraph-Linux-x86_64.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      🐧 EigenGraph-Linux-x86_64.tar.gz
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/releases/download/v0.2.3/SHA256SUMS.txt" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      🔐 SHA256SUMS.txt
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.2.3.zip" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (zip)
+                    </a>
+                    <a href="https://github.com/EigenGraph/EigenGraph/archive/refs/tags/v0.2.3.tar.gz" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:5px 10px;">
+                      📦 Source code (tar.gz)
+                    </a>
+                  </div>
+                  <ul style="color:var(--text-secondary); font-size:0.82rem; margin:10px 0 0 18px; line-height:1.5;">
+                    <li><strong>Web Mercator (EPSG:3857) Quadtree Engine:</strong> High-performance slippy map tiling mathematical routines, continuous 60 FPS viewport panning, and smooth sub-pixel zoom ($z = 1.0 \to 19.0$).</li>
+                    <li><strong>GIS Site Inception & Geodetic Pinning:</strong> Interactive geodetic site anchoring with automated WGS84 coordinate normalization, EPSG:3857 metric projected coordinates, and quadtree $[Z, X, Y]$ tile indexing.</li>
+                    <li><strong>PusGeN / SNI 1726 Seismic Hazard Parameter Binding:</strong> Instant site classification (Site Class A–E), short-period acceleration $S_s$, 1-sec period acceleration $S_1$, and soil bearing capacity ($q_a$) association.</li>
+                    <li><strong>Cartographic Basemaps & Autonomous Vector Fallback:</strong> Multi-provider support (OpenStreetMap, Esri Satellite, OpenTopoMap, CartoDB Dark Matter, and offline procedural vector terrain with continent/island boundaries, parallels, and meridians).</li>
+                  </ul>
+                </div>
+
+                <!-- v0.2.2 -->
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                      <span class="dossier-tag blue" style="font-size:0.7rem; font-weight:700;">PRODUCTION</span>
                       <span style="font-weight:700; color:#fff; font-size:1rem; margin-left:6px;">EigenGraph v0.2.2</span>
                       <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">(Phase 22: The Master Shell & 15-Pillar High-Fidelity Layout — Apple Minimalist HIG)</span>
                     </div>
