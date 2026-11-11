@@ -42,9 +42,9 @@ The Left Sidebar Layout (`src/app.rs`) and macOS-inspired Window Chrome are **ST
 
 ---
 
-## ⚡ Local-First Execution Protocol
-- All UI modifications, `cargo test`, and `trunk build` checks run locally within the workspace.
-- Operations pushing to external repositories or GitHub Pages execute only when the user explicitly gives instructions.
+## ⚡ Continuous Deployment & Automatic GitHub Push Protocol
+- All UI modifications, `cargo test`, and `trunk build` checks are validated locally within the workspace before publishing.
+- **Automatic Push Enabled**: Every completed feature development, enhancement, and architectural update must be automatically committed and pushed directly to GitHub `main` without waiting for separate manual push instructions.
 
 ---
 
