@@ -42,7 +42,7 @@ impl Default for ResultsView {
             doc_project_title: "Menara Sudirman Structural Complex — Phase 22".to_string(),
             doc_drawing_no: "S-101-REV-0".to_string(),
             doc_scale: "1 : 100".to_string(),
-            doc_engineer_name: "Harids Irawan, S.T., M.T.".to_string(),
+            doc_engineer_name: "EigenGraph Structural Engineer".to_string(),
             sheet_formula_input: "=SUM(E2:E6)".to_string(),
             sheet_active_cell: (6, 4),
             active_slide_index: 0,

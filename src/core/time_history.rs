@@ -637,7 +637,7 @@ impl TimeHistoryEngine {
         md.push_str(&format!("- Viscous Damping Energy Dissipated $E_D$: {:.1} kJ\n", report.total_damping_energy_kj));
         md.push_str(&format!("- Maximum Energy Conservation Error $\\epsilon_E$: {:.2}% (Limit $\\le 2.5\\%$ per ATC-114)\n", report.max_energy_balance_error_pct));
 
-        md.push_str("\n---\n*Certified by EigenGraph Desktop Structural Engine v0.1.3*\n");
+        md.push_str("\n---\n*Certified by EigenGraph Web Structural Engine*\n");
         md
     }
 }

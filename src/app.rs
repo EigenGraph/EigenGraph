@@ -40,7 +40,6 @@ pub struct EigenGraphApp {
     pub results_view: ResultsView,              // Pillar 15: 📑 Report (Living Docs, Sheets, Slides)
     pub settings_view: SettingsView,
     pub ai_assistant_view: AiAssistantView,
-    pub updater: crate::updater::AppUpdater,
 
     // Domain Data & Parametric Component Database
     pub projects: Vec<ProjectItem>,
@@ -75,7 +74,6 @@ impl Default for EigenGraphApp {
             results_view: ResultsView::default(),
             settings_view: SettingsView::default(),
             ai_assistant_view: AiAssistantView::default(),
-            updater: crate::updater::AppUpdater::default(),
 
             projects: crate::core::InternalVault::default_nvw_dcr_lod_projects(),
             db_components: crate::core::InternalVault::load_or_init_parametric_components(),
@@ -109,9 +107,6 @@ impl EigenGraphApp {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 ui.add_space(2.0);
-                #[cfg(all(target_os = "macos", not(target_arch = "wasm32")))]
-                ui.label(RichText::new("🔴  🟡  🟢").size(9.5));
-                #[cfg(not(all(target_os = "macos", not(target_arch = "wasm32"))))]
                 ui.label(
                     RichText::new("⚛️ EigenGraph")
                         .size(13.0)
@@ -172,7 +167,7 @@ impl EigenGraphApp {
                 });
             ui.add_space(10.0);
 
-            let bottom_section_height = 112.0;
+            let bottom_section_height = 52.0;
             let nav_area_height = (ui.available_height() - bottom_section_height).max(100.0);
             let nav_item_h = if is_overlay || is_mobile { 38.0 } else { 32.0 };
 
@@ -265,109 +260,24 @@ impl EigenGraphApp {
                 },
             );
 
-            // Bottom Pinned Dock: Release/Update & Settings + Profile
+            // Bottom Pinned Dock: Workspace Settings
             ui.separator();
             ui.add_space(6.0);
 
-            ui.columns(2, |cols| {
-                let w0 = cols[0].available_width();
-                let action_label = if cfg!(target_arch = "wasm32") {
-                    "🌐 Web Info"
-                } else {
-                    "🔄 Update App"
-                };
-                let action_hint = if cfg!(target_arch = "wasm32") {
-                    "View Web Edition build info & desktop releases"
-                } else {
-                    "Check GitHub Releases & install software update"
-                };
-                if cols[0]
-                    .add(
-                        egui::Button::new(
-                            RichText::new(action_label)
-                                .size(11.0)
-                                .strong()
-                                .color(Color32::WHITE),
-                        )
-                        .fill(self.theme.accent_blue)
-                        .corner_radius(CornerRadius::same(7))
-                        .min_size(Vec2::new(w0, 30.0)),
+            if ui
+                .add(
+                    egui::Button::new(
+                        RichText::new("⚙️ Settings")
+                            .size(11.5)
+                            .color(self.theme.text_secondary),
                     )
-                    .on_hover_text(action_hint)
-                    .clicked()
-                {
-                    self.updater.check_for_updates();
-                    if is_overlay {
-                        self.sidebar_open = false;
-                    }
-                }
-
-                let w1 = cols[1].available_width();
-                if cols[1]
-                    .add(
-                        egui::Button::new(
-                            RichText::new("⚙️ Settings")
-                                .size(11.0)
-                                .color(self.theme.text_secondary),
-                        )
-                        .fill(self.theme.bg_card)
-                        .corner_radius(CornerRadius::same(7))
-                        .min_size(Vec2::new(w1, 30.0)),
-                    )
-                    .on_hover_text("Workspace Settings")
-                    .clicked()
-                {
-                    self.show_settings = !self.show_settings;
-                    if is_overlay {
-                        self.sidebar_open = false;
-                    }
-                }
-            });
-
-            ui.add_space(6.0);
-
-            let (prof_rect, prof_resp) = ui.allocate_exact_size(
-                Vec2::new(ui.available_width(), 38.0),
-                egui::Sense::click(),
-            );
-            let prof_hovered = prof_resp.hovered();
-            let prof_fill = if self.show_settings {
-                self.theme.accent_blue.gamma_multiply(0.18)
-            } else if prof_hovered {
-                self.theme.bg_card_hover
-            } else {
-                self.theme.bg_card
-            };
-            ui.painter()
-                .rect_filled(prof_rect, CornerRadius::same(8), prof_fill);
-
-            let avatar_pos = prof_rect.left_center() + Vec2::new(16.0, 0.0);
-            ui.painter()
-                .circle_filled(avatar_pos, 11.5, self.theme.accent_blue);
-            ui.painter().text(
-                avatar_pos,
-                Align2::CENTER_CENTER,
-                "HI",
-                egui::FontId::proportional(9.5),
-                Color32::WHITE,
-            );
-
-            ui.painter().text(
-                prof_rect.left_center() + Vec2::new(34.0, -5.0),
-                Align2::LEFT_CENTER,
-                "Harids Irawan",
-                egui::FontId::proportional(12.0),
-                self.theme.text_primary,
-            );
-            ui.painter().text(
-                prof_rect.left_center() + Vec2::new(34.0, 7.5),
-                Align2::LEFT_CENTER,
-                "Lead Structural Engineer",
-                egui::FontId::proportional(9.5),
-                self.theme.text_muted,
-            );
-
-            if prof_resp.on_hover_text("Workspace Settings").clicked() {
+                    .fill(self.theme.bg_card)
+                    .corner_radius(CornerRadius::same(7))
+                    .min_size(Vec2::new(ui.available_width(), 32.0)),
+                )
+                .on_hover_text("Workspace Settings")
+                .clicked()
+            {
                 self.show_settings = !self.show_settings;
                 if is_overlay {
                     self.sidebar_open = false;
@@ -376,8 +286,8 @@ impl EigenGraphApp {
         });
     }
 
-    /// Renders compact status pills and version/update action inside the workspace header.
-    fn render_header_badges(&mut self, ui: &mut egui::Ui, is_mobile: bool) {
+    /// Renders compact status and build version pills inside the workspace header.
+    fn render_header_badges(&self, ui: &mut egui::Ui) {
         Frame::new()
             .fill(self.theme.accent_green.gamma_multiply(0.14))
             .stroke(Stroke::new(1.0, self.theme.accent_green.gamma_multiply(0.6)))
@@ -405,29 +315,6 @@ impl EigenGraphApp {
                         .color(self.theme.accent_blue),
                 );
             });
-
-        let btn_label = if cfg!(target_arch = "wasm32") {
-            "🌐 Info"
-        } else {
-            "🔄 Update"
-        };
-        if ui
-            .add(
-                egui::Button::new(
-                    RichText::new(btn_label)
-                        .size(10.5)
-                        .strong()
-                        .color(Color32::WHITE),
-                )
-                .fill(self.theme.accent_blue)
-                .corner_radius(CornerRadius::same(7))
-                .min_size(Vec2::new(if is_mobile { 68.0 } else { 78.0 }, 26.0)),
-            )
-            .on_hover_text("Check release info & build status")
-            .clicked()
-        {
-            self.updater.check_for_updates();
-        }
     }
 
     /// Renders the quick stage ribbon with horizontal scrolling on phones and wrapping on wider screens.
@@ -602,7 +489,7 @@ impl App for EigenGraphApp {
                                 });
 
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    self.render_header_badges(ui, is_mobile);
+                                    self.render_header_badges(ui);
                                 });
                             });
                         } else {
@@ -648,7 +535,7 @@ impl App for EigenGraphApp {
 
                             ui.add_space(6.0);
                             ui.horizontal_wrapped(|ui| {
-                                self.render_header_badges(ui, is_mobile);
+                                self.render_header_badges(ui);
                             });
                         }
 
@@ -814,10 +701,7 @@ impl App for EigenGraphApp {
             }
         }
 
-        // 5. SOFTWARE UPDATE / WEB INFO MODAL
-        self.updater.render_modal(&ctx, &self.theme);
-
-        // 6. SETTINGS MODAL (Responsive to Mobile, Tablet & Desktop)
+        // 5. SETTINGS MODAL (Responsive to Mobile, Tablet & Desktop)
         if self.show_settings {
             let mut open = self.show_settings;
             egui::Window::new("⚙️ System Preferences")
@@ -835,7 +719,7 @@ impl App for EigenGraphApp {
                         .inner_margin(Margin::same(if is_mobile { 14 } else { 20 })),
                 )
                 .show(&ctx, |ui| {
-                    self.settings_view.show(ui, &self.theme, &mut self.updater);
+                    self.settings_view.show(ui, &self.theme);
                 });
             self.show_settings = open;
         }

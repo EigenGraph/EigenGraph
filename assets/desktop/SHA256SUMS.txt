@@ -1,3 +1,0 @@
-819f60169f7c894b10b35600e4ecbf0c4e38902da229dc933093a877059f5885  EigenGraph-Linux-x86_64.tar.gz
-cf760aaee15f4d75cf76bf8ddbcd6dd7405560d177382b99fa4d3909fcf5f1cd  EigenGraph-Windows-x64.zip
-81c65eb82f77ea44a6251b8de4d78574a7bf28b27f378927e3701149ca7c70b0  EigenGraph-macOS.dmg

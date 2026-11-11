@@ -1824,7 +1824,7 @@ impl ResearchConceptView {
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(
-                            RichText::new("Lead Engineer: Harids Irawan, S.T., M.T. (EigenGraph Systems)")
+                            RichText::new("Verification Authority: EigenGraph Structural Systems")
                                 .size(11.0)
                                 .color(theme.accent_blue),
                         );

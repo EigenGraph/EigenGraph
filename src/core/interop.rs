@@ -238,7 +238,7 @@ impl IfcExporter {
         s.push_str("HEADER;\n");
         s.push_str("FILE_DESCRIPTION(('ViewDefinition [DesignTransferView_V1.0]'),'2;1');\n");
         s.push_str(&format!(
-            "FILE_NAME('{}','2026-10-30T12:00:00',('Harids Irawan'),('EigenGraph Platform'),'EigenGraph BIM Engine v1.0.0','EigenGraph','');\n",
+            "FILE_NAME('{}','2026-10-30T12:00:00',('EigenGraph Engineer'),('EigenGraph Platform'),'EigenGraph BIM Engine','EigenGraph','');\n",
             model.name.replace('\'', "")
         ));
         s.push_str("FILE_SCHEMA(('IFC4'));\n");
@@ -247,7 +247,7 @@ impl IfcExporter {
         s.push_str("DATA;\n");
 
         // Project and Context
-        s.push_str("#1=IFCPERSON('ID_HI','Irawan','Harids',$,$,$,$,$);\n");
+        s.push_str("#1=IFCPERSON('ID_EG','Engineering','EigenGraph',$,$,$,$,$);\n");
         s.push_str("#2=IFCORGANIZATION('ORG_EIGENGRAPH','EigenGraph Structural Platform','Engineering & Research',$,$);\n");
         s.push_str("#3=IFCPERSONANDORGANIZATION(#1,#2,$);\n");
         s.push_str("#4=IFCAPPLICATION(#2,'1.0.0','EigenGraph','EigenGraph');\n");
@@ -377,9 +377,9 @@ impl DossierExporter {
         let mut md = String::new();
 
         md.push_str("# 📜 OFFICIAL STRUCTURAL REDUNDANCY & PROGRESSIVE COLLAPSE AUDIT DOSSIER\n\n");
-        md.push_str("> **Analytical Platform:** EigenGraph Desktop Engine (Rust 1.80+ / Metal GPU)\n");
+        md.push_str("> **Analytical Platform:** EigenGraph WebAssembly Engine (Rust / WebGL2)\n");
         md.push_str("> **Theoretical Foundation:** EigenGraph Structural Redundancy Framework (2026)\n");
-        md.push_str("> **Lead Engineer:** Harids Irawan, S.T., M.T. (EigenGraph Systems)\n");
+        md.push_str("> **Verification Authority:** EigenGraph Structural Systems\n");
         md.push_str("> **Technical Dossier:** *Formulation & Validation of Adjusted Redundancy Index for Pre-Analysis Disruption Screening in Linear-Elastic Structures*\n\n");
 
         md.push_str("---\n\n");
@@ -2332,7 +2332,7 @@ impl Default for PbgProjectMetadata {
             location_city: "DKI Jakarta (Wilayah Seismik Tinggi)".to_string(),
             building_function: "Fungsi Usaha / Perkantoran (Kategori Risiko II)".to_string(),
             owner_name: "PT Eigen Mandiri Graha".to_string(),
-            structural_engineer_name: "Ir. Harids Irawan, S.T., M.T., IPM.".to_string(),
+            structural_engineer_name: "EigenGraph Structural Engineer".to_string(),
             ska_ipb_number: "SKA-HAKI-1.1.201.2.09.1082345".to_string(),
             total_stories: 8,
             building_height_m: 28.8,
@@ -2680,7 +2680,7 @@ impl IfcSamExporter {
         let mut s = String::new();
         s.push_str("ISO-10303-21;\nHEADER;\n");
         s.push_str("FILE_DESCRIPTION(('IFC4 Structural Analysis Model (SAM) certified export by EigenGraph v0.0.3'),'2;1');\n");
-        s.push_str("FILE_NAME('StructuralAnalysisModel.ifc','2026-11-06T14:00:00',('Harids Irawan'),('EigenGraph Core Engine'),'EigenGraph 0.0.3','EigenGraph 2026','');\n");
+        s.push_str("FILE_NAME('StructuralAnalysisModel.ifc','2026-11-06T14:00:00',('EigenGraph Engineer'),('EigenGraph Core Engine'),'EigenGraph','EigenGraph Web','');\n");
         s.push_str("FILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n");
 
         s.push_str("#1= IFCPROJECT('0Y_p1F2X98$P0L_v9Q1w2Z',#2,'EigenGraph Structural Project',$,$,$,$,(#3),#4);\n");
@@ -2688,12 +2688,12 @@ impl IfcSamExporter {
         s.push_str("#3= IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,#7,$);\n");
         s.push_str("#4= IFCUNITASSIGNMENT((#8,#9,#10));\n");
         s.push_str("#5= IFCPERSONANDORGANIZATION(#11,#12,$);\n");
-        s.push_str("#6= IFCAPPLICATION(#12,'0.0.3','EigenGraph','EigenGraph.app');\n");
+        s.push_str("#6= IFCAPPLICATION(#12,'web','EigenGraph','EigenGraph Web');\n");
         s.push_str("#7= IFCAXIS2PLACEMENT3D(#13,$,$);\n");
         s.push_str("#8= IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);\n");
         s.push_str("#9= IFCSIUNIT(*,.FORCEUNIT.,.KILO.,.NEWTON.);\n");
         s.push_str("#10= IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.);\n");
-        s.push_str("#11= IFCPERSON('IRAWAN','Harids',$,$,$,$,$,$);\n");
+        s.push_str("#11= IFCPERSON('EG_ENG','Engineering','EigenGraph',$,$,$,$,$);\n");
         s.push_str("#12= IFCORGANIZATION($,'EigenGraph Engineering',$,$,$);\n");
         s.push_str("#13= IFCCARTESIANPOINT((0.,0.,0.));\n");
 

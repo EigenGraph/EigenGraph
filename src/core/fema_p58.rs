@@ -795,7 +795,7 @@ impl FemaP58Engine {
         md.push_str(&format!("- **Estimated Facility Downtime:** {:.0} days\n", report.downtime_days));
         md.push_str(&format!("- **Expected Annual Loss (EAL):** {:.2}% of asset value per year\n", report.expected_annual_loss_ratio * 100.0));
 
-        md.push_str("\n---\n*Certified by EigenGraph Desktop Structural Engine v0.1.4*\n");
+        md.push_str("\n---\n*Certified by EigenGraph Web Structural Engine*\n");
         md
     }
 }

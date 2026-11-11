@@ -1,8 +1,7 @@
-//! settings.rs — Pillar 5: macOS System Preferences Style.
+//! settings.rs — Workspace Settings & Preferences.
 
-use egui::{Color32, RichText, ScrollArea, Ui};
+use egui::{RichText, ScrollArea, Ui};
 use crate::theme::MacTheme;
-use crate::updater::AppUpdater;
 
 pub struct SettingsView {
     pub unit_system: String,
@@ -11,7 +10,6 @@ pub struct SettingsView {
     pub enable_svd_guard: bool,
     pub enable_anti_leakage: bool,
     pub gemini_api_key: String,
-    pub github_token: String,
 }
 
 impl Default for SettingsView {
@@ -23,13 +21,12 @@ impl Default for SettingsView {
             enable_svd_guard: true,
             enable_anti_leakage: true,
             gemini_api_key: String::new(),
-            github_token: String::new(),
         }
     }
 }
 
 impl SettingsView {
-    pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme, updater: &mut AppUpdater) {
+    pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme) {
         ScrollArea::vertical().show(ui, |ui| {
             ui.add_space(8.0);
 
@@ -76,36 +73,15 @@ impl SettingsView {
 
             ui.add_space(16.0);
 
-            // Group 3: AI Copilot & Cloud / Auto-Updater
+            // Group 3: AI Copilot Integration
             theme.card_frame().show(ui, |ui| {
-                ui.label(RichText::new("AI COPILOT & CLOUD / AUTO-UPDATER SYNCHRONIZATION").strong().size(12.0).color(theme.accent_blue));
+                ui.label(RichText::new("AI COPILOT INTEGRATION").strong().size(12.0).color(theme.accent_blue));
                 ui.separator();
                 ui.add_space(8.0);
 
                 ui.label(RichText::new("Google Gemini API Key:").size(13.0).color(theme.text_primary));
                 ui.add(egui::TextEdit::singleline(&mut self.gemini_api_key).password(true));
                 ui.label(RichText::new("Used for autonomous BIM modeling, load path diagnostics, and structural reports.").size(11.0).color(theme.text_muted));
-
-                ui.add_space(12.0);
-                ui.label(RichText::new("GitHub Personal Access Token (PAT) [Optional]:").size(13.0).color(theme.text_primary));
-                ui.add(egui::TextEdit::singleline(&mut self.github_token).password(true));
-                ui.label(RichText::new("Used for automatic update authentication if GitHub repository is private.").size(11.0).color(theme.text_muted));
-
-                ui.add_space(12.0);
-                ui.separator();
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Software Updates:").size(13.0).strong().color(theme.text_primary));
-                    if ui.add(
-                        egui::Button::new(RichText::new("🚀 Check for Updates Now").size(12.0).strong().color(Color32::WHITE))
-                            .fill(theme.accent_blue)
-                            .corner_radius(egui::CornerRadius::same(6)),
-                    ).clicked() {
-                        updater.github_token = self.github_token.clone();
-                        updater.check_for_updates();
-                    }
-                });
-                ui.label(RichText::new("Checks for latest release versions and official update details from GitHub Releases.").size(11.0).color(theme.text_muted));
             });
 
             ui.add_space(16.0);
@@ -118,47 +94,18 @@ impl SettingsView {
 
                 ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
-                    ui.label(RichText::new(format!("v{} (Universal Multi-Platform)", env!("CARGO_PKG_VERSION"))).size(13.0).color(theme.accent_green).strong());
-
-                    if ui.add(
-                        egui::Button::new(RichText::new("🚀 Update").size(11.0).color(theme.accent_blue))
-                            .fill(Color32::TRANSPARENT),
-                    ).on_hover_text("Check for latest release").clicked() {
-                        updater.github_token = self.github_token.clone();
-                        updater.check_for_updates();
-                    }
+                    ui.label(RichText::new(format!("v{} (WebAssembly Edition)", env!("CARGO_PKG_VERSION"))).size(13.0).color(theme.accent_green).strong());
                 });
 
                 ui.add_space(4.0);
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("Author & Lead Developer:").strong().size(12.0).color(theme.text_primary));
-                    ui.label(RichText::new("Harids Irawan <harids.irawan@gmail.com>").size(12.0).color(theme.text_secondary));
-                });
-
-                ui.add_space(4.0);
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("Architecture:").strong().size(12.0).color(theme.text_primary));
-                    let arch = if cfg!(target_arch = "wasm32") {
-                        "WebAssembly (wasm32)"
-                    } else if cfg!(target_arch = "aarch64") {
-                        "Apple Silicon (aarch64)"
-                    } else if cfg!(target_arch = "x86_64") {
-                        "x86_64 64-bit"
+                    ui.label(RichText::new("Runtime:").strong().size(12.0).color(theme.text_primary));
+                    let runtime = if cfg!(target_arch = "wasm32") {
+                        "Browser (WebGL2) • WebAssembly (wasm32)"
                     } else {
-                        "Universal"
+                        "EigenGraph Web Engine (Local Preview)"
                     };
-                    let os = if cfg!(target_arch = "wasm32") {
-                        "Browser (WebGL2)"
-                    } else if cfg!(target_os = "macos") {
-                        "macOS"
-                    } else if cfg!(target_os = "windows") {
-                        "Windows"
-                    } else if cfg!(target_os = "linux") {
-                        "Linux"
-                    } else {
-                        "Desktop"
-                    };
-                    ui.label(RichText::new(format!("{} • {}", os, arch)).size(12.0).color(theme.text_secondary));
+                    ui.label(RichText::new(runtime).size(12.0).color(theme.text_secondary));
                 });
 
                 ui.add_space(8.0);
@@ -171,7 +118,7 @@ impl SettingsView {
                          • SVD Kinematic Mechanism Guard (m_e = 1 - h_e) for instant singularity detection\n\
                          • Planar Half-Edge Face Arrangement & Non-Recursive BSP Tree Solid CSG Subtraction\n\
                          • 2D Sheet Composer (A4, A3, A2, A1) with Vector PDF 1.4 & SVG Blueprint Generation\n\
-                         • Obsidian-Compliant Reactive Autosave Internal Vault with Copilot Integration"
+                         • Interactive Web Workspace with Responsive Navigation & AI Copilot Integration"
                     )
                     .size(11.0)
                     .color(theme.text_muted)

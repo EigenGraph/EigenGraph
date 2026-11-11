@@ -37,7 +37,7 @@ Keep the 15 engineering workflow modules accessible in navigation (sidebar/drawe
 ## 📁 REPOSITORY STRUCTURE & ORGANIZATION
 
 - `src/` — Rust application (`app.rs`, `theme.rs`, `models.rs`, `core/`, `views/`, `bin/`).
-- `assets/` — Web icons/logos at `assets/*.png`; native desktop packaging metadata & checksums under `assets/desktop/`.
+- `assets/` — Web icons/logos (`assets/*.png`).
 - `docs/` — Versioned project documentation and changelog (`CHANGELOG.md`).
 - `.github/workflows/deploy.yml` — Automated Rust unit tests, WASM verification, Trunk release build, and Cloudflare Workers deployment.
 - Keep the repository root clean; place new design documents, specifications, and guides under `docs/`.

@@ -524,7 +524,7 @@ impl MyProjectView {
                             });
 
                             ui.label(RichText::new("AUTHORITY & AUDITOR INFORMATION:").size(11.5).strong().color(theme.text_secondary));
-                            ui.label(RichText::new("• Lead Engineer / Auditor: Harids Irawan, S.T., M.T. (EigenGraph Systems)").size(11.5).color(theme.text_primary));
+                            ui.label(RichText::new("• Verification Authority: EigenGraph Structural Systems").size(11.5).color(theme.text_primary));
                             ui.label(RichText::new("• Analysis Framework: Development and Validation of Adjusted Redundancy Index for Pre-Analysis Screening of Element Disruption Scenarios").size(11.0).color(theme.text_secondary));
                             ui.label(RichText::new("• Publication / Verification Year: 2026").size(11.0).color(theme.text_muted));
 

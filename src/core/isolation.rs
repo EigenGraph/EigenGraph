@@ -1025,7 +1025,7 @@ impl SeismicIsolationEngine {
             }
         }
 
-        md.push_str("\n---\n*Certified by EigenGraph Desktop Structural Engine v0.1.2*\n");
+        md.push_str("\n---\n*Certified by EigenGraph Web Structural Engine*\n");
         md
     }
 }

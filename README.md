@@ -12,7 +12,7 @@
 
 *Full Rust/egui **EigenGraph** 10D BIM & Structural Mechanics Workstation compiled to WebAssembly (`wasm32-unknown-unknown`) via `eframe` and `Trunk`, with responsive navigation across Desktop, Tablet, and Mobile.*
 
-[**Launch EigenGraph Web App ↗**](https://eigengraph.net/) • [**Mirror (`www`) ↗**](https://www.eigengraph.net/) • [**Desktop Releases ↗**](https://github.com/EigenGraph/EigenGraph/releases)
+[**Launch EigenGraph Web App ↗**](https://eigengraph.net/) • [**Mirror (`www`) ↗**](https://www.eigengraph.net/)
 
 </div>
 
@@ -50,8 +50,7 @@
 EigenGraph/
 ├── .github/workflows/deploy.yml   # Test, Trunk WASM build & Cloudflare Workers deploy
 ├── assets/
-│   ├── *.png                      # Web favicon & runtime app icons/logos
-│   └── desktop/                   # macOS bundle metadata, .icns & release checksums
+│   └── *.png                      # Web favicon & runtime app icons/logos
 ├── docs/
 │   └── CHANGELOG.md               # Versioned changelog across development phases
 ├── src/                           # Rust core mechanics, egui views, WebAssembly bridge
@@ -65,7 +64,7 @@ EigenGraph/
 
 ## 💻 Local Development
 
-### Run as WebAssembly Web App (Recommended)
+### Run as Full WebAssembly Web App
 ```bash
 # Install the WebAssembly Rust target and Trunk bundler
 rustup target add wasm32-unknown-unknown
@@ -73,11 +72,6 @@ cargo install --locked trunk
 
 # Serve locally with live reload
 trunk serve --public-url / --open
-```
-
-### Run as Native Desktop Application
-```bash
-cargo run --release --bin eigengraph
 ```
 
 ### Run Automated Tests & Checks

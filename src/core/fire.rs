@@ -872,7 +872,7 @@ impl FireEngine {
         md.push_str("## Structural Fire Engineering & Coupled Thermo-Mechanical Response\n");
         md.push_str(&format!("**Project:** {}  \n", report.input.project_name));
         md.push_str("**Standards:** AISC 360-16 Appendix 4 / Eurocode 1 & 3 (EN 1991-1-2 / EN 1993-1-2) / ASTM E119 / ACI 216.1  \n");
-        md.push_str("**Analyst:** Harids Irawan, ST., MT., IPM. (EigenGraph Automated Certification)  \n\n");
+        md.push_str("**Analyst:** EigenGraph Automated Certification  \n\n");
 
         md.push_str("---\n\n");
         md.push_str("### 1. Fire Compartment Exposure & Thermal Profile\n\n");

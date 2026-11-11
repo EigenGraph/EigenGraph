@@ -1170,7 +1170,7 @@ impl BlastEngine {
         md.push_str("## Blast Resistant Design & Structural Dynamics Under Explosive Impulses\n");
         md.push_str(&format!("**Project:** {}  \n", report.input.project_name));
         md.push_str("**Standards:** DoD UFC 3-340-02 / ASCE 59-11 / USACE PDC-TR-06-08 / ACI 318-19  \n");
-        md.push_str("**Analyst:** Harids Irawan, ST., MT., IPM. (EigenGraph Automated Certification)  \n\n");
+        md.push_str("**Analyst:** EigenGraph Automated Certification  \n\n");
 
         md.push_str("---\n\n");
         md.push_str("### 1. Executive Summary & Threat Characterization\n\n");

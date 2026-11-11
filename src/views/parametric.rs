@@ -140,7 +140,7 @@ impl Default for ParametricView {
             sheet_scale: SheetScale::Scale1_100,
             sheet_number: "A101".to_string(),
             sheet_title: "Structural Framing Plan & Section A-A".to_string(),
-            sheet_author: "Harids Irawan, S.T., M.T.".to_string(),
+            sheet_author: "EigenGraph Studio".to_string(),
             component_name: "NVW_DCR Portal Frame FL1-FL6 (ASTM A992)".to_string(),
             component_category: "NVW_DCR-LOD350_BIMCraft".to_string(),
             variables: vec![
