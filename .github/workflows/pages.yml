@@ -1,4 +1,4 @@
-name: Build & Deploy EigenGraph Web App (GitHub Pages)
+name: Build & Deploy EigenGraph Web App (Cloudflare Workers)
 
 on:
   push:
@@ -9,11 +9,9 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: "pages"
+  group: "cloudflare-workers-deploy"
   cancel-in-progress: false
 
 env:
@@ -58,12 +56,9 @@ jobs:
         run: cargo check --bin eigengraph --target wasm32-unknown-unknown
 
   build-and-deploy:
-    name: Build Trunk WASM & Deploy GitHub Pages
+    name: Build Trunk WASM & Deploy to Cloudflare Workers
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -88,18 +83,13 @@ jobs:
       - name: Install Trunk
         uses: jetli/trunk-action@v0.5.1
 
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v5
-
       - name: Build EigenGraph WebAssembly App
-        run: trunk build --release --public-url "${{ steps.pages.outputs.base_path }}/"
+        run: trunk build --release --public-url /
 
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy Static Assets to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v4
         with:
-          path: 'dist'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: d53f20ace71a15665f813fedb55fde1c
+          wranglerVersion: "4.160.0"
+          command: deploy
