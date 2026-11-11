@@ -1,0 +1,921 @@
+# EigenGraph Release Notes & Changelog
+
+All official versioned releases of EigenGraph are cataloged here.
+
+The project strictly adheres to sequential versioning and strict 1-to-1 phase mapping:
+`v0.0.1` (Phase 1) ➔ `v0.0.2` (Phase 2) ➔ `v0.0.3` (Phase 3) ➔ `v0.0.4` (Phase 4) ➔ `v0.0.5` (Phase 5) ➔ `v0.0.6` (Phase 6) ➔ `v0.0.7` (Phase 7) ... (never skip patch numbers).
+
+---
+
+## 🚀 EigenGraph v0.2.0 — Phase 20: OpenBIM IFC Spatial Clash Detection, Model Diff, IDS Validation & Multi-Format Exporter
+**Release Date:** 2026-11-08  
+**Git Tag:** `v0.2.0`  
+**Target:** Production Engine
+
+EigenGraph v0.2.0 delivers an industry-grade **OpenBIM IFC Spatial Clash Detection, Model Differential, buildingSMART IDS Validation & Multi-Format Exporter**, establishing EigenGraph as a premier coordination and validation platform for structural engineering workflows. Engineers can now perform automated 3D collision analyses, track geometric and parametric revisions across project cycles with cryptographic SHA-256 integrity, audit IFC models against buildingSMART Information Delivery Specifications (IDS), and export coordination packages via standard BCF XML and ifcJSON-4 formats.
+
+### 🌟 Key Features & Architectural Mechanics
+
+#### 1. Spatial Clash Detection Engine
+- **3D Axis-Aligned Bounding Box (AABB) Collision Solver**:
+  - Spatial intersection tests with configurable physical tolerance ($\Delta_{\text{tol}} \ge 0.0$ mm).
+  - True 3D volumetric interference evaluation ($V_{\text{intersect}} = \Delta x \times \Delta y \times \Delta z$).
+  - Overlap ratio calculation relative to the smaller interacting element volume.
+  - Multi-axis proximity clearance computation detecting minimum Euclidean separation distances.
+- **Hierarchical Clash Classification**:
+  - `Duplicate`: Identical element centroids and dimensions within spatial tolerance.
+  - `HardClash`: Physical volumetric interpenetration of distinct structural members.
+  - `ClearanceViolation`: Separation distance falling below required clearance margins.
+  - Comprehensive collision report detailing colliding pairs, class types, collision centroids, overlap volumes, and clearance deficits.
+
+#### 2. BIM Differential & Revision Tracking Engine
+- **Full Model Comparison (`diff`, `IfcModelDiff`)**:
+  - Compares baseline against revised IFC models via GlobalId GUID and Step ID indices.
+  - Categorizes components into `Added`, `Deleted`, `Modified`, and `Unchanged`.
+  - Detailed parameter deltas tracking identity changes (name, description, type), storey reassignments, material substitutions, 3D translation vectors $[dX, dY, dZ]$, and volume variances ($\Delta V$).
+  - Cryptographic model revision hashing using FIPS 180-4 SHA-256 for audit provenance.
+
+#### 3. buildingSMART Information Delivery Specification (IDS) Validation
+- **Automated OpenBIM Conformance Auditing**:
+  - Validates naming conventions, standard 22-character Base64 alphanumeric GUIDs, mandatory material bindings, spatial storey containment, and positive bounding extents.
+  - Generates compliance scores, passed/failed rule breakdown, and itemized defect summaries for model clearance.
+
+#### 4. Multi-Format OpenBIM Exporters & Interoperability
+- **buildingSMART BCF (BIM Collaboration Format) 2.1 XML Generator**:
+  - Converts active spatial clashes into standardized BCF XML topics with unique UUIDs.
+  - Automatically calculates 3D camera viewpoints and target vectors pointing directly at collision midpoints.
+- **buildingSMART ifcJSON-4 Serializer**:
+  - Serializes the entire IFC model hierarchy, entities, bounding boxes, and property sets into modern, web-ready JSON notation.
+- **Analytical FEM Sync**:
+  - Seamless structural model conversion (`to_structural_model`) into nodes and frame elements for immediate static and dynamic finite element analysis.
+
+#### 5. OpenBIM Studio Interactive Clash, Diff & IDS Workbench
+- **4th Inspector Tab (`⚔️ Clash, Diff & IDS`)**:
+  - Dedicated sub-navigation: **⚔️ Spatial Clash Matrix**, **🔀 BIM Differential**, and **📋 IDS & BCF Collaboration**.
+  - Interactive parameter controls for collision tolerance and clearance buffers.
+  - Summary status pills, interactive audit tables, and one-click export buttons for `.json` (ifcJSON-4) and `.xml` (BCF topics).
+
+#### 6. Unit Testing Suite Expansion
+- 5 comprehensive new unit tests:
+  1. `test_ifc_spatial_clash_detection_hard_and_clearance`
+  2. `test_ifc_model_diff_added_deleted_modified`
+  3. `test_ifc_ids_specification_validation`
+  4. `test_ifc_bcf_topic_generation`
+  5. `test_ifc_json_serializer`
+- All **107/107 unit tests verified and passing (100%)**.
+
+---
+
+## 🚀 EigenGraph v0.1.9 — Phase 19: OpenBIM IFC Geometric Topology, Swept Solid Extrusion & Element Synthesis Engine
+**Release Date:** 2026-11-08  
+**Git Tag:** `v0.1.9`  
+**Target:** Production Engine
+
+EigenGraph v0.1.9 delivers a full-fledged **OpenBIM IFC Geometric Topology, Swept Solid Extrusion & Element Synthesis Engine**, transforming EigenGraph into an active BIM geometric authoring platform. Structural engineers can now resize extruded solid bodies in-place, apply 3D Cartesian translation displacements, alter parametric profile cross-sections, synthesize new structural elements directly into the STEP entity graph, and execute safe element deletions with full transactional rollback safety.
+
+### 🌟 Key Features & Architectural Mechanics
+
+#### 1. In-Place Swept Solid Extrusion Mutator
+- **Parametric Extrusion Depth (`IfcExtrudedAreaSolid.Depth`)**:
+  - Direct parameter mutation of swept solid extrusion depth across structural entities (`IfcColumn`, `IfcBeam`, `IfcMember`).
+  - Automatically updates underlying STEP entity parameters.
+  - Dynamically recalculates 3D Axis-Aligned Bounding Box (AABB) extents, volume, and analytical wireframe coordinates.
+
+#### 2. 3D Cartesian Spatial Translation Mutator
+- **Spatial Coordinate Relocation (`IfcCartesianPoint`)**:
+  - Traverses the element's placement hierarchy (`IfcLocalPlacement` ➔ `IfcAxis2Placement3D` ➔ `IfcCartesianPoint`).
+  - Shifts base coordinates by 3D displacement vectors $[dX, dY, dZ]$.
+  - Instantly recalculates global spatial extents, bounding boxes, and wireframe visualization lines.
+
+#### 3. 2D Parametric Profile Cross-Section Resizer
+- **Profile Dimension Control (`IfcRectangleProfileDef`)**:
+  - In-place mutation of width ($X_{Dim}$) and depth ($Y_{Dim}$) parameters.
+  - Real-time bounding box expansion/contraction and volumetric takeoff recalculation.
+
+#### 4. Physical Structural Element Synthesizer
+- **Native STEP Entity Graph Generation (`create_structural_element`, `IfcElementCreationSpec`)**:
+  - Generates valid buildingSMART IFC4 / IFC2x3 compliant entities:
+    1. Cryptographic 22-character GUID creation (`IfcGloballyUniqueId`).
+    2. Coordinate references: `IfcCartesianPoint`, `IfcDirection`.
+    3. Spatial placement tree: `IfcAxis2Placement3D`, `IfcLocalPlacement`.
+    4. Representation geometry: `IfcRectangleProfileDef`, `IfcExtrudedAreaSolid`, `IfcShapeRepresentation`, `IfcProductDefinitionShape`.
+    5. Structural entity instantiation: `IfcColumn`, `IfcBeam`, or `IfcMember`.
+    6. Relational bindings: `IfcRelContainedInSpatialStructure` (storey containment) and `IfcRelAssociatesMaterial`.
+  - Automatically indexes new entities into `StepModel` type index and spatial tree.
+
+#### 5. Safe Structural Element Deletion & Restoration
+- **Zero-Loss Element Deletion (`delete_structural_element`, `restore_structural_element`)**:
+  - Safely excises elements and their relational links from spatial and material indices.
+  - Retains entity graph snapshots allowing exact bidirectional undo/redo rollback.
+
+#### 6. Expanded Transactional Command Stack
+- **Atomic Geometric Commands (`IfcEditCommand`, `IfcEditSession`)**:
+  - First-class variants: `ModifyExtrusionDepth`, `TranslateElement`, `ModifyProfileDimensions`, `CreateElement`, `DeleteElementById`, and `RestoreElement`.
+  - Bidirectional inversion (`inverse()`) guaranteeing 100% deterministic state rollback.
+
+#### 7. Verified Test Suite Expansion
+- 5 comprehensive new unit tests:
+  1. `test_ifc_modify_element_extrusion_depth`
+  2. `test_ifc_modify_element_placement_translation`
+  3. `test_ifc_modify_element_profile_dimensions`
+  4. `test_ifc_create_and_delete_structural_element`
+  5. `test_ifc_geometric_transaction_undo_redo`
+- Full test suite expanded to **102/102 tests (100% pass)**.
+
+---
+
+## 🚀 EigenGraph v0.1.8 — Phase 18: OpenBIM IFC Interactive Editing & Property/Metadata Mutation Engine
+**Release Date:** 2026-11-08  
+**Git Tag:** `v0.1.8`  
+**Target:** Production Engine
+
+EigenGraph v0.1.8 introduces an industrial-grade **OpenBIM IFC Interactive Editing & Property/Metadata Mutation Engine**, advancing EigenGraph from a read-only OpenBIM inspector into a full bi-directional BIM editing and model management suite. Engineers can now directly mutate entity identities, manage property sets, reassign materials, relocate elements across building storeys, update custom takeoff quantities, and serialize clean ISO 10303-21 STEP physical files with unlimited transactional undo/redo protection.
+
+### 🌟 Key Features & Architectural Mechanics
+
+#### 1. In-Place Identity & Classification Mutation
+- **Direct Parameter Updates**:
+  - Live editing of fundamental IFC attributes: `Name`, `Description`, `ObjectType`, and `PredefinedType`.
+  - Bi-directional synchronization: updates in-memory `IfcElementSummary` and propagates parameter updates directly into underlying ISO 10303-21 `StepEntity` arrays.
+
+#### 2. Dynamic Property Sets (Psets) Manipulation
+- **Key-Value Property Modification**:
+  - Add, edit, and delete properties within existing `IfcPropertySet` containers (`IfcPropertySingleValue`).
+  - Add custom new Property Sets (e.g. `Pset_StructuralAudit`, `Pset_CarbonMetrics`).
+  - Delete obsolete or incorrect Property Sets with one-click cleanup.
+
+#### 3. Real-Time Material Reassignment
+- **Structural Material Binding**:
+  - Reassigns element materials (`IfcMaterial`).
+  - Automatically manages underlying `IFCMATERIAL` and `IFCRELASSOCIATESMATERIAL` relationships in the STEP entity index.
+
+#### 4. Spatial Storey Relocation Solver
+- **Cross-Storey Containment Transfers**:
+  - Easily move columns, beams, braces, or walls from one storey to another (`IfcBuildingStorey`).
+  - Automatically rebalances `IfcSpatialNode` hierarchy and updates `IFCRELCONTAINEDINSPATIALSTRUCTURE` spatial containment links.
+
+#### 5. ISO 10303-21 STEP Physical File Serializer
+- **Native OpenBIM Exporter (`StepModel::to_step_string()`)**:
+  - Formats headers (`FILE_DESCRIPTION`, `FILE_NAME`, `FILE_SCHEMA`) and all modified entity statements (`#id = TYPE(params);`).
+  - Generates pristine, standardized STEP physical files compatible with buildingSMART standards, Revit, ArchiCAD, and Tekla.
+
+#### 6. Transactional Command Architecture & Undo/Redo Engine
+- **Command Pattern (`IfcEditCommand`, `IfcEditSession`)**:
+  - Every mutation is executed through an atomic command with an exact bidirectional inverse (`inverse()`).
+  - Full Undo/Redo session manager with user-friendly descriptions and dirty state detection.
+
+#### 7. Automated Model Health Audit Recomputation
+- **Continuous Quality Control**:
+  - Automatically re-evaluates schema conformance, GUID uniqueness, dangling references, and uncontained products following any mutation.
+
+#### 8. Verified Test Suite Expansion
+- 5 comprehensive new unit tests:
+  1. `test_ifc_update_element_attributes`
+  2. `test_ifc_property_set_mutation_and_deletion`
+  3. `test_ifc_material_reassignment`
+  4. `test_ifc_storey_reassignment`
+  5. `test_ifc_transaction_undo_redo_rollback`
+- Suite expanded to **97/97 tests (100% pass)**.
+
+---
+
+## 🚀 EigenGraph v0.1.7 — Phase 17: OpenBIM IFC Fundamental Reader, Spatial Hierarchy & Inspection Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.7`  
+**Target:** Production Engine
+
+EigenGraph v0.1.7 establishes a native, high-fidelity **OpenBIM Industry Foundation Classes (IFC) Fundamental Reader, Spatial Hierarchy Decomposition & Inspection Engine**, delivering comprehensive support for **ISO 10303-21 (STEP Physical File format / SPF)**, **ISO 16739-1:2024 / buildingSMART IFC4.3 Add2**, **ISO 16739-1:2018 / IFC4 Reference View**, and **ISO 16739:2013 / IFC2x3 Coordination View 2.0**.
+
+### 🌟 Key Features & Architectural Mechanics
+
+#### 1. Robust STEP ISO-10303-21 Tokenizer & Lexer
+- **Zero-Dependency Syntax Parsing**:
+  - Full lexing and parsing of STEP SPF statements (`#id = TYPE(params);`).
+  - Handles nested parameter lists, entity references `#id`, string literals with quotes, enum values `.ENUM.`, null values `$`, derived attributes `*`, and block comments `/* ... */`.
+  - Resilience against arbitrary line endings (`\r\n`, `\n`, `\r`) and multi-line entity definitions.
+
+#### 2. Spatial Hierarchy Decomposition & Topological Mapping
+- **Spatial Structure Tree Reconstruction**:
+  - Automatically reconstructs the canonical openBIM spatial structure:
+    $$\text{IfcProject} \longrightarrow \text{IfcSite} \longrightarrow \text{IfcBuilding} \longrightarrow \text{IfcBuildingStorey} \longrightarrow \text{IfcProduct}$$
+  - Resolves `IfcRelAggregates` and `IfcRelContainedInSpatialStructure` relationships to associate each physical element with its elevation and storey level.
+
+#### 3. BIM Metadata, Property Sets & Quantities Takeoff
+- **Comprehensive Entity Classification**:
+  - Captures `GlobalId` (22-character GUID), `Name`, `Description`, `ObjectType`, and `PredefinedType`.
+- **Property Set (Pset) Extraction**:
+  - Resolves `IfcRelDefinesByProperties` mapping elements to `IfcPropertySet` and `IfcPropertySingleValue` (e.g. `Pset_BeamCommon`, `Pset_ColumnCommon`, `Pset_ConcreteElementGeneral`).
+- **Quantities (Qto) Integration**:
+  - Parses `IfcElementQuantity` (Qto: GrossVolume, NetVolume, Length, Width, Height) directly into real-time element summaries.
+
+#### 4. Material Associations & Profile Composition
+- **Multi-Level Material Resolution**:
+  - Resolves `IfcRelAssociatesMaterial` for single `IfcMaterial`, layered composite assemblies (`IfcMaterialLayerSet` / `IfcMaterialLayerSetUsage`), and profile sets (`IfcMaterialProfileSet`).
+
+#### 5. Local Placement & 3D Bounding Box Geometry Solver
+- **Recursive Coordinate Transformation**:
+  - Traverses `IfcLocalPlacement` hierarchy to accumulate global 3D transformations.
+  - Resolves swept solid extrusions (`IfcExtrudedAreaSolid`), rectangular/I-shape profile definitions, and 3D axis polylines (`IfcPolyline`).
+  - Computes enclosing 3D Bounding Box $[X_{\min}, X_{\max}] \times [Y_{\min}, Y_{\max}] \times [Z_{\min}, Z_{\max}]$, element centroid, dimensions, and wireframe vector lines.
+
+#### 6. OpenBIM Model Quality & Conformance Audit
+- **Automated Health Verification**:
+  - Validates schema compliance, detects duplicate GUID collisions, identifies uncontained or orphaned elements, and flags broken `#Ref` dangling pointer references.
+  - Generates a certified Conformance Score (%) and actionable check ledger.
+
+#### 7. Bi-directional Bridge to Analytical Structural Model
+- **Instant FEA & ARI Synchronization**:
+  - Automatically maps physical IFC columns, beams, and braces into frame elements with node snapping tolerance (50 mm) and ground boundary fixities for immediate SVD Kinematic Guard and ARI redundancy assessment.
+
+---
+
+## 🚀 EigenGraph v0.1.6 — Phase 16: Structural Fire Engineering & Coupled Thermo-Mechanical Response Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.6`  
+**Target:** Production Engine
+
+EigenGraph v0.1.6 introduces an industry-grade **Structural Fire Engineering & Coupled Thermo-Mechanical Response Engine**, delivering comprehensive transient heat transfer, elevated-temperature material constitutive degradation, thermal expansion restraint forces, and Fire Resistance Rating (FRR) endurance verification in full compliance with **AISC 360-16 Appendix 4**, **Eurocode 1 (EN 1991-1-2)**, **Eurocode 2 (EN 1992-1-2)**, **Eurocode 3 (EN 1993-1-2)**, **ISO 834-1**, and **ASTM E119**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Standard & Parametric Compartment Fire Dynamics
+- **Standard Cellulosic Fire Curves**:
+  - ISO 834-1 / EN 1991-1-2:
+    $$T_g(t) = 20 + 345 \log_{10}(8t + 1) \quad (^\circ\text{C})$$
+  - ASTM E119 closed-form formulation.
+- **Hydrocarbon & External Fires**:
+  - Eurocode Hydrocarbon Curve reaching $1100^\circ\text{C}$ within 30 minutes for petrochemical and offshore hazards.
+  - External Fire Curve ($T_{\max} \approx 660^\circ\text{C}$) for exterior building facades.
+- **Parametric Natural Fire**:
+  - Heating phase coupled with linear decay cooling rates simulating real compartment fuel burnout.
+
+#### 2. Transient Cross-Section Heat Conduction & Section Factors
+- **Section Factor ($A_m / V$) Calculation**:
+  - Automated evaluation for 3-sided beam (composite deck protected top flange) and 4-sided column exposures.
+- **Unprotected Steel Temperature Evolution**:
+  - Incremental finite difference heat balance incorporating convective and non-linear radiative fluxes:
+    $$\Delta T_s = \frac{A_m / V}{c_s \rho_s} \left[ h_c (T_g - T_s) + \sigma \epsilon_{\text{res}} ((T_g + 273.15)^4 - (T_s + 273.15)^4) \right] \Delta t$$
+    where $h_c = 25\text{ W/m}^2\text{K}$, $\epsilon_{\text{res}} = 0.70$, and $\sigma = 5.67 \times 10^{-8}\text{ W/m}^2\text{K}^4$.
+- **Protected Steel Insulation Heat Conduction**:
+  - Multi-material passive fire protection modeling (Sprayed Gypsum SFRM, Intumescent Coatings, Calcium Silicate Boards, and Concrete Encasement):
+    $$\Delta T_s = \frac{k_p d_p^{-1} (A_m / V)}{c_s \rho_s (1 + \phi / 2)} (T_g - T_s) \Delta t$$
+- **Automated Passive Fireproofing Sizing**:
+  - Direct inverse solver determining required insulation thickness $d_p$ (mm) to achieve specified Fire Resistance Ratings (FRR 60, 90, 120, 180 min) under design demand ratios.
+
+#### 3. Elevated-Temperature Constitutive Material Degradation
+- **AISC 360-16 / Eurocode 3 Structural Steel**:
+  - High-temperature yield strength retention factor $k_y(T)$ and elastic modulus factor $k_E(T)$:
+    $$F_y(T) = k_y(T) \cdot F_y, \quad E(T) = k_E(T) \cdot E_0$$
+- **Eurocode 2 Concrete Degradation**:
+  - Compressive strength retention factor $k_c(T)$ calibrated for both siliceous and calcareous aggregate types.
+- **Elevated-Temperature Member Capacities**:
+  - Compression column buckling capacity $P_n(T)$ via AISC 360 Chapter E with high-temperature $F_{cr}(T)$.
+  - Flexural beam moment capacity $M_n(T) = k_y(T) M_{px}$.
+  - Shear capacity $V_n(T) = 0.60 k_y(T) F_y A_w$.
+
+#### 4. Thermal Expansion & Structural Restraint Axial Forces
+- **Thermal Elongation Strain $\epsilon_{th}(T)$**:
+  - Temperature-dependent thermal expansion integrating differential thermal expansion coefficients $\alpha(T)$.
+- **Coupled Thermal Restraint Forces**:
+  - Axial compressive forces generated under longitudinal boundary restraint (pinned-pinned, rigid continuous frames):
+    $$P_{th}(T) = K_{ax,restraint} \cdot \Delta L_{th} = \left(\frac{k_{ax} \cdot E(T) A}{k_{ax} L + E(T) A}\right) \cdot (\epsilon_{th} L)$$
+  - Combined P-M interaction check under simultaneous gravity load and thermal thrust:
+    $$\frac{P_u + P_{th}(T)}{\phi_c P_n(T)} + \frac{8}{9} \frac{M_u}{\phi_b M_n(T)} \le 1.0$$
+
+#### 5. 3D Fire Compartment Archetype & Comprehensive Calculation Dossier
+- **3D Archetype Model**: Parametric 3-bay, 2-story steel building frame (`generate_fire_compartment_archetype`) featuring an active ground-floor fire compartment with localized elevated-temperature thermal zones, heated beams, and boundary restraints.
+- **Automated Calculation Dossier**: Complete engineering verification report exportable to Markdown (`EigenGraph_Structural_Fire_AISC360_Dossier.md`).
+- **Interactive UI Sub-Tab**: Dedicated `"🔥 Structural Fire (AISC/EC3)"` panel featuring interactive 2D vector CAD temperature history charts, capacity retention curves, real-time parametric controllers, and code compliance audit tables.
+
+---
+
+## 🚀 EigenGraph v0.1.5 — Phase 15: Blast Resistant Design & Explosive Impulse Dynamics Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.5`  
+**Target:** Production Engine
+
+EigenGraph v0.1.5 introduces an advanced **Blast Resistant Design & Explosive Impulse Dynamics Engine**, delivering state-of-the-art computational mechanics for antiterrorism perimeter protection, hardened bunker facilities, and critical infrastructure defense in full compliance with **DoD UFC 3-340-02**, **ASCE 59-11**, **USACE PDC-TR-06-08**, and **GSA PBS-P100 / ISC Physical Security Criteria**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Kingery-Bulmash Empirical Blast Wave Characterization
+- **Threat Equivalence & Scaling**: Multi-explosive TNT equivalency (TNT, ANFO, C-4, PETN, Dynamite) with surface burst reflection enhancement factor ($\alpha = 1.80$):
+  $$Z = \frac{R}{W_{\text{effective}}^{1/3}} \quad (\text{m/kg}^{1/3})$$
+- **High-Order Rankine-Hugoniot Reflection**:
+  $$P_r = 2 P_{so} \left(\frac{7 P_0 + 4 P_{so}}{7 P_0 + P_{so}}\right)$$
+- **Calibrated Friedlander Waveform**: Positive phase exponential decay calibrated via numerical Newton-Raphson:
+  $$P(t) = P_r \left(1 - \frac{t}{t_d}\right) e^{-b \cdot t / t_d}$$
+- **Clearing Relief**: Stagnation pressure relaxation on finite facade envelopes ($t_c = 3 S / C_r$).
+
+#### 2. Equivalent SDOF Dynamic Transformation (Biggs Method)
+- Load-mass transformation factors $K_M, K_L, K_{LM}$ across simply supported, clamped, propped cantilever, and cantilever boundaries.
+- Dynamic Material Strengths with Dynamic Increase Factors (DIF): $\text{DIF}_c = 1.25$ for concrete compression, $\text{DIF}_y = 1.20$ with $\text{SIF} = 1.10$ for flexural rebar and steel sections.
+- Cracked section stiffness $k_E$, ultimate plastic resistance $R_u$, and response regime categorization (Impulsive, Dynamic, Quasi-Static).
+
+#### 3. Central Difference Elastoplastic Numerical Dynamics
+- Time-history integration of $M_e \ddot{y} + C \dot{y} + R(y) = F_e(t)$ solving dynamic displacement $y(t)$, dynamic resistance $R(t)$, and support reactions $V(t)$.
+- Ductility ratio $\mu = y_{\max} / y_e$ and support rotation $\theta = \arctan(y_{\max} / (L/2))$.
+- Direct dynamic shear capacity verification ($V_u \le \phi V_{c,\text{dyn}}$).
+
+#### 4. PDC-TR-06-08 / UFC 3-340-02 Damage Classification
+- Automated classification into **B1: Superficial**, **B2: Low Damage**, **B3: Medium Damage**, **B4: High Damage**, and **B5: Hazardous Failure**.
+
+#### 5. Pressure-Impulse (P-I) Iso-Damage Diagrams
+- Analytical generation of asymptotic P-I curves delineating impulsive and quasi-static damage thresholds with live operating threat point.
+
+#### 6. 3D Protective Blast Bunker Archetype & Calculation Dossier
+- Parametric 3D model generator (`generate_blast_bunker_archetype`) with 450mm blast shear walls, roof diaphragms, and perimeter standoff deflector revetments.
+- Professional Markdown dossier generator (`generate_markdown_dossier`) ready for defense and security certification.
+
+---
+
+## 🚀 EigenGraph v0.1.4 — Phase 14: FEMA P-58 Seismic Performance Assessment & Probabilistic Loss Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.4`  
+**Target:** Production Engine
+
+EigenGraph v0.1.4 introduces a groundbreaking **FEMA P-58 Next-Generation Seismic Performance Assessment & Probabilistic Loss Engine**, enabling structural engineers, facility owners, and risk analysts to quantify the seismic resilience of buildings in terms of tangible economic and societal metrics: direct repair costs, business interruption downtime, environmental carbon footprint, and collapse/demolition risks in compliance with **FEMA P-58 / ATC-58**, **Arup REDi™ Rating System**, and **ISO 14040/EN 15978**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Component Lognormal Fragility Functions
+- Probability of damage state exceedance:
+  $$P(DS \ge ds | EDP) = \Phi\left(\frac{\ln(EDP / \theta)}{\beta}\right)$$
+  where $\theta$ is the median demand capacity, $\beta$ is the composite lognormal dispersion ($0.35 \le \beta \le 0.45$), and $EDP$ is the Engineering Demand Parameter (Peak Inter-Story Drift Ratio $PIDR$ or Peak Floor Acceleration $PFA$).
+- Extensive standard component library covering ductile RC moment frame connections, metal stud gypsum drywall partitions, silicone glazed curtain wall facades, suspended acoustic ceilings, and seismically braced chilled water MEP piping.
+
+#### 2. Sequential Damage State Partitioning & Consequence Modeling
+- Discrete damage state probability:
+  $$P(DS = i) = P(DS \ge ds_i) - P(DS \ge ds_{i+1})$$
+- Consequence integration across stories:
+  $$C_{\text{repair}} = \sum_{s=1}^N \sum_{c} \sum_i P(DS = i) \cdot \text{Cost}_i \cdot \text{Quantity}_c$$
+
+#### 3. Downtime & Business Interruption (REDi™ Methodology)
+- Critical-path labor synthesis modeling parallel vs serial labor allocation per story:
+  $$T_{\text{downtime}} = \max\left(\frac{\text{Labor Person-Days}}{\text{Max Workers per Story}}\right) \cdot 1.35 + T_{\text{permitting/inspection}}$$
+- Indirect financial exposure: $\text{Loss}_{\text{BI}} = T_{\text{downtime}} \cdot \text{Daily Revenue}$.
+
+#### 4. Post-Earthquake Embodied Carbon Footprint (ISO 14040 / EN 15978)
+- Quantification of greenhouse gas emissions ($\text{kg CO}_2e$) resulting from structural/non-structural component demolition, replacement materials, transport, and site construction.
+
+#### 5. REDi™ Resilience Tier Classification
+- Benchmarks building resilience against international resilience standards:
+  - **REDi™ Platinum**: $\le 7$ days downtime, $\le 5\%$ loss ratio.
+  - **REDi™ Gold**: $\le 30$ days downtime, $\le 10\%$ loss ratio.
+  - **REDi™ Silver**: $\le 60$ days downtime, $\le 20\%$ loss ratio.
+
+---
+
+## 🚀 EigenGraph v0.1.3 — Phase 13: Nonlinear Dynamic Direct Time-History Analysis (NL-THA) Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.3`  
+**Target:** Production Engine
+
+EigenGraph v0.1.3 introduces a state-of-the-art **Nonlinear Dynamic Direct Time-History Analysis (NL-THA) & Ground Motion Record Scaling Engine**, empowering civil and structural earthquake engineers to perform rigorous performance-based seismic engineering and high-rise structural evaluations in full compliance with **ASCE 7-22 Chapter 16 (Nonlinear Response History Analysis)**, **SNI 1726:2019 Pasal 11 (Prosedur Riwayat Respon Linier dan Non-Linier)**, **NIST GCR 17-917-46 / ATC-114**, and **PEER/TBI Guidelines (2017)**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Canonical Ground Motion Suite & Stochastic Wave Generation (§16.2)
+- Built-in canonical earthquake records:
+  - **1994 Northridge (Sylmar Station)**: PGA 0.843g, $T_{5-95} = 12.5\text{ s}$
+  - **1995 Kobe (Takatori Station)**: PGA 0.671g, $T_{5-95} = 14.8\text{ s}$
+  - **1940 El Centro (Array #9)**: PGA 0.348g, $T_{5-95} = 24.2\text{ s}$
+  - **1999 Chi-Chi Taiwan (TCU068)**: PGA 0.512g, $T_{5-95} = 28.6\text{ s}$
+  - **2004 Sumatra Mega-thrust Subduction**: PGA 0.425g, $T_{5-95} = 52.0\text{ s}$
+- Synthetic acceleration wave generator with non-stationary Gamma modulation:
+  $$e(t) = \tau^2 \exp(-2(\tau - 1)), \quad \tau = \frac{t}{t_{peak}}$$
+- Amplitude scaling factor $SF$ per ASCE 7-22 §16.2.3 over the fundamental period spectrum range $[0.2 T_1, 1.5 T_1]$.
+
+#### 2. Hilber-Hughes-Taylor ($\text{HHT}-\alpha$) Implicit Numerical Solver
+- Unconditionally stable second-order accurate time-stepping algorithm with controllable numerical dissipation:
+  $$\mathbf{M} \ddot{\mathbf{u}}_{n+1} + (1 + \alpha) \mathbf{C} \dot{\mathbf{u}}_{n+1} - \alpha \mathbf{C} \dot{\mathbf{u}}_n + (1 + \alpha) \mathbf{f}_s(\mathbf{u}_{n+1}) - \alpha \mathbf{f}_s(\mathbf{u}_n) = \mathbf{p}_{n+1 + \alpha}$$
+  $$\mathbf{u}_{n+1} = \mathbf{u}_n + \Delta t \dot{\mathbf{u}}_n + \Delta t^2 \left[ \left(\frac{1}{2} - \beta\right) \ddot{\mathbf{u}}_n + \beta \ddot{\mathbf{u}}_{n+1} \right]$$
+  $$\dot{\mathbf{u}}_{n+1} = \dot{\mathbf{u}}_n + \Delta t \left[ (1 - \gamma) \ddot{\mathbf{u}}_n + \gamma \ddot{\mathbf{u}}_{n+1} \right]$$
+  with optimal parameters $\alpha = -0.10$, $\beta = \frac{(1 - \alpha)^2}{4} = 0.3025$, and $\gamma = \frac{1 - 2\alpha}{2} = 0.60$.
+
+#### 3. Bouc-Wen Differential Hysteresis Restoring Force Model
+- Smooth nonlinear inelastic yielding formulation:
+  $$f_s(u, z) = \alpha_p k_0 u + (1 - \alpha_p) k_0 u_y z$$
+  $$\dot{z} = \frac{1}{u_y} \left[ A \dot{u} - \beta_w |\dot{u}| |z|^{n-1} z - \gamma_w \dot{u} |z|^n \right]$$
+- Newton-Raphson tangent stiffness solver ensuring rapid quadratic convergence at each sub-increment.
+
+#### 4. Instantaneous Energy Balance Integration & Conservation (ATC-114)
+- Continuous evaluation of five energetic terms:
+  $$E_I(t) = \int_0^t \mathbf{p}_{eff}(\tau) \cdot \dot{\mathbf{u}}(\tau) d\tau$$
+  $$E_K(t) = \frac{1}{2} M \dot{u}^2, \quad E_D(t) = \int_0^t C \dot{u}^2 d\tau, \quad E_S(t) = \frac{1}{2} K_e u^2, \quad E_H(t) = \int_0^t f_{inelastic} d u_{pl}$$
+- Real-time tracking of residual energy balance error $\epsilon_E \le 2.50\%$ verifying numerical stability.
+
+#### 5. Multi-Story Dynamic Envelope Profiles (§16.4)
+- Evaluation of peak inter-story drift ratio $\theta_i$ along structure elevation:
+  $$\theta_i = \frac{u_i - u_{i-1}}{h_i} \le 0.020 \quad (\text{ASCE 7-22 §16.4.1 Limit})$$
+- Verification of minimum dynamic base shear lower bound:
+  $$V_b \ge 0.85 V_{\text{ELF}} \quad (\text{ASCE 7-22 §16.4.2})$$
+
+---
+
+## 🚀 EigenGraph v0.1.2 — Phase 12: Seismic Base Isolation & Energy Dissipation Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.2`  
+**Target:** Production Engine
+
+EigenGraph v0.1.2 introduces a comprehensive **Seismic Base Isolation & Supplementary Energy Dissipation Systems Design Engine**, enabling civil & structural earthquake engineers to analyze, design, and verify base-isolated structures, elastomeric and friction bearings, and viscous damping devices in accordance with **ASCE 7-22 Chapter 17 (Seismic Design of Seismically Isolated Structures)**, **ASCE 7-22 Chapter 18 (Seismic Design of Structures with Damping Systems)**, **SNI 1726:2019 Pasal 12 & 13**, and **FEMA P-1051 Chapter 12**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Lead-Rubber Bearings (LRB) Bilinear Hysteretic Formulation
+- **Characteristic Yield Strength ($Q_d$)**:
+  $$Q_d = \sigma_{pb} \cdot A_{pb}$$
+  where $\sigma_{pb} = 10.2\text{ MPa}$ shear yield stress of lead plug and $A_{pb} = \frac{\pi}{4} d_{pb}^2$.
+- **Post-Yield Stiffness ($k_d$) & Elastic Stiffness ($k_u$)**:
+  $$k_d = \frac{G \cdot A_{bonded}}{T_r}, \quad k_u = 10 \cdot k_d, \quad D_y = \frac{Q_d}{k_u - k_d}$$
+  where $T_r = n_{layers} \cdot t_{layer}$ total bonded rubber thickness.
+- **Haringx Critical Buckling Capacity**:
+  $$P_{cr0} = \sqrt{\frac{1}{3} P_E P_S}, \quad P_{cr}(D_M) = P_{cr0} \left(1 - \frac{D_M}{D_o}\right)$$
+  ensuring stability factor $SF \ge 2.0$ under factored seismic axial demands.
+
+#### 2. Friction Pendulum Systems (FPS)
+- **Restoring Pendulum Kinematics**:
+  $$k_r = \frac{W}{R_{eff}}, \quad K_{eff} = \frac{W}{R_{eff}} + \frac{\mu W}{D}, \quad Q_d = \mu W$$
+- **Natural Isolation Period**:
+  $$T_M = 2\pi \sqrt{\frac{R_{eff}}{g \left(1 + \mu \dfrac{R_{eff}}{D_M}\right)}}$$
+
+#### 3. Fluid Viscous Dampers (FVD) Supplementary Damping
+- **Nonlinear Velocity Power Law**:
+  $$F_D = C \cdot \operatorname{sgn}(\dot{u}) |\dot{u}|^\alpha$$
+  with velocity exponent $0.30 \le \alpha \le 1.0$.
+- **Supplemental Viscous Damping Ratio**:
+  $$\beta_V = \frac{\sum E_{D,j}}{4 \pi E_S}, \quad \beta_{total} = \beta_{inherent} + \beta_V$$
+
+#### 4. MCE_R Iterative Displacement & Accidental Torsion
+- **Maximum Displacement Demand ($D_M$)**:
+  $$D_M = \frac{g S_{M1} T_M}{4 \pi^2 B_M}$$
+- **Total Maximum Displacement ($D_{TM}$)** with accidental eccentricity $e$:
+  $$D_{TM} = D_M \left[ 1 + y \left(\frac{12 e}{b^2 + d^2}\right) \right]$$
+- **Required Seismic Moat Clearance**: $\delta_{\text{moat}} \ge 1.10 D_{TM}$.
+
+#### 5. Interactive Desktop UI Integration
+- **Analyze View Studio (`src/views/analyze.rs`)**: Subtab `AnalyzeSubTab::BaseIsolationDesign` ("🛡️ Base Isolation & Dampers") with 4 KPI cards, parameter sliders, 2D vector CAD blueprint, live force-displacement hysteresis loop canvas, and ASCE 7-22 / SNI 1726 regulatory audit table.
+- **Build View 3D Viewport (`src/views/build.rs`)**: Archetype `ModelArchetype::BaseIsolatedHospital3D` (8-story essential facility with 16 base isolators).
+- **Results View Exporters (`src/views/results.rs`)**: Direct export of `EigenGraph_Seismic_Base_Isolation_Damper_Dossier.md`.
+
+---
+
+## 🚀 EigenGraph v0.1.1 — Phase 11: Special Structural Concrete Shear Walls & Diagonally Reinforced Coupling Beams Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.1`  
+**Target:** Production Engine
+
+EigenGraph v0.1.1 introduces a comprehensive **Reinforced Concrete Special Structural Shear Walls & Diagonally Reinforced Coupling Beams Design Engine**, enabling civil & earthquake engineers to analyze, design, and verify high-rise shear wall cores, boundary elements, and coupling beams in accordance with **ACI 318-19 Chapter 18 (Section 18.10)**, **SNI 2847:2019 Pasal 18.10**, and **NIST GCR 11-917-11 / NEHRP Seismic Design Technical Brief No. 6**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. In-Plane Web Shear Resistance ($V_n$)
+- **Aspect Ratio Factor $\alpha_c$ (ACI §18.10.4.1)**:
+  $$\alpha_c = \begin{cases} 0.25, & \frac{h_w}{l_w} \le 1.5 \\ 0.25 - 0.16\left(\frac{h_w}{l_w} - 1.5\right), & 1.5 < \frac{h_w}{l_w} < 2.0 \\ 0.17, & \frac{h_w}{l_w} \ge 2.0 \end{cases}$$
+- **Nominal Web Shear Strength**:
+  $$V_n = A_{cv} \left( \alpha_c \lambda \sqrt{f'_c} + \rho_t f_y \right) \le 0.83 A_{cv} \sqrt{f'_c}$$
+  with strength reduction factor $\phi = 0.75$, ensuring $\phi V_n \ge V_u$.
+- **Double Curtain Web Reinforcement (ACI §18.10.2.2)**: Automatically enforced whenever $V_u > 0.17 A_{cv} \lambda \sqrt{f'_c}$ or $h_w / l_w \ge 2.0$.
+
+#### 2. Dual Boundary Element Trigger Assessment
+- **Displacement-Based Trigger (ACI §18.10.6.2 / SNI Pasal 18.10.6.2)**:
+  $$c \ge \frac{l_w}{600 \left(\dfrac{\delta_u}{h_w}\right)}$$
+  where $\delta_u / h_w \ge 0.005$ is the design inelastic lateral drift ratio.
+- **Stress-Based Trigger (ACI §18.10.6.3)**:
+  $$\sigma_{\text{comp}} = \frac{P_u}{A_g} + \frac{M_u (l_w/2)}{I_g} \ge 0.20 f'_c$$
+
+#### 3. Special Boundary Element (SBE) Detailing & Confinement
+- **Boundary Extension Length**: $b_E \ge \max\left(c - 0.1 l_w, \; \frac{c}{2}\right)$.
+- **Boundary Thickness**: $b \ge \max\left(t_w, \; \frac{h_u}{16}\right)$ to eliminate out-of-plane lateral buckling.
+- **Transverse Confinement Reinforcement (ACI Table 18.10.6.4(f))**:
+  $$\frac{A_{sh}}{s \cdot b_c} \ge \max\left( 0.3 \left(\frac{A_g}{A_{ch}} - 1\right) \frac{f'_c}{f_{yt}}, \; 0.09 \frac{f'_c}{f_{yt}} \right)$$
+- **Vertical Tie Spacing**: $s_{\max} = \min\left( \frac{b}{3}, \; 6 d_{b,\text{long}}, \; 150\text{ mm} \right)$.
+
+#### 4. Diagonally Reinforced Coupling Beams
+- **Aspect Ratio Regime Classification (ACI §18.10.7)**:
+  - Deep coupling beams ($l_n / h < 2.0$ and $V_u \ge 0.33 \lambda \sqrt{f'_c} b_w d$): Diagonally reinforced X-cages mandatory.
+  - Slender coupling beams ($l_n / h \ge 4.0$): Special moment frame beam detailing.
+- **Diagonal Bar Inclination**: $\alpha = \arctan\left(\frac{h - 2 d'}{l_n}\right)$.
+- **Diagonal Shear Capacity**:
+  $$V_n = 2 A_{vd} f_y \sin\alpha \le 0.83 \sqrt{f'_c} b_w d, \quad \phi V_n = 0.75 V_n \ge V_u$$
+- **Transverse Confinement**: Full hoop cages enclosing each diagonal group ($A_{sh} \ge 0.09 s b_c \frac{f'_c}{f_{yt}}$).
+
+#### 5. Interactive Desktop UI Integration
+- **Analyze View Studio (`src/views/analyze.rs`)**:
+  - Subtab `AnalyzeSubTab::ShearWallDesign` ("🏢 RC Shear Walls & Coupling Beams (ACI 318 / SNI 2847)").
+  - 4 Metric cards, Parameter Studio with interactive sliders, 2D vector CAD canvas, and regulatory compliance audit table.
+- **Build View 3D Viewport (`src/views/build.rs`)**:
+  - New Archetype `ModelArchetype::CoupledShearWallCore3D` with 12-story coupled shear wall tower, vertical wall piers, floor spandrels, and central coupling beams.
+- **Results View Exporters (`src/views/results.rs`)**:
+  - Direct export of `EigenGraph_RC_Shear_Wall_Coupling_Beam_Dossier.md`.
+
+---
+
+## 🚀 EigenGraph v0.1.0 — Phase 10: Prestressed & Post-Tensioned Concrete Design Engine
+**Release Date:** 2026-11-07  
+**Git Tag:** `v0.1.0`  
+**Target:** Production Engine
+
+EigenGraph v0.1.0 delivers a comprehensive **Prestressed & Post-Tensioned Concrete Design Engine**, enabling civil & structural engineers to design, analyze, and verify bonded and unbonded prestressed concrete bridge girders and building beams according to **ACI 318-19 Chapter 24**, **SNI 2847:2019 Pasal 24**, **AASHTO LRFD Section 5**, and the **PCI Design Handbook (8th Edition)**.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Parametric Tendon Profiling & Geometry
+- **Parabolic Continuous Profile**:
+  $$e(x) = e_{mid} - 4(e_{mid} - e_{end})\left(\frac{x}{L} - 0.5\right)^2$$
+- **Harped 2-Point Depressed Profile**: Constant eccentricity $e_{mid}$ between hold-downs at $L/3$ and $2L/3$, tapering linearly to $e_{end}$ at supports.
+- **Equivalent Balancing Load**:
+  $$w_{bal} = \frac{8 P_{eff} (e_{mid} - e_{end})}{L^2}$$
+
+#### 2. Prestress Losses Calculation
+- **Curvature & Wobble Friction Loss**:
+  $$\Delta f_{pF}(x) = f_{pj} \left[1 - \exp\left(-(\mu \alpha + K x)\right)\right]$$
+  where $\mu = 0.20$ (curvature friction) and $K = 0.0015\text{ /m}$ (wobble friction).
+- **Anchorage Seating Slip**:
+  $$\Delta f_{pA} = \frac{\Delta_{anc} E_p}{L_{set}}$$
+- **Concrete Elastic Shortening**:
+  $$\Delta f_{pES} = \frac{N-1}{2N} \frac{E_p}{E_{ci}} f_{cgp} \quad (\text{post-tensioned sequential})$$
+- **Long-Term Time-Dependent Losses**:
+  $$\Delta f_{pCR} = K_{cr} \frac{E_p}{E_c} (f_{cgp} - f_{cds}) \quad (\text{Creep})$$
+  $$\Delta f_{pSH} = 8.2 \times 10^{-6} K_{sh} E_p (1 - 0.06 V/S)(100 - RH) \quad (\text{Shrinkage})$$
+  $$\Delta f_{pRE} = [K_{re} - J(\Delta f_{pSH} + \Delta f_{pCR} + \Delta f_{pES})] C \quad (\text{Steel Relaxation})$$
+
+#### 3. Concrete Extreme Fiber Stresses & Serviceability
+- **Transfer Stage ($P_i + M_{sw}$)**:
+  $$\sigma_{top,i} = -\frac{P_i}{A} + \frac{P_i e}{S_t} - \frac{M_{sw}}{S_t} \le +0.25 \sqrt{f'_{ci}}$$
+  $$\sigma_{bot,i} = -\frac{P_i}{A} - \frac{P_i e}{S_b} + \frac{M_{sw}}{S_b} \ge -0.60 f'_{ci}$$
+- **Service Stage ($P_{eff} + M_{serv}$)**:
+  $$\sigma_{top,s} = -\frac{P_{eff}}{A} + \frac{P_{eff} e}{S_t} - \frac{M_{serv}}{S_t} \ge -0.45 f'_c$$
+  $$\sigma_{bot,s} = -\frac{P_{eff}}{A} - \frac{P_{eff} e}{S_b} + \frac{M_{serv}}{S_b}$$
+- **ACI 318-19 Table 24.5.2.1 Classification**:
+  - Class U (Uncracked): $\sigma_{bot,s} \le 0.62 \sqrt{f'_c}$
+  - Class T (Transition): $0.62 \sqrt{f'_c} < \sigma_{bot,s} \le 1.0 \sqrt{f'_c}$
+  - Class C (Cracked): $\sigma_{bot,s} > 1.0 \sqrt{f'_c}$
+- **Cracking Moment Safety Margin**:
+  $$M_{cr} = S_b \left( f_r + \frac{P_{eff}}{A} + \frac{P_{eff} e}{S_b} \right), \quad \phi M_n \ge 1.2 M_{cr}$$
+
+#### 4. Ultimate Flexural & Shear Capacities
+- **Prestressing Steel Stress $f_{ps}$ at Nominal Strength**:
+  $$f_{ps} = f_{pu} \left[ 1 - \frac{\gamma_p}{\beta_1} \left( \rho_p \frac{f_{pu}}{f'_c} \right) \right]$$
+- **Whitney Compression Block**:
+  $$a = \frac{A_{ps} f_{ps}}{0.85 f'_c b}, \quad M_n = A_{ps} f_{ps} \left( d_p - \frac{a}{2} \right), \quad \phi M_n = 0.90 M_n$$
+- **Concrete Shear Resistance ($V_{ci}$ & $V_{cw}$)**:
+  $$V_{ci} = 0.05 \sqrt{f'_c} b_w d_p + V_d + \frac{V_i M_{cre}}{M_{\max}}, \quad V_{cw} = (0.29 \sqrt{f'_c} + 0.3 f_{pc}) b_w d_p + V_p$$
+  $$V_n = \min(V_{ci}, V_{cw}) + V_s, \quad \phi V_n = 0.75 V_n$$
+
+#### 5. Interactive Desktop UI Integration
+- **Analyze View Studio (`src/views/analyze.rs`)**:
+  - Subtab `AnalyzeSubTab::PrestressedDesign` ("🪢 PT Concrete (ACI 318)").
+  - 4 Metric cards, Parameter Studio with interactive sliders, 2D vector tendon elevation canvas with neutral axis, and regulatory compliance audit table.
+- **Build View 3D Viewport (`src/views/build.rs`)**:
+  - New Archetype `ModelArchetype::PrestressedGirderBridge3D` with precast girders, diaphragms, and 3D internal parabolic tendon curves.
+- **Results View Exporters (`src/views/results.rs`)**:
+  - Direct export of `EigenGraph_Prestressed_Concrete_Dossier.md`.
+
+---
+
+## 🚀 EigenGraph v0.0.9 — Phase 9: Modeling & Advanced Computational Geometry Engine
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.9`  
+**Target:** Production Engine
+
+EigenGraph v0.0.9 introduces comprehensive **Modeling & Advanced Computational Geometry**, equipping structural engineers with an algorithmic spatial structure generator wizard, exact Green's Theorem boundary line integrals for arbitrary 2D cross-sections, duplicate vertex consolidation, and 3D Wavefront OBJ / AutoCAD DXF mesh exporters.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Green's Theorem Arbitrary Cross-Section Integrator
+- **Exact Line Integrals for Closed Polygons**:
+  $$A = \frac{1}{2} \left| \sum_{i=0}^{n-1} (x_i y_{i+1} - x_{i+1} y_i) \right|$$
+  $$\bar{x} = \frac{1}{6A} \sum_{i=0}^{n-1} (x_i + x_{i+1}) (x_i y_{i+1} - x_{i+1} y_i), \quad \bar{y} = \frac{1}{6A} \sum_{i=0}^{n-1} (y_i + y_{i+1}) (x_i y_{i+1} - x_{i+1} y_i)$$
+- **Centroidal Moments of Inertia via Parallel Axis Theorem**:
+  $$I_{xx} = \frac{1}{12} \sum_{i=0}^{n-1} (y_i^2 + y_i y_{i+1} + y_{i+1}^2) (x_i y_{i+1} - x_{i+1} y_i) - A \bar{y}^2$$
+  $$I_{yy} = \frac{1}{12} \sum_{i=0}^{n-1} (x_i^2 + x_i x_{i+1} + x_{i+1}^2) (x_i y_{i+1} - x_{i+1} y_i) - A \bar{x}^2$$
+  $$I_{xy} = \frac{1}{24} \sum_{i=0}^{n-1} (x_i y_{i+1} + 2 x_i y_i + 2 x_{i+1} y_{i+1} + x_{i+1} y_i) (x_i y_{i+1} - x_{i+1} y_i) - A \bar{x} \bar{y}$$
+- **Principal Inertias & Orientation**:
+  $$I_1, I_2 = \frac{I_{xx} + I_{yy}}{2} \pm \sqrt{\left(\frac{I_{xx} - I_{yy}}{2}\right)^2 + I_{xy}^2}, \quad \theta_p = \frac{1}{2} \operatorname{atan2}(-2 I_{xy}, \; I_{xx} - I_{yy})$$
+- Formulates elastic section moduli ($S_x, S_y$), sliced numerical plastic moduli ($Z_x, Z_y$), polar inertia ($J = I_{xx} + I_{yy}$), and Saint-Venant torsional constant ($J_t$).
+
+#### 2. Parametric Spatial Structure Generator Wizard
+- **3D Double-Layer Space Truss (MERO Octet)**:
+  Generates orthogonal two-way top chord grid, bottom chord offset grid, and diagonal pyramidal web braces with perimeter corner pin supports.
+- **3D Geodesic Lattice Dome (Schwedler Dome)**:
+  Generates spherical surface subdivisions with hoop rings, meridional ribs, and diagonal cross-braces converging to the crown apex.
+- **Hyperbolic Paraboloid Ruled Shell (Hypar Inverted Umbrella)**:
+  Generates doubly-curved ruled surfaces ($z = 4c \cdot \xi \cdot \eta$) with orthogonal straight-line timber/steel framework and 4-node quad shell panel meshing.
+- **Multi-Story 3D Tower with Core Walls**:
+  Generates multi-story frame towers with 3D columns, beams, outrigger links, and central concrete shear wall shell panels.
+
+#### 3. Topological Mesh Operations & Cleaners
+- **Distance-Based Node Consolidation**: Eliminates duplicate spatial nodes within tolerance $\varepsilon_{\text{tol}} = 0.05\text{ m}$, remapping beam and shell connectivity.
+- **Certified 3D Exporters**: Wavefront 3D OBJ (`export_to_obj`) and AutoCAD 3D DXF (`export_to_dxf_3d`).
+
+#### 4. Interactive Desktop UI Integration
+- **`SidebarTab::Geometry` ("📐 Geometry & Wizard")**:
+  - Interactive sliders for dimensions, bays, radius, rings, and stories.
+  - Section studio with live 2D CAD vector cross-section preview, centroid reticle, and properties table.
+- **Top Ribbon Preset Selector**: Seamless 1-click switching between spatial archetypes in 360° interactive turntable viewport.
+- **Results View Exporters**: One-click generation of `EigenGraph_Computational_Geometry_Dossier.md` and `EigenGraph_Spatial_Truss.obj`.
+
+---
+
+## 🚀 EigenGraph v0.0.8 — Phase 8: Composite Steel-Concrete Beam & Slab Design per AISC 360-16 / SNI 1729:2020
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.8`  
+**Target:** Production Engine
+
+EigenGraph v0.0.8 introduces comprehensive **Composite Steel-Concrete Beam & Slab Design**, delivering an automated code-compliance and plastic stress distribution engine per AISC 360-16 Chapter I and SNI 1729:2020 Pasal I for composite floor systems, headed shear stud connectors, ribbed metal decks, unshored construction stages, and long-term creep deflections.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Headed Shear Stud Nominal Shear Strength ($Q_n$)
+- **AISC 360-16 Eq. I8-1**:
+  $$Q_n = \min\left(0.5 A_{sa} \sqrt{f'_c E_c}, \; R_g R_p A_{sa} F_u\right)$$
+  where $A_{sa}$ is the stud cross-sectional area ($\frac{\pi d_{sa}^2}{4}$), $f'_c$ is the concrete compressive strength, $E_c = 4700 \sqrt{f'_c}$ (MPa), and $F_u$ is the stud tensile strength (450 MPa for ASTM A108).
+- **Deck Rib Geometry Reduction Factors**:
+  - Perpendicular ribs: $R_g = 1.0$ (single stud per rib) or $0.85$ (multiple studs); $R_p = 0.75$ (for rib height $h_r \le 75\text{ mm}$ with $e_{mid-ht} \ge 50\text{ mm}$).
+  - Parallel ribs: $R_g = 1.0, R_p = 0.75$.
+  - Flat solid slab: $R_g = 1.0, R_p = 1.0$.
+
+#### 2. Effective Slab Flange Width ($b_{\text{eff}}$) & Concrete Compression
+- **AISC 360-16 Section I3.1.1**:
+  $$b_{\text{eff}} = \min\left(\frac{L}{4}, \; S\right)$$
+  where $L$ is the beam span and $S$ is the center-to-center beam spacing.
+- **Maximum Concrete Compression Capacity**:
+  $$C_{\text{max}} = 0.85 f'_c b_{\text{eff}} t_c$$
+  where $t_c$ is the slab cover thickness above the metal deck ribs.
+
+#### 3. Plastic Neutral Axis (PNA) Tracking & Flexural Resistance ($\phi M_n$)
+- Total horizontal shear transfer $V' = \min(T_s, C_{\text{max}}, \sum Q_n)$, where $T_s = A_s F_y$.
+- Plastic stress distribution evaluates three distinct equilibrium regimes:
+  - **Case 1 (PNA in concrete slab)**: When $\sum Q_n \ge T_s$ and $a = \frac{T_s}{0.85 f'_c b_{\text{eff}}} \le t_c$.
+    $$M_n = T_s \left( \frac{d}{2} + h_r + t_c - \frac{a}{2} \right)$$
+  - **Case 2 (PNA in top steel flange)**: When $C_c < T_s$ but $C_c + 2 F_y b_f t_f \ge T_s$.
+    $$y_p = \frac{T_s - C_c}{2 F_y b_f}, \quad M_n = C_c y_{c} + M_{\text{steel, PNA}}$$
+  - **Case 3 (PNA in steel web)**: When PNA descends into the web.
+    $$y_w = \frac{T_s - C_c - 2 F_y b_f t_f}{2 F_y t_w}, \quad M_n = C_c y_c + M_{\text{steel, PNA}}$$
+- LRFD flexural design strength: $\phi M_n = 0.90 M_n$.
+
+#### 4. Minimum Composite Action Verification
+- AISC 360-16 requires at least 25% composite action:
+  $$\text{Degree of Composite Action} = \frac{\sum Q_n}{C_{\text{max}}} \times 100\% \ge 25\%$$
+  Prevents excessive slip and ductility loss at steel-concrete interface.
+
+#### 5. Unshored Construction Stage Stability
+- Evaluates wet concrete dead load ($w_{\text{conc}} = 24\text{ kN/m}^3 \times [t_c + 0.5 h_r] \times S$) + construction live load ($1.0\text{ kPa}$).
+- Verifies bare steel section capacity $\phi M_n \ge M_{u,\text{const}}$ to prevent lateral-torsional or plastic failure during pouring prior to concrete curing.
+
+#### 6. Lower-Bound Effective Moment of Inertia ($I_{\text{eff}}$) & Creep Deflection
+- **AISC 360-16 Commentary Eq. C-I3-1**:
+  $$I_{\text{eff}} = I_s + \sqrt{\frac{\sum Q_n}{C_{\text{max}}}} \left(I_{\text{tr}} - I_s\right)$$
+  where $I_s$ is bare steel moment of inertia and $I_{\text{tr}}$ is elastic transformed section inertia.
+- Serviceability checks:
+  - Immediate live load deflection: $\Delta_{\text{LL}} = \frac{5 w_{\text{LL}} L^4}{384 E_s I_{\text{eff}}} \le \frac{L}{360}$.
+  - Total sustained deflection including concrete creep ($k_{\text{creep}} = 1.35$): $\Delta_{\text{total}} \le \frac{L}{240}$.
+
+#### 7. Interactive Analyze View Studio & Dossier Export
+- **Sub-Tab `🥞 AISC Composite`**:
+  - Real-time parameter controls for span, beam spacing, wide flange section, slab thickness, deck ribs, shear studs, and loads.
+  - Dual vector graphics rendering 2D cross-section detailing (hatch, ribs, studs, W-beam, PNA elevation) + plastic stress block diagram and deflection gauge.
+  - Limit states verification table with DCR indicators.
+- **Export Action**: One-click generation of `AISC360_Composite_Beam_Audit.md` in Results View.
+
+---
+
+## 🚀 EigenGraph v0.0.7 — Phase 7: Wind Engineering & Computational Aero-Dynamics per ASCE 7-22 / SNI 1727:2020
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.7`  
+**Target:** Production Engine
+
+EigenGraph v0.0.7 introduces comprehensive **Wind Engineering & Computational Aero-Dynamics**, delivering an automated code-compliance and aero-elastic engine per ASCE 7-22 Chapters 26–31 and SNI 1727:2020 for Main Wind Force Resisting Systems (MWFRS), dynamic gust effect factors ($G_f$), along-wind / cross-wind vortex shedding acceleration for human comfort (ISO 10137), and wind vs. seismic governing envelope audits.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Terrain Profiles & Velocity Pressure Profiles ($q_z$)
+- **Terrain Exposure Categories**: Implemented Exposure B (urban/suburban $z_g = 365.76\text{ m}, \alpha = 7.0$), Exposure C (open grassland $z_g = 274.32\text{ m}, \alpha = 9.5$), and Exposure D (unobstructed coastal $z_g = 213.36\text{ m}, \alpha = 11.5$).
+- **Exposure Coefficient $K_z$ & Velocity Pressure $q_z$**:
+  $$K_z = 2.01 \left( \frac{\max(z, 4.5)}{z_g} \right)^{2/\alpha}, \quad q_z = 0.613 K_z K_{zt} K_d K_e V^2 \; (\text{Pa})$$
+- Evaluates directional wind pressure factoring wind directionality $K_d = 0.85$, topographic factor $K_{zt}$, and ground elevation factor $K_e$.
+
+#### 2. Dynamic Gust Effect Factor ($G_f$) for Flexible High-Rise Structures
+- **Background Response Factor ($Q$) & Resonant Factor ($R$)**:
+  $$Q = \sqrt{ \frac{1}{1 + 0.63 \left( \frac{B + h}{L_{\bar{z}}} \right)^{0.63}} }, \quad R = \sqrt{ \frac{1}{\beta} R_n R_h R_b (0.53 + 0.47 R_L) }$$
+- Unified formulation automatically switching between rigid structures ($G = 0.85$ for $f_1 \ge 1\text{ Hz}$) and flexible resonant high-rises ($f_1 < 1\text{ Hz}$) per ASCE 7-22 Section 26.11.
+
+#### 3. MWFRS Directional Procedure & Multi-Story Shear Aggregation
+- **Windward & Leeward Pressures**:
+  $$p_{\text{windward}} = q_z G C_p \; (C_p = 0.80), \quad p_{\text{leeward}} = q_h G C_p \; (C_p = -0.50 \text{ to } -0.30)$$
+- **Enclosure Internal Pressure**: Incorporates $GC_{pi} = \pm 0.18$ (Enclosed) and $\pm 0.55$ (Partially Enclosed).
+- **Story Force & Overturning Moment**:
+  $$F_i = p_{\text{net}, i} \cdot A_{\text{trib}, i}, \quad V_w(z) = \sum_{j=i}^{N} F_j, \quad M_{\text{OTM}} = \sum_{i=1}^{N} F_i z_i$$
+
+#### 4. Human Occupant Dynamic Comfort (ISO 10137 / ASCE 7-22 CC)
+- **Along-Wind Acceleration**: Peak acceleration $a_{\text{along}}$ formulated from background and resonant energy under 10-year MRI wind.
+- **Cross-Wind Vortex Shedding**: Evaluates vortex shedding dynamic acceleration based on reduced velocity $V_r = \frac{V}{f_1 B}$.
+- **Comfort Verification**: Compares resultant building top acceleration $a_{\text{res}} = \sqrt{a_{\text{along}}^2 + a_{\text{cross}}^2}$ against the ISO 10137 residential/commercial comfort threshold of $20\text{ milli-g}$.
+
+#### 5. Interactive Desktop UI & Official Dossier Export
+- **Sub-Tab `🌪️ ASCE 7 Wind`**: Dual-vector visualizer rendering elevation velocity pressure profiles, building silhouette, and dynamic comfort acceleration gauges.
+- **Wind Engineering Dossier**: One-click generation of `ASCE7_Wind_Engineering_Dossier.md` via Results View export suite.
+
+---
+
+## 🚀 EigenGraph v0.0.6 — Phase 6: Steel Connection Design & AISC 360-16 / SNI 1729:2020 Limit States Engine
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.6`  
+**Target:** Production Engine
+
+EigenGraph v0.0.6 introduces comprehensive **Structural Steel Connection Design & Limit States Verification**, providing automated code compliance checks per AISC 360-16 / AISC 360-22, SNI 1729:2020, and AISC 358-16 / SNI 7860:2020 for moment and shear connections.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. AISC 360-16 & SNI 1729:2020 Limit States Suite
+- **High-Strength Bolt Shear Rupture**: Sizing for ASTM A325-N/X, ASTM A490-N/X, and ISO Class 8.8 / 10.9 fasteners per Table J3.2 ($\phi R_n = \phi \cdot n_b \cdot F_{nv} A_b$).
+- **Bolt Bearing & Tearout (Section J3.10)**: Clear edge distance $l_c$ tracking with governing limit $R_n = \min(1.2 l_c t F_u, 2.4 d_b t F_u)$ ($\phi = 0.75$).
+- **Block Shear Rupture (Section J4.3 / SNI 1729 Section J4.3)**:
+  $$R_n = \min \left( 0.60 F_u A_{nv} + U_{bs} F_u A_{nt}, \; 0.60 F_y A_{gv} + U_{bs} F_u A_{nt} \right) \quad (\phi = 0.75, \; U_{bs} = 1.0)$$
+- **Plate Gross Shear Yielding & Net Shear Rupture**: Gross yield ($\phi R_n = 1.0 \cdot 0.60 F_y A_g$) and net fracture ($\phi R_n = 0.75 \cdot 0.60 F_u A_{nv}$).
+- **Double Fillet Weld Shear Resistance**: Weld throat $t_e = 0.707 w$ with E70XX filler metal ($R_n = 0.60 F_{EXX} A_{we}$).
+
+#### 2. AISC 358-16 4E Extended End-Plate Moment Connection
+- **Yield-Line Mechanism**:
+  $$Y_p = \frac{b_p}{2} \left[ h_1 \left(\frac{1}{p_{fi}} + \frac{1}{s}\right) + h_0 \left(\frac{1}{p_{fo}}\right) \right] + \frac{2}{g} \left[ h_1 (p_{fi} + s) + h_0 p_{fo} \right]$$
+- **Flexural Moment Capacity**: $\phi M_n = \phi_b F_{yp} t_p^2 Y_p$ ($\phi_b = 0.90$).
+- **Flange Tension Bolt Group**: Evaluates tension demands across 4 critical bolts with prying action checks.
+
+#### 3. Column Panel Zone & Stiffener Audit (AISC 360 Section J10)
+- **Panel Zone Shear Capacity**:
+  $$R_n = 0.60 F_y d_c t_w \left[ 1 + \frac{3 b_{cf} t_{cf}^2}{d_b d_c t_w} \right] \quad (\phi = 0.90)$$
+- **Web Doubler Plate Sizing**: Automatically computes required doubler plate thickness $t_{\text{doubler}} = \frac{V_{pz} - \phi R_n}{0.60 \phi F_y d_c}$.
+- **Web Local Yielding & Crippling**: Sizes column web against concentrated flange forces, triggering transverse continuity plate warnings when required.
+
+#### 4. Interactive Desktop UI & Official Dossier Export
+- **Sub-Tab `🔩 Steel Connections`**: Features interactive 2D CAD elevation blueprint with column, beam, end-plate, weld beads, and bolt group circles, alongside an AISC limit state DCR bar chart.
+- **Audit Dossier Export**: One-click generation of `AISC360_Steel_Connection_Audit.md` via the Results View export suite.
+
+---
+
+## 🚀 EigenGraph v0.0.5 — Phase 5: Geotechnical Engineering, Deep Foundations & Soil-Structure Interaction (SSI)
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.5`  
+**Target:** Production Engine
+
+EigenGraph v0.0.5 introduces full-stack **Geotechnical Engineering, Deep Foundation Analytics, and Dynamic Soil-Structure Interaction (SSI)**, bridging the critical gap between super-structure structural analysis and sub-structure soil foundations in accordance with SNI 2847:2019, SNI 1726:2019, ACI 318-19, and ASCE 7-22 Chapter 19.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Winkler Subgrade Reaction & 6-DOF Foundation Spring Matrix
+- **Bowles / Vesic Elastic Formulation**: Converts soil stratigraphy subgrade modulus $k_s$ into equivalent 6-DOF uncoupled spring stiffnesses for spread footings and mat foundations:
+  - Vertical translation: $K_z = k_s \cdot B \cdot L$ (kN/m)
+  - Horizontal shear translation: $K_x = K_y = 0.82 \cdot K_z$ (kN/m)
+  - Rocking rotation about primary axes: $K_{\theta x} = k_s \cdot \frac{B \cdot L^3}{12}$, $K_{\theta y} = k_s \cdot \frac{L \cdot B^3}{12}$ (kNm/rad)
+  - Torsional rotation about vertical axis: $K_{\theta z} = 0.65 \cdot k_s \cdot (I_x + I_y)$ (kNm/rad)
+- **Soil Stratum Library**: Pre-configured parameters for 7 geotechnical profiles (Dense Sand, Medium Sand, Loose Sand, Stiff Clay, Medium Clay, Soft Clay, Bedrock).
+
+#### 2. Deep Foundation Pile Group Converse-Labarre Efficiency & Biaxial Distribution
+- **Converse-Labarre Group Efficiency ($E_g$)**:
+  $$E_g = 1 - \theta \cdot \frac{(n_x - 1)n_y + (n_y - 1)n_x}{90 \cdot n_x \cdot n_y}, \quad \text{where } \theta = \arctan(d / s)$$
+- **Biaxial Eccentric Load Distribution**: Calculates individual pile vertical reaction forces $P_i$ under combined axial load $P_u$ and moments $M_{ux}, M_{uy}$:
+  $$P_i = \frac{P_u}{N} \pm \frac{M_{uy} \cdot x_i}{\sum x^2} \pm \frac{M_{ux} \cdot y_i}{\sum y^2}$$
+- **Individual Pile Capacity & Deflection**: Verifies compressive, tensile uplift, and lateral shear head deflection $\delta_{\text{lat}}$ for every pile in the group.
+
+#### 3. Two-Way Concrete Punching Shear Audit (SNI 2847:2019 / ACI 318-19 Section 22.6)
+- **Critical Perimeter ($b_o$)**: Evaluated at distance $d/2$ from column face ($b_o = 2(c_1 + d) + 2(c_2 + d)$).
+- **Nominal Concrete Shear Capacity ($V_c$)**:
+  $$V_c = \min \left\{ 0.33 \sqrt{f'_c}, \; 0.17 \left(1 + \frac{2}{\beta}\right) \sqrt{f'_c}, \; 0.083 \left(2 + \frac{\alpha_s d}{b_o}\right) \sqrt{f'_c} \right\} \cdot b_o d$$
+- **Unbalanced Moment Transfer**: Integrates polar moment of inertia $J_c$ and eccentric shear stress fraction $\gamma_v = 1 - \gamma_f$ into total factored shear stress $\nu_u$.
+
+#### 4. Veletsos & Meek Dynamic Soil-Structure Interaction (SSI)
+- **Modal Period Lengthening**:
+  $$\left(\frac{\tilde{T}}{T}\right)^2 = 1 + \frac{K_{\text{fixed}}}{K_h} + \frac{K_{\text{fixed}} h^2}{K_r}$$
+- **ASCE 7-22 Chapter 19 Damping & Base Shear Reduction**: Accounts for radiation and hysteretic soil damping $\beta_{\text{ssi}}$ to reduce design seismic base shear while verifying lateral drift amplification.
+
+#### 5. Interactive Desktop UI & Official Dossier Export
+- **Sub-Tab `🌱 Geotech & SSI`**: Interactive dual visualizer rendering the 2D pile cap layout with axial stress gradients alongside the critical punching shear perimeter.
+- **Audit Dossier Export**: Generates `Geotechnical_SSI_Foundation_Audit.md` directly via the export button in the Results pillar.
+
+---
+
+## 🚀 EigenGraph v0.0.4 — Phase 4: Advanced Seismic & Pushover Analysis (ASCE 41-17 / ATC-40)
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.4`  
+**Target:** Production Engine
+
+EigenGraph v0.0.4 introduces the **Non-Linear Static Pushover Engine & Capacity Spectrum Method (CSM / ATC-40)**, enabling structural engineers to conduct Performance-Based Earthquake Engineering (PBEE) assessments in accordance with ASCE 41-17, FEMA 356, and SNI 1726:2019.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. Capacity Spectrum Method (CSM / ATC-40) in ADRS Space
+- **ADRS Coordinate Transformation**: Converts traditional Pushover curve coordinates $(D_{\text{roof}}, V_b)$ into Acceleration-Displacement Response Spectrum ($ADRS$) spectral coordinates $(S_d, S_a)$:
+  $$S_d = \frac{D_{\text{roof}}}{\Gamma_1 \cdot \phi_{\text{roof}, 1}}, \quad S_a = \frac{V_b / W}{\alpha_1}$$
+  where $\Gamma_1$ is the first-mode participation factor and $\alpha_1$ is the effective modal mass coefficient.
+- **Inelastic Damping Reduction**: Derives equivalent hysteretic viscous damping:
+  $$\beta_{\text{eff}} = \beta_0 + \kappa \cdot \frac{2}{\pi} \frac{A_y D_p - D_y A_p}{A_p D_p}$$
+  with spectral damping reduction factors $SR_A = \frac{3.21 - 0.68 \ln(\beta_{\text{eff}})}{2.12}$ and $SR_V = \frac{2.31 - 0.41 \ln(\beta_{\text{eff}})}{1.65}$.
+- **Performance Point Convergence**: Uses iterative ATC-40 Procedure A to locate the intersecting Performance Point $P^*(S_d^*, S_a^*)$, determining target roof drift $D_t$, target base shear $V_t$, and secant period $T_{\text{eff}}$.
+
+#### 2. Performance-Based Earthquake Engineering (PBEE) Classification
+- Evaluates the structural system against ASCE 41-17 Table 9-6 / FEMA 356 performance levels:
+  - `ImmediateOccupancy` (IO): Minor micro-yielding, no residual drift, immediate re-entry.
+  - `LifeSafety` (LS): Controlled plastification, wide collapse margin under Design Basis Earthquake (DBE).
+  - `CollapsePrevention` (CP): Severe structural damage, prevents global collapse under Maximum Considered Earthquake (MCE).
+  - `CollapseExceeded`: Demand exceeds inelastic capacity limit, indicating structural collapse risk.
+- Tallies plastic hinge performance states (Elastic, IO, LS, CP, Mechanism) across all frame members.
+
+#### 3. Dual Vector Visualization in Desktop UI
+- Side-by-side interactive vector plots:
+  - **Plot 1**: Base Shear vs Roof Drift capacity curve with target displacement $D_t$ reticle indicator.
+  - **Plot 2**: ADRS Capacity-Demand Spectrum showing Elastic 5% Demand (red dashed), Inelastic Reduced Demand (amber), Capacity Spectrum (emerald green), and intersecting Performance Point $P^*(S_d^*, S_a^*)$.
+- Dynamic toolbar controls for Lateral Load Patterns (`FirstModeModal`, `UniformMass`, `InvertedTriangular`) and Soil Site Classes (SB, SC, SD, SE).
+
+---
+
+## 🚀 EigenGraph v0.0.3 — Phase 3: Core Upgrade (Shell FEA, P-Delta & IFC4 SAM)
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.3`  
+**Target:** Production Engine
+
+EigenGraph v0.0.3 delivers three critical core upgrades: Mindlin-Reissner 2D shell quad elements for shear walls and slabs, second-order geometric non-linearity ($P-\Delta$ and $P-\delta$) with tangent stiffness formulation, and certified OpenBIM IFC4 / IFC4.3 Structural Analysis Model export.
+
+### 🌟 Key Features & Mathematical Formulation
+
+#### 1. 2D Mindlin-Reissner Flat Shell / Plate Finite Elements (`ShellElement4N`)
+- **4-Node Isoparametric Quadrilateral Shell**: Designed for reinforced concrete shear walls (*dinding geser*) and structural diaphragms/slabs.
+- **Combined 24-DOF Element**:
+  - In-plane membrane behavior ($u, v$ displacements).
+  - Out-of-plane Mindlin-Reissner plate bending ($w, \theta_x, \theta_y$ rotations) incorporating transverse shear deformation.
+  - Drilling degree of freedom ($\theta_z$) to eliminate numerical singularities when connecting non-coplanar elements.
+- **Numerical Integration**: $2 \times 2$ Gauss-Legendre quadrature for exact stiffness evaluation.
+- **Automatic Classification**: Classifies vertical elements (`is_shear_wall`) and computes shell surface areas.
+
+#### 2. Second-Order Geometric Non-Linearity $P-\Delta$ & $P-\delta$ Solver (`SecondOrderStabilitySolver`)
+- **Geometric Stiffness Matrix $\mathbf{K}_g(\mathbf{P})$**: Accounts for compressive softening and tensile stiffening under axial force vectors $\mathbf{P}$.
+- **Tangent Stiffness Formulation**:
+  $$\mathbf{K}_t = \mathbf{K}_e - \mathbf{K}_g(\mathbf{P})$$
+- **Euler Elastic Critical Buckling Load**:
+  $$P_{\text{cr}} = \frac{\pi^2 E I}{(K L)^2}$$
+- **AISC 360-16 / 360-22 $B_1$ Moment Amplification Factor**:
+  $$B_1 = \frac{C_m}{1 - P_u / P_{e1}} \ge 1.0$$
+- **ASCE 7-22 Section 12.8.7 Story Drift Stability Coefficient**:
+  $$\theta = \frac{P_x \Delta I_e}{V_x h_{sx} C_d} \le \theta_{\max} = \frac{0.50}{\beta C_d} \le 0.25$$
+- **Automated Instability Diagnostics**: Categorizes stability as `StableLinear`, `PDeltaAmplified`, `CriticalBucklingRisk`, or `DynamicPDeltaInstability`.
+
+#### 3. OpenBIM IFC4 / IFC4.3 Structural Analysis Model Exporter (`IfcSamExporter`)
+- **ISO 16739-1 Compliant Output**: Zero-dependency `.ifc` step-physical text generation.
+- **Schema Entities**:
+  - `IFCSTRUCTURALANALYSISMODEL`
+  - `IFCSTRUCTURALCURVEMEMBER` (linear framing: beams, columns, bracings with local axes)
+  - `IFCSTRUCTURALSURFACEMEMBER` (2D planar elements: shear walls, floor slabs)
+  - `IFCSTRUCTURALPOINTCONNECTION` (nodes with full 6-DOF elastic/rigid boundary conditions)
+  - `IFCMATERIAL` (structural concrete and structural steel)
+- **Multi-BIM Interoperability**: Seamlessly imported by Autodesk Revit Structure, Tekla Structures, ArchiCAD, BlenderBIM, and Solibri.
+
+---
+
+## ⚡ EigenGraph v0.0.2 — Phase 2: Quick Wins (ETABS Interop, PBG/SIMBG & Rebar BBS)
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.2`  
+**Target:** Production Engine
+
+EigenGraph v0.0.2 introduces critical interoperability and compliance automation: bidirectional CSI ETABS `.e2k` translation, Indonesian municipal PBG/SIMBG calculation dossier generation per PP 16/2021 & SNI 1726/2847, and automated Bar Bending Schedules (BBS) per SNI 2847:2019 Pasal 25.3.
+
+### 🌟 Key Features & Engineering Formulations
+
+#### 1. CSI ETABS `.e2k` Native Importer & Exporter (`EtabsE2kExporter`, `EtabsE2kImporter`)
+- Complete bidirectional exchange with CSI ETABS text definition files (`.e2k` / `.$et`).
+- Serializes and parses `PROGRAM INFORMATION`, `STORIES`, `GRIDS`, `POINT COORDINATES`, `FRAME SECTIONS`, `LINE OBJECTS`, and point/line structural loads.
+- Allows structural engineers to migrate models seamlessly between ETABS v18–v21 and EigenGraph.
+
+#### 2. Indonesian Municipal PBG/SIMBG Technical Calculation Dossier (`PbgReportGenerator`, `PbgProjectMetadata`)
+- Automated generation of structural calculation reports (*Dokumen Perhitungan Teknis Struktur*) tailored for the Indonesian Ministry of Public Works and Public Housing (PUPR) SIMBG portal under Government Regulation PP No. 16 Tahun 2021.
+- **Automated Code Compliance Checks**:
+  - **SNI 1726:2019**: Inelastic drift limit $\Delta_a = 0.020 h_{sx} / \rho$, P-Delta stability coefficients, modal mass participation ratio $\ge 90\%$.
+  - **SNI 2847:2019**: Strength reduction factors ($\phi = 0.90$ flexure, $\phi = 0.75$ shear/torsion, $\phi = 0.65$ tied axial compression), and Strong-Column Weak-Beam flexural capacity ratio $\sum M_{nc} / \sum M_{nb} \ge 1.20$.
+  - **SNI 1727:2020**: Minimum design loads for buildings.
+- Formatted in publication-ready Markdown/PDF with engineering stamp seals, SKA/SKK Utama certification, and project registration metadata.
+
+#### 3. Automated Bar Bending Schedule (BBS) & Rebar Detailing (`RebarBbsDetailer`, `RebarBbsSchedule`)
+- Complies with SNI 2847:2019 Pasal 25.3 / ACI 318-19 Chapter 25.
+- Supports deformed rebar grades BJTS 420B (D10, D13, D16, D19, D22, D25) with exact unit weights per meter ($w = 0.006165 \times d_b^2 \text{ kg/m}$).
+- Calculates development length ($l_d$), seismic standard hooks ($135^\circ$ with $6d_b \ge 75\text{ mm}$ extension), lap splice lengths ($1.3 l_d$ Class B), and total rebar tonnage including scrap allowance.
+- Exports tabular CSV for procurement, cost estimation (BoQ), and fabrication shops.
+
+---
+
+## 🏛️ EigenGraph v0.0.1 — Phase 1: Structural Mechanics & Non-Linear Core Engine
+**Release Date:** 2026-11-06  
+**Git Tag:** `v0.0.1`  
+**Target:** Initial Release
+
+- **Non-Linear Sherman-Morrison & Woodbury Redistribution Engine (`core::nonlinear`)**:
+  - Rank-1 matrix perturbation solver computing exact redistribution vector $\Delta \mathbf{N}$ without full stiffness inversion $\mathcal{O}(N^3) \to \mathcal{O}(N^2)$.
+  - Redundancy Reserve Ratio ($RRR(\lambda)$) tracking progressive plastic hinge formation.
+- **3D Biaxial P-M-M Concrete Interaction Surface (`core::concrete`)**:
+  - Bresler reciprocal load method and PCA load contour formulation per SNI 2847:2019 and ACI 318-19.
+  - Capacity ratio checks across axial-flexural limit states.
+- **CQC and SRSS Modal Dynamic Response Combination (`core::modal`)**:
+  - Complete Quadratic Combination with Der Kiureghian cross-modal correlation coefficients $\rho_{ij}$ accounting for closely spaced modal frequencies.
+  - 85% static base shear minimum scaling per SNI 1726:2019 Pasal 7.9.4.1.
+- **Linear High-Performance Solvers**:
+  - Sparse Cholesky $\mathbf{L}\mathbf{L}^T$ and Preconditioned Conjugate Gradient (PCG) in Compressed Sparse Row (CSR) format.
+- **Vector Blueprint Exporter**:
+  - Direct CAD-to-Vector generator exporting architectural and structural sheets to SVG and vector PDF.

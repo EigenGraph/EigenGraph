@@ -1,7 +1,9 @@
-name: Deploy GitHub Pages
+name: Build & Deploy EigenGraph Web App (GitHub Pages)
 
 on:
   push:
+    branches: ["main"]
+  pull_request:
     branches: ["main"]
   workflow_dispatch:
 
@@ -14,21 +16,90 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  deploy:
+  test:
+    name: Rust Unit Tests & WASM Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain & wasm32 Target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install Linux System Libraries for Native Tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config build-essential libgl1-mesa-dev libegl1-mesa-dev \
+            libxkbcommon-dev libx11-dev libxi-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libwayland-dev libgtk-3-dev libfontconfig1-dev libfreetype6-dev
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-v1-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-v1-
+
+      - name: Run Unit Test Suite
+        run: cargo test --lib
+
+      - name: Verify WebAssembly Compilation
+        run: cargo check --bin eigengraph --target wasm32-unknown-unknown
+
+  build-and-deploy:
+    name: Build Trunk WASM & Deploy GitHub Pages
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain & wasm32 Target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-wasm-v1-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-v1-
+
+      - name: Install Trunk
+        uses: jetli/trunk-action@v0.5.1
+
       - name: Setup Pages
+        id: pages
         uses: actions/configure-pages@v5
-      - name: Upload artifact
+
+      - name: Build EigenGraph WebAssembly App
+        run: trunk build --release --public-url "${{ steps.pages.outputs.base_path }}/"
+
+      - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: 'dist'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

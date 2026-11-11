@@ -1,0 +1,26 @@
+# Rust & Trunk build artifacts
+/target/
+/dist/
+**/*.rs.bk
+
+# macOS system & Finder files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Disk images & temporary staging
+*.dmg
+*.app/
+EigenGraph.app/
+InternalVault/
+dmg_staging/
+/tmp/
+
+# IDE & Editor caches
+.idea/
+.vscode/
+*.swp
+*~
+.gemini/
