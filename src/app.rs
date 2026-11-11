@@ -513,9 +513,11 @@ impl App for EigenGraphApp {
             self.sidebar_open = !is_compact;
             self.layout_initialized = true;
             self.last_compact_layout = is_compact;
+            ctx.request_repaint();
         } else if is_compact != self.last_compact_layout {
             self.sidebar_open = !is_compact;
             self.last_compact_layout = is_compact;
+            ctx.request_repaint();
         }
 
         // 1. DOCKED SIDEBAR ON DESKTOP (>= 960px WHEN OPEN)

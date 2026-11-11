@@ -9,6 +9,9 @@ pub struct AiAssistantView {
     pub expanded: bool,
     pub chat_history: Vec<ChatMessage>,
     pub input: String,
+    last_vp_width: f32,
+    last_expanded: bool,
+    last_offset_x: f32,
 }
 
 impl Default for AiAssistantView {
@@ -24,6 +27,9 @@ impl Default for AiAssistantView {
                 }
             ],
             input: String::new(),
+            last_vp_width: 0.0,
+            last_expanded: false,
+            last_offset_x: 0.0,
         }
     }
 }
@@ -56,8 +62,24 @@ impl AiAssistantView {
             sidebar_offset_x
         };
 
+        // Re-run an invisible sizing pass whenever viewport width, expanded state, or sidebar offset changes
+        // so egui's anchored Area never positions using a stale wide desktop rect after shrinking to mobile.
+        let needs_sizing = (vp.x - self.last_vp_width).abs() > 1.0
+            || self.expanded != self.last_expanded
+            || (offset_x - self.last_offset_x).abs() > 1.0;
+        if needs_sizing {
+            self.last_vp_width = vp.x;
+            self.last_expanded = self.expanded;
+            self.last_offset_x = offset_x;
+            ctx.request_repaint();
+        }
+
         Area::new(Id::new("global_floating_dynamic_island"))
             .anchor(Align2::CENTER_BOTTOM, Vec2::new(offset_x, -12.0))
+            .default_size(Vec2::new((vp.x - 24.0).clamp(240.0, 560.0), 42.0))
+            .constrain(true)
+            .fade_in(false)
+            .sizing_pass(needs_sizing)
             .show(ctx, |ui| {
                 if self.expanded {
                     self.render_expanded(ui, theme, active_pillar, members, projects, db_components, vp);
