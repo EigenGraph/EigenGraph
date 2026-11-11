@@ -1,9 +1,9 @@
-# Website Agent Guidelines & Architectural Rules
+# EigenGraph Web Agent Guidelines & Architectural Rules
 
 ## 🌐 MANDATORY ENGLISH CONSISTENCY FOR ALL GITHUB INPUTS & CONTRIBUTIONS
 
 - **Strict English-Only Policy**:
-  - All content committed or pushed to GitHub for `Website` **MUST BE EXCLUSIVELY WRITTEN IN PROFESSIONAL CIVIL & STRUCTURAL ENGINEERING ENGLISH**.
+  - All content committed or pushed to GitHub for `EigenGraph` **MUST BE EXCLUSIVELY WRITTEN IN PROFESSIONAL CIVIL & STRUCTURAL ENGINEERING ENGLISH**.
 - **Automatic Language Conversion**:
   - If a user prompt, issue, task description, or feedback is submitted in Indonesian (or any language other than English), agents **must automatically translate and adapt** all resulting code, comments, documentation, UI labels, and commit messages into standard English before staging, committing, or pushing to GitHub.
 - **Enforced Scope**:
@@ -14,43 +14,45 @@
 
 ---
 
-## 🔒 CORE RULE: LOCKED SIDEBAR & SLIDE-MODEL WORKSPACE FREEDOM
+## 📱 RESPONSIVE WEB-FIRST UI & FLEXIBLE NAVIGATION ARCHITECTURE
 
-### 1. 🛡️ Absolute Locked Sidebar Layout (Until Explicit Instructions):
-The Left Sidebar Layout (`src/app.rs`) and macOS-inspired Window Chrome are **STRICTLY LOCKED AND MUST NOT BE MODIFIED** unless the user explicitly provides written instructions (e.g., `CHANGE_SIDEBAR:` or `CHANGE_UI:`).
+### 1. Flexible Layout Across Phone, Tablet, and Desktop:
+- **No Rigid Sidebar or Chrome Locks**: `src/app.rs` and `src/views/` are **NOT** locked to a fixed sidebar width, permanent desktop sidebar, or macOS window chrome.
+- **Responsive Viewport Adaptation**: All navigation, toolbars, panels, floating overlays, and modals must adapt smoothly across **Mobile (`< 640px`)**, **Tablet (`640px – 960px`)**, and **Desktop (`>= 960px`)** screens:
+  - Sidebars must be **collapsible/toggleable** and behave as an **overlay drawer** (or compact navigation) on phones and narrow tablets so the main workspace retains full usable width.
+  - Multi-column inspectors and canvas pairs must stack vertically or wrap cleanly on narrow viewports rather than forcing fixed pixel minimums that clip horizontally.
+  - Action bars, ribbons, and badges must wrap (`horizontal_wrapped`) or scroll cleanly without overlapping text.
+  - Modals and floating overlays (`egui::Window`, `Area`, AI Copilot) must clamp their dimensions to `ctx.content_rect()` using shared helpers in `src/theme.rs`.
 
-**Fixed List of 15 Navigation Pillars (Phase 22+ Master Shell):**
-1. `📁   My Library`
-2. `🤖   AI Agent`
-3. `💡   Research`
-4. `📐   Parametric`
-5. `🏗️   Geometry`
-6. `⚡   Analysis`
-7. `⏱️   Time & Scheduling`
-8. `💰   Cost & Budgeting`
-9. `🌱   Sustainability & Energy`
-10. `🏢   Facility Management`
-11. `🛡️   Safety & Health`
-12. `♻️   Lean Construction`
-13. `🤖   Industrialized & Automation`
-14. `🔮   Prediction`
-15. `📑   Report`
+### 2. Core Domain Navigation Pillars (`NavigationPillar`):
+Keep the 15 engineering workflow modules accessible in navigation (sidebar/drawer/quick switcher), while allowing visual presentation, grouping, icons, and responsive controls to evolve freely for web and touch usability:
+`My Library`, `AI Agent`, `Research`, `Parametric`, `Geometry`, `Analysis`, `Time & Scheduling`, `Cost & Budgeting`, `Sustainability & Energy`, `Facility Management`, `Safety & Health`, `Lean Construction`, `Industrialized & Automation`, `Prediction`, and `Report`.
 
-### 2. 🌐 WebAssembly & Cross-Platform Compatibility:
+### 3. 🌐 WebAssembly & Cross-Platform Compatibility:
 - All core mechanics and UI code must compile cleanly on both native targets and `wasm32-unknown-unknown`.
-- Never invoke blocking native OS APIs (`std::process::Command`, `std::time::SystemTime::now()`, `std::thread::spawn`, or unconditional filesystem writes) without `#[cfg(not(target_arch = "wasm32"))]` guards or browser-safe alternatives in `src/core/web_bridge.rs`.
+- Never invoke blocking native OS APIs (`std::process::Command`, `std::time::SystemTime::now()`, `std::time::Instant::now()`, `std::thread::spawn`, or unconditional filesystem writes) without `#[cfg(not(target_arch = "wasm32"))]` guards or browser-safe alternatives in `src/core/web_bridge.rs`.
 
 ---
 
-## ⚡ Continuous Deployment & Automatic GitHub Push Protocol
-- All UI modifications, `cargo test`, and `trunk build` checks are validated locally within the workspace before publishing.
-- **Automatic Push Enabled**: Every completed feature development, enhancement, and architectural update must be automatically committed and pushed directly to GitHub `main` without waiting for separate manual push instructions.
+## 📁 REPOSITORY STRUCTURE & ORGANIZATION
+
+- `src/` — Rust application (`app.rs`, `theme.rs`, `models.rs`, `core/`, `views/`, `bin/`).
+- `assets/` — Web icons/logos at `assets/*.png`; native desktop packaging metadata & checksums under `assets/desktop/`.
+- `docs/` — Versioned project documentation and changelog (`CHANGELOG.md`).
+- `.github/workflows/deploy.yml` — Automated Rust unit tests, WASM verification, Trunk release build, and Cloudflare Workers deployment.
+- Keep the repository root clean; place new design documents, specifications, and guides under `docs/`.
+
+---
+
+## ⚡ Continuous Deployment & Verification Protocol
+- Validate UI modifications, `cargo test --lib`, `cargo check --bin eigengraph --target wasm32-unknown-unknown`, and `trunk build` before publishing.
+- Every push to `main` automatically deploys `./dist` to Cloudflare Workers (`eigengraph.net` and `www.eigengraph.net`).
 
 ---
 
 ## 🔢 STRICT SEMANTIC VERSIONING PROGRESSION RULE
 
-To maintain predictable engineering cadence and transparent release lineage, all repositories (`EigenGraph`, `Website`, `EigenGate`, `EigenFlow`) follow a **mandatory three-tier numerical progression and 1-to-1 Phase mapping rule**:
+To maintain predictable engineering cadence and transparent release lineage, the project follows a **mandatory three-tier numerical progression and 1-to-1 Phase mapping rule**:
 
 1. **Patch Level Progression (Initial Releases):**
    - Versioning begins at initial baseline `v0.0.1` and advances one patch digit at a time (`v0.0.1` → `v0.0.2` → ... → `v0.0.9`).

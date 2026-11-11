@@ -2,4 +2,4 @@
 # Ensure GitHub repository language statistics report 100% Rust by excluding the WebAssembly canvas entry wrapper and vendor assets.
 
 index.html linguist-detectable=false
-assets/* linguist-vendored
+assets/** linguist-vendored

@@ -68,7 +68,7 @@ impl SettingsView {
                 ui.label(RichText::new("Guarantees screening upper bounds are computed 100% from intact structure facts.").size(11.0).color(theme.text_muted));
 
                 ui.add_space(8.0);
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("Parallel Solver Threads:").color(theme.text_primary));
                     ui.add(egui::Slider::new(&mut self.solver_threads, 1..=32));
                 });
@@ -116,7 +116,7 @@ impl SettingsView {
                 ui.separator();
                 ui.add_space(8.0);
 
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
                     ui.label(RichText::new(format!("v{} (Universal Multi-Platform)", env!("CARGO_PKG_VERSION"))).size(13.0).color(theme.accent_green).strong());
 
@@ -130,13 +130,13 @@ impl SettingsView {
                 });
 
                 ui.add_space(4.0);
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("Author & Lead Developer:").strong().size(12.0).color(theme.text_primary));
                     ui.label(RichText::new("Harids Irawan <harids.irawan@gmail.com>").size(12.0).color(theme.text_secondary));
                 });
 
                 ui.add_space(4.0);
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("Architecture:").strong().size(12.0).color(theme.text_primary));
                     let arch = if cfg!(target_arch = "wasm32") {
                         "WebAssembly (wasm32)"
@@ -178,19 +178,19 @@ impl SettingsView {
                 );
 
                 ui.add_space(8.0);
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("Design Standards:").strong().size(11.5).color(theme.text_primary));
                     ui.label(RichText::new("AISC 360-16 • ACI 318-19 • SNI 1729:2020 • SNI 2847:2019 • SNI 1726:2019").size(11.0).color(theme.text_secondary));
                 });
 
                 ui.add_space(4.0);
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("Integrity & License:").strong().size(11.5).color(theme.text_primary));
                     ui.label(RichText::new("NIST FIPS 180-4 SHA-256 Validated • Dual MIT / Apache 2.0").size(11.0).color(theme.text_secondary));
                 });
 
                 ui.add_space(4.0);
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("Repository:").strong().size(11.5).color(theme.text_primary));
                     ui.hyperlink_to("github.com/EigenGraph/EigenGraph", "https://github.com/EigenGraph/EigenGraph");
                 });

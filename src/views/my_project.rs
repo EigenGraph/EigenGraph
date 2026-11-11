@@ -26,9 +26,12 @@ impl Default for MyProjectView {
 
 impl MyProjectView {
     pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme, projects: &[ProjectItem], active_pillar: &mut NavigationPillar) {
+        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
+        let outer_margin = Margin::symmetric(if is_mobile { 10 } else { 20 }, 12);
+
         ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-            Frame::new().inner_margin(Margin::symmetric(20, 12)).show(ui, |ui| {
-                // 1. HERO FEATURED BANNER (Mac App Store Style)
+            Frame::new().inner_margin(outer_margin).show(ui, |ui| {
+                // 1. HERO FEATURED BANNER
                 if let Some(featured) = projects.iter().find(|p| p.is_featured) {
                     self.render_hero_banner(ui, theme, featured, active_pillar);
                 }
@@ -36,7 +39,7 @@ impl MyProjectView {
                 if let Some(ref msg) = self.export_success_msg {
                     ui.add_space(10.0);
                     theme.card_frame().show(ui, |ui| {
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new("✅ INTERNAL VAULT AUTOSAVE:").size(11.5).strong().color(theme.accent_green));
                             ui.label(RichText::new(msg).size(11.5).color(theme.text_primary));
                         });
@@ -55,10 +58,10 @@ impl MyProjectView {
 
                 ui.add_space(16.0);
 
-                // 3. CURATED CARD GRID (Balanced 2x2 Grid with Live Vector Wireframes)
+                // 3. CURATED PROJECT CARDS (Responsive 1-col / 2-col grid)
                 self.render_projects_grid(ui, theme, projects, active_pillar);
 
-                ui.add_space(24.0);
+                ui.add_space(68.0);
             });
         });
 
@@ -68,127 +71,135 @@ impl MyProjectView {
         }
     }
 
+    fn render_hero_content(&mut self, ui: &mut Ui, theme: &MacTheme, p: &ProjectItem, active_pillar: &mut NavigationPillar) {
+        ui.horizontal_wrapped(|ui| {
+            Frame::new()
+                .fill(theme.accent_blue.gamma_multiply(0.2))
+                .corner_radius(CornerRadius::same(6))
+                .inner_margin(Margin::symmetric(8, 4))
+                .show(ui, |ui| {
+                    ui.label(RichText::new("FEATURED MASTER PROJECT").size(11.0).strong().color(theme.accent_blue));
+                });
+
+            ui.add_space(6.0);
+            ui.label(RichText::new(p.status.badge_label()).size(12.0).color(theme.accent_green).strong());
+        });
+
+        ui.add_space(8.0);
+        ui.heading(RichText::new(&p.title).size(20.0).strong().color(theme.text_primary));
+        ui.add_space(2.0);
+        ui.label(RichText::new(&p.description).size(13.0).color(theme.text_secondary));
+
+        ui.add_space(10.0);
+        ui.label(RichText::new(format!(
+            "📊 Elements: {}   •   Nodes: {}   •   Max Disp: {:.2} mm   •   Min ARI: {:.2}",
+            p.elements_count, p.nodes_count, p.max_deflection_mm, p.min_ari
+        )).size(12.0).color(theme.text_muted));
+
+        ui.add_space(14.0);
+        ui.horizontal_wrapped(|ui| {
+            if ui.add(egui::Button::new(RichText::new("🚀 Open in 3D Workspace").size(12.5).strong().color(Color32::WHITE))
+                .fill(theme.accent_blue)
+                .corner_radius(CornerRadius::same(8))
+                .min_size(egui::Vec2::new(165.0, 32.0))).clicked() {
+                *active_pillar = NavigationPillar::GeometryAssembly;
+            }
+
+            if ui.add(egui::Button::new(RichText::new("📜 EigenGraph Audit Certificate").size(12.5).strong().color(Color32::WHITE))
+                .fill(theme.accent_green)
+                .corner_radius(CornerRadius::same(8))
+                .min_size(egui::Vec2::new(180.0, 32.0))).clicked() {
+                self.show_dossier_modal = true;
+            }
+
+            if ui.add(egui::Button::new(RichText::new("🔐 Autosave to InternalVault (.eigen)").size(12.0).strong().color(theme.text_primary))
+                .fill(theme.bg_card)
+                .stroke(Stroke::new(1.0, theme.border_subtle))
+                .corner_radius(CornerRadius::same(8))
+                .min_size(egui::Vec2::new(180.0, 32.0))).clicked() {
+                let mut engine = crate::core::ParametricEngine::new();
+                if let Ok(mut model) = engine.generate_warren_truss() {
+                    model.name = "NVW_DCR-LOD300_Eng-CON".to_string();
+                    if let Ok(path) = crate::core::InternalVault::autosave_project_model("NVW_DCR-LOD300_Eng-CON.eigen", &model) {
+                        self.export_success_msg = Some(format!("Saved automatically to Package Contents: {}", path));
+                    }
+                }
+            }
+        });
+    }
+
+    fn render_arch_wireframe_card(ui: &mut Ui, theme: &MacTheme, card_w: f32) {
+        Frame::new()
+            .fill(Color32::from_rgb(18, 22, 30))
+            .corner_radius(CornerRadius::same(12))
+            .stroke(Stroke::new(1.0, theme.border_card))
+            .inner_margin(Margin::same(10))
+            .show(ui, |ui| {
+                let (rect, _) = ui.allocate_exact_size(egui::Vec2::new(card_w.max(180.0), 125.0), egui::Sense::hover());
+                let painter = ui.painter_at(rect);
+
+                // Draw Arch Bridge Vector Wireframe
+                let left_x = rect.left() + 18.0;
+                let right_x = rect.right() - 18.0;
+                let deck_y = rect.bottom() - 28.0;
+                let span = right_x - left_x;
+                let panels = 8;
+
+                painter.line_segment(
+                    [egui::pos2(left_x, deck_y), egui::pos2(right_x, deck_y)],
+                    Stroke::new(2.0, theme.accent_blue),
+                );
+
+                let mut prev_arch = egui::pos2(left_x, deck_y);
+                for i in 0..=panels {
+                    let t = i as f32 / panels as f32;
+                    let x = left_x + t * span;
+                    let arch_h = 4.0 * t * (1.0 - t) * 68.0;
+                    let arch_pt = egui::pos2(x, deck_y - arch_h);
+                    let deck_pt = egui::pos2(x, deck_y);
+
+                    if i > 0 {
+                        painter.line_segment([prev_arch, arch_pt], Stroke::new(2.2, theme.accent_green));
+                        if i < panels {
+                            painter.line_segment([arch_pt, deck_pt], Stroke::new(1.0, theme.text_muted));
+                        }
+                    }
+                    painter.circle_filled(arch_pt, 2.5, Color32::WHITE);
+                    painter.circle_filled(deck_pt, 2.0, theme.accent_blue);
+                    prev_arch = arch_pt;
+                }
+
+                painter.text(
+                    egui::pos2(rect.center().x, rect.bottom() - 8.0),
+                    egui::Align2::CENTER_CENTER,
+                    "🏢 NVW_DCR-LOD (LOD 100 • 200 • 300)",
+                    egui::FontId::proportional(10.0),
+                    theme.text_secondary,
+                );
+            });
+    }
+
     fn render_hero_banner(&mut self, ui: &mut Ui, theme: &MacTheme, p: &ProjectItem, active_pillar: &mut NavigationPillar) {
         theme.hero_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            let avail_w = ui.available_width();
+            if avail_w >= 720.0 {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.set_max_width((avail_w - 280.0).max(320.0));
+                        self.render_hero_content(ui, theme, p, active_pillar);
+                    });
+
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        Self::render_arch_wireframe_card(ui, theme, 240.0);
+                    });
+                });
+            } else {
                 ui.vertical(|ui| {
-                    ui.set_max_width((ui.available_width() - 280.0).max(320.0));
-                    ui.horizontal(|ui| {
-                        Frame::new()
-                            .fill(theme.accent_blue.gamma_multiply(0.2))
-                            .corner_radius(CornerRadius::same(6))
-                            .inner_margin(Margin::symmetric(8, 4))
-                            .show(ui, |ui| {
-                                ui.label(RichText::new("FEATURED MASTER PROJECT").size(11.0).strong().color(theme.accent_blue));
-                            });
-
-                        ui.add_space(6.0);
-                        ui.label(RichText::new(p.status.badge_label()).size(12.0).color(theme.accent_green).strong());
-                    });
-
-                    ui.add_space(8.0);
-                    ui.heading(RichText::new(&p.title).size(22.0).strong().color(theme.text_primary));
-                    ui.add_space(2.0);
-                    ui.label(RichText::new(&p.description).size(13.0).color(theme.text_secondary));
-
-                    ui.add_space(10.0);
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(format!(
-                            "📊 Elements: {}   •   Nodes: {}   •   Max Disp: {:.2} mm   •   Min ARI: {:.2}",
-                            p.elements_count, p.nodes_count, p.max_deflection_mm, p.min_ari
-                        )).size(12.0).color(theme.text_muted));
-                    });
-
-                    ui.add_space(14.0);
-                    ui.horizontal(|ui| {
-                        if ui.add(egui::Button::new(RichText::new("🚀 Open in 3D Workspace").size(12.5).strong().color(Color32::WHITE))
-                            .fill(theme.accent_blue)
-                            .corner_radius(CornerRadius::same(8))
-                            .min_size(egui::Vec2::new(170.0, 32.0))).clicked() {
-                            *active_pillar = NavigationPillar::GeometryAssembly;
-                        }
-
-                        ui.add_space(6.0);
-
-                        if ui.add(egui::Button::new(RichText::new("📜 EigenGraph Audit Certificate").size(12.5).strong().color(Color32::WHITE))
-                            .fill(theme.accent_green)
-                            .corner_radius(CornerRadius::same(8))
-                            .min_size(egui::Vec2::new(190.0, 32.0))).clicked() {
-                            self.show_dossier_modal = true;
-                        }
-
-                        ui.add_space(6.0);
-
-                        if ui.add(egui::Button::new(RichText::new("🔐 Autosave to InternalVault (.eigen)").size(12.0).strong().color(theme.text_primary))
-                            .fill(theme.bg_card)
-                            .stroke(Stroke::new(1.0, theme.border_subtle))
-                            .corner_radius(CornerRadius::same(8))
-                            .min_size(egui::Vec2::new(190.0, 32.0))).clicked() {
-                            let mut engine = crate::core::ParametricEngine::new();
-                            if let Ok(mut model) = engine.generate_warren_truss() {
-                                model.name = "NVW_DCR-LOD300_Eng-CON".to_string();
-                                if let Ok(path) = crate::core::InternalVault::autosave_project_model("NVW_DCR-LOD300_Eng-CON.eigen", &model) {
-                                    self.export_success_msg = Some(format!("Saved automatically to Package Contents: {}", path));
-                                }
-                            }
-                        }
-                    });
+                    self.render_hero_content(ui, theme, p, active_pillar);
+                    ui.add_space(12.0);
+                    Self::render_arch_wireframe_card(ui, theme, (avail_w - 22.0).min(360.0));
                 });
-
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    Frame::new()
-                        .fill(Color32::from_rgb(18, 22, 30))
-                        .corner_radius(CornerRadius::same(12))
-                        .stroke(Stroke::new(1.0, theme.border_card))
-                        .inner_margin(Margin::same(10))
-                        .show(ui, |ui| {
-                            let (rect, _) = ui.allocate_exact_size(egui::Vec2::new(240.0, 125.0), egui::Sense::hover());
-                            let painter = ui.painter_at(rect);
-
-                            // Draw Arch Bridge Vector Wireframe
-                            let left_x = rect.left() + 18.0;
-                            let right_x = rect.right() - 18.0;
-                            let deck_y = rect.bottom() - 28.0;
-                            let span = right_x - left_x;
-                            let panels = 8;
-
-                            // Deck line
-                            painter.line_segment(
-                                [egui::pos2(left_x, deck_y), egui::pos2(right_x, deck_y)],
-                                Stroke::new(2.0, theme.accent_blue),
-                            );
-
-                            let mut prev_arch = egui::pos2(left_x, deck_y);
-                            for i in 0..=panels {
-                                let t = i as f32 / panels as f32;
-                                let x = left_x + t * span;
-                                let arch_h = 4.0 * t * (1.0 - t) * 68.0;
-                                let arch_pt = egui::pos2(x, deck_y - arch_h);
-                                let deck_pt = egui::pos2(x, deck_y);
-
-                                if i > 0 {
-                                    // Arch rib segment
-                                    painter.line_segment([prev_arch, arch_pt], Stroke::new(2.2, theme.accent_green));
-                                    // Hanger cable
-                                    if i < panels {
-                                        painter.line_segment([arch_pt, deck_pt], Stroke::new(1.0, theme.text_muted));
-                                    }
-                                }
-                                painter.circle_filled(arch_pt, 2.5, Color32::WHITE);
-                                painter.circle_filled(deck_pt, 2.0, theme.accent_blue);
-                                prev_arch = arch_pt;
-                            }
-
-                            painter.text(
-                                egui::pos2(rect.center().x, rect.bottom() - 8.0),
-                                egui::Align2::CENTER_CENTER,
-                                "🏢 NVW_DCR-LOD (LOD 100 • 200 • 300)",
-                                egui::FontId::proportional(10.0),
-                                theme.text_secondary,
-                            );
-                        });
-                });
-            });
+            }
         });
     }
 
@@ -198,7 +209,7 @@ impl MyProjectView {
         let categories = crate::core::InternalVault::list_all_vault_categories();
 
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("⚛️ EIGENGRAPH ENGINEERING VAULT & KNOWLEDGE MEMORY").size(13.0).strong().color(theme.accent_blue));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui.add(egui::Button::new(RichText::new("🔄 Sync & Train ARI Memory").size(11.5).strong().color(Color32::WHITE))
@@ -219,49 +230,85 @@ impl MyProjectView {
             });
 
             ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new(format!(
-                        "📂 Active Vault Location: {}",
-                        vault_root.display()
-                    ))
-                    .size(11.5)
-                    .monospace()
-                    .color(theme.text_secondary),
-                );
-            });
+            ui.label(
+                RichText::new(format!(
+                    "📂 Active Vault Location: {}",
+                    vault_root.display()
+                ))
+                .size(11.5)
+                .monospace()
+                .color(theme.text_secondary),
+            );
 
             ui.add_space(8.0);
-            ui.columns(4, |cols| {
-                cols[0].vertical(|ui| {
-                    ui.label(RichText::new("ORGANIZED CATEGORIES").size(10.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new(format!("{} Category Folders", categories.len())).size(15.0).strong().color(theme.accent_blue));
-                    ui.label(RichText::new("Auto-Taxonomy Routing").size(10.5).color(theme.text_secondary));
+            let best_sec = mem
+                .learned_optimal_sections
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or("RC Column 500x500");
+            let stats = [
+                (
+                    "ORGANIZED CATEGORIES",
+                    format!("{} Category Folders", categories.len()),
+                    "Auto-Taxonomy Routing".to_string(),
+                    theme.accent_blue,
+                ),
+                (
+                    "AI LEARNING CYCLES",
+                    format!("{} Evaluations", mem.total_ari_evaluations),
+                    format!("Best ARI: {:.3}", mem.best_recorded_system_ari),
+                    theme.accent_green,
+                ),
+                (
+                    "SEAMLESS AUTOSAVE",
+                    format!("{}x Saved", mem.total_autosaves_count),
+                    format!("{} Parametric Components", mem.total_parametric_mutations),
+                    theme.accent_orange,
+                ),
+                (
+                    "OPTIMIZED SECTIONS",
+                    best_sec.to_string(),
+                    "Historical Memory Recommendation".to_string(),
+                    Color32::WHITE,
+                ),
+            ];
+            let render_stat = |ui: &mut Ui, title: &str, value: &str, sub: &str, col: Color32| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new(title).size(10.0).strong().color(theme.text_muted));
+                    ui.label(RichText::new(value).size(14.5).strong().color(col));
+                    ui.label(RichText::new(sub).size(10.5).color(theme.text_secondary));
                 });
-                cols[1].vertical(|ui| {
-                    ui.label(RichText::new("AI LEARNING CYCLES").size(10.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new(format!("{} Evaluations", mem.total_ari_evaluations)).size(15.0).strong().color(theme.accent_green));
-                    ui.label(RichText::new(format!("Best ARI: {:.3}", mem.best_recorded_system_ari)).size(10.5).color(theme.text_secondary));
+            };
+            let vault_w = ui.available_width();
+            if vault_w >= 820.0 {
+                ui.columns(4, |cols| {
+                    for (idx, (t, v, s, c)) in stats.iter().enumerate() {
+                        render_stat(&mut cols[idx], t, v, s, *c);
+                    }
                 });
-                cols[2].vertical(|ui| {
-                    ui.label(RichText::new("SEAMLESS AUTOSAVE").size(10.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new(format!("{}x Saved", mem.total_autosaves_count)).size(15.0).strong().color(theme.accent_orange));
-                    ui.label(RichText::new(format!("{} Parametric Components", mem.total_parametric_mutations)).size(10.5).color(theme.text_secondary));
-                });
-                cols[3].vertical(|ui| {
-                    let best_sec = mem.learned_optimal_sections.first().map(|s| s.as_str()).unwrap_or("RC Column 500x500");
-                    ui.label(RichText::new("OPTIMIZED SECTIONS").size(10.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new(best_sec).size(13.0).strong().color(Color32::WHITE));
-                    ui.label(RichText::new("Historical Memory Recommendation").size(10.5).color(theme.text_secondary));
-                });
-            });
+            } else if vault_w >= 500.0 {
+                for row in stats.chunks(2) {
+                    ui.columns(2, |cols| {
+                        for (idx, (t, v, s, c)) in row.iter().enumerate() {
+                            render_stat(&mut cols[idx], t, v, s, *c);
+                        }
+                    });
+                    ui.add_space(6.0);
+                }
+            } else {
+                for (t, v, s, c) in &stats {
+                    render_stat(ui, t, v, s, *c);
+                    ui.add_space(6.0);
+                }
+            }
 
             ui.add_space(8.0);
-            ui.horizontal(|ui| {
+            let dir_input_w = (ui.available_width() - 80.0).clamp(160.0, 320.0);
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("🎯 Switch Target Vault Directory:").size(11.0).color(theme.text_muted));
                 let resp = ui.add(egui::TextEdit::singleline(&mut self.custom_vault_override)
-                    .hint_text("Enter custom folder path (e.g. /Users/name/Documents/MyVault)...")
-                    .desired_width(320.0));
+                    .hint_text("Enter custom folder path...")
+                    .desired_width(dir_input_w));
                 if resp.lost_focus() && !self.custom_vault_override.trim().is_empty() {
                     let path = std::path::PathBuf::from(self.custom_vault_override.trim());
                     let _ = crate::core::InternalVault::set_custom_vault_dir(path);
@@ -278,37 +325,41 @@ impl MyProjectView {
 
             // Multi-LOD Redundancy Convergence Engine Table (LOD 100 -> LOD 200 -> LOD 300)
             let conv = crate::core::InternalVault::evaluate_nvw_multi_lod_convergence();
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("📈 MULTI-LOD REDUNDANCY CONVERGENCE AUDIT (LOD 100 ➔ LOD 200 ➔ LOD 300)").size(11.5).strong().color(theme.accent_green));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new(format!("ΔARI: +{:.1}% • κ(K) Reduction: {:.1}x", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)).size(11.0).strong().color(theme.accent_blue));
                 });
             });
             ui.add_space(4.0);
-            egui::Grid::new("multi_lod_convergence_grid")
-                .striped(true)
-                .min_col_width(95.0)
+            ScrollArea::horizontal()
+                .id_salt("multi_lod_convergence_scroll")
                 .show(ui, |ui| {
-                    ui.label(RichText::new("LOD Stage").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("IFC File").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Nodes / Elements").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Indeterminacy (DSI)").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Condition κ(K)").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Avg ARI").size(10.5).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Min ARI").size(10.5).strong().color(theme.text_muted));
-                    ui.end_row();
+                    egui::Grid::new("multi_lod_convergence_grid")
+                        .striped(true)
+                        .min_col_width(95.0)
+                        .show(ui, |ui| {
+                            ui.label(RichText::new("LOD Stage").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("IFC File").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Nodes / Elements").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Indeterminacy (DSI)").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Condition κ(K)").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Avg ARI").size(10.5).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Min ARI").size(10.5).strong().color(theme.text_muted));
+                            ui.end_row();
 
-                    for st in &conv.stages {
-                        ui.label(RichText::new(&st.lod_level).size(11.0).strong().color(theme.text_primary));
-                        ui.label(RichText::new(&st.ifc_filename).size(10.5).monospace().color(theme.accent_blue));
-                        ui.label(RichText::new(format!("{} / {}", st.nodes_count, st.elements_count)).size(10.5).color(theme.text_secondary));
-                        ui.label(RichText::new(format!("{} DOF", st.static_indeterminacy_dsi)).size(10.5).color(theme.text_secondary));
-                        ui.label(RichText::new(format!("{:.2e}", st.condition_number_kappa)).size(10.5).monospace().color(theme.accent_orange));
-                        ui.label(RichText::new(format!("{:.3}", st.avg_ari)).size(11.0).strong().color(theme.text_primary));
-                        let min_col = if st.min_system_ari >= 0.75 { theme.accent_green } else { theme.accent_orange };
-                        ui.label(RichText::new(format!("{:.3}", st.min_system_ari)).size(11.0).strong().color(min_col));
-                        ui.end_row();
-                    }
+                            for st in &conv.stages {
+                                ui.label(RichText::new(&st.lod_level).size(11.0).strong().color(theme.text_primary));
+                                ui.label(RichText::new(&st.ifc_filename).size(10.5).monospace().color(theme.accent_blue));
+                                ui.label(RichText::new(format!("{} / {}", st.nodes_count, st.elements_count)).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(format!("{} DOF", st.static_indeterminacy_dsi)).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(format!("{:.2e}", st.condition_number_kappa)).size(10.5).monospace().color(theme.accent_orange));
+                                ui.label(RichText::new(format!("{:.3}", st.avg_ari)).size(11.0).strong().color(theme.text_primary));
+                                let min_col = if st.min_system_ari >= 0.75 { theme.accent_green } else { theme.accent_orange };
+                                ui.label(RichText::new(format!("{:.3}", st.min_system_ari)).size(11.0).strong().color(min_col));
+                                ui.end_row();
+                            }
+                        });
                 });
         });
     }
@@ -332,8 +383,7 @@ impl MyProjectView {
 
                 let btn = egui::Button::new(RichText::new(cat).size(12.0).color(fg))
                     .fill(bg)
-                    .corner_radius(CornerRadius::same(16))
-                    ;
+                    .corner_radius(CornerRadius::same(16));
 
                 if ui.add(btn).clicked() {
                     self.selected_category = cat.to_string();
@@ -342,193 +392,197 @@ impl MyProjectView {
         });
     }
 
-    fn render_projects_grid(&self, ui: &mut Ui, theme: &MacTheme, projects: &[ProjectItem], active_pillar: &mut NavigationPillar) {
-        for chunk in projects.chunks(2) {
-            ui.columns(2, |columns| {
-                for (col_idx, p) in chunk.iter().enumerate() {
-                    let col = &mut columns[col_idx];
-                    theme.card_frame().show(col, |ui| {
-                        // Card 3D Procedural Wireframe Preview Box
-                        Frame::new()
-                            .fill(Color32::from_rgb(20, 23, 30))
-                            .corner_radius(CornerRadius::same(10))
-                            .stroke(Stroke::new(1.0, theme.border_subtle))
-                            .inner_margin(Margin::symmetric(12, 8))
-                            .show(ui, |ui| {
-                                let avail_w = ui.available_width();
-                                let (rect, _) = ui.allocate_exact_size(egui::Vec2::new(avail_w, 72.0), egui::Sense::hover());
-                                let painter = ui.painter_at(rect);
+    fn render_project_card(&self, ui: &mut Ui, theme: &MacTheme, p: &ProjectItem, active_pillar: &mut NavigationPillar) {
+        theme.card_frame().show(ui, |ui| {
+            Frame::new()
+                .fill(Color32::from_rgb(20, 23, 30))
+                .corner_radius(CornerRadius::same(10))
+                .stroke(Stroke::new(1.0, theme.border_subtle))
+                .inner_margin(Margin::symmetric(12, 8))
+                .show(ui, |ui| {
+                    let avail_w = ui.available_width().max(120.0);
+                    let (rect, _) = ui.allocate_exact_size(egui::Vec2::new(avail_w, 72.0), egui::Sense::hover());
+                    let painter = ui.painter_at(rect);
 
-                                let lx = rect.left() + 16.0;
-                                let rx = rect.right() - 16.0;
-                                let by = rect.bottom() - 10.0;
-                                let ty = rect.top() + 10.0;
-                                let w = rx - lx;
+                    let lx = rect.left() + 16.0;
+                    let rx = rect.right() - 16.0;
+                    let by = rect.bottom() - 10.0;
+                    let ty = rect.top() + 10.0;
+                    let w = (rx - lx).max(40.0);
 
-                                if p.id == "p1" || p.id == "p2" {
-                                    // Arch / Dome curve
-                                    let n = 8;
-                                    let mut prev = egui::pos2(lx, by);
-                                    painter.line_segment([egui::pos2(lx, by), egui::pos2(rx, by)], Stroke::new(1.4, theme.border_card));
-                                    for i in 1..=n {
-                                        let t = i as f32 / n as f32;
-                                        let x = lx + t * w;
-                                        let y = by - 4.0 * t * (1.0 - t) * (by - ty);
-                                        let pt = egui::pos2(x, y);
-                                        painter.line_segment([prev, pt], Stroke::new(1.8, theme.accent_blue));
-                                        painter.line_segment([pt, egui::pos2(x, by)], Stroke::new(0.8, theme.text_muted));
-                                        painter.circle_filled(pt, 2.2, theme.accent_green);
-                                        prev = pt;
-                                    }
-                                } else {
-                                    // Warren / Diagrid lattice
-                                    let n = 6;
-                                    painter.line_segment([egui::pos2(lx, ty), egui::pos2(rx, ty)], Stroke::new(1.8, theme.accent_blue));
-                                    painter.line_segment([egui::pos2(lx, by), egui::pos2(rx, by)], Stroke::new(1.8, theme.accent_blue));
-                                    for i in 0..n {
-                                        let t0 = i as f32 / n as f32;
-                                        let t1 = (i + 1) as f32 / n as f32;
-                                        let x0 = lx + t0 * w;
-                                        let x1 = lx + t1 * w;
-                                        let xm = 0.5 * (x0 + x1);
-                                        let col_diag = if i == 2 && p.min_ari < 0.70 { theme.accent_orange } else { theme.accent_green };
-                                        painter.line_segment([egui::pos2(x0, by), egui::pos2(xm, ty)], Stroke::new(1.4, col_diag));
-                                        painter.line_segment([egui::pos2(xm, ty), egui::pos2(x1, by)], Stroke::new(1.4, col_diag));
-                                        painter.circle_filled(egui::pos2(x0, by), 2.0, Color32::WHITE);
-                                        painter.circle_filled(egui::pos2(xm, ty), 2.0, Color32::WHITE);
-                                    }
-                                }
-                            });
+                    if p.id == "p1" || p.id == "p2" {
+                        let n = 8;
+                        let mut prev = egui::pos2(lx, by);
+                        painter.line_segment([egui::pos2(lx, by), egui::pos2(rx, by)], Stroke::new(1.4, theme.border_card));
+                        for i in 1..=n {
+                            let t = i as f32 / n as f32;
+                            let x = lx + t * w;
+                            let y = by - 4.0 * t * (1.0 - t) * (by - ty);
+                            let pt = egui::pos2(x, y);
+                            painter.line_segment([prev, pt], Stroke::new(1.8, theme.accent_blue));
+                            painter.line_segment([pt, egui::pos2(x, by)], Stroke::new(0.8, theme.text_muted));
+                            painter.circle_filled(pt, 2.2, theme.accent_green);
+                            prev = pt;
+                        }
+                    } else {
+                        let n = 6;
+                        painter.line_segment([egui::pos2(lx, ty), egui::pos2(rx, ty)], Stroke::new(1.8, theme.accent_blue));
+                        painter.line_segment([egui::pos2(lx, by), egui::pos2(rx, by)], Stroke::new(1.8, theme.accent_blue));
+                        for i in 0..n {
+                            let t0 = i as f32 / n as f32;
+                            let t1 = (i + 1) as f32 / n as f32;
+                            let x0 = lx + t0 * w;
+                            let x1 = lx + t1 * w;
+                            let xm = 0.5 * (x0 + x1);
+                            let col_diag = if i == 2 && p.min_ari < 0.70 { theme.accent_orange } else { theme.accent_green };
+                            painter.line_segment([egui::pos2(x0, by), egui::pos2(xm, ty)], Stroke::new(1.4, col_diag));
+                            painter.line_segment([egui::pos2(xm, ty), egui::pos2(x1, by)], Stroke::new(1.4, col_diag));
+                            painter.circle_filled(egui::pos2(x0, by), 2.0, Color32::WHITE);
+                            painter.circle_filled(egui::pos2(xm, ty), 2.0, Color32::WHITE);
+                        }
+                    }
+                });
 
-                        ui.add_space(10.0);
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(&p.category).size(11.0).color(theme.accent_blue).strong());
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                let status_col = if p.min_ari >= 0.70 { theme.accent_green } else { theme.accent_orange };
-                                ui.label(RichText::new(p.status.badge_label()).size(11.0).strong().color(status_col));
-                            });
-                        });
-
-                        ui.add_space(4.0);
-                        ui.label(RichText::new(&p.title).size(15.0).strong().color(theme.text_primary));
-                        ui.add_space(2.0);
-                        ui.label(RichText::new(&p.description).size(12.0).color(theme.text_secondary));
-
-                        ui.add_space(10.0);
-                        ui.separator();
-                        ui.add_space(6.0);
-
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(format!(
-                                "📊 {} El  •  {} Nd  •  ARI: {:.2}",
-                                p.elements_count, p.nodes_count, p.min_ari
-                            )).size(11.5).color(theme.text_muted));
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.add(egui::Button::new(RichText::new("Open Model ➔").size(11.5).strong().color(Color32::WHITE))
-                                    .fill(theme.accent_blue)
-                                    .corner_radius(CornerRadius::same(6))
-                                    .min_size(egui::Vec2::new(100.0, 26.0))).clicked() {
-                                    *active_pillar = NavigationPillar::GeometryAssembly;
-                                }
-                            });
-                        });
-                    });
-                }
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(&p.category).size(11.0).color(theme.accent_blue).strong());
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let status_col = if p.min_ari >= 0.70 { theme.accent_green } else { theme.accent_orange };
+                    ui.label(RichText::new(p.status.badge_label()).size(11.0).strong().color(status_col));
+                });
             });
-            ui.add_space(14.0);
+
+            ui.add_space(4.0);
+            ui.label(RichText::new(&p.title).size(15.0).strong().color(theme.text_primary));
+            ui.add_space(2.0);
+            ui.label(RichText::new(&p.description).size(12.0).color(theme.text_secondary));
+
+            ui.add_space(10.0);
+            ui.separator();
+            ui.add_space(6.0);
+
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(format!(
+                    "📊 {} El  •  {} Nd  •  ARI: {:.2}",
+                    p.elements_count, p.nodes_count, p.min_ari
+                )).size(11.5).color(theme.text_muted));
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.add(egui::Button::new(RichText::new("Open Model ➔").size(11.5).strong().color(Color32::WHITE))
+                        .fill(theme.accent_blue)
+                        .corner_radius(CornerRadius::same(6))
+                        .min_size(egui::Vec2::new(100.0, 26.0))).clicked() {
+                        *active_pillar = NavigationPillar::GeometryAssembly;
+                    }
+                });
+            });
+        });
+    }
+
+    fn render_projects_grid(&self, ui: &mut Ui, theme: &MacTheme, projects: &[ProjectItem], active_pillar: &mut NavigationPillar) {
+        if ui.available_width() >= 680.0 {
+            for chunk in projects.chunks(2) {
+                ui.columns(2, |columns| {
+                    for (col_idx, p) in chunk.iter().enumerate() {
+                        self.render_project_card(&mut columns[col_idx], theme, p, active_pillar);
+                    }
+                });
+                ui.add_space(14.0);
+            }
+        } else {
+            for p in projects {
+                self.render_project_card(ui, theme, p, active_pillar);
+                ui.add_space(12.0);
+            }
         }
     }
 
     fn render_dossier_modal(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let ctx = ui.ctx().clone();
         egui::Window::new("📜 OFFICIAL STRUCTURAL REDUNDANCY AUDIT CERTIFICATE (EIGENGRAPH)")
             .collapsible(false)
             .resizable(true)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::new(0.0, 0.0))
-            .show(ui.ctx(), |ui| {
-                ui.set_width(620.0);
-                Frame::new()
-                    .fill(Color32::from_rgb(18, 22, 30))
-                    .stroke(Stroke::new(1.0, theme.border_card))
-                    .corner_radius(CornerRadius::same(10))
-                    .inner_margin(Margin::symmetric(20, 16))
-                    .show(ui, |ui| {
-                        ui.vertical_centered(|ui| {
-                            ui.label(RichText::new("EIGENGRAPH STRUCTURAL PLATFORM").size(12.0).strong().color(theme.accent_blue));
-                            ui.label(RichText::new("ADVANCED STRUCTURAL INTEGRITY & RESILIENCE ENGINE").size(11.0).color(theme.text_secondary));
-                            ui.add_space(4.0);
-                            ui.heading(RichText::new("CERTIFICATE OF STRUCTURAL REDUNDANCY & PROGRESSIVE COLLAPSE RESILIENCE").size(14.0).strong().color(Color32::WHITE));
-                            ui.label(RichText::new("Verification based on Adjusted Redundancy Index (ARI) & SVD Kinematic Mechanism Guard").size(11.0).color(theme.accent_green));
-                            ui.add_space(10.0);
-                            ui.separator();
-                            ui.add_space(10.0);
-                        });
-
-                        ui.label(RichText::new("AUTHORITY & AUDITOR INFORMATION:").size(11.5).strong().color(theme.text_secondary));
-                        ui.label(RichText::new("• Lead Engineer / Auditor: Harids Irawan, S.T., M.T. (EigenGraph Systems)").size(11.5).color(theme.text_primary));
-                        ui.label(RichText::new("• Analysis Framework: Development and Validation of Adjusted Redundancy Index for Pre-Analysis Screening of Element Disruption Scenarios").size(11.0).color(theme.text_secondary));
-                        ui.label(RichText::new("• Publication / Verification Year: 2026").size(11.0).color(theme.text_muted));
-
-                        ui.add_space(8.0);
-                        ui.separator();
-                        ui.add_space(8.0);
-
-                        ui.label(RichText::new("OFFICIAL AUDIT METRICS FOR ACTIVE MODEL:").size(11.5).strong().color(theme.text_secondary));
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("• Minimum System ARI:").size(11.5).color(theme.text_secondary));
-                            ui.label(RichText::new("0.942 [GRADE A: SAFE MULTI-PATH]").size(11.5).strong().color(theme.accent_green));
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("• SVD Kinematic Mechanism Guard:").size(11.5).color(theme.text_secondary));
-                            ui.label(RichText::new("CERTIFIED SAFE (Gate 1 Passed, rank = n_free)").size(11.5).strong().color(theme.accent_blue));
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("• Maximum Member Criticality (CI_max):").size(11.5).color(theme.text_secondary));
-                            ui.label(RichText::new("0.4200 (Free of Catastrophic Collapse Vulnerabilities)").size(11.5).strong().color(theme.accent_orange));
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("• Mathematical Reference Formulations:").size(11.5).color(theme.text_secondary));
-                            ui.label(RichText::new("Equations (2.5a)–(2.19), (4.1)–(4.4), (4.13b)–(4.13c)").size(11.5).color(theme.text_muted));
-                        });
-
-                        ui.add_space(8.0);
-                        ui.separator();
-                        ui.add_space(8.0);
-
-                        // SHA-256 Cryptographic Audit Seal (FIPS 180-4)
-                        let mock_hash = crate::core::Sha256Hasher::digest_hex(b"EIGENGRAPH_DOSSIER:name=Warren_Truss_24m:nodes=14:elems=25:avg_ari=0.9420:min_ari=0.8840:cond=1.42e3:rank=36");
-                        Frame::new()
-                            .fill(Color32::from_rgb(12, 16, 22))
-                            .stroke(Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.5)))
-                            .corner_radius(CornerRadius::same(6))
-                            .inner_margin(Margin::same(10))
-                            .show(ui, |ui| {
-                                ui.horizontal(|ui| {
-                                    ui.label(RichText::new("🔐 CRYPTOGRAPHIC AUDIT SEAL (SHA-256):").size(11.0).strong().color(theme.accent_blue));
-                                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                        ui.label(RichText::new("✅ Tamper-Proof Authentic").size(10.5).color(theme.accent_green));
-                                    });
-                                });
-                                ui.label(RichText::new(format!("Hash: {}", mock_hash)).size(10.0).color(theme.text_secondary));
-                                ui.label(RichText::new(format!("QR Payload: eigengraph://verify?hash={}&org=eigengraph", &mock_hash[..16])).size(10.0).color(theme.text_muted));
+            .default_size(MacTheme::clamp_modal_size(&ctx, egui::Vec2::new(620.0, 560.0)))
+            .max_size(MacTheme::modal_max_size(&ctx))
+            .show(&ctx, |ui| {
+                ScrollArea::vertical().show(ui, |ui| {
+                    Frame::new()
+                        .fill(Color32::from_rgb(18, 22, 30))
+                        .stroke(Stroke::new(1.0, theme.border_card))
+                        .corner_radius(CornerRadius::same(10))
+                        .inner_margin(Margin::symmetric(16, 14))
+                        .show(ui, |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.label(RichText::new("EIGENGRAPH STRUCTURAL PLATFORM").size(12.0).strong().color(theme.accent_blue));
+                                ui.label(RichText::new("ADVANCED STRUCTURAL INTEGRITY & RESILIENCE ENGINE").size(11.0).color(theme.text_secondary));
+                                ui.add_space(4.0);
+                                ui.heading(RichText::new("CERTIFICATE OF STRUCTURAL REDUNDANCY & PROGRESSIVE COLLAPSE RESILIENCE").size(14.0).strong().color(Color32::WHITE));
+                                ui.label(RichText::new("Verification based on Adjusted Redundancy Index (ARI) & SVD Kinematic Mechanism Guard").size(11.0).color(theme.accent_green));
+                                ui.add_space(10.0);
+                                ui.separator();
+                                ui.add_space(10.0);
                             });
 
-                        ui.add_space(12.0);
-                        ui.separator();
-                        ui.add_space(10.0);
+                            ui.label(RichText::new("AUTHORITY & AUDITOR INFORMATION:").size(11.5).strong().color(theme.text_secondary));
+                            ui.label(RichText::new("• Lead Engineer / Auditor: Harids Irawan, S.T., M.T. (EigenGraph Systems)").size(11.5).color(theme.text_primary));
+                            ui.label(RichText::new("• Analysis Framework: Development and Validation of Adjusted Redundancy Index for Pre-Analysis Screening of Element Disruption Scenarios").size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new("• Publication / Verification Year: 2026").size(11.0).color(theme.text_muted));
 
-                        ui.horizontal(|ui| {
+                            ui.add_space(8.0);
+                            ui.separator();
+                            ui.add_space(8.0);
+
+                            ui.label(RichText::new("OFFICIAL AUDIT METRICS FOR ACTIVE MODEL:").size(11.5).strong().color(theme.text_secondary));
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(RichText::new("• Minimum System ARI:").size(11.5).color(theme.text_secondary));
+                                ui.label(RichText::new("0.942 [GRADE A: SAFE MULTI-PATH]").size(11.5).strong().color(theme.accent_green));
+                            });
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(RichText::new("• SVD Kinematic Mechanism Guard:").size(11.5).color(theme.text_secondary));
+                                ui.label(RichText::new("CERTIFIED SAFE (Gate 1 Passed, rank = n_free)").size(11.5).strong().color(theme.accent_blue));
+                            });
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(RichText::new("• Maximum Member Criticality (CI_max):").size(11.5).color(theme.text_secondary));
+                                ui.label(RichText::new("0.4200 (Free of Catastrophic Collapse Vulnerabilities)").size(11.5).strong().color(theme.accent_orange));
+                            });
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(RichText::new("• Mathematical Reference Formulations:").size(11.5).color(theme.text_secondary));
+                                ui.label(RichText::new("Equations (2.5a)–(2.19), (4.1)–(4.4), (4.13b)–(4.13c)").size(11.5).color(theme.text_muted));
+                            });
+
+                            ui.add_space(8.0);
+                            ui.separator();
+                            ui.add_space(8.0);
+
+                            let mock_hash = crate::core::Sha256Hasher::digest_hex(b"EIGENGRAPH_DOSSIER:name=Warren_Truss_24m:nodes=14:elems=25:avg_ari=0.9420:min_ari=0.8840:cond=1.42e3:rank=36");
+                            Frame::new()
+                                .fill(Color32::from_rgb(12, 16, 22))
+                                .stroke(Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.5)))
+                                .corner_radius(CornerRadius::same(6))
+                                .inner_margin(Margin::same(10))
+                                .show(ui, |ui| {
+                                    ui.horizontal_wrapped(|ui| {
+                                        ui.label(RichText::new("🔐 CRYPTOGRAPHIC AUDIT SEAL (SHA-256):").size(11.0).strong().color(theme.accent_blue));
+                                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                            ui.label(RichText::new("✅ Tamper-Proof Authentic").size(10.5).color(theme.accent_green));
+                                        });
+                                    });
+                                    ui.label(RichText::new(format!("Hash: {}", mock_hash)).size(10.0).color(theme.text_secondary));
+                                    ui.label(RichText::new(format!("QR Payload: eigengraph://verify?hash={}&org=eigengraph", &mock_hash[..16])).size(10.0).color(theme.text_muted));
+                                });
+
+                            ui.add_space(12.0);
+                            ui.separator();
+                            ui.add_space(10.0);
+
                             ui.label(RichText::new("Certification Status: OFFICIALLY VALIDATED (EIGENGRAPH 2026)").size(11.5).strong().color(theme.accent_green));
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.add(egui::Button::new(RichText::new("✕ Close").size(12.0).color(theme.text_secondary))
-                                    .fill(theme.bg_card)
-                                    .corner_radius(CornerRadius::same(6))).clicked() {
-                                    self.show_dossier_modal = false;
-                                }
+                            if let Some(ref msg) = self.export_success_msg {
+                                ui.add_space(4.0);
+                                ui.label(RichText::new(format!("✅ {}", msg)).size(11.0).color(theme.accent_green));
+                            }
 
-                                if let Some(ref msg) = self.export_success_msg {
-                                    ui.label(RichText::new(format!("✅ {}", msg)).size(11.0).color(theme.accent_green));
-                                }
-
+                            ui.add_space(8.0);
+                            ui.horizontal_wrapped(|ui| {
                                 if ui.add(egui::Button::new(RichText::new("🌐 Download Interactive 3D Viewer (.html)").size(12.0).strong().color(Color32::WHITE))
                                     .fill(Color32::from_rgb(147, 51, 234))
                                     .corner_radius(CornerRadius::same(6))).clicked() {
@@ -594,9 +648,15 @@ impl MyProjectView {
                                     .corner_radius(CornerRadius::same(6))).clicked() {
                                     self.export_success_msg = Some("Document ready to print to PDF format via system viewer".to_string());
                                 }
+
+                                if ui.add(egui::Button::new(RichText::new("✕ Close").size(12.0).color(theme.text_secondary))
+                                    .fill(theme.bg_card)
+                                    .corner_radius(CornerRadius::same(6))).clicked() {
+                                    self.show_dossier_modal = false;
+                                }
                             });
                         });
-                    });
+                });
             });
     }
 }

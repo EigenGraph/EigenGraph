@@ -637,7 +637,8 @@ open -n "$TARGET_APP"
             .collapsible(false)
             .resizable(false)
             .anchor(Align2::CENTER_CENTER, Vec2::new(0.0, 0.0))
-            .fixed_size(Vec2::new(520.0, 385.0))
+            .default_size(MacTheme::clamp_modal_size(ctx, Vec2::new(520.0, 385.0)))
+            .max_size(MacTheme::modal_max_size(ctx))
             .frame(
                 Frame::new()
                     .fill(theme.bg_card)
@@ -950,15 +951,17 @@ impl AppUpdater {
             .collapsible(false)
             .resizable(false)
             .anchor(Align2::CENTER_CENTER, Vec2::new(0.0, 0.0))
-            .fixed_size(Vec2::new(500.0, 320.0))
+            .default_size(MacTheme::clamp_modal_size(ctx, Vec2::new(500.0, 340.0)))
+            .max_size(MacTheme::modal_max_size(ctx))
             .frame(
                 Frame::new()
                     .fill(theme.bg_card)
                     .stroke(Stroke::new(1.0, theme.border_subtle))
                     .corner_radius(CornerRadius::same(14))
-                    .inner_margin(Margin::same(22)),
+                    .inner_margin(Margin::same(18)),
             )
             .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("🌐").size(30.0));
@@ -992,7 +995,7 @@ impl AppUpdater {
                         .inner_margin(Margin::same(12))
                         .show(ui, |ui| {
                             ui.label(
-                                RichText::new("✅ Always Up to Date via GitHub Pages")
+                                RichText::new("✅ Always Up to Date via Cloudflare Workers")
                                     .size(13.0)
                                     .strong()
                                     .color(theme.accent_green),
@@ -1057,6 +1060,7 @@ impl AppUpdater {
                             reload_page = true;
                         }
                     });
+                });
                 });
             });
 

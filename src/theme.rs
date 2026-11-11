@@ -1,6 +1,6 @@
 //! theme.rs — Modern macOS Sequoia / Pro Dark Engineering Visual System.
 
-use egui::{Color32, CornerRadius, Frame, Margin, Stroke};
+use egui::{Color32, CornerRadius, Frame, Margin, Stroke, Vec2};
 
 #[derive(Debug, Clone)]
 pub struct MacTheme {
@@ -164,5 +164,68 @@ impl MacTheme {
         visuals.widgets.open.corner_radius = CornerRadius::same(8);
 
         ctx.set_visuals(visuals);
+    }
+
+    /// Viewport width threshold below which phone-first compact stacking applies.
+    pub const MOBILE_BREAKPOINT: f32 = 640.0;
+
+    /// Viewport width threshold below which the sidebar collapses into an overlay drawer.
+    pub const COMPACT_BREAKPOINT: f32 = 960.0;
+
+    /// Returns the safe content viewport size, clamped against transient zero-sized frames.
+    pub fn viewport_size(ctx: &egui::Context) -> Vec2 {
+        ctx.content_rect().size().max(Vec2::new(280.0, 320.0))
+    }
+
+    /// Returns `true` on narrow mobile viewports (`width < 640px`).
+    pub fn is_mobile(ctx: &egui::Context) -> bool {
+        Self::viewport_size(ctx).x < Self::MOBILE_BREAKPOINT
+    }
+
+    /// Returns `true` on mobile and portrait/narrow tablet viewports (`width < 960px`).
+    pub fn is_compact(ctx: &egui::Context) -> bool {
+        Self::viewport_size(ctx).x < Self::COMPACT_BREAKPOINT
+    }
+
+    /// Clamps a desired modal/window size against an explicit viewport dimension.
+    pub fn clamp_modal_for_viewport(vp: Vec2, desired: Vec2) -> Vec2 {
+        let safe_vp = vp.max(Vec2::new(280.0, 320.0));
+        Vec2::new(
+            (safe_vp.x - 24.0).clamp(240.0, desired.x.max(240.0)),
+            (safe_vp.y - 48.0).clamp(240.0, desired.y.max(240.0)),
+        )
+    }
+
+    /// Clamps a desired modal/window size so it always fits inside the current viewport.
+    pub fn clamp_modal_size(ctx: &egui::Context, desired: Vec2) -> Vec2 {
+        Self::clamp_modal_for_viewport(Self::viewport_size(ctx), desired)
+    }
+
+    /// Maximum modal size bounded cleanly inside the active viewport.
+    pub fn modal_max_size(ctx: &egui::Context) -> Vec2 {
+        let vp = Self::viewport_size(ctx);
+        Vec2::new((vp.x - 16.0).max(260.0), (vp.y - 32.0).max(240.0))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_modal_size_clamps_for_mobile_tablet_and_desktop() {
+        let desired = Vec2::new(620.0, 560.0);
+
+        // Mobile viewport (375x667) must clamp horizontally below 375px
+        let mobile = MacTheme::clamp_modal_for_viewport(Vec2::new(375.0, 667.0), desired);
+        assert_eq!(mobile, Vec2::new(351.0, 560.0));
+
+        // Ultra-compact landscape phone (320x300) still clamps safely
+        let small = MacTheme::clamp_modal_for_viewport(Vec2::new(320.0, 300.0), desired);
+        assert_eq!(small, Vec2::new(296.0, 272.0));
+
+        // Desktop (1440x900) keeps desired size untouched
+        let desktop = MacTheme::clamp_modal_for_viewport(Vec2::new(1440.0, 900.0), desired);
+        assert_eq!(desktop, desired);
     }
 }

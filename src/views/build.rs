@@ -184,13 +184,24 @@ struct Member3D {
 
 impl BuildView {
     pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember], db_components: &[DatabaseComponent]) {
-        ui.horizontal(|ui| {
-            // 1. UNIFIED CAD/BIM TRIAD DOCK (Properties, Project Browser, Modify, Layers)
-            self.render_unified_sidebar(ui, theme, members, db_components);
-
-            // 2. 3D VIEWPORT CANVAS WITH INTERACTIVE VECTOR & SOLID RENDERER
-            self.render_canvas(ui, theme, members);
-        });
+        let avail_w = ui.available_width();
+        if avail_w >= 780.0 {
+            let panel_w = (avail_w * 0.30).clamp(250.0, 320.0);
+            ui.horizontal(|ui| {
+                self.render_unified_sidebar(ui, theme, members, db_components, Some(panel_w));
+                self.render_canvas(ui, theme, members, None);
+            });
+        } else {
+            let stacked_canvas_h = (MacTheme::viewport_size(ui.ctx()).y * 0.48).clamp(260.0, 420.0);
+            egui::ScrollArea::vertical()
+                .id_salt("build_compact_scroll")
+                .show(ui, |ui| {
+                    self.render_canvas(ui, theme, members, Some(stacked_canvas_h));
+                    ui.add_space(10.0);
+                    self.render_unified_sidebar(ui, theme, members, db_components, None);
+                    ui.add_space(68.0);
+                });
+        }
     }
 
     fn render_unified_sidebar(
@@ -199,12 +210,17 @@ impl BuildView {
         theme: &MacTheme,
         members: &[StructuralMember],
         db_components: &[DatabaseComponent],
+        panel_width: Option<f32>,
     ) {
         theme.sidebar_frame().show(ui, |ui| {
-            ui.set_width(320.0);
+            if let Some(w) = panel_width {
+                ui.set_width(w);
+            } else {
+                ui.set_width(ui.available_width());
+            }
             ui.vertical(|ui| {
                 // Activity Bar Tabs
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     let tabs = [
                         SidebarTab::Properties,
                         SidebarTab::Geometry,
@@ -933,7 +949,7 @@ impl BuildView {
         }
     }
 
-    fn render_canvas(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
+    fn render_canvas(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember], stacked_height: Option<f32>) {
         ui.vertical(|ui| {
             // Contextual Top Modeling Ribbon
             Frame::new()
@@ -989,7 +1005,7 @@ impl BuildView {
                         ];
                         egui::ComboBox::from_id_salt("model_archetype_combo")
                             .selected_text(RichText::new(self.active_model.label()).size(11.5).strong().color(theme.text_primary))
-                            .width(235.0)
+                            .width(ui.available_width().clamp(140.0, 235.0))
                             .show_ui(ui, |ui| {
                                 for m in models {
                                     let is_m_sel = self.active_model == m;
@@ -1071,8 +1087,11 @@ impl BuildView {
 
             // 3D Canvas Viewport Container (Fills Available Screen Space)
             let avail_size = ui.available_size();
-            let canvas_width = avail_size.x.max(680.0);
-            let canvas_height = (avail_size.y - 10.0).max(460.0);
+            let canvas_width = avail_size.x.max(240.0);
+            let canvas_height = match stacked_height {
+                Some(h) => h,
+                None => (avail_size.y - 10.0).max(360.0),
+            };
 
             Frame::new()
                 .fill(Color32::from_rgb(14, 16, 22))

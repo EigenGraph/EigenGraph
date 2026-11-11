@@ -7,7 +7,7 @@ authors = ["Harids Irawan <harids.irawan@gmail.com>"]
 description = "EigenGraph — 10D BIM & Structural Graph Analytics (WebAssembly & Native Desktop)"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/EigenGraph/Website"
+repository = "https://github.com/EigenGraph/EigenGraph"
 
 [dependencies]
 eframe = { version = "0.36", default-features = false, features = [

@@ -29,7 +29,8 @@ impl Default for AiAssistantView {
 }
 
 impl AiAssistantView {
-    /// Renders the floating Dynamic Island Copilot at the bottom-center across ALL views
+    /// Renders the floating Dynamic Island Copilot centered across the active workspace area.
+    #[allow(clippy::too_many_arguments)]
     pub fn show(
         &mut self,
         ctx: &egui::Context,
@@ -38,6 +39,7 @@ impl AiAssistantView {
         members: &[StructuralMember],
         projects: &[ProjectItem],
         db_components: &mut Vec<DatabaseComponent>,
+        sidebar_offset_x: f32,
     ) {
         // Global Keyboard Shortcut: Cmd+K toggles the Floating AI Copilot, Esc closes it
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::K)) {
@@ -47,20 +49,25 @@ impl AiAssistantView {
             self.expanded = false;
         }
 
-        // Anchor at bottom-center of the main content area:
-        // Offset X = 120.0 to center over the content area (accounting for the 240px left sidebar)
-        // Offset Y = -18.0 to float cleanly above the bottom window edge
+        let vp = MacTheme::viewport_size(ctx);
+        let offset_x = if vp.x < MacTheme::COMPACT_BREAKPOINT {
+            0.0
+        } else {
+            sidebar_offset_x
+        };
+
         Area::new(Id::new("global_floating_dynamic_island"))
-            .anchor(Align2::CENTER_BOTTOM, Vec2::new(120.0, -18.0))
+            .anchor(Align2::CENTER_BOTTOM, Vec2::new(offset_x, -12.0))
             .show(ctx, |ui| {
                 if self.expanded {
-                    self.render_expanded(ui, theme, active_pillar, members, projects, db_components);
+                    self.render_expanded(ui, theme, active_pillar, members, projects, db_components, vp);
                 } else {
-                    self.render_collapsed(ui, theme, active_pillar, members, projects, db_components);
+                    self.render_collapsed(ui, theme, active_pillar, members, projects, db_components, vp);
                 }
             });
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_collapsed(
         &mut self,
         ui: &mut Ui,
@@ -69,31 +76,58 @@ impl AiAssistantView {
         members: &[StructuralMember],
         projects: &[ProjectItem],
         db_components: &mut Vec<DatabaseComponent>,
+        vp: Vec2,
     ) {
+        let is_narrow = vp.x < 700.0;
+        let show_chips_count = if vp.x >= 980.0 {
+            2
+        } else if vp.x >= 780.0 {
+            1
+        } else {
+            0
+        };
+        let input_w = if is_narrow {
+            (vp.x - 195.0).clamp(80.0, 190.0)
+        } else {
+            240.0
+        };
+
         theme.floating_pill_frame().show(ui, |ui| {
+            ui.set_max_width((vp.x - 20.0).max(240.0));
             ui.horizontal(|ui| {
                 ui.label(RichText::new("⚛️ EigenAI").size(13.0).strong().color(theme.accent_blue));
-                ui.add_space(3.0);
-                ui.label(RichText::new("•").size(13.0).color(theme.accent_green));
-                ui.add_space(3.0);
 
-                // Workspace context badge
-                let badge_bg = theme.accent_blue.gamma_multiply(0.2);
-                Frame::new()
-                    .fill(badge_bg)
-                    .corner_radius(CornerRadius::same(6))
-                    .inner_margin(Margin::symmetric(6, 2))
-                    .show(ui, |ui| {
-                        ui.label(RichText::new(format!("{} {}", active_pillar.icon(), active_pillar.clean_name())).size(10.5).color(theme.accent_blue));
-                    });
+                if !is_narrow {
+                    ui.add_space(3.0);
+                    ui.label(RichText::new("•").size(13.0).color(theme.accent_green));
+                    ui.add_space(3.0);
 
-                ui.add_space(6.0);
+                    let badge_bg = theme.accent_blue.gamma_multiply(0.2);
+                    Frame::new()
+                        .fill(badge_bg)
+                        .corner_radius(CornerRadius::same(6))
+                        .inner_margin(Margin::symmetric(6, 2))
+                        .show(ui, |ui| {
+                            ui.label(
+                                RichText::new(format!("{} {}", active_pillar.icon(), active_pillar.clean_name()))
+                                    .size(10.5)
+                                    .color(theme.accent_blue),
+                            );
+                        });
+                }
+
+                ui.add_space(4.0);
 
                 // Quick input field in collapsed pill
+                let hint = if is_narrow {
+                    "Ask EigenAI..."
+                } else {
+                    "Ask EigenAI across all features (⌘K)..."
+                };
                 let input_field = ui.add(
                     egui::TextEdit::singleline(&mut self.input)
-                        .hint_text("Ask EigenAI across all features (⌘K)...")
-                        .desired_width(260.0)
+                        .hint_text(hint)
+                        .desired_width(input_w),
                 );
 
                 if input_field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) && !self.input.trim().is_empty() {
@@ -103,26 +137,33 @@ impl AiAssistantView {
                     self.input.clear();
                 }
 
-                // Top 2 Context Action Chips for active pillar
-                let chips = Self::get_chips_for_pillar(active_pillar);
-                for &(chip_label, prompt_query) in chips.iter().take(2) {
-                    if ui.add(egui::Button::new(RichText::new(chip_label).size(11.0).color(theme.text_secondary))
-                        .fill(theme.bg_card)
-                        .corner_radius(CornerRadius::same(12))).clicked() {
-                        self.expanded = true;
-                        self.execute_prompt(prompt_query, active_pillar, members, projects, db_components);
+                if show_chips_count > 0 {
+                    let chips = Self::get_chips_for_pillar(active_pillar);
+                    for &(chip_label, prompt_query) in chips.iter().take(show_chips_count) {
+                        if ui.add(
+                            egui::Button::new(RichText::new(chip_label).size(11.0).color(theme.text_secondary))
+                                .fill(theme.bg_card)
+                                .corner_radius(CornerRadius::same(12)),
+                        ).clicked() {
+                            self.expanded = true;
+                            self.execute_prompt(prompt_query, active_pillar, members, projects, db_components);
+                        }
                     }
                 }
 
-                ui.add_space(4.0);
-                if ui.add(egui::Button::new(RichText::new("⤢ Expand").size(11.0).color(theme.accent_blue))
-                    .fill(Color32::TRANSPARENT)).on_hover_text("Open Copilot Console (⌘K)").clicked() {
+                ui.add_space(2.0);
+                let expand_label = if is_narrow { "⤢" } else { "⤢ Expand" };
+                if ui.add(
+                    egui::Button::new(RichText::new(expand_label).size(11.5).color(theme.accent_blue))
+                        .fill(Color32::TRANSPARENT),
+                ).on_hover_text("Open Copilot Console (⌘K)").clicked() {
                     self.expanded = true;
                 }
             });
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_expanded(
         &mut self,
         ui: &mut Ui,
@@ -131,24 +172,36 @@ impl AiAssistantView {
         members: &[StructuralMember],
         projects: &[ProjectItem],
         db_components: &mut Vec<DatabaseComponent>,
+        vp: Vec2,
     ) {
+        let modal_w = (vp.x - 24.0).clamp(260.0, 640.0);
+        let chat_max_h = (vp.y * 0.36).clamp(120.0, 220.0);
+
         theme.floating_island_expanded_frame().show(ui, |ui| {
-            ui.set_width(640.0);
+            ui.set_width(modal_w);
             ui.vertical(|ui| {
                 // Header Bar
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("🤖 EigenAI Copilot").size(14.0).strong().color(theme.text_primary));
-                    ui.add_space(8.0);
-                    ui.label(RichText::new(format!("🟢 Workspace: {} {}", active_pillar.icon(), active_pillar.clean_name())).size(11.0).color(theme.accent_green));
+                    ui.add_space(6.0);
+                    ui.label(
+                        RichText::new(format!("🟢 {} {}", active_pillar.icon(), active_pillar.clean_name()))
+                            .size(11.0)
+                            .color(theme.accent_green),
+                    );
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.add(egui::Button::new(RichText::new("⤡ Minimize").size(11.0).color(theme.text_secondary))
-                            .fill(theme.bg_card)
-                            .corner_radius(CornerRadius::same(6))).clicked() {
+                        if ui.add(
+                            egui::Button::new(RichText::new("⤡ Minimize").size(11.0).color(theme.text_secondary))
+                                .fill(theme.bg_card)
+                                .corner_radius(CornerRadius::same(6)),
+                        ).clicked() {
                             self.expanded = false;
                         }
-                        if ui.add(egui::Button::new(RichText::new("🧹 Clear").size(11.0).color(theme.text_muted))
-                            .fill(Color32::TRANSPARENT)).clicked() {
+                        if ui.add(
+                            egui::Button::new(RichText::new("🧹 Clear").size(11.0).color(theme.text_muted))
+                                .fill(Color32::TRANSPARENT),
+                        ).clicked() {
                             self.chat_history.clear();
                         }
                     });
@@ -162,9 +215,11 @@ impl AiAssistantView {
                 ui.horizontal_wrapped(|ui| {
                     let chips = Self::get_chips_for_pillar(active_pillar);
                     for &(chip_label, prompt_query) in chips {
-                        if ui.add(egui::Button::new(RichText::new(chip_label).size(11.0).color(theme.accent_blue))
-                            .fill(theme.bg_card)
-                            .corner_radius(CornerRadius::same(12))).on_hover_text(prompt_query).clicked() {
+                        if ui.add(
+                            egui::Button::new(RichText::new(chip_label).size(11.0).color(theme.accent_blue))
+                                .fill(theme.bg_card)
+                                .corner_radius(CornerRadius::same(12)),
+                        ).on_hover_text(prompt_query).clicked() {
                             self.execute_prompt(prompt_query, active_pillar, members, projects, db_components);
                         }
                     }
@@ -173,7 +228,7 @@ impl AiAssistantView {
                 ui.add_space(8.0);
 
                 // Scrollable Chat Message Stream
-                egui::ScrollArea::vertical().max_height(200.0).stick_to_bottom(true).show(ui, |ui| {
+                egui::ScrollArea::vertical().max_height(chat_max_h).stick_to_bottom(true).show(ui, |ui| {
                     for chat in &self.chat_history {
                         if chat.is_user {
                             ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
@@ -205,17 +260,18 @@ impl AiAssistantView {
 
                 // Bottom Prompt Input Bar
                 ui.horizontal(|ui| {
+                    let send_reserve = 78.0;
                     let input_response = ui.add(
                         egui::TextEdit::singleline(&mut self.input)
-                            .hint_text(format!("Ask EigenAI or type command in {} (e.g. 'check stability')...", active_pillar.clean_name()))
-                            .desired_width(ui.available_width() - 85.0)
+                            .hint_text(format!("Ask EigenAI in {}...", active_pillar.clean_name()))
+                            .desired_width((ui.available_width() - send_reserve).max(110.0)),
                     );
 
                     let enter_pressed = input_response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                     let send_clicked = ui.add(
                         egui::Button::new(RichText::new("Send ↵").size(12.0).strong().color(Color32::WHITE))
                             .fill(theme.accent_blue)
-                            .corner_radius(CornerRadius::same(6))
+                            .corner_radius(CornerRadius::same(6)),
                     ).clicked();
 
                     if (enter_pressed || send_clicked) && !self.input.trim().is_empty() {

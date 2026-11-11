@@ -241,15 +241,29 @@ impl ParametricView {
         db_components: &mut Vec<DatabaseComponent>,
         active_pillar: &mut NavigationPillar,
     ) {
+        let avail_w = ui.available_width();
         ui.vertical(|ui| {
             // 1. TOP DRAFTING & BIMCRAFT AUTHORING RIBBON
             self.render_drafting_ribbon(ui, theme, db_components, active_pillar);
 
-            // 2. MAIN WORKSPACE (Left Variables & BIM Browser + Center Interactive Vector Canvas)
-            ui.horizontal(|ui| {
-                self.render_variables_panel(ui, theme, active_pillar);
-                self.render_drawing_canvas(ui, theme, db_components, active_pillar);
-            });
+            // 2. MAIN WORKSPACE (Side-by-side on Desktop, Stacked on Mobile/Narrow Tablet)
+            if avail_w >= 780.0 {
+                let panel_w = (avail_w * 0.28).clamp(240.0, 300.0);
+                ui.horizontal(|ui| {
+                    self.render_variables_panel(ui, theme, active_pillar, Some(panel_w));
+                    self.render_drawing_canvas(ui, theme, db_components, active_pillar, None);
+                });
+            } else {
+                let stacked_h = (MacTheme::viewport_size(ui.ctx()).y * 0.45).clamp(260.0, 380.0);
+                egui::ScrollArea::vertical()
+                    .id_salt("parametric_compact_scroll")
+                    .show(ui, |ui| {
+                        self.render_drawing_canvas(ui, theme, db_components, active_pillar, Some(stacked_h));
+                        ui.add_space(10.0);
+                        self.render_variables_panel(ui, theme, active_pillar, None);
+                        ui.add_space(68.0);
+                    });
+            }
         });
 
         if self.show_db_drawer {
@@ -602,9 +616,14 @@ impl ParametricView {
         ui: &mut Ui,
         theme: &MacTheme,
         active_pillar: &mut NavigationPillar,
+        panel_width: Option<f32>,
     ) {
         theme.sidebar_frame().show(ui, |ui| {
-            ui.set_width(300.0);
+            if let Some(w) = panel_width {
+                ui.set_width(w);
+            } else {
+                ui.set_width(ui.available_width());
+            }
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.label(
                     RichText::new("BIM LEVELS, ROOMS & DRIVING PARAMETERS")
@@ -828,6 +847,7 @@ impl ParametricView {
         theme: &MacTheme,
         _db_components: &[DatabaseComponent],
         _active_pillar: &mut NavigationPillar,
+        stacked_height: Option<f32>,
     ) {
         ui.vertical(|ui| {
             if let Some(ref note) = self.save_notification {
@@ -837,7 +857,7 @@ impl ParametricView {
                     .corner_radius(CornerRadius::same(8))
                     .inner_margin(Margin::symmetric(14, 6))
                     .show(ui, |ui| {
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new("✅").size(13.0));
                             ui.label(RichText::new(note).size(11.5).color(theme.accent_green));
                         });
@@ -845,8 +865,11 @@ impl ParametricView {
                 ui.add_space(4.0);
             }
 
-            let available_height = (ui.available_height() - 135.0).max(360.0);
-            let available_width = ui.available_width().max(480.0);
+            let available_height = match stacked_height {
+                Some(h) => h,
+                None => (ui.available_height() - 135.0).max(320.0),
+            };
+            let available_width = ui.available_width().max(240.0);
 
             Frame::new()
                 .fill(Color32::from_rgb(14, 17, 23))
@@ -1933,7 +1956,8 @@ impl ParametricView {
             .collapsible(false)
             .resizable(true)
             .anchor(egui::Align2::CENTER_CENTER, Vec2::new(0.0, 0.0))
-            .default_size(Vec2::new(660.0, 520.0))
+            .default_size(MacTheme::clamp_modal_size(ctx, Vec2::new(660.0, 520.0)))
+            .max_size(MacTheme::modal_max_size(ctx))
             .frame(
                 Frame::new()
                     .fill(theme.bg_card)

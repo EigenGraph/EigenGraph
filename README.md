@@ -6,13 +6,13 @@
 
 ### High-Performance 10D BIM & Structural Graph Analytics Running Natively in WebAssembly (Rust + egui/eframe)
 
-[![Live Web App](https://img.shields.io/badge/web%20app-live%20on%20GitHub%20Pages-0A84FF?style=for-the-badge&logo=githubpages&logoColor=white)](https://eigengraph.github.io/Website/)
+[![Live Web App](https://img.shields.io/badge/web%20app-eigengraph.net-0A84FF?style=for-the-badge&logo=cloudflare&logoColor=white)](https://eigengraph.net/)
 [![Core Engine](https://img.shields.io/badge/engine-Rust%20%2B%20WebAssembly%20(WebGL2)-orange?style=for-the-badge&logo=rust&logoColor=white)](https://github.com/EigenGraph/EigenGraph)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue?style=for-the-badge)](LICENSE)
 
-*Full Rust/egui **EigenGraph** 10D BIM & Structural Mechanics Workstation compiled directly to WebAssembly (`wasm32-unknown-unknown`) via `eframe` and `Trunk`.*
+*Full Rust/egui **EigenGraph** 10D BIM & Structural Mechanics Workstation compiled to WebAssembly (`wasm32-unknown-unknown`) via `eframe` and `Trunk`, with responsive navigation across Desktop, Tablet, and Mobile.*
 
-[**Launch EigenGraph Web App ↗**](https://eigengraph.github.io/Website/) • [**Desktop Repository ↗**](https://github.com/EigenGraph/EigenGraph) • [**Download Desktop Releases ↗**](https://github.com/EigenGraph/EigenGraph/releases)
+[**Launch EigenGraph Web App ↗**](https://eigengraph.net/) • [**Mirror (`www`) ↗**](https://www.eigengraph.net/) • [**Desktop Releases ↗**](https://github.com/EigenGraph/EigenGraph/releases)
 
 </div>
 
@@ -23,9 +23,9 @@
 
 ## 🏛️ Overview
 
-This repository (`EigenGraph/Website`) hosts the **EigenGraph Web Application**, directly ported from the [`EigenGraph/EigenGraph`](https://github.com/EigenGraph/EigenGraph) Rust codebase (`v0.2.5`, Phase 25) and compiled into a client-side **WebAssembly + WebGL2** application deployed automatically to GitHub Pages.
+**EigenGraph** (`EigenGraph/EigenGraph`) is a client-side **WebAssembly + WebGL2** 10D BIM and structural mechanics workstation compiled cleanly from Rust (`v0.2.5`, Phase 25) and deployed automatically to **Cloudflare Workers**.
 
-### 15-Pillar Master Shell Architecture
+### 15 Engineering Modules
 1. **📁 My Library** — Project records, parametric component catalog, interactive HTML5 3D viewer & Markdown dossier browser downloads.
 2. **🤖 AI Agent** — Virtual engineering firm & multi-agent collaboration board.
 3. **💡 Research** — Interactive Slippy Map (Web Mercator Quadtree), WGS84/UTM geodetic CRS transformations, and DEM topographic TIN mesh.
@@ -44,6 +44,25 @@ This repository (`EigenGraph/Website`) hosts the **EigenGraph Web Application**,
 
 ---
 
+## 📁 Repository Structure
+
+```text
+EigenGraph/
+├── .github/workflows/deploy.yml   # Test, Trunk WASM build & Cloudflare Workers deploy
+├── assets/
+│   ├── *.png                      # Web favicon & runtime app icons/logos
+│   └── desktop/                   # macOS bundle metadata, .icns & release checksums
+├── docs/
+│   └── CHANGELOG.md               # Versioned changelog across development phases
+├── src/                           # Rust core mechanics, egui views, WebAssembly bridge
+├── Cargo.toml                     # Rust package manifest & dependencies
+├── Trunk.toml                     # WebAssembly build configuration
+├── wrangler.jsonc                 # Cloudflare Workers Static Assets deployment config
+└── index.html                     # Responsive HTML5 WebGL2 shell
+```
+
+---
+
 ## 💻 Local Development
 
 ### Run as WebAssembly Web App (Recommended)
@@ -53,7 +72,7 @@ rustup target add wasm32-unknown-unknown
 cargo install --locked trunk
 
 # Serve locally with live reload
-trunk serve --open
+trunk serve --public-url / --open
 ```
 
 ### Run as Native Desktop Application
@@ -69,12 +88,19 @@ cargo check --bin eigengraph --target wasm32-unknown-unknown
 
 ---
 
-## 🚀 Continuous Deployment (GitHub Pages)
+## 🚀 Continuous Deployment (Cloudflare Workers)
 
-Every push to `main` triggers [`.github/workflows/pages.yml`](.github/workflows/pages.yml):
+Every push to `main` triggers [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
 1. Runs `cargo test --lib` and verifies `cargo check --bin eigengraph --target wasm32-unknown-unknown`.
-2. Builds the optimized WebAssembly bundle with `trunk build --release`.
-3. Publishes `dist/` directly to GitHub Pages.
+2. Builds the optimized WebAssembly bundle with `trunk build --release --public-url /`.
+3. Deploys `./dist` via Wrangler to Cloudflare Workers (`eigengraph.net` and `www.eigengraph.net`).
+
+---
+
+## 📚 Documentation
+
+- [Changelog](docs/CHANGELOG.md)
+- [Agent & Architecture Guidelines](AGENTS.md)
 
 ---
 
