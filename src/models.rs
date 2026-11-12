@@ -287,29 +287,35 @@ pub struct ChatMessage {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SidebarTab {
+    Properties,
+    ProjectBrowser,
+    ClashMatrix,
+    ModelAudit,
+    BcfIssues,
     Geometry,
+    Modify,
+    Layers,
     Sections,
     Materials,
     Loads,
     Settings,
-    Properties,
-    ProjectBrowser,
-    Modify,
-    Layers,
 }
 
 impl SidebarTab {
     pub fn icon_and_name(&self) -> (&'static str, &'static str) {
         match self {
-            Self::Geometry => ("📐", "Geometry"),
+            Self::Properties => ("📋", "Properties & IFC Psets"),
+            Self::ProjectBrowser => ("📁", "Project Browser & SBS"),
+            Self::ClashMatrix => ("⚔️", "Clash Detection Matrix"),
+            Self::ModelAudit => ("🛡️", "Solibri BIM Audit"),
+            Self::BcfIssues => ("💬", "BCF 3.0 Issues"),
+            Self::Geometry => ("📐", "Geometry & Wizards"),
+            Self::Modify => ("✏️", "Modify & Reinforce"),
+            Self::Layers => ("📑", "Layers & Worksets"),
             Self::Sections => ("📏", "Sections"),
             Self::Materials => ("🧱", "Materials"),
             Self::Loads => ("⬇️", "Loads"),
             Self::Settings => ("⚙️", "Settings"),
-            Self::Properties => ("📋", "Properties"),
-            Self::ProjectBrowser => ("📁", "Browser"),
-            Self::Modify => ("✏️", "Modify"),
-            Self::Layers => ("📑", "Layers"),
         }
     }
 }
