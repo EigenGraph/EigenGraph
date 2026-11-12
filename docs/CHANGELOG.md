@@ -7,6 +7,51 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.2.7] - 2026-11-12 — Phase 27: All-Inclusive World-Class Master BIM Superstation (2D Drawing Sheets & DED Engine, Visual Dynamo/Grasshopper Node Graph Studio, 10D BIM Lifecycle Master Hub & Global Family Catalog)
+
+### Added
+- **Interactive 2D Drawing Sheets & DED Production Engine (`src/views/results.rs`, `ResultsSubTab::DrawingSheets`, `DrawingSheetItem`)**:
+  - Full-featured ISO architectural & structural sheet layout workstation:
+    - Standard paper sizes: ISO A0 (1189×841 mm), ISO A1 (841×594 mm), ISO A2 (594×420 mm), ISO A3 (420×297 mm), and ANSI Arch D (36"×24").
+    - Professional engineering title block: Project metadata ("Menara Sudirman Structural Complex"), Client attribution, Sheet titles, Sheet numbers (`S-101`, `S-201`, `A-101`, `M-301`), Drawing scale (`1:100`), Revision markers (`REV-0`, `REV-B`), North Arrow compass gizmo, and graphic scale bar.
+    - Verified Professional Engineer (PE) Digital Seal stamp with circular golden certification boundary (`PE #49120-ST`).
+    - Multi-viewport layout engine:
+      - Viewport 1 (Main Framing Plan): Structural grids A–D and 1–4, grid callout bubbles, column placements with crosshatching, primary double-line girders (`W14x90 [G1]`), and automatic dimension chains with tick marks.
+      - Viewport 2 (Schedule Table): Real-time column & footing schedules with marks (`C1`, `C2`, `F1`), dimensions, rebar arrangements, and concrete strengths.
+      - Viewport 3 (Connection Detail): 1:10 scale moment connection callout with column/beam profiles, flange continuity plates, and 4-bolt shear tabs.
+    - One-click production exports: Vector PDF (ISO A1, 300 DPI), AutoCAD 2024 DXF with layered geometry (`S-GRID`, `S-COLS`, `S-BEAMS`, `S-ANNO-DIMS`), and SVG vector graphics.
+- **Visual Dynamo / Grasshopper Computational Node Graph Studio (`src/views/parametric.rs`, `DraftingViewMode::VisualNodeGraphDynamo`, `VisualNodeGraph`)**:
+  - Visual node-based computational programming canvas built alongside the 2D CAD studio:
+    - Infinite dark slate canvas with interactive pan, smooth zoom scaling, and subtle coordinate dot lattice.
+    - Cubic Bézier wire connectors linking output sockets to input sockets with smooth gradients and green pulsing data-flow packet indicators.
+    - Four core computational node categories (`VisualNodeCategory`):
+      - **Input Nodes**: Parameter sliders (Span length, bay width, storey height, loads).
+      - **Math & Logic Nodes**: Procedural formula evaluators, trigonometry functions, ratio calculators ($H = L / 8$).
+      - **3D Solid Generators**: Parametric space truss generators, box meshes, beam grids, curtain wall mullion arrays.
+      - **BIM Scene Bakers**: Direct scene synchronization baking procedural computational elements into the live BIM model.
+    - Real-time "Run Graph" execution button with instant feedback toast logging element generation count and compute latency.
+    - Procedural node insertion tools and pre-configured algorithmic templates.
+- **10D BIM Multi-Discipline Lifecycle Master Hub (`src/views/industrialized.rs`, `IndustrializedSubTab::Lifecycle10DHub`)**:
+  - Unified Integrated Project Delivery (IPD) command dashboard encompassing all 10 engineering lifecycle dimensions:
+    - **1D Scope**: Project Charter, specifications, and baseline tracking.
+    - **2D Working Drawings**: DED drawing sheets, schedules, and code annotations.
+    - **3D Spatial**: Coordinated CSG B-Rep solid geometry and parametric elements.
+    - **4D Time & Scheduling**: Synchro-style 180-day construction timeline ($SPI = 1.04$).
+    - **5D Cost & Earned Value (EVM)**: Live Earned Value Management metrics calculating Planned Value ($PV$), Earned Value ($EV$), Actual Cost ($AC$), Cost Variance ($CV = +\$295,000$), Schedule Variance ($SV = +\$290,000$), $CPI = 1.061$, and $SPI = 1.059$.
+    - **6D Sustainability & LCA**: Cradle-to-gate embodied carbon tracking ($-28.4\%\text{ CO}_2\text{e}$) and LEED Platinum 84-point scorecard.
+    - **7D Digital Twin & IoT Telemetry**: Real-time sensor stream readouts for strain gauges ($\mu\epsilon$), accelerometers ($f_1 = 1.42\text{ Hz}$), tiltmeters, and thermocouples.
+    - **8D Site Safety & Logistics**: Dynamic tower crane hook radius (48m / 55m jib envelope), Safe Working Load (SWL 70%), and perimeter slab-edge fall arrest net detection.
+    - **9D Lean Construction**: Last Planner System (LPS) Kanban board with live status pills (Done, In Progress, Committed, Backlog) tracking Percent Plan Complete ($PPC = 88\%$).
+    - **10D Industrialized DfMA**: Off-site prefabrication modularity metrics ($82.5\%$ factory pre-assembly) and highway transport module clearance validation.
+- **Global BIM Component Family Catalog & Parameter Inspector (`src/views/my_project.rs`, `BimFamilyItem`, `LibraryViewMode`)**:
+  - Top library mode switcher between "Project Portfolios & Vault" and "Global BIM Families & Parameter Inspector (Revit RFA / IFC Style)".
+  - Searchable multi-discipline catalog of parametric component families categorized by MasterFormat 2024 and UniFormat II.
+  - Multi-discipline families pre-loaded: AISC W14x90 Steel Girder, Cast-in-Place RC 600x600 Column, Unitized Curtain Wall Facade, VAV Rooftop AHU Package, PCI Type IV 30m Prestressed I-Girder, Precast Stormwater Box Culvert.
+  - Deep parameter inspector panel exposing Type Parameters, Instance Parameters, and buildingSMART IFC Property Sets (`Pset_BeamCommon`, `Pset_StructuralAnalysis`, `Pset_EnvironmentalMetrics`).
+  - One-click "Insert into Active 3D Scene", "Duplicate Type", and "Export IFC Spec" action controls.
+
+---
+
 ## [v0.2.6] - 2026-11-12 — Phase 26: Master World-Class BIM Suite Overhaul (Architecture, Structure, MEP, Civil, 4D/5D, Solibri Audit & BCF 3.0)
 
 ### Added

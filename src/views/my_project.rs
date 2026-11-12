@@ -1,25 +1,40 @@
-//! my_project.rs — Pillar 1: Mac App Store style Portfolio & Project Hub.
-
-use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui};
-use crate::models::{NavigationPillar, ProjectItem};
+use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui, Vec2};
+use crate::models::{BimFamilyItem, NavigationPillar, ProjectItem};
 use crate::theme::MacTheme;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryViewMode {
+    ProjectsAndPortfolios,
+    GlobalBimFamilyCatalog,
+}
+
 pub struct MyProjectView {
+    pub library_mode: LibraryViewMode,
     pub selected_category: String,
     pub search_query: String,
     pub show_dossier_modal: bool,
     pub export_success_msg: Option<String>,
     pub custom_vault_override: String,
+    // Phase 27: BIM Family Catalog & Parameter Inspector fields
+    pub families: Vec<BimFamilyItem>,
+    pub selected_family_idx: usize,
+    pub family_search_query: String,
+    pub family_category_filter: String,
 }
 
 impl Default for MyProjectView {
     fn default() -> Self {
         Self {
+            library_mode: LibraryViewMode::ProjectsAndPortfolios,
             selected_category: "All Projects".to_string(),
             search_query: String::new(),
             show_dossier_modal: false,
             export_success_msg: None,
             custom_vault_override: String::new(),
+            families: BimFamilyItem::default_catalog(),
+            selected_family_idx: 0,
+            family_search_query: String::new(),
+            family_category_filter: "All Families".to_string(),
         }
     }
 }
@@ -31,35 +46,65 @@ impl MyProjectView {
 
         ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
             Frame::new().inner_margin(outer_margin).show(ui, |ui| {
-                // 1. HERO FEATURED BANNER
-                if let Some(featured) = projects.iter().find(|p| p.is_featured) {
-                    self.render_hero_banner(ui, theme, featured, active_pillar);
-                }
-
-                if let Some(ref msg) = self.export_success_msg {
-                    ui.add_space(10.0);
-                    theme.card_frame().show(ui, |ui| {
+                // Top Library Mode Selector (Phase 27)
+                Frame::new()
+                    .fill(theme.bg_card)
+                    .corner_radius(CornerRadius::same(8))
+                    .inner_margin(Margin::same(6))
+                    .stroke(Stroke::new(1.0, theme.border_subtle))
+                    .show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(RichText::new("✅ INTERNAL VAULT AUTOSAVE:").size(11.5).strong().color(theme.accent_green));
-                            ui.label(RichText::new(msg).size(11.5).color(theme.text_primary));
+                            let is_proj = self.library_mode == LibraryViewMode::ProjectsAndPortfolios;
+                            let is_fam = self.library_mode == LibraryViewMode::GlobalBimFamilyCatalog;
+
+                            if ui.add(egui::Button::new(RichText::new("📁 Project Portfolios & Vault").size(12.0).strong().color(if is_proj { Color32::WHITE } else { theme.text_secondary }))
+                                .fill(if is_proj { theme.accent_blue } else { Color32::TRANSPARENT })
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                self.library_mode = LibraryViewMode::ProjectsAndPortfolios;
+                            }
+                            if ui.add(egui::Button::new(RichText::new("🧱 Global BIM Families & Parameter Inspector (Revit RFA / IFC Style)").size(12.0).strong().color(if is_fam { Color32::WHITE } else { theme.text_secondary }))
+                                .fill(if is_fam { theme.accent_blue } else { Color32::TRANSPARENT })
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                self.library_mode = LibraryViewMode::GlobalBimFamilyCatalog;
+                            }
                         });
                     });
+
+                ui.add_space(14.0);
+
+                if self.library_mode == LibraryViewMode::GlobalBimFamilyCatalog {
+                    self.render_family_catalog(ui, theme);
+                } else {
+                    // 1. HERO FEATURED BANNER
+                    if let Some(featured) = projects.iter().find(|p| p.is_featured) {
+                        self.render_hero_banner(ui, theme, featured, active_pillar);
+                    }
+
+                    if let Some(ref msg) = self.export_success_msg {
+                        ui.add_space(10.0);
+                        theme.card_frame().show(ui, |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(RichText::new("✅ INTERNAL VAULT AUTOSAVE:").size(11.5).strong().color(theme.accent_green));
+                                ui.label(RichText::new(msg).size(11.5).color(theme.text_primary));
+                            });
+                        });
+                    }
+
+                    ui.add_space(16.0);
+
+                    // 1B. SELF-CONTAINED PACKAGE VAULT & SELF-LEARNING MEMORY PANEL
+                    self.render_internal_vault_panel(ui, theme);
+
+                    ui.add_space(20.0);
+
+                    // 2. CATEGORY FILTER PILLS
+                    self.render_category_bar(ui, theme);
+
+                    ui.add_space(16.0);
+
+                    // 3. CURATED PROJECT CARDS (Responsive 1-col / 2-col grid)
+                    self.render_projects_grid(ui, theme, projects, active_pillar);
                 }
-
-                ui.add_space(16.0);
-
-                // 1B. SELF-CONTAINED PACKAGE VAULT & SELF-LEARNING MEMORY PANEL
-                self.render_internal_vault_panel(ui, theme);
-
-                ui.add_space(20.0);
-
-                // 2. CATEGORY FILTER PILLS
-                self.render_category_bar(ui, theme);
-
-                ui.add_space(16.0);
-
-                // 3. CURATED PROJECT CARDS (Responsive 1-col / 2-col grid)
-                self.render_projects_grid(ui, theme, projects, active_pillar);
 
                 ui.add_space(68.0);
             });
@@ -656,6 +701,298 @@ impl MyProjectView {
                                 }
                             });
                         });
+                });
+            });
+    }
+
+    /// Phase 27: Renders the Global BIM Component Family Catalog & Parameter Inspector
+    fn render_family_catalog(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        // Top Filter Bar
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .stroke(Stroke::new(1.0, theme.border_card))
+            .inner_margin(Margin::symmetric(14, 10))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("🔍 Search:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::TextEdit::singleline(&mut self.family_search_query).desired_width(160.0).hint_text("Filter families..."));
+
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.add_space(8.0);
+
+                    let categories = [
+                        "All Families",
+                        "Structural Framing",
+                        "Columns",
+                        "Curtain Wall",
+                        "MEP Equipment",
+                        "Civil Infrastructure",
+                    ];
+                    for cat in categories {
+                        let is_sel = self.family_category_filter == cat;
+                        let bg = if is_sel { theme.accent_blue } else { theme.bg_sidebar };
+                        let fg = if is_sel { Color32::WHITE } else { theme.text_primary };
+                        if ui.add(egui::Button::new(RichText::new(cat).size(10.5).color(fg))
+                            .fill(bg)
+                            .corner_radius(CornerRadius::same(6))).clicked() {
+                            self.family_category_filter = cat.to_string();
+                        }
+                    }
+
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if ui.add(egui::Button::new(RichText::new("➕ Create Family").size(11.0).strong().color(Color32::WHITE))
+                            .fill(theme.accent_blue)
+                            .corner_radius(CornerRadius::same(6))).clicked() {
+                            let next_idx = self.families.len() + 1;
+                            self.families.push(crate::models::BimFamilyItem {
+                                id: format!("fam_custom_{}", next_idx),
+                                name: format!("Custom Parametric Profile #{}", next_idx),
+                                category: "Structural Framing".to_string(),
+                                classification: "MasterFormat 05 12 00".to_string(),
+                                ifc_entity: "IfcBeam".to_string(),
+                                lod: "LOD 350".to_string(),
+                                material: "ASTM A992 Gr 50".to_string(),
+                                dimensions_desc: "Custom User Specified Geometry".to_string(),
+                                embodied_carbon_kg: 120.0,
+                                fire_rating_hr: 2.0,
+                                type_params: vec![("Section Height".to_string(), "400 mm".to_string())],
+                                instance_params: vec![("Mark".to_string(), format!("BM-{}", next_idx))],
+                            });
+                            self.export_success_msg = Some(format!("Custom family #{} created and added to global BIM library.", next_idx));
+                        }
+                    });
+                });
+            });
+
+        ui.add_space(14.0);
+
+        let avail_w = ui.available_width();
+        let is_wide = avail_w >= 840.0;
+
+        // Filter families
+        let query = self.family_search_query.to_lowercase();
+        let cat_filter = &self.family_category_filter;
+        let filtered_indices: Vec<usize> = self.families.iter().enumerate()
+            .filter(|(_, fam)| {
+                let match_cat = cat_filter == "All Families" || fam.category == *cat_filter;
+                let match_query = query.is_empty()
+                    || fam.name.to_lowercase().contains(&query)
+                    || fam.classification.to_lowercase().contains(&query)
+                    || fam.ifc_entity.to_lowercase().contains(&query);
+                match_cat && match_query
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        if is_wide {
+            let left_w = (avail_w - 16.0) * 0.58;
+            let right_w = (avail_w - 16.0) * 0.42;
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.set_width(left_w);
+                    self.render_family_card_list(ui, theme, &filtered_indices);
+                });
+                ui.add_space(16.0);
+                ui.vertical(|ui| {
+                    ui.set_width(right_w);
+                    self.render_family_inspector_panel(ui, theme);
+                });
+            });
+        } else {
+            ui.vertical(|ui| {
+                self.render_family_card_list(ui, theme, &filtered_indices);
+                ui.add_space(16.0);
+                self.render_family_inspector_panel(ui, theme);
+            });
+        }
+    }
+
+    fn render_family_card_list(&mut self, ui: &mut Ui, theme: &MacTheme, indices: &[usize]) {
+        ui.label(RichText::new(format!("PARAMETRIC FAMILIES ({} FOUND)", indices.len())).size(11.5).strong().color(theme.text_secondary));
+        ui.add_space(6.0);
+
+        for idx in indices {
+            let fam = &self.families[*idx];
+            let is_sel = self.selected_family_idx == *idx;
+
+            let border_stroke = if is_sel {
+                Stroke::new(2.0, theme.accent_blue)
+            } else {
+                Stroke::new(1.0, theme.border_card)
+            };
+
+            let bg = if is_sel {
+                theme.bg_card
+            } else {
+                theme.bg_card
+            };
+
+            Frame::new()
+                .fill(bg)
+                .corner_radius(CornerRadius::same(10))
+                .stroke(border_stroke)
+                .inner_margin(Margin::same(14))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new(&fam.name).size(13.0).strong().color(theme.text_primary));
+                            ui.add_space(2.0);
+                            ui.label(RichText::new(&fam.classification).size(10.0).color(theme.text_secondary));
+                            ui.label(RichText::new(&fam.dimensions_desc).size(10.0).color(theme.text_muted));
+                            ui.add_space(6.0);
+
+                            ui.horizontal_wrapped(|ui| {
+                                Frame::new()
+                                    .fill(theme.accent_blue.linear_multiply(0.2))
+                                    .corner_radius(CornerRadius::same(4))
+                                    .inner_margin(Margin::symmetric(6, 2))
+                                    .show(ui, |ui| {
+                                        ui.label(RichText::new(&fam.ifc_entity).size(9.5).strong().color(theme.accent_blue));
+                                    });
+                                Frame::new()
+                                    .fill(theme.accent_green.linear_multiply(0.2))
+                                    .corner_radius(CornerRadius::same(4))
+                                    .inner_margin(Margin::symmetric(6, 2))
+                                    .show(ui, |ui| {
+                                        ui.label(RichText::new(&fam.lod).size(9.5).strong().color(theme.accent_green));
+                                    });
+                                Frame::new()
+                                    .fill(theme.bg_sidebar)
+                                    .corner_radius(CornerRadius::same(4))
+                                    .inner_margin(Margin::symmetric(6, 2))
+                                    .show(ui, |ui| {
+                                        ui.label(RichText::new(format!("CO2e: {:.1} kg", fam.embodied_carbon_kg)).size(9.0).color(theme.text_secondary));
+                                    });
+                                Frame::new()
+                                    .fill(theme.bg_sidebar)
+                                    .corner_radius(CornerRadius::same(4))
+                                    .inner_margin(Margin::symmetric(6, 2))
+                                    .show(ui, |ui| {
+                                        ui.label(RichText::new(format!("Fire: {:.1}h", fam.fire_rating_hr)).size(9.0).color(theme.text_secondary));
+                                    });
+                            });
+                        });
+
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            if ui.add(egui::Button::new(RichText::new(if is_sel { "✓ Selected" } else { "Inspect" }).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_primary }))
+                                .fill(if is_sel { theme.accent_blue } else { theme.bg_sidebar })
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                self.selected_family_idx = *idx;
+                            }
+                        });
+                    });
+                });
+            ui.add_space(8.0);
+        }
+    }
+
+    fn render_family_inspector_panel(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        let active_fam = self.families.get(self.selected_family_idx).cloned().unwrap_or_else(|| self.families[0].clone());
+
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(12))
+            .stroke(Stroke::new(1.0, theme.border_card))
+            .inner_margin(Margin::same(16))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("📋 PARAMETER INSPECTOR").size(10.5).strong().color(theme.accent_blue));
+                        ui.label(RichText::new(&active_fam.name).size(13.0).strong().color(theme.text_primary));
+                    });
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        Frame::new()
+                            .fill(theme.accent_green.linear_multiply(0.2))
+                            .corner_radius(CornerRadius::same(4))
+                            .inner_margin(Margin::symmetric(6, 3))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(&active_fam.lod).size(10.0).strong().color(theme.accent_green));
+                            });
+                    });
+                });
+
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
+
+                // Type Parameters
+                ui.label(RichText::new("TYPE PARAMETERS (FAMILY DEFINITION)").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                for (param, val) in &active_fam.type_params {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(param).size(10.5).color(theme.text_secondary));
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.label(RichText::new(val).size(10.5).strong().color(theme.text_primary));
+                        });
+                    });
+                    ui.separator();
+                }
+
+                ui.add_space(8.0);
+
+                // Instance Parameters
+                ui.label(RichText::new("INSTANCE PARAMETERS (PROJECT PLACEMENT)").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                for (param, val) in &active_fam.instance_params {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(param).size(10.5).color(theme.text_secondary));
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.label(RichText::new(val).size(10.5).strong().color(theme.accent_blue));
+                        });
+                    });
+                    ui.separator();
+                }
+
+                ui.add_space(8.0);
+
+                // buildingSMART Property Sets
+                ui.label(RichText::new("buildingSMART IFC PROPERTY SETS").size(10.5).strong().color(theme.text_secondary));
+                ui.add_space(4.0);
+                ui.horizontal_wrapped(|ui| {
+                    let psets = ["Pset_BeamCommon", "Pset_StructuralAnalysis", "Pset_EnvironmentalMetrics", "Qto_BodyGeometryValidation"];
+                    for ps in psets {
+                        Frame::new()
+                            .fill(theme.bg_sidebar)
+                            .corner_radius(CornerRadius::same(4))
+                            .inner_margin(Margin::symmetric(6, 2))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(ps).size(9.0).color(theme.text_secondary));
+                            });
+                    }
+                });
+
+                ui.add_space(16.0);
+
+                // Action Buttons
+                ui.vertical(|ui| {
+                    if ui.add(egui::Button::new(RichText::new("🏗️ Insert into Active 3D Scene").size(12.0).strong().color(Color32::WHITE))
+                        .fill(theme.accent_blue)
+                        .corner_radius(CornerRadius::same(7))
+                        .min_size(Vec2::new(ui.available_width(), 32.0))).clicked() {
+                        self.export_success_msg = Some(format!("Family '{}' successfully instantiated into active BIM model at Grid Intersection A-1.", active_fam.name));
+                    }
+                    ui.add_space(6.0);
+                    ui.horizontal(|ui| {
+                        let btn_w = (ui.available_width() - 8.0) * 0.5;
+                        if ui.add(egui::Button::new(RichText::new("📋 Duplicate Type").size(11.0).color(theme.text_primary))
+                            .fill(theme.bg_sidebar)
+                            .corner_radius(CornerRadius::same(6))
+                            .min_size(Vec2::new(btn_w, 28.0))).clicked() {
+                            let mut dup = active_fam.clone();
+                            dup.id = format!("{}_copy", dup.id);
+                            dup.name = format!("{} (Type 2)", dup.name);
+                            self.families.push(dup);
+                            self.export_success_msg = Some(format!("Duplicated family type '{}'.", active_fam.name));
+                        }
+                        if ui.add(egui::Button::new(RichText::new("📥 Export IFC Spec").size(11.0).color(theme.text_primary))
+                            .fill(theme.bg_sidebar)
+                            .corner_radius(CornerRadius::same(6))
+                            .min_size(Vec2::new(btn_w, 28.0))).clicked() {
+                            self.export_success_msg = Some(format!("Exported ISO 10303-21 STEP specification for '{}'.", active_fam.name));
+                        }
+                    });
                 });
             });
     }

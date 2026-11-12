@@ -424,3 +424,366 @@ impl DatabaseComponent {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Phase 27: Master BIM Superstation Models (Family Catalog, Dynamo Nodes, Sheets)
+// ---------------------------------------------------------------------------
+
+/// Standardized BIM Component Family for Global Library (UniFormat & MasterFormat)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BimFamilyItem {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    pub classification: String,
+    pub ifc_entity: String,
+    pub lod: String,
+    pub material: String,
+    pub dimensions_desc: String,
+    pub embodied_carbon_kg: f32,
+    pub fire_rating_hr: f32,
+    pub type_params: Vec<(String, String)>,
+    pub instance_params: Vec<(String, String)>,
+}
+
+impl BimFamilyItem {
+    pub fn default_catalog() -> Vec<Self> {
+        vec![
+            Self {
+                id: "fam_w14x90".to_string(),
+                name: "AISC W14x90 Wide Flange Steel Girder".to_string(),
+                category: "Structural Framing".to_string(),
+                classification: "MasterFormat 05 12 00 / UniFormat B1010.10".to_string(),
+                ifc_entity: "IfcBeam".to_string(),
+                lod: "LOD 350".to_string(),
+                material: "ASTM A992 Gr 50 Steel".to_string(),
+                dimensions_desc: "d=356mm, bf=368mm, tf=18.0mm, tw=11.2mm".to_string(),
+                embodied_carbon_kg: 134.2,
+                fire_rating_hr: 2.0,
+                type_params: vec![
+                    ("Section Depth (d)".to_string(), "356 mm".to_string()),
+                    ("Flange Width (bf)".to_string(), "368 mm".to_string()),
+                    ("Elastic Modulus (Sx)".to_string(), "2340 cm³".to_string()),
+                    ("Yield Strength (Fy)".to_string(), "345 MPa".to_string()),
+                ],
+                instance_params: vec![
+                    ("Structural Mark".to_string(), "B-101".to_string()),
+                    ("Top Elevation".to_string(), "+4.000 m".to_string()),
+                    ("Camber".to_string(), "15 mm".to_string()),
+                    ("Phase Created".to_string(), "Phase 1 - Superstructure".to_string()),
+                ],
+            },
+            Self {
+                id: "fam_rc_col_600".to_string(),
+                name: "Cast-in-Place RC Square Column 600x600".to_string(),
+                category: "Columns".to_string(),
+                classification: "MasterFormat 03 30 00 / UniFormat B1010.20".to_string(),
+                ifc_entity: "IfcColumn".to_string(),
+                lod: "LOD 350".to_string(),
+                material: "Concrete C40/50 + Rebar D25".to_string(),
+                dimensions_desc: "600 mm x 600 mm (12-D25 Main + D10@100 Ties)".to_string(),
+                embodied_carbon_kg: 285.6,
+                fire_rating_hr: 3.0,
+                type_params: vec![
+                    ("Width / Depth".to_string(), "600 x 600 mm".to_string()),
+                    ("Compressive Strength f'c".to_string(), "40 MPa".to_string()),
+                    ("Rebar Longitudinal Ratio".to_string(), "2.45%".to_string()),
+                    ("Cover Depth".to_string(), "40 mm".to_string()),
+                ],
+                instance_params: vec![
+                    ("Column Tag".to_string(), "C-1".to_string()),
+                    ("Base Level".to_string(), "Level 0 GF".to_string()),
+                    ("Top Level".to_string(), "Level 1 (+4.00m)".to_string()),
+                    ("Slenderness kl/r".to_string(), "24.2 (Short Column)".to_string()),
+                ],
+            },
+            Self {
+                id: "fam_curtain_wall_mullion".to_string(),
+                name: "Double-Glazed Unitized Curtain Wall Facade".to_string(),
+                category: "Curtain Wall".to_string(),
+                classification: "MasterFormat 08 44 00 / UniFormat B2020".to_string(),
+                ifc_entity: "IfcCurtainWall".to_string(),
+                lod: "LOD 300".to_string(),
+                material: "Extruded Aluminium 6063-T6 + Low-E Glass".to_string(),
+                dimensions_desc: "1500 mm module width x 4000 mm story height".to_string(),
+                embodied_carbon_kg: 88.4,
+                fire_rating_hr: 1.0,
+                type_params: vec![
+                    ("U-Value Thermal".to_string(), "1.25 W/m²K".to_string()),
+                    ("SHGC Solar Heat Gain".to_string(), "0.32".to_string()),
+                    ("Acoustic Rating (STC)".to_string(), "42 dB".to_string()),
+                    ("Mullion Profile Depth".to_string(), "180 mm".to_string()),
+                ],
+                instance_params: vec![
+                    ("Facade Elevation".to_string(), "South Elevation Grid 1-4".to_string()),
+                    ("Wind Pressure Design".to_string(), "2.40 kPa (ASCE 7-22)".to_string()),
+                    ("Glass Type".to_string(), "6mm Low-E + 12mm Argon + 6mm Clr".to_string()),
+                ],
+            },
+            Self {
+                id: "fam_hvac_ahu_rooftop".to_string(),
+                name: "Variable Air Volume Rooftop AHU Package".to_string(),
+                category: "MEP Equipment".to_string(),
+                classification: "MasterFormat 23 74 13 / UniFormat D3030".to_string(),
+                ifc_entity: "IfcAirTerminal".to_string(),
+                lod: "LOD 350".to_string(),
+                material: "Galvanized Steel Casing + EC Motors".to_string(),
+                dimensions_desc: "3200 mm L x 1800 mm W x 1650 mm H".to_string(),
+                embodied_carbon_kg: 420.0,
+                fire_rating_hr: 0.0,
+                type_params: vec![
+                    ("Nominal Airflow".to_string(), "12,000 CFM (5,660 L/s)".to_string()),
+                    ("Cooling Capacity".to_string(), "350 kW (100 Tons)".to_string()),
+                    ("External Static Pressure".to_string(), "500 Pa".to_string()),
+                    ("Refrigerant".to_string(), "R-454B (Low GWP)".to_string()),
+                ],
+                instance_params: vec![
+                    ("Equipment Tag".to_string(), "AHU-ROOF-01".to_string()),
+                    ("Location".to_string(), "Rooftop Plant Deck Grid B-2".to_string()),
+                    ("BMS Address".to_string(), "BACnet/IP ID 40012".to_string()),
+                ],
+            },
+            Self {
+                id: "fam_pt_i_girder_30m".to_string(),
+                name: "PCI Type IV Prestressed I-Girder 30m Span".to_string(),
+                category: "Civil Infrastructure".to_string(),
+                classification: "MasterFormat 34 71 00 / UniFormat G2010".to_string(),
+                ifc_entity: "IfcBeam".to_string(),
+                lod: "LOD 350".to_string(),
+                material: "Precast Concrete 55 MPa + 0.6\" Strands".to_string(),
+                dimensions_desc: "Height 1370mm, Length 30.0m, Web 200mm".to_string(),
+                embodied_carbon_kg: 680.0,
+                fire_rating_hr: 3.0,
+                type_params: vec![
+                    ("Span Length".to_string(), "30.0 m".to_string()),
+                    ("Girder Depth".to_string(), "1370 mm".to_string()),
+                    ("PT Tendons".to_string(), "34 x 15.2mm Low-Relaxation Strands".to_string()),
+                    ("Prestress Force Pjack".to_string(), "6,800 kN".to_string()),
+                ],
+                instance_params: vec![
+                    ("Span Mark".to_string(), "GIRDER-SPAN-02-G1".to_string()),
+                    ("Casting Date".to_string(), "2026-10-15".to_string()),
+                    ("Measured Camber".to_string(), "42 mm".to_string()),
+                ],
+            },
+            Self {
+                id: "fam_box_culvert".to_string(),
+                name: "Precast Stormwater Box Culvert 3.0x2.5m".to_string(),
+                category: "Civil Infrastructure".to_string(),
+                classification: "MasterFormat 33 42 16 / UniFormat G3020".to_string(),
+                ifc_entity: "IfcDistributionElement".to_string(),
+                lod: "LOD 300".to_string(),
+                material: "Reinforced Concrete C35/45".to_string(),
+                dimensions_desc: "3000 mm span x 2500 mm rise x 2000 mm lay length".to_string(),
+                embodied_carbon_kg: 510.0,
+                fire_rating_hr: 0.0,
+                type_params: vec![
+                    ("Hydraulic Capacity".to_string(), "18.5 m³/s (Manning n=0.013)".to_string()),
+                    ("Wall Thickness".to_string(), "250 mm".to_string()),
+                    ("Live Load Rating".to_string(), "AASHTO HL-93 Highway Loading".to_string()),
+                ],
+                instance_params: vec![
+                    ("Station Invert".to_string(), "Sta 0+450 Invert EL -1.25m".to_string()),
+                    ("Bedding Condition".to_string(), "Class B Granular Cradle".to_string()),
+                ],
+            },
+        ]
+    }
+}
+
+/// Visual Node Programming Category for Dynamo/Grasshopper Studio
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VisualNodeCategory {
+    Input,
+    MathLogic,
+    GeometryGen,
+    BimBake,
+}
+
+impl VisualNodeCategory {
+    pub fn badge_color_and_name(&self) -> (&'static str, (u8, u8, u8)) {
+        match self {
+            Self::Input => ("Input Parameter", (52, 199, 89)),
+            Self::MathLogic => ("Math & Transform", (255, 149, 0)),
+            Self::GeometryGen => ("3D Solid Generator", (10, 132, 255)),
+            Self::BimBake => ("BIM Scene Baker", (175, 82, 222)),
+        }
+    }
+}
+
+/// A computational node on the visual programming graph canvas
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualGraphNode {
+    pub id: usize,
+    pub title: String,
+    pub category: VisualNodeCategory,
+    pub pos: [f32; 2],
+    pub inputs: Vec<String>,
+    pub outputs: Vec<String>,
+    pub value_display: String,
+    pub is_active: bool,
+}
+
+/// Connection wire linking two sockets on the visual programming canvas
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualGraphWire {
+    pub from_node: usize,
+    pub from_socket: usize,
+    pub to_node: usize,
+    pub to_socket: usize,
+}
+
+/// Full Visual Dynamo/Grasshopper computational graph model
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualNodeGraph {
+    pub nodes: Vec<VisualGraphNode>,
+    pub wires: Vec<VisualGraphWire>,
+}
+
+impl Default for VisualNodeGraph {
+    fn default() -> Self {
+        Self {
+            nodes: vec![
+                VisualGraphNode {
+                    id: 1,
+                    title: "Slider: Span L (m)".to_string(),
+                    category: VisualNodeCategory::Input,
+                    pos: [40.0, 60.0],
+                    inputs: vec![],
+                    outputs: vec!["Length (m)".to_string()],
+                    value_display: "24.0".to_string(),
+                    is_active: true,
+                },
+                VisualGraphNode {
+                    id: 2,
+                    title: "Slider: Bay Width B (m)".to_string(),
+                    category: VisualNodeCategory::Input,
+                    pos: [40.0, 190.0],
+                    inputs: vec![],
+                    outputs: vec!["Width (m)".to_string()],
+                    value_display: "6.0".to_string(),
+                    is_active: true,
+                },
+                VisualGraphNode {
+                    id: 3,
+                    title: "Math: Formula H = L / 8".to_string(),
+                    category: VisualNodeCategory::MathLogic,
+                    pos: [290.0, 60.0],
+                    inputs: vec!["L".to_string()],
+                    outputs: vec!["Depth H".to_string()],
+                    value_display: "3.00 m".to_string(),
+                    is_active: true,
+                },
+                VisualGraphNode {
+                    id: 4,
+                    title: "Truss Octet Generator".to_string(),
+                    category: VisualNodeCategory::GeometryGen,
+                    pos: [520.0, 90.0],
+                    inputs: vec!["L".to_string(), "B".to_string(), "H".to_string()],
+                    outputs: vec!["Mesh 3D".to_string(), "Elem Count".to_string()],
+                    value_display: "48 Elements".to_string(),
+                    is_active: true,
+                },
+                VisualGraphNode {
+                    id: 5,
+                    title: "Bake to BIM 3D Scene".to_string(),
+                    category: VisualNodeCategory::BimBake,
+                    pos: [790.0, 110.0],
+                    inputs: vec!["Geometry".to_string()],
+                    outputs: vec!["IfcExport".to_string()],
+                    value_display: "Live Synced".to_string(),
+                    is_active: true,
+                },
+            ],
+            wires: vec![
+                VisualGraphWire { from_node: 1, from_socket: 0, to_node: 3, to_socket: 0 },
+                VisualGraphWire { from_node: 1, from_socket: 0, to_node: 4, to_socket: 0 },
+                VisualGraphWire { from_node: 2, from_socket: 0, to_node: 4, to_socket: 1 },
+                VisualGraphWire { from_node: 3, from_socket: 0, to_node: 4, to_socket: 2 },
+                VisualGraphWire { from_node: 4, from_socket: 0, to_node: 5, to_socket: 0 },
+            ],
+        }
+    }
+}
+
+/// A Drawing Sheet Item for Production Working Drawings (DED)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DrawingSheetItem {
+    pub id: String,
+    pub sheet_number: String,
+    pub sheet_title: String,
+    pub paper_size: String,
+    pub scale: String,
+    pub discipline: String,
+    pub engineer_stamp: String,
+    pub revision: String,
+    pub viewports: Vec<String>,
+}
+
+impl DrawingSheetItem {
+    pub fn default_set() -> Vec<Self> {
+        vec![
+            Self {
+                id: "sheet_s101".to_string(),
+                sheet_number: "S-101".to_string(),
+                sheet_title: "FOUNDATION & GROUND FLOOR FRAMING PLAN".to_string(),
+                paper_size: "ISO A1 (841 x 594 mm)".to_string(),
+                scale: "1 : 100".to_string(),
+                discipline: "Structural (STR)".to_string(),
+                engineer_stamp: "PE Structural License #49120-ST (Digital Sealed)".to_string(),
+                revision: "REV-0 (Issued for Construction)".to_string(),
+                viewports: vec![
+                    "Main Framing Grid A-D & 1-4 (Scale 1:100)".to_string(),
+                    "Isolated Footing Schedule Table".to_string(),
+                    "Typical RC Column Detail Callout 1:20".to_string(),
+                ],
+            },
+            Self {
+                id: "sheet_s201".to_string(),
+                sheet_number: "S-201".to_string(),
+                sheet_title: "LEVEL 2 TYPICAL FLOOR BEAM & SLAB REBAR".to_string(),
+                paper_size: "ISO A1 (841 x 594 mm)".to_string(),
+                scale: "1 : 100".to_string(),
+                discipline: "Structural (STR)".to_string(),
+                engineer_stamp: "PE Structural License #49120-ST (Digital Sealed)".to_string(),
+                revision: "REV-B (Coordination Approval)".to_string(),
+                viewports: vec![
+                    "Floor Slab Two-Way Mesh Detailing".to_string(),
+                    "W14x90 Moment Frame Connection Detail 1:10".to_string(),
+                    "Bar Bending Schedule (BBS) Table".to_string(),
+                ],
+            },
+            Self {
+                id: "sheet_a101".to_string(),
+                sheet_number: "A-101".to_string(),
+                sheet_title: "ARCHITECTURAL FLOOR PLAN & ROOM SCHEDULE".to_string(),
+                paper_size: "ISO A1 (841 x 594 mm)".to_string(),
+                scale: "1 : 100".to_string(),
+                discipline: "Architectural (ARC)".to_string(),
+                engineer_stamp: "Licensed Architect #IAI-88241".to_string(),
+                revision: "REV-1 (Client Signoff)".to_string(),
+                viewports: vec![
+                    "Ground Floor Partition & Door Layout".to_string(),
+                    "Room Boundary Area Tag Matrix".to_string(),
+                    "Curtain Wall Mullion Elevation 1:50".to_string(),
+                ],
+            },
+            Self {
+                id: "sheet_m301".to_string(),
+                sheet_number: "M-301".to_string(),
+                sheet_title: "HVAC DUCTING & FIRE SPRINKLER DISTRIBUTION".to_string(),
+                paper_size: "ISO A1 (841 x 594 mm)".to_string(),
+                scale: "1 : 100".to_string(),
+                discipline: "Mechanical & Fire (MEP)".to_string(),
+                engineer_stamp: "Professional Mechanical Engineer #MEP-3310".to_string(),
+                revision: "REV-0 (Issued for Construction)".to_string(),
+                viewports: vec![
+                    "Level 1 Supply/Return Air Run (Scale 1:100)".to_string(),
+                    "VAV Terminal Box Wiring & Riser Diagram".to_string(),
+                    "Automatic Sprinkler Hydraulic Calculation Summary".to_string(),
+                ],
+            },
+        ]
+    }
+}
+
