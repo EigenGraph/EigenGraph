@@ -1176,6 +1176,8 @@ impl BuildView {
             });
             ui.checkbox(&mut self.animate_vibration, "🌀 Mode 1 Vibration Animation");
         }
+    }
+
     fn render_clash_tab(&mut self, ui: &mut Ui, theme: &MacTheme) {
         ui.label(RichText::new("⚔️ SPATIAL CLASH MATRIX & INTERFERENCE DETECTOR").size(11.5).strong().color(theme.text_secondary));
         ui.add_space(4.0);
