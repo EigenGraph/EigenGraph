@@ -803,7 +803,7 @@ impl IndustrializedView {
                     if ui.add(egui::Button::new(RichText::new("🌐 Export Clean IFC 4.3 (.ifc)").size(12.0).strong().color(Color32::WHITE))
                         .fill(theme.accent_green)
                         .corner_radius(CornerRadius::same(6))).clicked() {
-                        if let Some(ref m) = self.ifc_model {
+                        if let Some(ref _m) = self.ifc_model {
                             let mut engine = crate::core::ParametricEngine::new();
                             if let Ok(model) = engine.generate_warren_truss() {
                                 let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();

@@ -9,7 +9,7 @@
 
 use egui::{
     Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText, Sense,
-    Stroke, Ui, Vec2,
+    Stroke, StrokeKind, Ui, Vec2,
 };
 use crate::core::{
     BimCommand, BimCommandBus, OpeningKind, P2, RebarPreset, RunCategory, RunJustify, SnapHit,
@@ -1915,7 +1915,7 @@ impl ParametricView {
             let n_pos = rect.min + Vec2::new(node.pos[0], node.pos[1]) * self.canvas_zoom + self.canvas_pan;
             let node_rect = Rect::from_min_size(n_pos, Vec2::new(node_w, node_h));
 
-            let (cat_label, (cr, cg, cb)) = node.category.badge_color_and_name();
+            let (_cat_label, (cr, cg, cb)) = node.category.badge_color_and_name();
             let cat_color = Color32::from_rgb(cr, cg, cb);
 
             // Node Drop Shadow & Card Frame
@@ -1927,7 +1927,7 @@ impl ParametricView {
             } else {
                 Stroke::new(1.0, Color32::from_rgb(50, 56, 70))
             };
-            painter.rect_stroke(node_rect, CornerRadius::same(8), border_stroke);
+            painter.rect_stroke(node_rect, CornerRadius::same(8), border_stroke, StrokeKind::Inside);
 
             // Node Header Bar
             let header_rect = Rect::from_min_size(n_pos, Vec2::new(node_w, 24.0 * self.canvas_zoom));
@@ -1976,7 +1976,7 @@ impl ParametricView {
             let pill_center = Pos2::new(node_rect.center().x, node_rect.min.y + 70.0 * self.canvas_zoom);
             let pill_rect = Rect::from_center_size(pill_center, Vec2::new(110.0 * self.canvas_zoom, 18.0 * self.canvas_zoom));
             painter.rect_filled(pill_rect, CornerRadius::same(9), Color32::from_rgb(16, 18, 22));
-            painter.rect_stroke(pill_rect, CornerRadius::same(9), Stroke::new(0.8, Color32::from_rgb(45, 50, 62)));
+            painter.rect_stroke(pill_rect, CornerRadius::same(9), Stroke::new(0.8, Color32::from_rgb(45, 50, 62)), StrokeKind::Inside);
             painter.text(
                 pill_center,
                 Align2::CENTER_CENTER,
@@ -1989,7 +1989,7 @@ impl ParametricView {
         // Floating Top-Left HUD Toolbar
         let hud_rect = Rect::from_min_size(rect.min + Vec2::new(14.0, 14.0), Vec2::new(320.0, 72.0));
         painter.rect_filled(hud_rect, CornerRadius::same(8), Color32::from_rgba_premultiplied(20, 24, 30, 230));
-        painter.rect_stroke(hud_rect, CornerRadius::same(8), Stroke::new(1.0, Color32::from_rgb(50, 56, 70)));
+        painter.rect_stroke(hud_rect, CornerRadius::same(8), Stroke::new(1.0, Color32::from_rgb(50, 56, 70)), StrokeKind::Inside);
         painter.text(
             hud_rect.min + Vec2::new(12.0, 10.0),
             Align2::LEFT_TOP,
@@ -2040,7 +2040,7 @@ impl ParametricView {
         if let Some(ref status_msg) = self.graph_bake_status {
             let toast_rect = Rect::from_min_size(rect.min + Vec2::new(14.0, rect.height() - 42.0), Vec2::new(rect.width() - 28.0, 28.0));
             painter.rect_filled(toast_rect, CornerRadius::same(6), Color32::from_rgba_premultiplied(16, 40, 25, 235));
-            painter.rect_stroke(toast_rect, CornerRadius::same(6), Stroke::new(1.0, Color32::from_rgb(40, 160, 80)));
+            painter.rect_stroke(toast_rect, CornerRadius::same(6), Stroke::new(1.0, Color32::from_rgb(40, 160, 80)), StrokeKind::Inside);
             painter.text(toast_rect.center(), Align2::CENTER_CENTER, status_msg, egui::FontId::proportional(9.5), Color32::from_rgb(120, 240, 160));
         }
     }

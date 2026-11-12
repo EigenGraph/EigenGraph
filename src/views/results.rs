@@ -1,7 +1,7 @@
 //! results.rs — Pillar: Results & Executive Audit.
 //! Executive structural health dashboard, comprehensive SNI/AISC code compliance matrix, and official certification dossier export.
 
-use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText, ScrollArea, Sense, Stroke, Ui, Vec2};
+use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText, ScrollArea, Sense, Stroke, StrokeKind, Ui, Vec2};
 use crate::models::{DrawingSheetItem, StructuralMember};
 use crate::theme::MacTheme;
 
@@ -151,7 +151,7 @@ impl ResultsView {
     }
 
     fn render_drawing_sheets(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
+        let _is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
 
         // Top Sheet Controls & Ribbon Bar
         Frame::new()
@@ -231,8 +231,8 @@ impl ResultsView {
 
                 // Outer and Inner Sheet Border Margins
                 let inner_rect = rect.shrink(10.0);
-                painter.rect_stroke(inner_rect, CornerRadius::same(2), Stroke::new(1.5, Color32::from_rgb(20, 20, 25)));
-                painter.rect_stroke(inner_rect.shrink(4.0), CornerRadius::same(1), Stroke::new(0.5, Color32::from_rgb(120, 120, 130)));
+                painter.rect_stroke(inner_rect, CornerRadius::same(2), Stroke::new(1.5, Color32::from_rgb(20, 20, 25)), StrokeKind::Inside);
+                painter.rect_stroke(inner_rect.shrink(4.0), CornerRadius::same(1), Stroke::new(0.5, Color32::from_rgb(120, 120, 130)), StrokeKind::Inside);
 
                 // Border Grid Coordinate Ticks
                 for i in 1..=6 {
@@ -249,7 +249,7 @@ impl ResultsView {
                     Pos2::new(inner_rect.min.x + inner_rect.width() * 0.64, inner_rect.max.y - 16.0),
                 );
                 painter.rect_filled(vp1_rect, CornerRadius::ZERO, Color32::from_rgb(255, 255, 255));
-                painter.rect_stroke(vp1_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)));
+                painter.rect_stroke(vp1_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
 
                 // Viewport 1 Header Tag
                 painter.text(
@@ -345,7 +345,7 @@ impl ResultsView {
                     Pos2::new(inner_rect.max.x - 16.0, inner_rect.min.y + inner_rect.height() * 0.36),
                 );
                 painter.rect_filled(vp2_rect, CornerRadius::ZERO, Color32::from_rgb(255, 255, 255));
-                painter.rect_stroke(vp2_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)));
+                painter.rect_stroke(vp2_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
                 painter.text(vp2_rect.min + Vec2::new(8.0, 8.0), Align2::LEFT_TOP, "2  COLUMN & FOOTING SCHEDULE", egui::FontId::proportional(9.5), Color32::BLACK);
 
                 let headers = ["Mark", "Type", "Dimensions", "Rebar", "fc'"];
@@ -353,7 +353,7 @@ impl ResultsView {
                 for (h_idx, h) in headers.iter().enumerate() {
                     let h_x = vp2_rect.min.x + h_idx as f32 * col_w;
                     painter.rect_filled(Rect::from_min_size(Pos2::new(h_x, vp2_rect.min.y + 22.0), Vec2::new(col_w, 14.0)), CornerRadius::ZERO, Color32::from_rgb(235, 240, 248));
-                    painter.rect_stroke(Rect::from_min_size(Pos2::new(h_x, vp2_rect.min.y + 22.0), Vec2::new(col_w, 14.0)), CornerRadius::ZERO, Stroke::new(0.5, Color32::GRAY));
+                    painter.rect_stroke(Rect::from_min_size(Pos2::new(h_x, vp2_rect.min.y + 22.0), Vec2::new(col_w, 14.0)), CornerRadius::ZERO, Stroke::new(0.5, Color32::GRAY), StrokeKind::Inside);
                     painter.text(Pos2::new(h_x + 4.0, vp2_rect.min.y + 24.0), Align2::LEFT_TOP, *h, egui::FontId::proportional(7.5), Color32::BLACK);
                 }
                 let rows = [
@@ -375,17 +375,17 @@ impl ResultsView {
                     Pos2::new(inner_rect.max.x - 16.0, inner_rect.min.y + inner_rect.height() * 0.66),
                 );
                 painter.rect_filled(vp3_rect, CornerRadius::ZERO, Color32::from_rgb(255, 255, 255));
-                painter.rect_stroke(vp3_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)));
+                painter.rect_stroke(vp3_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
                 painter.text(vp3_rect.min + Vec2::new(8.0, 8.0), Align2::LEFT_TOP, "3  TYPICAL MOMENT CONNECTION (1:10)", egui::FontId::proportional(9.5), Color32::BLACK);
 
                 // Draw Moment Connection 2D Detail
                 let det_center = vp3_rect.center() + Vec2::new(0.0, 8.0);
                 // Column Profile Vertical
                 painter.rect_filled(Rect::from_center_size(det_center - Vec2::new(50.0, 0.0), Vec2::new(28.0, 80.0)), CornerRadius::ZERO, Color32::from_rgb(210, 215, 225));
-                painter.rect_stroke(Rect::from_center_size(det_center - Vec2::new(50.0, 0.0), Vec2::new(28.0, 80.0)), CornerRadius::ZERO, Stroke::new(1.2, Color32::BLACK));
+                painter.rect_stroke(Rect::from_center_size(det_center - Vec2::new(50.0, 0.0), Vec2::new(28.0, 80.0)), CornerRadius::ZERO, Stroke::new(1.2, Color32::BLACK), StrokeKind::Inside);
                 // Beam Horizontal
                 painter.rect_filled(Rect::from_min_size(det_center - Vec2::new(36.0, 18.0), Vec2::new(110.0, 36.0)), CornerRadius::ZERO, Color32::from_rgb(220, 225, 235));
-                painter.rect_stroke(Rect::from_min_size(det_center - Vec2::new(36.0, 18.0), Vec2::new(110.0, 36.0)), CornerRadius::ZERO, Stroke::new(1.2, Color32::BLACK));
+                painter.rect_stroke(Rect::from_min_size(det_center - Vec2::new(36.0, 18.0), Vec2::new(110.0, 36.0)), CornerRadius::ZERO, Stroke::new(1.2, Color32::BLACK), StrokeKind::Inside);
                 // Flange continuity weld & 4-bolt shear tab
                 painter.rect_filled(Rect::from_min_size(det_center - Vec2::new(34.0, 8.0), Vec2::new(16.0, 16.0)), CornerRadius::ZERO, Color32::from_rgb(80, 90, 105));
                 for b_idx in 0..4 {
@@ -402,7 +402,7 @@ impl ResultsView {
                     inner_rect.max - Vec2::new(16.0, 16.0),
                 );
                 painter.rect_filled(tb_rect, CornerRadius::ZERO, Color32::from_rgb(248, 250, 252));
-                painter.rect_stroke(tb_rect, CornerRadius::ZERO, Stroke::new(1.5, Color32::from_rgb(20, 20, 30)));
+                painter.rect_stroke(tb_rect, CornerRadius::ZERO, Stroke::new(1.5, Color32::from_rgb(20, 20, 30)), StrokeKind::Inside);
 
                 // Title Block Dividers & Text
                 painter.line_segment([Pos2::new(tb_rect.min.x, tb_rect.min.y + 26.0), Pos2::new(tb_rect.max.x, tb_rect.min.y + 26.0)], Stroke::new(1.0, Color32::BLACK));
