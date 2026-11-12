@@ -2,7 +2,7 @@
 //! Features a True 360° Interactive 3D Turntable/Orbit Viewport, Solid Profile Extrusions,
 //! Depth-Sorted Shaded Rendering (Painter's Algorithm), and Stress/ARI Gradient Contours.
 
-use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText, Sense, Stroke, Ui, Vec2};
+use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText, ScrollArea, Sense, Stroke, Ui, Vec2};
 use crate::models::{DatabaseComponent, SidebarTab, StructuralMember};
 use crate::theme::MacTheme;
 
@@ -47,9 +47,6 @@ impl ModelArchetype {
             Self::MultiStoryTower3D => "🏢 12-Story Tower (Core Wall)",
             Self::PrestressedGirderBridge3D => "🌉 Prestressed Bridge (30m PT Girder)",
             Self::CoupledShearWallCore3D => "🏢 Coupled Shear Wall Core (12-Story)",
-            Self::BaseIsolatedHospital3D => "🛡️ Base-Isolated Hospital (8-Story)",
-            Self::TimeHistoryTower3D => "🌊 NL-THA Tower (16-Story)",
-            Self::FemaP58HospitalArchetype => "🏥 FEMA P-58 Hospital (10-Story)",
         }
     }
 }
@@ -2866,7 +2863,7 @@ impl BuildView {
                         }
 
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(RichText::new(format!("● {} Elements", raw_members.len())).size(10.0).strong().color(theme.accent_green));
+                            ui.label(RichText::new(format!("● {} Elements", members.len())).size(10.0).strong().color(theme.accent_green));
                         });
                     });
                 });
