@@ -1,8 +1,13 @@
 //! planning.rs — Pillar 5: 5D Construction Planning, Dynamic RAB, 4D Scheduling & Cost-ARI Trade-Off.
 //! Automatically calculated and synchronized with PARAMETRIC variables (dimensions, material, stiffness, unit prices).
 
-use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui, Vec2};
-use crate::models::{ParametricVariable, StructuralMember};
+use egui::{
+    Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText,
+    ScrollArea, Sense, Stroke, StrokeKind, Ui, Vec2,
+};
+use crate::models::{
+    ConstructionSimulationPhase, CurrencyUnit, ParametricVariable, StructuralMember, WbsCostItem,
+};
 use crate::theme::MacTheme;
 
 /// Formats a number as Rupiah / Indonesian currency string with dot separators (e.g. 1.250.000)
@@ -33,6 +38,7 @@ pub enum PlanningSubTab {
     Schedule4d,
     CostAriTradeoff,
     StagedErectionSvd,
+    WbsHierarchy,
 }
 
 pub struct PlanningView {
@@ -42,6 +48,16 @@ pub struct PlanningView {
     pub contingency_percent: f32,
     pub overhead_percent: f32,
     pub vat_percent: f32,
+    // Phase 28: 4D Simulation & 5D WBS
+    pub active_currency: CurrencyUnit,
+    pub simulation_day: u32,
+    pub is_simulating: bool,
+    pub simulation_speed: u32,
+    pub simulation_phases: Vec<ConstructionSimulationPhase>,
+    pub wbs_catalog: Vec<WbsCostItem>,
+    pub selected_wbs_division: Option<String>,
+    pub show_manpower_curve: bool,
+    pub show_cpm_only: bool,
 }
 
 impl Default for PlanningView {
@@ -53,6 +69,15 @@ impl Default for PlanningView {
             contingency_percent: 5.0,
             overhead_percent: 10.0,
             vat_percent: 11.0,
+            active_currency: CurrencyUnit::Idr,
+            simulation_day: 145,
+            is_simulating: false,
+            simulation_speed: 1,
+            simulation_phases: ConstructionSimulationPhase::default_phases(),
+            wbs_catalog: WbsCostItem::default_catalog(),
+            selected_wbs_division: None,
+            show_manpower_curve: true,
+            show_cpm_only: false,
         }
     }
 }
@@ -250,6 +275,7 @@ impl PlanningView {
                     PlanningSubTab::Schedule4d => self.render_schedule_4d(ui, theme, &takeoff),
                     PlanningSubTab::CostAriTradeoff => self.render_cost_ari_tradeoff(ui, theme, &takeoff),
                     PlanningSubTab::StagedErectionSvd => self.render_staged_erection_svd(ui, theme, &takeoff),
+                    PlanningSubTab::WbsHierarchy => self.render_wbs_hierarchy(ui, theme, &takeoff),
                 }
 
                 ui.add_space(64.0);
@@ -267,8 +293,9 @@ impl PlanningView {
                 ui.horizontal_wrapped(|ui| {
                     let tabs = [
                         (PlanningSubTab::DynamicRab, "💰 5D BoQ / Cost"),
+                        (PlanningSubTab::WbsHierarchy, "📑 5D WBS Explorer"),
                         (PlanningSubTab::TakeoffQto, "📊 QTO"),
-                        (PlanningSubTab::Schedule4d, "⏱️ 4D S-Curve"),
+                        (PlanningSubTab::Schedule4d, "⏱️ 4D Synchro Simulation"),
                         (PlanningSubTab::CostAriTradeoff, "📈 Cost vs ARI"),
                         (PlanningSubTab::StagedErectionSvd, "🏗️ Staged Erection Guard"),
                     ];
@@ -287,7 +314,7 @@ impl PlanningView {
                         }
                     }
 
-                    // Right Side Actions
+                    // Right Side Actions & Currency Switcher
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         // Publish to Dossier
                         let pub_text = if self.published_to_dossier { "✅ Saved to Dossier" } else { "📁 Save to MY PROJECT" };
@@ -307,6 +334,23 @@ impl PlanningView {
                             .corner_radius(CornerRadius::same(8))).clicked() {
                             self.export_status = Some(format!("File BoQ-5D_L{:.0}m.csv exported successfully!", takeoff.span_m));
                         }
+
+                        ui.add_space(10.0);
+                        ui.separator();
+                        ui.add_space(10.0);
+
+                        // Currency Selector Pills
+                        for curr in CurrencyUnit::all().iter().rev() {
+                            let is_curr = self.active_currency == *curr;
+                            let c_bg = if is_curr { theme.accent_orange } else { theme.bg_canvas };
+                            let c_fg = if is_curr { Color32::WHITE } else { theme.text_secondary };
+                            if ui.add(egui::Button::new(RichText::new(format!("{} ({})", curr.code(), curr.symbol())).size(11.0).color(c_fg))
+                                .fill(c_bg)
+                                .corner_radius(CornerRadius::same(6))).clicked() {
+                                self.active_currency = *curr;
+                            }
+                        }
+                        ui.label(RichText::new("CURRENCY:").size(10.5).strong().color(theme.text_muted));
                     });
                 });
             });
@@ -523,109 +567,385 @@ impl PlanningView {
     // -------------------------------------------------------------
     // SUB-TAB 3: 4D SCHEDULING & S-CURVE
     // -------------------------------------------------------------
-    fn render_schedule_4d(&self, ui: &mut Ui, theme: &MacTheme, t: &Parametric5DTakeoff) {
+    // -------------------------------------------------------------
+    // SUB-TAB 3: 4D SYNCHRO CONSTRUCTION SIMULATION & TIMELINE
+    // -------------------------------------------------------------
+    fn render_schedule_4d(&mut self, ui: &mut Ui, theme: &MacTheme, _t: &Parametric5DTakeoff) {
+        // Top 4 Metrics
         ui.columns(4, |cols| {
-            self.metric_card(&mut cols[0], theme, "TOTAL WORKING DURATION", &format!("{} Days", t.duration_days), &format!("{:.1} Calendar Months", t.duration_days as f64 / 30.0), theme.accent_blue);
-            self.metric_card(&mut cols[1], theme, "TOTAL MAN-DAYS", &format!("{} MD", t.total_man_days), "Labor Requirement", theme.accent_orange);
-            self.metric_card(&mut cols[2], theme, "CRITICAL PATH (CPM)", "WBS 5.0 (Erection)", "Zero Float Critical Path", theme.accent_red);
-            self.metric_card(&mut cols[3], theme, "SVD ERECTION GUARD", "Rank Safe (14/14)", "Zero Mechanism during Cantilever", theme.accent_green);
+            self.metric_card(&mut cols[0], theme, "TOTAL WORKING DURATION", "360 Days", "12 Calendar Months", theme.accent_blue);
+            self.metric_card(&mut cols[1], theme, "SIMULATION TIMELINE", &format!("Day {} / 360", self.simulation_day), "Interactive 4D Step", theme.accent_orange);
+            self.metric_card(&mut cols[2], theme, "CRITICAL PATH (CPM)", "WBS 05.12.00", "Structural Steel Erection (Float: 0d)", theme.accent_red);
+            self.metric_card(&mut cols[3], theme, "TOTAL WBS PACKAGES", &format!("{} Items", self.wbs_catalog.len()), "Multi-Discipline Master WBS", theme.accent_green);
         });
 
-        ui.add_space(16.0);
+        ui.add_space(14.0);
 
-        theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("WBS 4D SCHEDULING & STAGED ERECTION SIMULATION (STAGED CONSTRUCTION)").size(13.0).strong().color(theme.text_primary));
-            ui.add_space(10.0);
+        // 4D Interactive Simulation Player Ribbon
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .inner_margin(Margin::symmetric(14, 10))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("⏱️ 4D SYNCHRO SIMULATION PLAYER").size(12.5).strong().color(theme.accent_blue));
+                    ui.add_space(8.0);
 
-            let mut engine = crate::core::ParametricEngine::new();
-            let live_schedule = engine.generate_warren_truss().ok().map(|m| {
-                crate::core::ScheduleEngine::generate_standard_schedule(&m, t.grand_total_rab)
+                    // Play / Pause toggle
+                    let play_label = if self.is_simulating { "⏸ Pause" } else { "▶ Play 4D" };
+                    let play_bg = if self.is_simulating { theme.accent_orange } else { theme.accent_green };
+                    if ui.add(egui::Button::new(RichText::new(play_label).size(11.0).strong().color(Color32::WHITE))
+                        .fill(play_bg)
+                        .corner_radius(CornerRadius::same(6))).clicked() {
+                        self.is_simulating = !self.is_simulating;
+                    }
+
+                    // Rewind & Reset
+                    if ui.add(egui::Button::new(RichText::new("⏪ Day 1").size(11.0).color(theme.text_primary))
+                        .fill(theme.bg_canvas)
+                        .corner_radius(CornerRadius::same(6))).clicked() {
+                        self.simulation_day = 1;
+                    }
+                    if ui.add(egui::Button::new(RichText::new("⏩ Day 360").size(11.0).color(theme.text_primary))
+                        .fill(theme.bg_canvas)
+                        .corner_radius(CornerRadius::same(6))).clicked() {
+                        self.simulation_day = 360;
+                    }
+
+                    // Speed Toggles
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Speed:").size(11.0).color(theme.text_secondary));
+                    for spd in [1, 2, 5] {
+                        let is_spd = self.simulation_speed == spd;
+                        let s_bg = if is_spd { theme.accent_blue } else { theme.bg_canvas };
+                        let s_fg = if is_spd { Color32::WHITE } else { theme.text_secondary };
+                        if ui.add(egui::Button::new(RichText::new(format!("{}x", spd)).size(10.5).color(s_fg))
+                            .fill(s_bg)
+                            .corner_radius(CornerRadius::same(4))).clicked() {
+                            self.simulation_speed = spd;
+                        }
+                    }
+
+                    // Simulation Day Slider
+                    ui.add_space(12.0);
+                    ui.add(egui::Slider::new(&mut self.simulation_day, 1..=360).text("Construction Day"));
+                });
+
+                // Auto-advance if simulating
+                if self.is_simulating {
+                    self.simulation_day = (self.simulation_day + self.simulation_speed).min(360);
+                    if self.simulation_day >= 360 {
+                        self.is_simulating = false;
+                    }
+                    ui.ctx().request_repaint();
+                }
+
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(8.0);
+
+                // Active Phase Status Bar
+                let cur_day = self.simulation_day;
+                let active_phase = self.simulation_phases.iter().find(|p| cur_day >= p.day_start && cur_day <= p.day_end)
+                    .or_else(|| self.simulation_phases.last());
+
+                if let Some(phase) = active_phase {
+                    ui.horizontal_wrapped(|ui| {
+                        Frame::new()
+                            .fill(Color32::from_rgb(phase.color_rgb.0, phase.color_rgb.1, phase.color_rgb.2).gamma_multiply(0.2))
+                            .stroke(Stroke::new(1.0, Color32::from_rgb(phase.color_rgb.0, phase.color_rgb.1, phase.color_rgb.2)))
+                            .corner_radius(CornerRadius::same(6))
+                            .inner_margin(Margin::symmetric(8, 4))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(format!("ACTIVE PHASE: {}", phase.name)).size(11.0).strong()
+                                    .color(Color32::from_rgb(phase.color_rgb.0, phase.color_rgb.1, phase.color_rgb.2)));
+                            });
+
+                        ui.add_space(8.0);
+                        ui.label(RichText::new(format!("👷 Manpower: {} Workers", phase.manpower_count)).size(11.0).color(theme.text_secondary));
+                        ui.label(RichText::new(format!("🏗️ Cranes/Equipment: {} Units", phase.equipment_count)).size(11.0).color(theme.text_secondary));
+                        if phase.concrete_volume_m3 > 0.0 {
+                            ui.label(RichText::new(format!("🏢 Concrete Poured: {:.0} m³", phase.concrete_volume_m3)).size(11.0).color(theme.accent_blue));
+                        }
+                        ui.label(RichText::new(format!("Planned: {:.1}% | Actual: {:.1}%", phase.planned_progress_pct, phase.actual_progress_pct)).size(11.0).color(theme.text_muted));
+                    });
+                }
             });
 
-            if let Some(ref sched) = live_schedule {
-                for act in &sched.activities {
-                    let stat_color = if act.is_critical {
-                        theme.accent_red
-                    } else if act.total_float < 7 {
-                        theme.accent_orange
-                    } else {
-                        theme.accent_green
-                    };
-                    let status_str = if act.is_critical {
-                        "Critical (CPM - Float 0)"
-                    } else {
-                        "Safe Float"
-                    };
+        ui.add_space(14.0);
 
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(format!("WBS {:02}", act.id)).size(12.0).strong().color(theme.accent_blue));
-                        ui.add_space(10.0);
-                        ui.label(RichText::new(&act.name).size(12.0).strong().color(theme.text_primary));
-                        ui.add_space(14.0);
-                        ui.label(RichText::new(format!("⏱️ Day {}-{} (Dur: {}d)", act.early_start, act.early_finish, act.duration_days)).size(11.5).color(theme.text_secondary));
+        // 2D Staged Building Erection Elevation Canvas
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("🏗️ 4D STAGED ERECTION ELEVATION & TOWER CRANE SIMULATION").size(13.0).strong().color(theme.text_primary));
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.label(RichText::new(format!("Scale 1:200 • Day {} Staging", self.simulation_day)).size(11.0).color(theme.text_muted));
+                });
+            });
+            ui.add_space(8.0);
 
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            Frame::new()
-                                .fill(stat_color.gamma_multiply(0.2))
-                                .corner_radius(CornerRadius::same(4))
-                                .inner_margin(Margin::symmetric(6, 2))
-                                .show(ui, |ui| {
-                                    ui.label(RichText::new(status_str).size(10.5).color(stat_color));
-                                });
-                            ui.add_space(14.0);
-                            ui.label(RichText::new(format!("Float: {}d", act.total_float)).size(11.0).color(theme.text_muted));
-                            ui.add_space(10.0);
-                            ui.label(RichText::new(format!("Weight: {:.1}%", act.weight_percentage)).size(11.5).color(theme.text_secondary));
-                        });
-                    });
+            let canvas_w = ui.available_width().clamp(300.0, 1100.0);
+            let canvas_h = 240.0;
+            let (rect, _resp) = ui.allocate_exact_size(Vec2::new(canvas_w, canvas_h), Sense::hover());
+            let painter = ui.painter_at(rect);
 
-                    ui.add_space(2.0);
-                    let (rect, _resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 6.0), egui::Sense::hover());
-                    let painter = ui.painter();
-                    painter.rect_filled(rect, CornerRadius::same(3), theme.bg_canvas);
-                    let filled_width = rect.width() * (act.weight_percentage as f32 / 30.0).min(1.0);
-                    let filled_rect = egui::Rect::from_min_size(rect.left_top(), Vec2::new(filled_width, rect.height()));
-                    painter.rect_filled(filled_rect, CornerRadius::same(3), stat_color);
+            // Background & Ground Line
+            painter.rect_filled(rect, CornerRadius::same(6), Color32::from_rgb(18, 22, 28));
+            painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, Color32::from_rgb(45, 52, 65)), StrokeKind::Inside);
 
-                    ui.add_space(6.0);
+            let ground_y = rect.min.y + 190.0;
+            painter.line_segment([Pos2::new(rect.min.x + 20.0, ground_y), Pos2::new(rect.max.x - 20.0, ground_y)], Stroke::new(2.0, Color32::from_rgb(120, 100, 70)));
+            painter.text(Pos2::new(rect.min.x + 30.0, ground_y + 12.0), Align2::LEFT_TOP, "GROUND LEVEL EL. ±0.000", egui::FontId::proportional(8.5), Color32::from_rgb(160, 140, 110));
+
+            // Building footprint centered
+            let bldg_w = (rect.width() * 0.46).clamp(180.0, 360.0);
+            let bldg_x1 = rect.center().x - bldg_w * 0.5;
+            let bldg_x2 = rect.center().x + bldg_w * 0.5;
+
+            // Substructure Piling (Day 1..45)
+            let pile_color = if self.simulation_day >= 1 { Color32::from_rgb(140, 90, 45) } else { Color32::from_rgb(40, 35, 30) };
+            for p_idx in 0..6 {
+                let px = bldg_x1 + (p_idx as f32 / 5.0) * bldg_w;
+                painter.rect_filled(Rect::from_min_max(Pos2::new(px - 3.0, ground_y), Pos2::new(px + 3.0, ground_y + 35.0)), CornerRadius::ZERO, pile_color);
+            }
+
+            // Raft Slab & Basement (Day 46..90)
+            if self.simulation_day >= 46 {
+                painter.rect_filled(Rect::from_min_max(Pos2::new(bldg_x1, ground_y - 8.0), Pos2::new(bldg_x2, ground_y)), CornerRadius::ZERO, Color32::from_rgb(130, 138, 150));
+            }
+
+            // Superstructure Steel & Concrete Floors (Day 91..195): 12 Storeys
+            let max_floors = 12;
+            let floors_erected = if self.simulation_day >= 91 {
+                (((self.simulation_day - 90) as f32 / 105.0) * max_floors as f32).clamp(1.0, max_floors as f32) as usize
+            } else {
+                0
+            };
+
+            let floor_h = 11.5;
+            for fl in 0..floors_erected {
+                let fy = ground_y - 8.0 - (fl + 1) as f32 * floor_h;
+
+                // Columns for this floor
+                for c_idx in 0..4 {
+                    let cx = bldg_x1 + (c_idx as f32 / 3.0) * bldg_w;
+                    painter.line_segment([Pos2::new(cx, fy + floor_h), Pos2::new(cx, fy)], Stroke::new(2.2, Color32::from_rgb(0, 140, 255)));
                 }
+
+                // Floor slab beam line
+                painter.line_segment([Pos2::new(bldg_x1, fy), Pos2::new(bldg_x2, fy)], Stroke::new(1.8, Color32::from_rgb(180, 190, 205)));
+
+                // Façade Glass Panels (Day 180..270)
+                if self.simulation_day >= 180 {
+                    let facade_floors = (((self.simulation_day - 180) as f32 / 90.0) * max_floors as f32).clamp(0.0, max_floors as f32) as usize;
+                    if fl < facade_floors {
+                        let glass_rect = Rect::from_min_max(Pos2::new(bldg_x1 + 4.0, fy + 2.0), Pos2::new(bldg_x2 - 4.0, fy + floor_h - 2.0));
+                        painter.rect_filled(glass_rect, CornerRadius::same(1), Color32::from_rgba_premultiplied(0, 180, 160, 45));
+                        painter.rect_stroke(glass_rect, CornerRadius::same(1), Stroke::new(0.6, Color32::from_rgb(0, 200, 180)), StrokeKind::Inside);
+                    }
+                }
+            }
+
+            // Tower Crane at the top
+            if floors_erected > 0 {
+                let top_y = ground_y - 8.0 - floors_erected as f32 * floor_h;
+                let crane_x = bldg_x1 + bldg_w * 0.70;
+                let mast_top = top_y - 28.0;
+
+                // Crane Mast
+                painter.line_segment([Pos2::new(crane_x, top_y), Pos2::new(crane_x, mast_top)], Stroke::new(2.0, Color32::from_rgb(255, 180, 0)));
+                // Crane Jib (Boom)
+                painter.line_segment([Pos2::new(crane_x - 18.0, mast_top), Pos2::new(crane_x + 45.0, mast_top)], Stroke::new(1.5, Color32::from_rgb(255, 200, 0)));
+                // Cable & Hook
+                let hook_x = crane_x + 24.0;
+                painter.line_segment([Pos2::new(hook_x, mast_top), Pos2::new(hook_x, mast_top + 16.0)], Stroke::new(0.8, Color32::WHITE));
+                painter.circle_filled(Pos2::new(hook_x, mast_top + 16.0), 2.0, Color32::from_rgb(255, 220, 0));
             }
         });
 
         ui.add_space(14.0);
 
-        // Visual Kurva S Display
+        // CPM Activities Breakdown with Planned vs. Current Day Status
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("📈 S-CURVE — CASHFLOW PROJECTION & WEEKLY CUMULATIVE PROGRESS").size(13.0).strong().color(theme.text_primary));
-            ui.add_space(8.0);
-            ui.label(RichText::new("Weekly physical cumulative progress targets (Planned S-Curve) integrated with BoQ progress payment disbursements:").size(11.5).color(theme.text_muted));
+            ui.label(RichText::new("📅 CRITICAL PATH METHOD (CPM) & STAGED WBS SCHEDULE").size(13.0).strong().color(theme.text_primary));
             ui.add_space(8.0);
 
-            // Graphical ASCII representation of S-Curve Progression
-            let weeks = [
-                ("W01-W04", " 8.5%", " IDR 280 M", "██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ Mobilization & Earthworks"),
-                ("W05-W08", "24.0%", " IDR 780 M", "█████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ Abutment Completed & Fabrication Starts"),
-                ("W09-W12", "58.0%", "IDR 1,880 M", "███████████▒▒▒▒▒▒▒▒▒ Fabrication 100% & Coating Completed"),
-                ("W13-W16", "86.5%", "IDR 2,850 M", "█████████████████▒▒▒ Full-Span Erection Stages 1-6 (SVD Certified)"),
-                ("W17-W20", "100.0%", "Completed", "████████████████████ Finishing, Torque Bolting & Handover"),
-            ];
+            for phase in &self.simulation_phases {
+                let is_current = self.simulation_day >= phase.day_start && self.simulation_day <= phase.day_end;
+                let is_done = self.simulation_day > phase.day_end;
+                let bar_color = if is_done {
+                    theme.accent_green
+                } else if is_current {
+                    theme.accent_blue
+                } else {
+                    theme.border_subtle
+                };
 
-            for (w, pct, cash, bar) in weeks {
+                let status_text = if is_done {
+                    "✅ Completed"
+                } else if is_current {
+                    "⚡ In Progress"
+                } else {
+                    "⏳ Pending"
+                };
+
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(w).size(11.5).strong().color(theme.accent_blue));
+                    ui.label(RichText::new(&phase.wbs_code).size(11.5).strong().color(theme.accent_blue));
+                    ui.add_space(8.0);
+                    ui.label(RichText::new(&phase.name).size(11.5).color(theme.text_primary));
                     ui.add_space(10.0);
-                    ui.label(RichText::new(pct).size(11.5).color(theme.accent_green));
-                    ui.add_space(10.0);
-                    let display_cash = if cash == "Completed" {
-                        format!("IDR {} M", format_idr(t.grand_total_rab / 1_000_000.0))
-                    } else {
-                        cash.to_string()
-                    };
-                    ui.label(RichText::new(display_cash).size(11.5).color(theme.text_primary));
-                    ui.add_space(14.0);
-                    ui.label(RichText::new(bar).size(11.5).color(theme.text_secondary));
+                    ui.label(RichText::new(format!("Day {}-{} ({}d)", phase.day_start, phase.day_end, phase.day_end - phase.day_start + 1)).size(10.5).color(theme.text_secondary));
+
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        Frame::new()
+                            .fill(bar_color.gamma_multiply(0.2))
+                            .corner_radius(CornerRadius::same(4))
+                            .inner_margin(Margin::symmetric(6, 2))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(status_text).size(10.0).color(bar_color));
+                            });
+
+                        ui.add_space(12.0);
+                        ui.label(RichText::new(format!("{} Workers", phase.manpower_count)).size(10.5).color(theme.text_muted));
+                        ui.add_space(10.0);
+                        if phase.is_critical {
+                            ui.label(RichText::new("CPM (Float: 0d)").size(10.0).strong().color(theme.accent_red));
+                        }
+                    });
                 });
-                ui.add_space(3.0);
+
+                ui.add_space(2.0);
+                let (p_rect, _resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 5.0), Sense::hover());
+                let p_painter = ui.painter();
+                p_painter.rect_filled(p_rect, CornerRadius::same(2), theme.bg_canvas);
+
+                let pct = if self.simulation_day >= phase.day_end {
+                    1.0
+                } else if self.simulation_day <= phase.day_start {
+                    0.0
+                } else {
+                    (self.simulation_day - phase.day_start) as f32 / (phase.day_end - phase.day_start) as f32
+                };
+                let fill_w = p_rect.width() * pct;
+                p_painter.rect_filled(Rect::from_min_size(p_rect.left_top(), Vec2::new(fill_w, p_rect.height())), CornerRadius::same(2), bar_color);
+                ui.add_space(6.0);
+            }
+        });
+    }
+
+    // -------------------------------------------------------------
+    // SUB-TAB: 5D WBS EXPLORER & DYNAMIC COST BREAKDOWN
+    // -------------------------------------------------------------
+    fn render_wbs_hierarchy(&mut self, ui: &mut Ui, theme: &MacTheme, _t: &Parametric5DTakeoff) {
+        // Top Summary Cards
+        let total_idr: f64 = self.wbs_catalog.iter().map(|item| item.total_cost_idr).sum();
+        let curr = self.active_currency;
+
+        ui.columns(4, |cols| {
+            self.metric_card(&mut cols[0], theme, "TOTAL BASE BUDGET", &curr.format_value(total_idr), "Grand Total Direct Cost", theme.accent_blue);
+            self.metric_card(&mut cols[1], theme, "ACTIVE CURRENCY", &format!("{} ({})", curr.code(), curr.symbol()), "Multi-Currency Dynamic Conversion", theme.accent_orange);
+            self.metric_card(&mut cols[2], theme, "CONTINGENCY ALLOCATION", &curr.format_value(total_idr * (self.contingency_percent as f64 / 100.0)), &format!("{:.1}% Reserve", self.contingency_percent), theme.accent_green);
+            self.metric_card(&mut cols[3], theme, "VAT / PBG STATUTORY TAX", &curr.format_value(total_idr * (self.vat_percent as f64 / 100.0)), &format!("{:.1}% Statutory", self.vat_percent), theme.accent_red);
+        });
+
+        ui.add_space(14.0);
+
+        // Division Filter Pills
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new("📁 DIVISION FILTER:").size(11.5).strong().color(theme.accent_blue));
+
+                let is_all = self.selected_wbs_division.is_none();
+                let all_bg = if is_all { theme.accent_blue } else { theme.bg_canvas };
+                let all_fg = if is_all { Color32::WHITE } else { theme.text_secondary };
+                if ui.add(egui::Button::new(RichText::new("All Divisions").size(11.0).color(all_fg))
+                    .fill(all_bg)
+                    .corner_radius(CornerRadius::same(6))).clicked() {
+                    self.selected_wbs_division = None;
+                }
+
+                let mut divisions: Vec<String> = self.wbs_catalog.iter().map(|i| i.division.clone()).collect();
+                divisions.sort();
+                divisions.dedup();
+
+                for div in divisions {
+                    let is_sel = self.selected_wbs_division.as_deref() == Some(&div);
+                    let bg = if is_sel { theme.accent_blue } else { theme.bg_canvas };
+                    let fg = if is_sel { Color32::WHITE } else { theme.text_secondary };
+                    if ui.add(egui::Button::new(RichText::new(&div).size(11.0).color(fg))
+                        .fill(bg)
+                        .corner_radius(CornerRadius::same(6))).clicked() {
+                        self.selected_wbs_division = Some(div);
+                    }
+                }
+            });
+        });
+
+        ui.add_space(12.0);
+
+        // WBS Table
+        theme.card_frame().show(ui, |ui| {
+            ui.label(RichText::new("📊 5D WORK BREAKDOWN STRUCTURE (WBS) QUANTITIES & RATES").size(13.0).strong().color(theme.text_primary));
+            ui.add_space(10.0);
+
+            // Table Header
+            ui.horizontal(|ui| {
+                ui.set_min_width(ui.available_width());
+                ui.label(RichText::new("WBS CODE").size(11.0).strong().color(theme.text_muted));
+                ui.add_space(18.0);
+                ui.label(RichText::new("DESCRIPTION").size(11.0).strong().color(theme.text_muted));
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.label(RichText::new("PROGRESS").size(11.0).strong().color(theme.text_muted));
+                    ui.add_space(20.0);
+                    ui.label(RichText::new("TOTAL COST").size(11.0).strong().color(theme.text_muted));
+                    ui.add_space(20.0);
+                    ui.label(RichText::new("UNIT RATE").size(11.0).strong().color(theme.text_muted));
+                    ui.add_space(20.0);
+                    ui.label(RichText::new("QTY / UNIT").size(11.0).strong().color(theme.text_muted));
+                });
+            });
+
+            ui.add_space(4.0);
+            ui.separator();
+            ui.add_space(6.0);
+
+            for item in &self.wbs_catalog {
+                if let Some(ref sel_div) = self.selected_wbs_division {
+                    if &item.division != sel_div {
+                        continue;
+                    }
+                }
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(&item.wbs_code).size(11.5).strong().color(theme.accent_blue));
+                    ui.add_space(14.0);
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new(&item.description).size(11.5).strong().color(theme.text_primary));
+                        ui.label(RichText::new(&item.division).size(10.0).color(theme.text_muted));
+                    });
+
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        // Progress bar
+                        ui.label(RichText::new(format!("{:.0}%", item.progress_pct)).size(11.0).color(theme.accent_green));
+                        ui.add_space(14.0);
+
+                        // Total cost
+                        ui.label(RichText::new(curr.format_value(item.total_cost_idr)).size(12.0).strong().color(theme.accent_blue));
+                        ui.add_space(14.0);
+
+                        // Unit rate
+                        ui.label(RichText::new(curr.format_value(item.unit_price_idr)).size(11.0).color(theme.text_secondary));
+                        ui.add_space(14.0);
+
+                        // Qty / unit
+                        ui.label(RichText::new(format!("{:.1} {}", item.quantity, item.unit)).size(11.0).color(theme.text_secondary));
+                    });
+                });
+
+                ui.add_space(4.0);
+                ui.separator();
+                ui.add_space(4.0);
             }
         });
     }

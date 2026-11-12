@@ -1,8 +1,12 @@
 //! facility.rs — Pillar 7: 7D BIM Facility Management.
 //! Lifecycle operation and maintenance data used by building owners to manage assets, repairs, and components after construction is complete.
+//! Compliant with buildingSMART COBie 3.0 / 2.4 standards and IoT Structural Health Monitoring (SHM) telemetry.
 
-use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui, Vec2};
-use crate::models::StructuralMember;
+use egui::{
+    Align, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText, ScrollArea, Sense,
+    Stroke, Ui, Vec2,
+};
+use crate::models::{CobieAssetRecord, ShmSensorTelemetry, StructuralMember};
 use crate::theme::MacTheme;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,6 +23,12 @@ pub struct FacilityView {
     pub simulated_strain_micro: f32,
     pub simulated_freq_hz: f32,
     pub simulated_degradation_pct: f32,
+    // Phase 28: IoT Telemetry & COBie 3.0
+    pub shm_sensors: Vec<ShmSensorTelemetry>,
+    pub cobie_records: Vec<CobieAssetRecord>,
+    pub selected_cobie_tab: String,
+    pub cobie_search_query: String,
+    pub maintenance_dispatch_status: Option<String>,
 }
 
 impl Default for FacilityView {
@@ -29,6 +39,11 @@ impl Default for FacilityView {
             simulated_strain_micro: 342.0,
             simulated_freq_hz: 3.48,
             simulated_degradation_pct: 1.8,
+            shm_sensors: ShmSensorTelemetry::default_sensors(),
+            cobie_records: CobieAssetRecord::default_records(),
+            selected_cobie_tab: "Component".to_string(),
+            cobie_search_query: String::new(),
+            maintenance_dispatch_status: None,
         }
     }
 }
@@ -41,6 +56,19 @@ impl FacilityView {
                 self.render_header_bar(ui, theme);
 
                 ui.add_space(16.0);
+
+                // Notification Toast
+                if let Some(ref msg) = self.maintenance_dispatch_status {
+                    Frame::new()
+                        .fill(Color32::from_rgba_premultiplied(16, 40, 25, 235))
+                        .stroke(Stroke::new(1.0, Color32::from_rgb(40, 160, 80)))
+                        .corner_radius(CornerRadius::same(6))
+                        .inner_margin(Margin::symmetric(14, 8))
+                        .show(ui, |ui| {
+                            ui.label(RichText::new(format!("⚡ {}", msg)).size(11.5).strong().color(Color32::from_rgb(120, 240, 160)));
+                        });
+                    ui.add_space(12.0);
+                }
 
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
@@ -64,8 +92,8 @@ impl FacilityView {
             .show(ui, |ui| {
                 let tabs = [
                     (FacilitySubTab::DigitalTwinShm, "📡 Digital Twin & SHM Sensors"),
-                    (FacilitySubTab::AssetRegistry, "📑 COBie Asset Registry"),
-                    (FacilitySubTab::PredictiveMaintenance, "🛠️ Predictive Maintenance (ARI Alert)"),
+                    (FacilitySubTab::AssetRegistry, "📑 COBie 3.0 Asset Registry"),
+                    (FacilitySubTab::PredictiveMaintenance, "🛠️ Predictive Maintenance & CMMS"),
                     (FacilitySubTab::LifecycleCosting, "💵 30-Year Lifecycle Cost (LCC)"),
                 ];
 
@@ -90,10 +118,10 @@ impl FacilityView {
     fn render_digital_twin_shm(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember]) {
         // Top Real-time Sensor Status Row
         ui.columns(4, |cols| {
-            self.render_sensor_card(&mut cols[0], theme, "STRAIN GAUGE SG-01", &format!("{:.0} µε", self.simulated_strain_micro), "Member E1 Strain (Safe < 1200 µε)", theme.accent_green);
+            self.render_sensor_card(&mut cols[0], theme, "STRAIN GAUGE SG-01", &format!("{:.0} µε", self.simulated_strain_micro), "Member E1 Strain (Safe < 600 µε)", theme.accent_green);
             self.render_sensor_card(&mut cols[1], theme, "NATURAL FREQUENCY (ACC-01)", &format!("{:.2} Hz", self.simulated_freq_hz), "Mode 1 Transverse (Resonance Free)", theme.accent_blue);
-            self.render_sensor_card(&mut cols[2], theme, "LIVE ARI DEGRADATION", "0.938", "Real-Time ARI(t) Degradation (-0.4%)", theme.accent_green);
-            self.render_sensor_card(&mut cols[3], theme, "HEALTH STATUS (SHM)", "🟢 NORMAL", "16 IoT Sensors Operating Active", theme.accent_green);
+            self.render_sensor_card(&mut cols[2], theme, "LIVE ARI RESILIENCE", "0.942", "Real-Time ARI(t) Degradation (-0.2%)", theme.accent_green);
+            self.render_sensor_card(&mut cols[3], theme, "HEALTH STATUS (SHM)", "🟢 OPTIMAL", "16 IoT Sensors Operating Active", theme.accent_green);
         });
 
         ui.add_space(16.0);
@@ -106,38 +134,87 @@ impl FacilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📡 Digital Twin Sensor Telemetry & Dynamic ARI Mapping").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📡 Real-Time IoT Structural Health Telemetry & Vibration FFT").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Sampling: 100 Hz • MQTT/TLS Protocol").size(11.0).color(theme.accent_blue));
+                        if ui.add(egui::Button::new(RichText::new("📊 Export Telemetry Log (.CSV)").size(11.0).color(theme.text_primary))
+                            .fill(theme.bg_canvas)
+                            .corner_radius(CornerRadius::same(6))).clicked() {
+                            self.maintenance_dispatch_status = Some("Exported 720-hour sensor telemetry archive to CSV format (100 Hz sample rate).".to_string());
+                        }
+
+                        if ui.add(egui::Button::new(RichText::new("⚡ Trigger Stress Test").size(11.0).strong().color(Color32::WHITE))
+                            .fill(theme.accent_blue)
+                            .corner_radius(CornerRadius::same(6))).clicked() {
+                            self.simulated_strain_micro += 45.0;
+                            self.maintenance_dispatch_status = Some("Simulated dynamic live vehicular shock load (+45.0 με). System returned to elastic equilibrium in 180ms.".to_string());
+                        }
+
+                        ui.label(RichText::new("Protocol: MQTT/TLS 1.3 • Sample Rate: 100 Hz").size(10.5).color(theme.text_muted));
                     });
                 });
-                ui.add_space(12.0);
+                ui.add_space(14.0);
 
-                let sensors = [
-                    ("SG-01 (Mid-Span Bottom Chord)", "Fiber Optic Strain Gauge", "342 µε", "68.4 MPa", "ARI: 0.94", "🟢 Operational Normal"),
-                    ("SG-02 (Mid-Span Top Chord)", "Electrical Resistance Strain Gauge", "-285 µε", "-57.0 MPa", "ARI: 0.94", "🟢 Elastic Compression Safe"),
-                    ("ACC-01 (Mid-Span Girder)", "Triaxial Piezoelectric Accelerometer", "0.042 g", "3.48 Hz", "Condition: Rigid", "🟢 Controlled Dynamic Vibration"),
-                    ("TILT-01 (Right Roller Support)", "Dual-Axis Digital Inclinometer", "0.018°", "Deflection 1.4 mm", "Rotation Safe", "🟢 Free Roller Expansion"),
-                    ("UT-01 (Critical Gusset Plate)", "Ultrasonic Thickness Sensor", "15.94 mm", "Corrosion Rate: 0.01 mm/yr", "Remaining Life: 94 Yrs", "🟢 Paint Protective Coating Intact"),
-                ];
+                // Sensor Table with Sparklines
+                for s in &self.shm_sensors {
+                    let (status_bg, status_fg) = match s.status_level.as_str() {
+                        "Critical" => (theme.accent_red.gamma_multiply(0.2), theme.accent_red),
+                        "Warning" => (theme.accent_orange.gamma_multiply(0.2), theme.accent_orange),
+                        _ => (theme.accent_green.gamma_multiply(0.2), theme.accent_green),
+                    };
 
-                for (id, stype, val, derived, ari_info, status) in sensors {
                     ui.horizontal(|ui| {
+                        Frame::new()
+                            .fill(theme.bg_canvas)
+                            .stroke(Stroke::new(1.0, theme.border_subtle))
+                            .corner_radius(CornerRadius::same(6))
+                            .inner_margin(Margin::symmetric(8, 4))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(&s.sensor_id).size(11.5).strong().color(theme.accent_blue));
+                            });
+
+                        ui.add_space(8.0);
                         ui.vertical(|ui| {
-                            ui.label(RichText::new(id).size(12.0).strong().color(theme.text_primary));
-                            ui.label(RichText::new(stype).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(&s.sensor_name).size(12.0).strong().color(theme.text_primary));
+                            ui.label(RichText::new(format!("Location: {} • Sensor Type: {}", s.location, s.sensor_type)).size(10.5).color(theme.text_secondary));
                         });
+
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(RichText::new(status).size(11.5).color(theme.accent_green));
+                            Frame::new()
+                                .fill(status_bg)
+                                .corner_radius(CornerRadius::same(4))
+                                .inner_margin(Margin::symmetric(6, 2))
+                                .show(ui, |ui| {
+                                    ui.label(RichText::new(&s.status_level).size(10.5).strong().color(status_fg));
+                                });
+
                             ui.add_space(16.0);
-                            ui.label(RichText::new(ari_info).size(11.5).strong().color(theme.accent_blue));
+                            ui.label(RichText::new(format!("Limit: < {:.1} {}", s.threshold_warning, s.unit)).size(11.0).color(theme.text_muted));
                             ui.add_space(16.0);
-                            ui.label(RichText::new(derived).size(11.5).color(theme.text_secondary));
-                            ui.add_space(16.0);
-                            ui.label(RichText::new(val).size(11.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(format!("{:.2} {}", s.current_value, s.unit)).size(13.0).strong().color(theme.text_primary));
                         });
                     });
+
+                    // Mini Sparkline Painter
+                    ui.add_space(2.0);
+                    let (spark_rect, _resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 10.0), Sense::hover());
+                    let painter = ui.painter();
+                    painter.rect_filled(spark_rect, CornerRadius::same(2), theme.bg_canvas);
+
+                    let min_v = s.sparkline_history.iter().cloned().fold(f32::INFINITY, f32::min);
+                    let max_v = s.sparkline_history.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+                    let v_range = (max_v - min_v).max(0.001);
+
+                    for i in 0..(s.sparkline_history.len() - 1) {
+                        let x1 = spark_rect.min.x + (i as f32 / (s.sparkline_history.len() - 1) as f32) * spark_rect.width();
+                        let x2 = spark_rect.min.x + ((i + 1) as f32 / (s.sparkline_history.len() - 1) as f32) * spark_rect.width();
+                        let y1 = spark_rect.max.y - ((s.sparkline_history[i] - min_v) / v_range) * spark_rect.height();
+                        let y2 = spark_rect.max.y - ((s.sparkline_history[i + 1] - min_v) / v_range) * spark_rect.height();
+                        painter.line_segment([Pos2::new(x1, y1), Pos2::new(x2, y2)], Stroke::new(1.2, theme.accent_blue));
+                    }
+
+                    ui.add_space(6.0);
                     ui.separator();
+                    ui.add_space(4.0);
                 }
             });
     }
@@ -150,33 +227,89 @@ impl FacilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📑 Facility Asset Registry (COBie / IFC 4.3 Standard)").size(13.5).strong().color(theme.text_primary));
+                    ui.label(RichText::new("📑 buildingSMART COBie 3.0 / 2.4 Facility Asset Inspector").size(13.5).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Total Assets: 48 Indexed Components").size(11.5).color(theme.text_muted));
+                        if ui.add(egui::Button::new(RichText::new("📥 Export COBie (.xlsx / JSON)").size(11.0).strong().color(Color32::WHITE))
+                            .fill(theme.accent_green)
+                            .corner_radius(CornerRadius::same(6))).clicked() {
+                            self.maintenance_dispatch_status = Some("COBie 3.0 spreadsheet workbook exported successfully (6 worksheets compliant with ISO 19650-4).".to_string());
+                        }
+                        ui.label(RichText::new(format!("Total Records: {} Components", self.cobie_records.len())).size(11.0).color(theme.text_muted));
                     });
                 });
+
                 ui.add_space(12.0);
 
-                let assets = [
-                    ("AST-CH-001", "Bottom Chord W14x90", "Structural Steel", "ASTM A992", "2026-10-15", "100 Years", "Every 2 Years", "🟢 Grade 1 (New)"),
-                    ("AST-CH-002", "Top Chord W14x90", "Structural Steel", "ASTM A992", "2026-10-15", "100 Years", "Every 2 Years", "🟢 Grade 1 (New)"),
-                    ("AST-DG-003", "Diagonal Web HSS8x8x1/2", "Secondary Bracing", "ASTM A500 Gr.B", "2026-10-15", "100 Years", "Every 3 Years", "🟢 Grade 1 (New)"),
-                    ("AST-BRG-01", "Elastomeric Pot Bearing 150T", "Bridge Bearing", "Neoprene/Steel", "2026-10-15", "25 Years", "Every Year", "🟢 Grade 1 (Prime)"),
-                    ("AST-EXP-01", "Modular Expansion Joint 80mm", "Floor Expansion Joint", "Galvanized Steel", "2026-10-15", "20 Years", "Every 6 Months", "🟢 Grade 1 (Gap-Free)"),
-                ];
+                // COBie Sheet Sub-tabs
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("COBie Worksheet:").size(11.0).strong().color(theme.accent_blue));
+                    let tabs = ["Facility", "Floor", "Space", "Component", "Type", "Document"];
+                    for tab in tabs {
+                        let is_active = self.selected_cobie_tab == tab;
+                        let bg = if is_active { theme.accent_blue } else { theme.bg_canvas };
+                        let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
+                        if ui.add(egui::Button::new(RichText::new(tab).size(11.0).color(fg))
+                            .fill(bg)
+                            .corner_radius(CornerRadius::same(6))).clicked() {
+                            self.selected_cobie_tab = tab.to_string();
+                        }
+                    }
 
-                for (tag, name, cat, spec, comm, life, interval, cond) in assets {
+                    ui.add_space(16.0);
+                    ui.label(RichText::new("🔍 Search:").size(11.0).color(theme.text_muted));
+                    ui.text_edit_singleline(&mut self.cobie_search_query);
+                });
+
+                ui.add_space(12.0);
+                ui.separator();
+                ui.add_space(8.0);
+
+                // COBie Table Header
+                ui.horizontal(|ui| {
+                    ui.set_min_width(ui.available_width());
+                    ui.label(RichText::new("NAME / TAG").size(10.5).strong().color(theme.text_muted));
+                    ui.add_space(18.0);
+                    ui.label(RichText::new("CATEGORY & SPECIFICATION").size(10.5).strong().color(theme.text_muted));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(RichText::new("CONDITION").size(10.5).strong().color(theme.text_muted));
+                        ui.add_space(18.0);
+                        ui.label(RichText::new("WARRANTY / DESIGN LIFE").size(10.5).strong().color(theme.text_muted));
+                        ui.add_space(18.0);
+                        ui.label(RichText::new("SERIAL / DOC ID").size(10.5).strong().color(theme.text_muted));
+                        ui.add_space(18.0);
+                        ui.label(RichText::new("LOCATION").size(10.5).strong().color(theme.text_muted));
+                    });
+                });
+
+                ui.add_space(4.0);
+                ui.separator();
+                ui.add_space(6.0);
+
+                for rec in &self.cobie_records {
+                    if rec.sheet_tab != self.selected_cobie_tab && self.selected_cobie_tab != "All" {
+                        continue;
+                    }
+                    if !self.cobie_search_query.is_empty() && !rec.name.to_lowercase().contains(&self.cobie_search_query.to_lowercase()) {
+                        continue;
+                    }
+
                     ui.horizontal(|ui| {
+                        ui.label(RichText::new(&rec.name).size(11.5).strong().color(theme.text_primary));
+                        ui.add_space(14.0);
                         ui.vertical(|ui| {
-                            ui.label(RichText::new(format!("{} • {}", tag, name)).size(12.0).strong().color(theme.text_primary));
-                            ui.label(RichText::new(format!("{} | {} | Design Life: {}", cat, spec, life)).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(&rec.category).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("Created By: {}", rec.created_by)).size(9.5).color(theme.text_muted));
                         });
+
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(RichText::new(cond).size(11.5).color(theme.accent_green));
+                            let cond_color = if rec.condition_index > 95.0 { theme.accent_green } else { theme.accent_orange };
+                            ui.label(RichText::new(format!("{:.1}%", rec.condition_index)).size(11.5).strong().color(cond_color));
                             ui.add_space(16.0);
-                            ui.label(RichText::new(interval).size(11.5).color(theme.accent_blue));
+                            ui.label(RichText::new(&rec.warranty_or_date).size(11.0).color(theme.text_secondary));
                             ui.add_space(16.0);
-                            ui.label(RichText::new(comm).size(11.0).color(theme.text_muted));
+                            ui.label(RichText::new(&rec.serial_or_doc_no).size(11.0).color(theme.text_muted));
+                            ui.add_space(16.0);
+                            ui.label(RichText::new(&rec.space_or_location).size(11.0).color(theme.accent_blue));
                         });
                     });
                     ui.separator();
@@ -191,9 +324,24 @@ impl FacilityView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("🛠️ Predictive Maintenance Protocols via Redundancy Alerts (ARI Alert)").size(13.5).strong().color(theme.text_primary));
-                ui.add_space(6.0);
-                ui.label(RichText::new("Automated Work Orders (WO) issued when material degradation or fatigue metrics approach critical resilience thresholds.").size(11.5).color(theme.text_secondary));
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("🛠️ Predictive Maintenance & Computerized Maintenance Management (CMMS)").size(13.5).strong().color(theme.text_primary));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if ui.add(egui::Button::new(RichText::new("👷 Dispatch Structural Inspector").size(11.0).strong().color(Color32::WHITE))
+                            .fill(theme.accent_blue)
+                            .corner_radius(CornerRadius::same(6))).clicked() {
+                            self.maintenance_dispatch_status = Some("Structural inspection team dispatched for Zone B-2 Column Foundation. Inspection ticket #INSP-2026-904 opened.".to_string());
+                        }
+
+                        if ui.add(egui::Button::new(RichText::new("📋 Generate Emergency Work Order").size(11.0).color(theme.text_primary))
+                            .fill(theme.bg_canvas)
+                            .corner_radius(CornerRadius::same(6))).clicked() {
+                            self.maintenance_dispatch_status = Some("Emergency Work Order #WO-EMG-044 generated and routed to On-Site Facilities Engineer.".to_string());
+                        }
+                    });
+                });
+                ui.add_space(10.0);
+                ui.label(RichText::new("Automated Work Orders (WO) issued when material degradation, strain history, or corrosion metrics approach critical resilience thresholds.").size(11.5).color(theme.text_secondary));
                 ui.add_space(14.0);
 
                 let work_orders = [

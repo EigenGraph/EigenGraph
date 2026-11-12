@@ -787,3 +787,545 @@ impl DrawingSheetItem {
     }
 }
 
+// ============================================================================
+// Phase 28: 4D-7D BIM Superstation Data Models
+// ============================================================================
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConstructionSimulationPhase {
+    pub id: String,
+    pub name: String,
+    pub day_start: u32,
+    pub day_end: u32,
+    pub planned_progress_pct: f32,
+    pub actual_progress_pct: f32,
+    pub manpower_count: u32,
+    pub equipment_count: u32,
+    pub concrete_volume_m3: f32,
+    pub color_rgb: (u8, u8, u8),
+    pub wbs_code: String,
+    pub is_critical: bool,
+}
+
+impl ConstructionSimulationPhase {
+    pub fn default_phases() -> Vec<Self> {
+        vec![
+            Self {
+                id: "ph_sub".to_string(),
+                name: "1. Substructure Piling & Deep Foundation".to_string(),
+                day_start: 1,
+                day_end: 45,
+                planned_progress_pct: 100.0,
+                actual_progress_pct: 100.0,
+                manpower_count: 42,
+                equipment_count: 6,
+                concrete_volume_m3: 1450.0,
+                color_rgb: (160, 100, 45),
+                wbs_code: "02.40.00".to_string(),
+                is_critical: true,
+            },
+            Self {
+                id: "ph_raft".to_string(),
+                name: "2. Raft Slab & Perimeter Retaining Walls".to_string(),
+                day_start: 46,
+                day_end: 90,
+                planned_progress_pct: 100.0,
+                actual_progress_pct: 96.0,
+                manpower_count: 58,
+                equipment_count: 8,
+                concrete_volume_m3: 2200.0,
+                color_rgb: (120, 130, 145),
+                wbs_code: "03.30.00".to_string(),
+                is_critical: true,
+            },
+            Self {
+                id: "ph_steel".to_string(),
+                name: "3. Structural Steel Erection L1-L15 & Composite Decks".to_string(),
+                day_start: 91,
+                day_end: 195,
+                planned_progress_pct: 78.0,
+                actual_progress_pct: 82.5,
+                manpower_count: 85,
+                equipment_count: 12,
+                concrete_volume_m3: 1850.0,
+                color_rgb: (0, 122, 255),
+                wbs_code: "05.12.00".to_string(),
+                is_critical: true,
+            },
+            Self {
+                id: "ph_facade".to_string(),
+                name: "4. Unitized Curtain Wall & Building Envelope".to_string(),
+                day_start: 180,
+                day_end: 270,
+                planned_progress_pct: 45.0,
+                actual_progress_pct: 42.0,
+                manpower_count: 64,
+                equipment_count: 5,
+                concrete_volume_m3: 0.0,
+                color_rgb: (52, 199, 89),
+                wbs_code: "08.44.00".to_string(),
+                is_critical: false,
+            },
+            Self {
+                id: "ph_mep".to_string(),
+                name: "5. MEP Core Risers, HVAC & Fire Suppression".to_string(),
+                day_start: 210,
+                day_end: 320,
+                planned_progress_pct: 30.0,
+                actual_progress_pct: 28.0,
+                manpower_count: 72,
+                equipment_count: 4,
+                concrete_volume_m3: 0.0,
+                color_rgb: (255, 149, 0),
+                wbs_code: "23.00.00".to_string(),
+                is_critical: true,
+            },
+            Self {
+                id: "ph_com".to_string(),
+                name: "6. Integrated Testing, Commissioning & Handover".to_string(),
+                day_start: 321,
+                day_end: 360,
+                planned_progress_pct: 5.0,
+                actual_progress_pct: 0.0,
+                manpower_count: 24,
+                equipment_count: 2,
+                concrete_volume_m3: 0.0,
+                color_rgb: (175, 82, 222),
+                wbs_code: "01.91.00".to_string(),
+                is_critical: true,
+            },
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CurrencyUnit {
+    Idr,
+    Usd,
+    Eur,
+    Sgd,
+}
+
+impl CurrencyUnit {
+    pub fn all() -> &'static [CurrencyUnit] {
+        &[CurrencyUnit::Idr, CurrencyUnit::Usd, CurrencyUnit::Eur, CurrencyUnit::Sgd]
+    }
+
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Idr => "IDR",
+            Self::Usd => "USD",
+            Self::Eur => "EUR",
+            Self::Sgd => "SGD",
+        }
+    }
+
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            Self::Idr => "Rp",
+            Self::Usd => "$",
+            Self::Eur => "€",
+            Self::Sgd => "S$",
+        }
+    }
+
+    pub fn rate_from_idr(&self) -> f64 {
+        match self {
+            Self::Idr => 1.0,
+            Self::Usd => 1.0 / 16_200.0,
+            Self::Eur => 1.0 / 17_400.0,
+            Self::Sgd => 1.0 / 12_100.0,
+        }
+    }
+
+    pub fn format_value(&self, idr_val: f64) -> String {
+        let converted = idr_val * self.rate_from_idr();
+        match self {
+            Self::Idr => {
+                let rounded = idr_val.round() as i64;
+                let s = rounded.abs().to_string();
+                let mut res = String::new();
+                let mut c = 0;
+                for ch in s.chars().rev() {
+                    if c > 0 && c % 3 == 0 { res.push('.'); }
+                    res.push(ch);
+                    c += 1;
+                }
+                let rev: String = res.chars().rev().collect();
+                if rounded < 0 { format!("-Rp {}", rev) } else { format!("Rp {}", rev) }
+            }
+            Self::Usd => {
+                let int_part = converted.round() as i64;
+                let s = int_part.abs().to_string();
+                let mut res = String::new();
+                let mut c = 0;
+                for ch in s.chars().rev() {
+                    if c > 0 && c % 3 == 0 { res.push(','); }
+                    res.push(ch);
+                    c += 1;
+                }
+                let rev: String = res.chars().rev().collect();
+                if int_part < 0 { format!("-${}", rev) } else { format!("${}", rev) }
+            }
+            Self::Eur => {
+                let int_part = converted.round() as i64;
+                let s = int_part.abs().to_string();
+                let mut res = String::new();
+                let mut c = 0;
+                for ch in s.chars().rev() {
+                    if c > 0 && c % 3 == 0 { res.push('.'); }
+                    res.push(ch);
+                    c += 1;
+                }
+                let rev: String = res.chars().rev().collect();
+                if int_part < 0 { format!("-€{}", rev) } else { format!("€{}", rev) }
+            }
+            Self::Sgd => {
+                let int_part = converted.round() as i64;
+                let s = int_part.abs().to_string();
+                let mut res = String::new();
+                let mut c = 0;
+                for ch in s.chars().rev() {
+                    if c > 0 && c % 3 == 0 { res.push(','); }
+                    res.push(ch);
+                    c += 1;
+                }
+                let rev: String = res.chars().rev().collect();
+                if int_part < 0 { format!("-S${}", rev) } else { format!("S${}", rev) }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WbsCostItem {
+    pub wbs_code: String,
+    pub description: String,
+    pub division: String,
+    pub unit: String,
+    pub quantity: f64,
+    pub unit_price_idr: f64,
+    pub total_cost_idr: f64,
+    pub progress_pct: f32,
+}
+
+impl WbsCostItem {
+    pub fn default_catalog() -> Vec<Self> {
+        vec![
+            Self {
+                wbs_code: "02.41.16".to_string(),
+                description: "Deep Bored Piling D=1000mm (L=32m)".to_string(),
+                division: "02 Substructure".to_string(),
+                unit: "m".to_string(),
+                quantity: 4800.0,
+                unit_price_idr: 2_850_000.0,
+                total_cost_idr: 13_680_000_000.0,
+                progress_pct: 100.0,
+            },
+            Self {
+                wbs_code: "03.31.00".to_string(),
+                description: "Structural Concrete fc' 40 MPa (Foundation & Columns)".to_string(),
+                division: "03 Cast-in-Place Concrete".to_string(),
+                unit: "m3".to_string(),
+                quantity: 5500.0,
+                unit_price_idr: 1_450_000.0,
+                total_cost_idr: 7_975_000_000.0,
+                progress_pct: 88.0,
+            },
+            Self {
+                wbs_code: "03.21.00".to_string(),
+                description: "Deformed High-Strength Rebar BJTS 420B".to_string(),
+                division: "03 Reinforcing Steel".to_string(),
+                unit: "kg".to_string(),
+                quantity: 680_000.0,
+                unit_price_idr: 14_800.0,
+                total_cost_idr: 10_064_000_000.0,
+                progress_pct: 85.0,
+            },
+            Self {
+                wbs_code: "05.12.23".to_string(),
+                description: "Structural Steel Framing ASTM A992 (W-Shapes & Trusses)".to_string(),
+                division: "05 Structural Metals".to_string(),
+                unit: "ton".to_string(),
+                quantity: 940.0,
+                unit_price_idr: 28_500_000.0,
+                total_cost_idr: 26_790_000_000.0,
+                progress_pct: 76.0,
+            },
+            Self {
+                wbs_code: "08.44.13".to_string(),
+                description: "Glazed Aluminum Curtain Wall System (Double Low-E)".to_string(),
+                division: "08 Openings & Glazing".to_string(),
+                unit: "m2".to_string(),
+                quantity: 7200.0,
+                unit_price_idr: 2_600_000.0,
+                total_cost_idr: 18_720_000_000.0,
+                progress_pct: 42.0,
+            },
+            Self {
+                wbs_code: "23.05.00".to_string(),
+                description: "Common Work Results for HVAC & Central Chillers".to_string(),
+                division: "23 Mechanical & HVAC".to_string(),
+                unit: "lot".to_string(),
+                quantity: 1.0,
+                unit_price_idr: 15_200_000_000.0,
+                total_cost_idr: 15_200_000_000.0,
+                progress_pct: 25.0,
+            },
+        ]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LcaStageEmission {
+    pub stage_code: String,
+    pub stage_name: String,
+    pub emissions_t_co2e: f64,
+    pub pct_of_total: f32,
+    pub description: String,
+    pub color_rgb: (u8, u8, u8),
+}
+
+impl LcaStageEmission {
+    pub fn default_stages() -> Vec<Self> {
+        vec![
+            Self {
+                stage_code: "A1-A3".to_string(),
+                stage_name: "Raw Material & Product Manufacturing".to_string(),
+                emissions_t_co2e: 1420.5,
+                pct_of_total: 54.2,
+                description: "Cradle-to-gate extraction of iron ore, blast furnace smelting, Portland cement clinker.".to_string(),
+                color_rgb: (235, 75, 55),
+            },
+            Self {
+                stage_code: "A4-A5".to_string(),
+                stage_name: "Transport & Construction Process".to_string(),
+                emissions_t_co2e: 312.4,
+                pct_of_total: 11.9,
+                description: "Fleet freight logistics, crane diesel consumption, batch plant site energy.".to_string(),
+                color_rgb: (255, 149, 0),
+            },
+            Self {
+                stage_code: "B1-B7".to_string(),
+                stage_name: "Operational Energy & Building Use".to_string(),
+                emissions_t_co2e: 648.0,
+                pct_of_total: 24.7,
+                description: "50-year structural serviceability, cathodic protection power, maintenance coating.".to_string(),
+                color_rgb: (0, 122, 255),
+            },
+            Self {
+                stage_code: "C1-C4".to_string(),
+                stage_name: "Deconstruction & Waste Processing".to_string(),
+                emissions_t_co2e: 140.2,
+                pct_of_total: 5.3,
+                description: "Controlled demolition, concrete crushing sorting, landfill transport.".to_string(),
+                color_rgb: (142, 142, 147),
+            },
+            Self {
+                stage_code: "Module D".to_string(),
+                stage_name: "Beyond Lifecycle Circular Reuse Offset".to_string(),
+                emissions_t_co2e: -480.0,
+                pct_of_total: 3.9,
+                description: "Net carbon credit from 95% structural steel electric arc furnace remelting recycling.".to_string(),
+                color_rgb: (52, 199, 89),
+            },
+        ]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GreenBuildingCredit {
+    pub standard: String,
+    pub category: String,
+    pub credit_title: String,
+    pub points_achieved: u32,
+    pub points_max: u32,
+    pub status: String,
+}
+
+impl GreenBuildingCredit {
+    pub fn default_credits() -> Vec<Self> {
+        vec![
+            Self {
+                standard: "GREENSHIP (GBCI)".to_string(),
+                category: "Material Resource & Cycle (MRC)".to_string(),
+                credit_title: "MRC 1: Recycled Content in Structural Steel (EAF > 75%)".to_string(),
+                points_achieved: 3,
+                points_max: 3,
+                status: "Compliant".to_string(),
+            },
+            Self {
+                standard: "GREENSHIP (GBCI)".to_string(),
+                category: "Energy Efficiency & Conservation (EEC)".to_string(),
+                credit_title: "EEC 1: Overall Thermal Transfer Value (OTTV < 35 W/m2)".to_string(),
+                points_achieved: 14,
+                points_max: 15,
+                status: "Compliant".to_string(),
+            },
+            Self {
+                standard: "LEED v4.1 BD+C".to_string(),
+                category: "Materials and Resources (MR)".to_string(),
+                credit_title: "Building Life-Cycle Impact Reduction (Option 4 Whole-Building LCA)".to_string(),
+                points_achieved: 4,
+                points_max: 4,
+                status: "Compliant".to_string(),
+            },
+            Self {
+                standard: "LEED v4.1 BD+C".to_string(),
+                category: "Energy and Atmosphere (EA)".to_string(),
+                credit_title: "Optimize Energy Performance (32% Improvement over ASHRAE 90.1)".to_string(),
+                points_achieved: 16,
+                points_max: 18,
+                status: "Under Review".to_string(),
+            },
+            Self {
+                standard: "BREEAM International".to_string(),
+                category: "Mat 01 Life Cycle Impacts".to_string(),
+                credit_title: "Environmental Product Declaration (ISO 14025 Type III EPD Verified)".to_string(),
+                points_achieved: 5,
+                points_max: 6,
+                status: "Compliant".to_string(),
+            },
+        ]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ShmSensorTelemetry {
+    pub sensor_id: String,
+    pub sensor_name: String,
+    pub location: String,
+    pub sensor_type: String,
+    pub current_value: f32,
+    pub unit: String,
+    pub threshold_warning: f32,
+    pub threshold_critical: f32,
+    pub status_level: String,
+    pub sparkline_history: [f32; 8],
+}
+
+impl ShmSensorTelemetry {
+    pub fn default_sensors() -> Vec<Self> {
+        vec![
+            Self {
+                sensor_id: "SG-L01-C03".to_string(),
+                sensor_name: "Fiber-Optic Strain Gauge SG-01".to_string(),
+                location: "Grid B-2 Ground Column Base".to_string(),
+                sensor_type: "Fiber Bragg Grating (FBG)".to_string(),
+                current_value: 342.5,
+                unit: "με".to_string(),
+                threshold_warning: 600.0,
+                threshold_critical: 950.0,
+                status_level: "Optimal".to_string(),
+                sparkline_history: [330.0, 335.0, 340.0, 338.0, 345.0, 341.0, 343.0, 342.5],
+            },
+            Self {
+                sensor_id: "ACC-ROOF-01".to_string(),
+                sensor_name: "Triaxial Accelerometer ACC-01".to_string(),
+                location: "Level 15 Roof Core Top".to_string(),
+                sensor_type: "MEMS Seismic Sensor".to_string(),
+                current_value: 1.48,
+                unit: "Hz".to_string(),
+                threshold_warning: 1.20,
+                threshold_critical: 0.95,
+                status_level: "Optimal".to_string(),
+                sparkline_history: [1.52, 1.51, 1.50, 1.49, 1.48, 1.49, 1.48, 1.48],
+            },
+            Self {
+                sensor_id: "CM-BASE-04".to_string(),
+                sensor_name: "Laser Displacement Crack Meter CM-04".to_string(),
+                location: "Basement 2 South Retaining Wall".to_string(),
+                sensor_type: "Potentiometric LVDT".to_string(),
+                current_value: 0.12,
+                unit: "mm".to_string(),
+                threshold_warning: 0.30,
+                threshold_critical: 0.50,
+                status_level: "Optimal".to_string(),
+                sparkline_history: [0.08, 0.09, 0.10, 0.10, 0.11, 0.11, 0.12, 0.12],
+            },
+            Self {
+                sensor_id: "TM-CORE-02".to_string(),
+                sensor_name: "Biaxial Inclinometer Tiltmeter TM-02".to_string(),
+                location: "Level 8 Mid-Tower Shear Core".to_string(),
+                sensor_type: "Electrolytic Tilt Sensor".to_string(),
+                current_value: 0.018,
+                unit: "deg".to_string(),
+                threshold_warning: 0.050,
+                threshold_critical: 0.100,
+                status_level: "Optimal".to_string(),
+                sparkline_history: [0.015, 0.016, 0.017, 0.017, 0.018, 0.018, 0.018, 0.018],
+            },
+        ]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CobieAssetRecord {
+    pub sheet_tab: String,
+    pub name: String,
+    pub created_by: String,
+    pub category: String,
+    pub space_or_location: String,
+    pub serial_or_doc_no: String,
+    pub warranty_or_date: String,
+    pub condition_index: f32,
+}
+
+impl CobieAssetRecord {
+    pub fn default_records() -> Vec<Self> {
+        vec![
+            Self {
+                sheet_tab: "Facility".to_string(),
+                name: "Menara Sudirman Commercial Tower".to_string(),
+                created_by: "EigenGraph BIM Team".to_string(),
+                category: "High-Rise Office Complex".to_string(),
+                space_or_location: "Kav. 52-53 Sudirman, Jakarta".to_string(),
+                serial_or_doc_no: "FAC-JKT-2026-001".to_string(),
+                warranty_or_date: "10-Year Structural Defect Liability".to_string(),
+                condition_index: 99.2,
+            },
+            Self {
+                sheet_tab: "Floor".to_string(),
+                name: "Level 01 Ground Lobby".to_string(),
+                created_by: "Architectural Lead".to_string(),
+                category: "Commercial Public Realm".to_string(),
+                space_or_location: "Elevation +0.000m".to_string(),
+                serial_or_doc_no: "FLR-L01".to_string(),
+                warranty_or_date: "Commissioned 2026-11-12".to_string(),
+                condition_index: 100.0,
+            },
+            Self {
+                sheet_tab: "Component".to_string(),
+                name: "W14x132 Transfer Girder TG-01".to_string(),
+                created_by: "Structural Engineer of Record".to_string(),
+                category: "ASTM A992 Heavy Section".to_string(),
+                space_or_location: "Grid C/2-3 Level 2 Ceiling".to_string(),
+                serial_or_doc_no: "HEAT-#88392-AISC".to_string(),
+                warranty_or_date: "50-Year Design Life".to_string(),
+                condition_index: 98.6,
+            },
+            Self {
+                sheet_tab: "Type".to_string(),
+                name: "Square RC Column 600x600 C1".to_string(),
+                created_by: "BIM Modeler".to_string(),
+                category: "C40/50 Self-Consolidating Concrete".to_string(),
+                space_or_location: "Ground through L15 Columns".to_string(),
+                serial_or_doc_no: "TYP-COL-600".to_string(),
+                warranty_or_date: "Tested to SNI 2847:2019".to_string(),
+                condition_index: 99.0,
+            },
+            Self {
+                sheet_tab: "Document".to_string(),
+                name: "As-Built Structural Certification Dossier".to_string(),
+                created_by: "Chief Structural Engineer".to_string(),
+                category: "Statutory Approval PBG".to_string(),
+                space_or_location: "Electronic Vault / SIMBG".to_string(),
+                serial_or_doc_no: "DOC-PBG-2026-881".to_string(),
+                warranty_or_date: "Certified 2026-11-12".to_string(),
+                condition_index: 100.0,
+            },
+        ]
+    }
+}
+
+

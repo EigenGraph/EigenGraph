@@ -2,7 +2,7 @@
 //! Analysis of energy efficiency, carbon footprint, environmental impact, and green building certification requirements.
 
 use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui, Vec2};
-use crate::models::StructuralMember;
+use crate::models::{GreenBuildingCredit, LcaStageEmission, StructuralMember};
 use crate::theme::MacTheme;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,6 +17,10 @@ pub struct SustainabilityView {
     pub active_subtab: SustainabilitySubTab,
     pub steel_production_route: SteelProductionRoute,
     pub target_rating: GreenRatingTarget,
+    // Phase 28: Whole-Life LCA & Multi-Standard Green Scorecards
+    pub lca_stages: Vec<LcaStageEmission>,
+    pub green_credits: Vec<GreenBuildingCredit>,
+    pub selected_credit_standard: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +44,9 @@ impl Default for SustainabilityView {
             active_subtab: SustainabilitySubTab::EmbodiedCarbon,
             steel_production_route: SteelProductionRoute::ElectricArcFurnace,
             target_rating: GreenRatingTarget::GreenshipPlatinum,
+            lca_stages: LcaStageEmission::default_stages(),
+            green_credits: GreenBuildingCredit::default_credits(),
+            selected_credit_standard: None,
         }
     }
 }
@@ -114,15 +121,15 @@ impl SustainabilityView {
             None => (48.5 * 1.15, 48.5, 35.0, "LEED Silver", 0.017),
         };
 
-        let factor = match self.steel_production_route {
+        let _factor = match self.steel_production_route {
             SteelProductionRoute::ElectricArcFurnace => 1.15,
             SteelProductionRoute::BlastFurnaceBof => 2.35,
             SteelProductionRoute::HydrogenDri => 0.45,
         };
-        let steel_co2 = total_steel_tons * factor;
-        let concrete_co2 = 72.0 * 0.28; // 72 m3 @ 0.28 t CO2e/m3
-        let coating_co2 = 340.0 * 0.008; // 340 m2 @ 8 kg CO2e/m2
-        let transport_co2 = total_steel_tons * 0.045; // 45 kg CO2e / ton transport
+        let _steel_co2 = total_steel_tons * _factor;
+        let _concrete_co2 = 72.0 * 0.28; // 72 m3 @ 0.28 t CO2e/m3
+        let _coating_co2 = 340.0 * 0.008; // 340 m2 @ 8 kg CO2e/m2
+        let _transport_co2 = total_steel_tons * 0.045; // 45 kg CO2e / ton transport
 
         // Metric Cards Row
         ui.columns(4, |cols| {
@@ -151,44 +158,56 @@ impl SustainabilityView {
 
         ui.add_space(16.0);
 
-        // Carbon Breakdown Table
+        // ISO 14040 / EN 15978 Whole-Life Carbon Assessment (WBLCA) Stages
         Frame::new()
             .fill(theme.bg_card)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("📊 Life Cycle Inventory Breakdown (EN 15978 / ISO 21930)").size(13.0).strong().color(theme.text_primary));
-                ui.add_space(10.0);
-
-                let rows = [
-                    ("A1–A3 Structural Steel (WF & HSS Sections)", format!("{:.1} Tons", total_steel_tons), format!("{:.2} t CO₂e", steel_co2), format!("{:.1}%", (steel_co2 / total_co2) * 100.0)),
-                    ("A1–A3 Reinforced Concrete Substructure", "72.0 m³".to_string(), format!("{:.2} t CO₂e", concrete_co2), format!("{:.1}%", (concrete_co2 / total_co2) * 100.0)),
-                    ("A1–A3 Anticorrosion & Fireproofing Coating", "340.0 m²".to_string(), format!("{:.2} t CO₂e", coating_co2), format!("{:.1}%", (coating_co2 / total_co2) * 100.0)),
-                    ("A4 Workshop to Site Transport (120 km)", "48.5 Ton-trips".to_string(), format!("{:.2} t CO₂e", transport_co2), format!("{:.1}%", (transport_co2 / total_co2) * 100.0)),
-                ];
-
-                for (name, qty, co2, pct) in rows {
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(name).size(12.0).color(theme.text_primary));
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(RichText::new(pct).size(11.5).strong().color(theme.accent_blue));
-                            ui.add_space(16.0);
-                            ui.label(RichText::new(co2).size(11.5).color(theme.text_secondary));
-                            ui.add_space(16.0);
-                            ui.label(RichText::new(qty).size(11.5).color(theme.text_muted));
-                        });
-                    });
-                    ui.separator();
-                }
-
-                ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("TOTAL GLOBAL EMBODIED CARBON:").size(12.5).strong().color(theme.accent_green));
+                    ui.label(RichText::new("🌍 WHOLE BUILDING LIFE CYCLE ASSESSMENT (EN 15978 / ISO 14040)").size(13.0).strong().color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new(format!("{:.2} Tons CO₂e", total_co2)).size(13.0).strong().color(theme.accent_green));
+                        ui.label(RichText::new("RIBA 2030 Climate Challenge Benchmark: Tier A (< 300 kg CO₂e/m²)").size(11.0).color(theme.accent_green));
                     });
                 });
+                ui.add_space(10.0);
+
+                for stage in &self.lca_stages {
+                    let col = Color32::from_rgb(stage.color_rgb.0, stage.color_rgb.1, stage.color_rgb.2);
+                    ui.horizontal(|ui| {
+                        Frame::new()
+                            .fill(col.gamma_multiply(0.2))
+                            .stroke(Stroke::new(1.0, col))
+                            .corner_radius(CornerRadius::same(4))
+                            .inner_margin(Margin::symmetric(6, 2))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(&stage.stage_code).size(11.0).strong().color(col));
+                            });
+
+                        ui.add_space(8.0);
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new(&stage.stage_name).size(11.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(&stage.description).size(10.5).color(theme.text_secondary));
+                        });
+
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.label(RichText::new(format!("{:.1}%", stage.pct_of_total)).size(11.5).strong().color(col));
+                            ui.add_space(16.0);
+                            let sign = if stage.emissions_t_co2e < 0.0 { "" } else { "+" };
+                            ui.label(RichText::new(format!("{}{:.1} t CO₂e", sign, stage.emissions_t_co2e)).size(12.0).color(theme.text_primary));
+                        });
+                    });
+
+                    ui.add_space(2.0);
+                    let (b_rect, _resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 4.0), egui::Sense::hover());
+                    let b_painter = ui.painter();
+                    b_painter.rect_filled(b_rect, CornerRadius::same(2), theme.bg_canvas);
+                    let fill_w = b_rect.width() * (stage.pct_of_total.abs() / 100.0).clamp(0.02, 1.0);
+                    b_painter.rect_filled(egui::Rect::from_min_size(b_rect.left_top(), Vec2::new(fill_w, b_rect.height())), CornerRadius::same(2), col);
+
+                    ui.add_space(6.0);
+                }
             });
     }
 
@@ -247,36 +266,85 @@ impl SustainabilityView {
     }
 
     fn render_green_certification(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        // Multi-Standard Rating Summary Row
+        ui.columns(3, |cols| {
+            self.render_stat_card(&mut cols[0], theme, "GREENSHIP (GBCI)", "PLATINUM", "86 / 100 Credit Points", theme.accent_green);
+            self.render_stat_card(&mut cols[1], theme, "LEED v4.1 BD+C", "PLATINUM", "84 / 110 Credit Points", theme.accent_blue);
+            self.render_stat_card(&mut cols[2], theme, "BREEAM INTERNATIONAL", "OUTSTANDING", "88.4% Rating Score", theme.accent_green);
+        });
+
+        ui.add_space(14.0);
+
+        // Standard Filter Pills
+        theme.card_frame().show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new("🏅 RATING SYSTEM:").size(11.5).strong().color(theme.accent_blue));
+
+                let is_all = self.selected_credit_standard.is_none();
+                let all_bg = if is_all { theme.accent_blue } else { theme.bg_canvas };
+                let all_fg = if is_all { Color32::WHITE } else { theme.text_secondary };
+                if ui.add(egui::Button::new(RichText::new("All Systems").size(11.0).color(all_fg))
+                    .fill(all_bg)
+                    .corner_radius(CornerRadius::same(6))).clicked() {
+                    self.selected_credit_standard = None;
+                }
+
+                let standards = ["GREENSHIP (GBCI)", "LEED v4.1 BD+C", "BREEAM International"];
+                for std in standards {
+                    let is_sel = self.selected_credit_standard.as_deref() == Some(std);
+                    let bg = if is_sel { theme.accent_blue } else { theme.bg_canvas };
+                    let fg = if is_sel { Color32::WHITE } else { theme.text_secondary };
+                    if ui.add(egui::Button::new(RichText::new(std).size(11.0).color(fg))
+                        .fill(bg)
+                        .corner_radius(CornerRadius::same(6))).clicked() {
+                        self.selected_credit_standard = Some(std.to_string());
+                    }
+                }
+            });
+        });
+
+        ui.add_space(12.0);
+
+        // Credit Checklist Table
         Frame::new()
             .fill(theme.bg_card)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("🏅 Green Building Certification Scorecard (Greenship & LEED)").size(13.5).strong().color(theme.text_primary));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Score: 86 / 100 (PLATINUM Rating)").size(12.0).strong().color(theme.accent_green));
-                    });
-                });
-                ui.add_space(12.0);
+                ui.label(RichText::new("📋 Green Certification Verification Checklist").size(13.0).strong().color(theme.text_primary));
+                ui.add_space(10.0);
 
-                let criteria = [
-                    ("MR 1: Sustainable Materials (Recycled Steel Scrap > 80%)", "12 / 12 Pts", "✅ Verified via manufacturer EPD certifications"),
-                    ("MR 2: Regional Materials (< 150 km fabrication haul)", "8 / 8 Pts", "✅ Local regional fabrication yard"),
-                    ("SE 1: Structural Efficiency & Weight Optimization (DfMA)", "15 / 15 Pts", "✅ L/7.5 span-to-depth ratio minimizes steel tonnage"),
-                    ("SE 2: Resilience & Long-Life Durability (ARI > 0.85)", "10 / 10 Pts", "✅ SVD Kinematic Guard prevents premature collapse and retrofit"),
-                    ("WA 1: Construction Waste Minimization (Offcut Waste < 3%)", "9 / 10 Pts", "✅ Integrated 1D Cutting Stock Optimizer heuristic"),
-                ];
+                for credit in &self.green_credits {
+                    if let Some(ref sel_std) = self.selected_credit_standard {
+                        if &credit.standard != sel_std {
+                            continue;
+                        }
+                    }
 
-                for (name, pts, notes) in criteria {
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
-                            ui.label(RichText::new(name).size(12.0).strong().color(theme.text_primary));
-                            ui.label(RichText::new(notes).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(&credit.credit_title).size(12.0).strong().color(theme.text_primary));
+                            ui.label(RichText::new(format!("{} • {}", credit.standard, credit.category)).size(10.5).color(theme.text_muted));
                         });
+
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(RichText::new(pts).size(12.0).strong().color(theme.accent_blue));
+                            let (badge_bg, badge_fg) = if credit.status == "Compliant" {
+                                (theme.accent_green.gamma_multiply(0.2), theme.accent_green)
+                            } else {
+                                (theme.accent_orange.gamma_multiply(0.2), theme.accent_orange)
+                            };
+
+                            Frame::new()
+                                .fill(badge_bg)
+                                .corner_radius(CornerRadius::same(4))
+                                .inner_margin(Margin::symmetric(6, 2))
+                                .show(ui, |ui| {
+                                    ui.label(RichText::new(&credit.status).size(10.5).strong().color(badge_fg));
+                                });
+
+                            ui.add_space(14.0);
+                            ui.label(RichText::new(format!("{}/{} Pts", credit.points_achieved, credit.points_max)).size(12.0).strong().color(theme.accent_blue));
                         });
                     });
                     ui.separator();
@@ -291,12 +359,12 @@ impl SustainabilityView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("⚡ Efisiensi Termal & Ketahanan Siklus Hidup (Life Cycle Durability)").size(13.5).strong().color(theme.text_primary));
+                ui.label(RichText::new("⚡ Thermal Efficiency & Life Cycle Durability Assessment").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(10.0);
 
                 ui.columns(3, |cols| {
-                    self.render_stat_card(&mut cols[0], theme, "DESIGN SERVICE LIFE", "100 Tahun", "SNI Bridge Serviceability Class A", theme.text_primary);
-                    self.render_stat_card(&mut cols[1], theme, "COATING DURABILITY", "25+ Tahun", "C5-High Marine Grade Polyurethane", theme.accent_blue);
+                    self.render_stat_card(&mut cols[0], theme, "DESIGN SERVICE LIFE", "100 Years", "SNI Bridge Serviceability Class A", theme.text_primary);
+                    self.render_stat_card(&mut cols[1], theme, "COATING DURABILITY", "25+ Years", "C5-High Marine Grade Polyurethane", theme.accent_blue);
                     self.render_stat_card(&mut cols[2], theme, "THERMAL EXPANSION", "±14.2 mm", "Elastomeric Bearing Expansion Allowance", theme.accent_green);
                 });
             });

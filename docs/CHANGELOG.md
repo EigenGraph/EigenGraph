@@ -7,6 +7,39 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.2.8] - 2026-11-12 — Phase 28: 4D-7D BIM Superstation (4D Synchro Simulation, 5D Dynamic WBS & Multi-Currency Explorer, 6D ISO 14040 Whole-Life Carbon Assessment & 7D COBie 3.0 Digital Twin Telemetry)
+
+### Added
+- **4D Synchro Construction Simulation & Staged Erection Studio (`src/views/planning.rs`, `PlanningSubTab::Schedule4d`, `ConstructionSimulationPhase`)**:
+  - Interactive 4D timeline simulation player with Play/Pause toggles, speed multipliers (1x, 2x, 5x), Day scrubber slider (Day 1 to Day 360), and calendar date conversion.
+  - Active construction phase indicator linking WBS codes, planned vs. actual progress %, daily manpower demands, active cranes/equipment, and cumulative concrete pour volume ($m^3$).
+  - 2D Staged Building Erection Elevation Canvas:
+    - Dynamic physical simulation of a 15-storey structure: deep bored piling, raft slab and basement walls, columns and primary girders, composite floor slabs, and unitized curtain wall glass panels reacting to current timeline day.
+    - Animated tower crane at the current roof elevation with realistic mast, jib, trolley, and hook geometry.
+  - Critical Path Method (CPM) zero-float activity tracking and S-Curve cashflow progress projection.
+- **5D Automated Quantity Takeoff (QTO) & Dynamic WBS Explorer (`src/views/planning.rs`, `PlanningSubTab::WbsHierarchy`, `WbsCostItem`, `CurrencyUnit`)**:
+  - Multi-Currency Dynamic Switcher with live conversion across Indonesian Rupiah (`IDR / Rp`), US Dollars (`USD / $`), Euros (`EUR / €`), and Singapore Dollars (`SGD / S$`).
+  - Hierarchical MasterFormat & UniFormat WBS Explorer with division filtering pills (`02 Substructure`, `03 Concrete`, `05 Structural Metals`, `08 Openings & Glazing`, `23 Mechanical`).
+  - Interactive itemized cost breakdown with unit rates, total prices, contingency reserves, statutory PBG tax estimation, and physical completion progress bars.
+- **6D Whole Building Life Cycle Carbon Assessment & Green Building Scorecard (`src/views/sustainability.rs`, `LcaStageEmission`, `GreenBuildingCredit`)**:
+  - Full EN 15978 / ISO 14040 cradle-to-grave WBLCA breakdown across stages:
+    - $A1–A3$ Product Manufacturing (Raw materials & steel smelting)
+    - $A4–A5$ Transport & Construction Process
+    - $B1–B7$ 50-Year Operational Energy & Building Use
+    - $C1–C4$ Deconstruction & End-of-Life Waste Processing
+    - Module $D$ Beyond Lifecycle Circular Reuse & Scrap Recycling Offset
+  - Benchmark tracking against RIBA 2030 Climate Challenge and carbon intensity ($kg\text{ CO}_2e / m^2$).
+  - Multi-Standard Green Building Certification Engine with real-time rating status for **GREENSHIP (GBCI Platinum: 86 Pts)**, **LEED v4.1 (BD+C Platinum: 84 Pts)**, and **BREEAM International (Outstanding: 88.4%)**.
+- **7D Digital Twin Asset Registry & COBie 3.0 Inspector (`src/views/facility.rs`, `ShmSensorTelemetry`, `CobieAssetRecord`)**:
+  - Live IoT Structural Health Monitoring (SHM) telemetry with multi-sensor sparkline history graphs:
+    - Fiber-Optic Strain Gauges ($\mu\varepsilon$) with elastic limit guards.
+    - Triaxial Accelerometers ($Hz$) for natural modal frequency resonance tracking.
+    - Laser displacement crack meters ($mm$) and electrolytic tiltmeters ($^\circ$).
+  - Full buildingSMART COBie 3.0 / 2.4 Spreadsheet Data Inspector with subtabs (`Facility`, `Floor`, `Space`, `Component`, `Type`, `Document`), search filter, condition indices, and one-click COBie workbook export.
+  - Computerized Maintenance Management (CMMS) dispatch panel with automated work order generation and inspector routing.
+
+---
+
 ## [v0.2.7] - 2026-11-12 — Phase 27: All-Inclusive World-Class Master BIM Superstation (2D Drawing Sheets & DED Engine, Visual Dynamo/Grasshopper Node Graph Studio, 10D BIM Lifecycle Master Hub & Global Family Catalog)
 
 ### Added

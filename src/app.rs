@@ -309,7 +309,7 @@ impl EigenGraphApp {
             .inner_margin(Margin::symmetric(8, 4))
             .show(ui, |ui| {
                 ui.label(
-                    RichText::new(format!("v{} • Phase 27", env!("CARGO_PKG_VERSION")))
+                    RichText::new(format!("v{} • Phase 28", env!("CARGO_PKG_VERSION")))
                         .size(10.5)
                         .strong()
                         .color(self.theme.accent_blue),
