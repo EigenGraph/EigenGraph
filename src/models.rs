@@ -1328,4 +1328,1523 @@ impl CobieAssetRecord {
     }
 }
 
+// ============================================================================
+// Phase 29: Coordination, AI Studio, Parametric Presets & Lean/DfMA Models
+// ============================================================================
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ClashSeverity {
+    Hard,
+    Soft,
+    CodeTolerance,
+}
+
+impl ClashSeverity {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Hard => "Hard Clash",
+            Self::Soft => "Soft Clearance",
+            Self::CodeTolerance => "Code Tolerance",
+        }
+    }
+
+    pub fn badge(&self) -> &'static str {
+        match self {
+            Self::Hard => "🔴 Hard",
+            Self::Soft => "🟡 Soft",
+            Self::CodeTolerance => "🟠 Code",
+        }
+    }
+
+    pub fn color_rgb(&self) -> (u8, u8, u8) {
+        match self {
+            Self::Hard => (239, 68, 68),
+            Self::Soft => (245, 158, 11),
+            Self::CodeTolerance => (249, 115, 22),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ClashStatus {
+    Active,
+    InReview,
+    Resolved,
+}
+
+impl ClashStatus {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Active => "Active",
+            Self::InReview => "In Review",
+            Self::Resolved => "Resolved",
+        }
+    }
+
+    pub fn next(&self) -> Self {
+        match self {
+            Self::Active => Self::InReview,
+            Self::InReview => Self::Resolved,
+            Self::Resolved => Self::Active,
+        }
+    }
+
+    pub fn color_rgb(&self) -> (u8, u8, u8) {
+        match self {
+            Self::Active => (239, 68, 68),
+            Self::InReview => (59, 130, 246),
+            Self::Resolved => (16, 185, 129),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ClashDetectionItem {
+    pub id: usize,
+    pub tag: String,
+    pub discipline_pair: String,
+    pub severity: ClashSeverity,
+    pub status: ClashStatus,
+    pub element_a: String,
+    pub element_b: String,
+    /// Negative for physical intersection depth (mm), positive for gap (mm).
+    pub intersection_mm: f64,
+    pub required_clearance_mm: f64,
+    pub point_3d: [f32; 3],
+    pub box_half_extents: [f32; 3],
+    pub note: String,
+}
+
+impl ClashDetectionItem {
+    pub fn is_triggered_at_tolerance(&self, tol_mm: f64) -> bool {
+        match self.severity {
+            ClashSeverity::Hard => (-self.intersection_mm) >= tol_mm,
+            ClashSeverity::Soft | ClashSeverity::CodeTolerance => {
+                let shortfall = (self.required_clearance_mm - self.intersection_mm).max(0.0);
+                shortfall >= tol_mm * 0.5
+            }
+        }
+    }
+
+    pub fn metric_summary(&self) -> String {
+        match self.severity {
+            ClashSeverity::Hard => format!("Penetration: {:.0} mm", -self.intersection_mm),
+            ClashSeverity::Soft => format!(
+                "Gap: {:.0} mm (< {:.0} mm req.)",
+                self.intersection_mm, self.required_clearance_mm
+            ),
+            ClashSeverity::CodeTolerance => format!(
+                "Clearance: {:.0} mm (< {:.0} mm code min.)",
+                self.intersection_mm, self.required_clearance_mm
+            ),
+        }
+    }
+
+    pub fn clash_volume_m3(&self) -> f64 {
+        let sx = (self.box_half_extents[0] * 2.0) as f64;
+        let sy = (self.box_half_extents[1] * 2.0) as f64;
+        let sz = (self.box_half_extents[2] * 2.0) as f64;
+        (sx * sy * sz * 0.08).max(0.004)
+    }
+
+    pub fn default_clashes() -> Vec<Self> {
+        vec![
+            Self {
+                id: 1,
+                tag: "CLASH-001".to_string(),
+                discipline_pair: "Structure vs HVAC Duct".to_string(),
+                severity: ClashSeverity::Hard,
+                status: ClashStatus::Active,
+                element_a: "HVAC Supply Duct Ø350".to_string(),
+                element_b: "Primary Girder W18x50 #4".to_string(),
+                intersection_mm: -42.0,
+                required_clearance_mm: 25.0,
+                point_3d: [4.2, 3.6, 2.8],
+                box_half_extents: [0.45, 0.35, 0.45],
+                note: "Mechanical soffit drops 42 mm into top flange zone at Grid B-2.".to_string(),
+            },
+            Self {
+                id: 2,
+                tag: "CLASH-002".to_string(),
+                discipline_pair: "Structure vs Piping".to_string(),
+                severity: ClashSeverity::Hard,
+                status: ClashStatus::Active,
+                element_a: "Chilled Water Pipe DN100".to_string(),
+                element_b: "Special Shear Wall SW-01".to_string(),
+                intersection_mm: -110.0,
+                required_clearance_mm: 50.0,
+                point_3d: [7.8, 2.4, 5.2],
+                box_half_extents: [0.40, 0.40, 0.40],
+                note: "Missing cast-in structural steel sleeve in boundary zone.".to_string(),
+            },
+            Self {
+                id: 3,
+                tag: "CLASH-003".to_string(),
+                discipline_pair: "Structure vs HVAC Duct".to_string(),
+                severity: ClashSeverity::Soft,
+                status: ClashStatus::InReview,
+                element_a: "Electrical Cable Ladder Tray".to_string(),
+                element_b: "Fire Sprinkler Main DN80".to_string(),
+                intersection_mm: 85.0,
+                required_clearance_mm: 150.0,
+                point_3d: [2.6, 3.4, 6.4],
+                box_half_extents: [0.50, 0.30, 0.40],
+                note: "Violates NFPA 13 minimum 150 mm hanger maintenance clearance.".to_string(),
+            },
+            Self {
+                id: 4,
+                tag: "CLASH-004".to_string(),
+                discipline_pair: "Framing vs Rebar Clearances".to_string(),
+                severity: ClashSeverity::Hard,
+                status: ClashStatus::Active,
+                element_a: "Column C2 Confining Stirrup".to_string(),
+                element_b: "Hold-Down Anchor Bolt M27".to_string(),
+                intersection_mm: -18.0,
+                required_clearance_mm: 20.0,
+                point_3d: [9.0, 0.4, 1.5],
+                box_half_extents: [0.35, 0.35, 0.35],
+                note: "Anchor bolt washer intersects top stirrup leg at plinth pedestal.".to_string(),
+            },
+            Self {
+                id: 5,
+                tag: "CLASH-005".to_string(),
+                discipline_pair: "Architecture vs Structure".to_string(),
+                severity: ClashSeverity::CodeTolerance,
+                status: ClashStatus::Active,
+                element_a: "Stair Landing Slab Soffit".to_string(),
+                element_b: "Emergency Conduits & Exit Signage".to_string(),
+                intersection_mm: 2050.0,
+                required_clearance_mm: 2100.0,
+                point_3d: [6.0, 2.05, 8.2],
+                box_half_extents: [0.55, 0.45, 0.45],
+                note: "Headroom 2,050 mm is 50 mm below IBC egress minimum (2,100 mm).".to_string(),
+            },
+            Self {
+                id: 6,
+                tag: "CLASH-006".to_string(),
+                discipline_pair: "Structure vs Piping".to_string(),
+                severity: ClashSeverity::Soft,
+                status: ClashStatus::Resolved,
+                element_a: "Level 2 Gravity Riser Sleeve".to_string(),
+                element_b: "Secondary Composite Beam B-12".to_string(),
+                intersection_mm: 22.0,
+                required_clearance_mm: 50.0,
+                point_3d: [3.2, 6.8, 4.1],
+                box_half_extents: [0.38, 0.30, 0.38],
+                note: "Offset riser by 120 mm west of beam web centerline.".to_string(),
+            },
+        ]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BcfComment {
+    pub id: usize,
+    pub author: String,
+    pub timestamp: String,
+    pub comment: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BcfPriority {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
+
+impl BcfPriority {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Critical => "🔴 Critical",
+            Self::High => "🟠 High",
+            Self::Medium => "🟡 Medium",
+            Self::Low => "🟢 Low",
+        }
+    }
+
+    pub fn color_rgb(&self) -> (u8, u8, u8) {
+        match self {
+            Self::Critical => (239, 68, 68),
+            Self::High => (249, 115, 22),
+            Self::Medium => (245, 158, 11),
+            Self::Low => (16, 185, 129),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BcfTopicStatus {
+    Open,
+    InProgress,
+    Resolved,
+}
+
+impl BcfTopicStatus {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Open => "Open",
+            Self::InProgress => "In Progress",
+            Self::Resolved => "Resolved",
+        }
+    }
+
+    pub fn next(&self) -> Self {
+        match self {
+            Self::Open => Self::InProgress,
+            Self::InProgress => Self::Resolved,
+            Self::Resolved => Self::Open,
+        }
+    }
+
+    pub fn color_rgb(&self) -> (u8, u8, u8) {
+        match self {
+            Self::Open => (239, 68, 68),
+            Self::InProgress => (59, 130, 246),
+            Self::Resolved => (16, 185, 129),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BcfTopicRecord {
+    pub id: usize,
+    pub guid: String,
+    pub tag: String,
+    pub title: String,
+    pub description: String,
+    pub priority: BcfPriority,
+    pub status: BcfTopicStatus,
+    pub assignee: String,
+    pub due_date: String,
+    pub linked_clash_id: Option<usize>,
+    pub cam_yaw: f32,
+    pub cam_pitch: f32,
+    pub cam_zoom: f32,
+    pub cam_target: [f32; 3],
+    pub comments: Vec<BcfComment>,
+}
+
+impl BcfTopicRecord {
+    pub fn default_topics() -> Vec<Self> {
+        vec![
+            Self {
+                id: 1,
+                guid: "8a9e4f12-21b0-4e8f-b901-bcf210000101".to_string(),
+                tag: "BCF-101".to_string(),
+                title: "Relocate HVAC Duct D-104 below W18x50 flange".to_string(),
+                description: "Duct elevation violates girder bottom chord cover near Grid B-2."
+                    .to_string(),
+                priority: BcfPriority::Critical,
+                status: BcfTopicStatus::InProgress,
+                assignee: "Senior MEP Lead".to_string(),
+                due_date: "2026-11-20".to_string(),
+                linked_clash_id: Some(1),
+                cam_yaw: 0.72,
+                cam_pitch: 0.42,
+                cam_zoom: 1.85,
+                cam_target: [4.2, 3.6, 2.8],
+                comments: vec![
+                    BcfComment {
+                        id: 1,
+                        author: "BIM Coordinator".to_string(),
+                        timestamp: "2026-11-11 09:15".to_string(),
+                        comment: "Flagged 42 mm web interference during federation run.".to_string(),
+                    },
+                    BcfComment {
+                        id: 2,
+                        author: "Senior MEP Lead".to_string(),
+                        timestamp: "2026-11-12 11:40".to_string(),
+                        comment: "Transitioning duct profile from Ø350 to 450x220 flat oval."
+                            .to_string(),
+                    },
+                ],
+            },
+            Self {
+                id: 2,
+                guid: "8a9e4f12-21b0-4e8f-b901-bcf210000102".to_string(),
+                tag: "BCF-102".to_string(),
+                title: "Add cast-in pipe sleeve at Shear Wall SW-01".to_string(),
+                description: "Provide Sch 80 steel sleeve and boundary confinement hairpin bars."
+                    .to_string(),
+                priority: BcfPriority::High,
+                status: BcfTopicStatus::Open,
+                assignee: "Structural Lead".to_string(),
+                due_date: "2026-11-18".to_string(),
+                linked_clash_id: Some(2),
+                cam_yaw: 1.15,
+                cam_pitch: 0.34,
+                cam_zoom: 2.05,
+                cam_target: [7.8, 2.4, 5.2],
+                comments: vec![BcfComment {
+                    id: 1,
+                    author: "Structural Lead".to_string(),
+                    timestamp: "2026-11-12 08:20".to_string(),
+                    comment: "Checking ACI 318-19 Ch. 18 opening reinforcement details."
+                        .to_string(),
+                }],
+            },
+            Self {
+                id: 3,
+                guid: "8a9e4f12-21b0-4e8f-b901-bcf210000103".to_string(),
+                tag: "BCF-103".to_string(),
+                title: "Stair landing headroom verification (min 2.10 m)".to_string(),
+                description: "Adjust emergency conduit routing out of stair flight envelope."
+                    .to_string(),
+                priority: BcfPriority::Medium,
+                status: BcfTopicStatus::Resolved,
+                assignee: "Project Architect".to_string(),
+                due_date: "2026-11-15".to_string(),
+                linked_clash_id: Some(5),
+                cam_yaw: 0.45,
+                cam_pitch: 0.28,
+                cam_zoom: 1.60,
+                cam_target: [6.0, 2.05, 8.2],
+                comments: vec![BcfComment {
+                    id: 1,
+                    author: "Project Architect".to_string(),
+                    timestamp: "2026-11-12 14:10".to_string(),
+                    comment: "Conduit recessed into dry-lined riser chase; headroom now 2.18 m."
+                        .to_string(),
+                }],
+            },
+        ]
+    }
+
+    pub fn export_bcf_xml(topics: &[Self], project_name: &str) -> String {
+        let escape = |s: &str| -> String {
+            s.replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('"', "&quot;")
+        };
+
+        let mut xml = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        xml.push_str(&format!(
+            "<BcfArchive Version=\"2.1\" ProjectName=\"{}\">\n",
+            escape(project_name)
+        ));
+        for t in topics {
+            xml.push_str(&format!(
+                "  <Markup>\n    <Topic Guid=\"{}\" TopicType=\"Clash\" TopicStatus=\"{}\">\n",
+                escape(&t.guid),
+                escape(t.status.label())
+            ));
+            xml.push_str(&format!("      <ReferenceLink>{}</ReferenceLink>\n", escape(&t.tag)));
+            xml.push_str(&format!("      <Title>{}</Title>\n", escape(&t.title)));
+            xml.push_str(&format!("      <Priority>{}</Priority>\n", escape(t.priority.label())));
+            xml.push_str(&format!("      <AssignedTo>{}</AssignedTo>\n", escape(&t.assignee)));
+            xml.push_str(&format!("      <DueDate>{}</DueDate>\n", escape(&t.due_date)));
+            xml.push_str(&format!("      <Description>{}</Description>\n", escape(&t.description)));
+            xml.push_str("    </Topic>\n");
+            for c in &t.comments {
+                xml.push_str(&format!(
+                    "    <Comment Guid=\"{}-c{}\">\n      <Date>{}</Date>\n      <Author>{}</Author>\n      <Comment>{}</Comment>\n    </Comment>\n",
+                    escape(&t.guid),
+                    c.id,
+                    escape(&c.timestamp),
+                    escape(&c.author),
+                    escape(&c.comment)
+                ));
+            }
+            xml.push_str("    <VisualizationInfo>\n      <PerspectiveCamera>\n");
+            xml.push_str(&format!(
+                "        <CameraViewPoint><X>{:.3}</X><Y>{:.3}</Y><Z>{:.3}</Z></CameraViewPoint>\n",
+                t.cam_target[0], t.cam_target[1], t.cam_target[2]
+            ));
+            xml.push_str(&format!(
+                "        <EigenGraphOrbit yaw_rad=\"{:.4}\" pitch_rad=\"{:.4}\" zoom=\"{:.3}\" />\n",
+                t.cam_yaw, t.cam_pitch, t.cam_zoom
+            ));
+            xml.push_str("      </PerspectiveCamera>\n    </VisualizationInfo>\n  </Markup>\n");
+        }
+        xml.push_str("</BcfArchive>\n");
+        xml
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CopilotWorkflowKind {
+    ShearWallAci318,
+    WindLoadAsce7,
+    CarbonMinimizerIso14040,
+}
+
+impl CopilotWorkflowKind {
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::ShearWallAci318,
+            Self::WindLoadAsce7,
+            Self::CarbonMinimizerIso14040,
+        ]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::ShearWallAci318 => "🧱 ACI 318-19 / EC2 Shear Wall Reinforcement",
+            Self::WindLoadAsce7 => "💨 ASCE 7-22 Lateral Wind Pressure",
+            Self::CarbonMinimizerIso14040 => "🌱 ISO 14040 / EN 15978 Carbon Minimizer",
+        }
+    }
+
+    pub fn short_tag(&self) -> &'static str {
+        match self {
+            Self::ShearWallAci318 => "ACI 318 / EC2",
+            Self::WindLoadAsce7 => "ASCE 7-22",
+            Self::CarbonMinimizerIso14040 => "ISO 14040",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CopilotShearWallParams {
+    pub wall_id: String,
+    pub length_m: f64,
+    pub thickness_mm: f64,
+    pub height_m: f64,
+    pub fc_mpa: f64,
+    pub fy_mpa: f64,
+    pub vu_kn: f64,
+    pub pu_kn: f64,
+    pub mu_knm: f64,
+}
+
+impl Default for CopilotShearWallParams {
+    fn default() -> Self {
+        Self {
+            wall_id: "SW-CORE-01".to_string(),
+            length_m: 4.8,
+            thickness_mm: 350.0,
+            height_m: 12.0,
+            fc_mpa: 35.0,
+            fy_mpa: 420.0,
+            vu_kn: 3250.0,
+            pu_kn: 4800.0,
+            mu_knm: 14500.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CopilotWindParams {
+    pub project_ref: String,
+    pub basic_wind_speed_ms: f64,
+    pub building_height_m: f64,
+    pub exposure: String,
+    pub topographic_kzt: f64,
+    pub gust_factor_g: f64,
+    pub cp_windward: f64,
+    pub cp_leeward: f64,
+}
+
+impl Default for CopilotWindParams {
+    fn default() -> Self {
+        Self {
+            project_ref: "Menara Sudirman Tower".to_string(),
+            basic_wind_speed_ms: 42.0,
+            building_height_m: 64.0,
+            exposure: "C".to_string(),
+            topographic_kzt: 1.0,
+            gust_factor_g: 0.85,
+            cp_windward: 0.80,
+            cp_leeward: -0.50,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CopilotCarbonParams {
+    pub concrete_vol_m3: f64,
+    pub steel_mass_tons: f64,
+    pub scm_replacement_pct: f64,
+    pub eaf_recycled_steel_pct: f64,
+    pub timber_hybrid_offset_pct: f64,
+}
+
+impl Default for CopilotCarbonParams {
+    fn default() -> Self {
+        Self {
+            concrete_vol_m3: 5500.0,
+            steel_mass_tons: 940.0,
+            scm_replacement_pct: 35.0,
+            eaf_recycled_steel_pct: 80.0,
+            timber_hybrid_offset_pct: 12.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CalculationMemoResult {
+    pub title: String,
+    pub standard_ref: String,
+    pub summary_headline: String,
+    pub dcr_ratio: f64,
+    pub is_compliant: bool,
+    pub equations: Vec<String>,
+    pub substitutions: Vec<(String, String, String)>,
+    pub recommendation: String,
+    pub markdown_memo: String,
+}
+
+/// Deterministic ACI 318-19 Chapter 18 / Eurocode 2 Special Structural Shear Wall Designer
+pub fn solve_aci318_shear_wall(p: &CopilotShearWallParams) -> CalculationMemoResult {
+    let lw_mm = (p.length_m * 1000.0).max(500.0);
+    let tw_mm = p.thickness_mm.max(150.0);
+    let hw_mm = (p.height_m * 1000.0).max(1000.0);
+    let fc = p.fc_mpa.max(20.0);
+    let fy = p.fy_mpa.max(280.0);
+
+    let acv_mm2 = lw_mm * tw_mm;
+    let hw_lw = hw_mm / lw_mm;
+    let alpha_c = if hw_lw <= 1.5 {
+        0.25
+    } else if hw_lw >= 2.0 {
+        0.17
+    } else {
+        0.25 - (hw_lw - 1.5) * (0.08 / 0.5)
+    };
+
+    let vc_n = alpha_c * fc.sqrt() * acv_mm2;
+    let vc_kn = vc_n / 1000.0;
+    let phi_v = 0.75;
+    let vu_req_kn = p.vu_kn / phi_v;
+    let rho_t_calc = ((vu_req_kn * 1000.0 / acv_mm2) - alpha_c * fc.sqrt()) / fy;
+    let rho_t_prov = rho_t_calc.max(0.0025);
+    let vn_kn = (acv_mm2 * (alpha_c * fc.sqrt() + rho_t_prov * fy)) / 1000.0;
+    let vn_max_kn = (0.83 * fc.sqrt() * acv_mm2) / 1000.0;
+    let phi_vn_kn = phi_v * vn_kn.min(vn_max_kn);
+    let dcr_shear = p.vu_kn / phi_vn_kn.max(1.0);
+
+    // Boundary element extreme fiber compressive stress check (ACI 318-19 18.10.6.3)
+    let ag_m2 = (lw_mm / 1000.0) * (tw_mm / 1000.0);
+    let ig_m4 = (tw_mm / 1000.0) * p.length_m.powi(3) / 12.0;
+    let sigma_max_mpa = ((p.pu_kn / ag_m2) + (p.mu_knm * (p.length_m * 0.5) / ig_m4)) / 1000.0;
+    let special_be_required = sigma_max_mpa >= 0.2 * fc;
+
+    // Bar selection across 2 curtains
+    let as_per_m_req = rho_t_prov * tw_mm * 1000.0; // mm2 / m total
+    let (bar_label, spacing_mm) = if as_per_m_req <= 1300.0 {
+        ("2x D13 (2 Curtains)", 200)
+    } else if as_per_m_req <= 2010.0 {
+        ("2x D16 (2 Curtains)", 200)
+    } else if as_per_m_req <= 2680.0 {
+        ("2x D16 (2 Curtains)", 150)
+    } else {
+        ("2x D19 (2 Curtains)", 150)
+    };
+
+    let shear_cap_ok = vn_kn <= vn_max_kn && dcr_shear <= 1.0;
+    let rec = if special_be_required {
+        format!(
+            "Provide {} @ {} mm horiz/vert + Special Boundary Elements (SBE length {:.2} m, D13 hoops @ 100 mm).",
+            bar_label,
+            spacing_mm,
+            (p.length_m * 0.15).max(0.45)
+        )
+    } else {
+        format!(
+            "Provide {} @ {} mm horiz/vert with Ordinary Boundary transverse ties @ 150 mm.",
+            bar_label, spacing_mm
+        )
+    };
+
+    let md = format!(
+        "# Engineering Calculation Memo: Structural Shear Wall ({})\n\
+        **Design Code:** ACI 318-19 Chapter 18 / Eurocode 2\n\n\
+        ## 1. Geometry & Applied Demands\n\
+        - Wall Length $l_w = {:.2}\\text{{ m}}$, Thickness $t_w = {:.0}\\text{{ mm}}$, Height $h_w = {:.2}\\text{{ m}}$\n\
+        - Concrete $f'_c = {:.1}\\text{{ MPa}}$, Steel $f_y = {:.1}\\text{{ MPa}}$\n\
+        - Factored Demands: $V_u = {:.1}\\text{{ kN}}$, $P_u = {:.1}\\text{{ kN}}$, $M_u = {:.1}\\text{{ kNm}}$\n\n\
+        ## 2. In-Plane Shear Strength & Reinforcement Ratio\n\
+        - Aspect ratio $h_w / l_w = {:.2} \\Rightarrow \\alpha_c = {:.3}$\n\
+        - Concrete shear contribution $V_c = {:.1}\\text{{ kN}}$\n\
+        - Required/Provided web ratio $\\rho_t = {:.4}$ (min 0.0025)\n\
+        - Design Shear Capacity $\\phi V_n = {:.1}\\text{{ kN}}$ vs $V_{{n,\\max}} = {:.1}\\text{{ kN}}$ (DCR = **{:.3}**)\n\n\
+        ## 3. Extreme Fiber Compression & Boundary Element Trigger\n\
+        - Extreme fiber stress $\\sigma_{{max}} = {:.2}\\text{{ MPa}}$ vs trigger $0.2 f'_c = {:.2}\\text{{ MPa}}$ -> **{}**\n\n\
+        ## 4. Reinforcement Recommendation\n\
+        - {}\n",
+        p.wall_id,
+        p.length_m,
+        p.thickness_mm,
+        p.height_m,
+        fc,
+        fy,
+        p.vu_kn,
+        p.pu_kn,
+        p.mu_knm,
+        hw_lw,
+        alpha_c,
+        vc_kn,
+        rho_t_prov,
+        phi_vn_kn,
+        vn_max_kn,
+        dcr_shear,
+        sigma_max_mpa,
+        0.2 * fc,
+        if special_be_required { "SPECIAL BOUNDARY ELEMENT REQUIRED" } else { "ORDINARY BOUNDARY" },
+        rec
+    );
+
+    CalculationMemoResult {
+        title: format!("Shear Wall Reinforcement Design — {}", p.wall_id),
+        standard_ref: "ACI 318-19 §18.10 / EN 1992-1-1".to_string(),
+        summary_headline: format!(
+            "{} @ {} mm • φVn = {:.0} kN • DCR = {:.2}",
+            bar_label, spacing_mm, phi_vn_kn, dcr_shear
+        ),
+        dcr_ratio: dcr_shear,
+        is_compliant: shear_cap_ok,
+        equations: vec![
+            "Vn = Acv * (alpha_c * sqrt(fc') + rho_t * fy) <= 0.83 * sqrt(fc') * Acv".to_string(),
+            "sigma_max = Pu / Ag + Mu * (lw / 2) / Ig  vs  0.20 * fc'".to_string(),
+        ],
+        substitutions: vec![
+            (
+                "Gross Web Shear Area (Acv)".to_string(),
+                format!("{:.0} mm * {:.0} mm", lw_mm, tw_mm),
+                format!("{:.2} m²", acv_mm2 / 1e6),
+            ),
+            (
+                "Aspect Coefficient (αc)".to_string(),
+                format!("hw/lw = {:.2}", hw_lw),
+                format!("{:.3} (Vc = {:.1} kN)", alpha_c, vc_kn),
+            ),
+            (
+                "Web Reinforcement Ratio (ρt)".to_string(),
+                format!("max(0.0025, req {:.4})", rho_t_calc.max(0.0)),
+                format!("{:.4} ({:.0} mm²/m)", rho_t_prov, as_per_m_req),
+            ),
+            (
+                "Shear Utilization (Vu / φVn)".to_string(),
+                format!("{:.1} / {:.1} kN", p.vu_kn, phi_vn_kn),
+                format!(
+                    "{:.3} ({})",
+                    dcr_shear,
+                    if shear_cap_ok { "PASS" } else { "EXCEEDS LIMIT" }
+                ),
+            ),
+            (
+                "Boundary Stress (σmax vs 0.2fc')".to_string(),
+                format!("{:.2} MPa vs {:.2} MPa", sigma_max_mpa, 0.2 * fc),
+                if special_be_required {
+                    "Special BE Triggered".to_string()
+                } else {
+                    "Ordinary Detailing OK".to_string()
+                },
+            ),
+        ],
+        recommendation: rec,
+        markdown_memo: md,
+    }
+}
+
+/// Deterministic ASCE 7-22 Chapter 27 MWFRS Wind Pressure Solver
+pub fn solve_asce7_wind(p: &CopilotWindParams) -> CalculationMemoResult {
+    let z_m = p.building_height_m.max(4.6);
+    let (zg_m, alpha) = match p.exposure.as_str() {
+        "B" => (365.76, 7.0),
+        "D" => (213.36, 11.5),
+        _ => (274.32, 9.5), // Exposure C
+    };
+    let kz = 2.01 * (z_m / zg_m).min(1.0).powf(2.0 / alpha);
+    let kd = 0.85;
+    let ke = 1.00;
+    let v_ms = p.basic_wind_speed_ms.max(20.0);
+    let qz_kpa = 0.613 * kz * p.topographic_kzt * kd * ke * v_ms * v_ms / 1000.0;
+    let p_windward_kpa = qz_kpa * p.gust_factor_g * p.cp_windward;
+    let p_leeward_kpa = qz_kpa * p.gust_factor_g * p.cp_leeward;
+    let p_net_kpa = p_windward_kpa + p_leeward_kpa.abs();
+    let dcr_curtain = p_net_kpa / 3.20; // Typical 3.20 kPa ultimate curtain wall capacity benchmark
+    let is_ok = dcr_curtain <= 1.0;
+
+    let rec = format!(
+        "Net roof-level MWFRS wind pressure {:.2} kPa (Windward +{:.2} kPa, Leeward {:.2} kPa). Specify facade mullions for >= {:.2} kPa.",
+        p_net_kpa,
+        p_windward_kpa,
+        p_leeward_kpa,
+        p_net_kpa * 1.1
+    );
+
+    let md = format!(
+        "# Engineering Calculation Memo: Lateral Wind Load Analysis ({})\n\
+        **Design Code:** ASCE 7-22 Chapter 27 (Directional Procedure)\n\n\
+        ## 1. Site Wind Parameters\n\
+        - Basic Wind Speed $V = {:.1}\\text{{ m/s}}$ | Exposure Category **{}** | Height $z = {:.1}\\text{{ m}}$\n\
+        - Factors: $K_d = {:.2}$, $K_{{zt}} = {:.2}$, $K_e = {:.2}$, $G = {:.2}$\n\n\
+        ## 2. Velocity Pressure & Design Net Pressure\n\
+        - Exposure Coefficient $K_z = 2.01 (z / z_g)^{{2/\\alpha}} = {:.3}$\n\
+        - Velocity Pressure $q_z = 0.613 K_z K_{{zt}} K_d K_e V^2 = {:.3}\\text{{ kPa}}$\n\
+        - Windward Pressure $p_w = +{:.3}\\text{{ kPa}}$ | Leeward Suction $p_l = {:.3}\\text{{ kPa}}$\n\
+        - Net Lateral Design Pressure $p_{{net}} = {:.3}\\text{{ kPa}}$\n",
+        p.project_ref, v_ms, p.exposure, z_m, kd, p.topographic_kzt, ke, p.gust_factor_g, kz, qz_kpa, p_windward_kpa, p_leeward_kpa, p_net_kpa
+    );
+
+    CalculationMemoResult {
+        title: format!("ASCE 7-22 Wind Pressure Sheet — {}", p.project_ref),
+        standard_ref: "ASCE/SEI 7-22 Ch. 26 & 27".to_string(),
+        summary_headline: format!(
+            "qz = {:.2} kPa • p_net = {:.2} kPa (Kz = {:.3})",
+            qz_kpa, p_net_kpa, kz
+        ),
+        dcr_ratio: dcr_curtain,
+        is_compliant: is_ok,
+        equations: vec![
+            "qz = 0.613 * Kz * Kzt * Kd * Ke * V^2 (N/m2)".to_string(),
+            "p_net = qz * G * Cp_windward - qh * G * Cp_leeward".to_string(),
+        ],
+        substitutions: vec![
+            (
+                "Velocity Pressure Coeff (Kz)".to_string(),
+                format!("Exp {} @ z={:.1}m (zg={:.1}m, α={:.1})", p.exposure, z_m, zg_m, alpha),
+                format!("{:.3}", kz),
+            ),
+            (
+                "Velocity Pressure (qz)".to_string(),
+                format!("0.613*{:.3}*{:.2}*0.85*{:.1}²", kz, p.topographic_kzt, v_ms),
+                format!("{:.3} kPa", qz_kpa),
+            ),
+            (
+                "Windward Face Pressure (pw)".to_string(),
+                format!("{:.3} * {:.2} * {:.2}", qz_kpa, p.gust_factor_g, p.cp_windward),
+                format!("+{:.3} kPa", p_windward_kpa),
+            ),
+            (
+                "Leeward Suction (pl)".to_string(),
+                format!("{:.3} * {:.2} * ({:.2})", qz_kpa, p.gust_factor_g, p.cp_leeward),
+                format!("{:.3} kPa", p_leeward_kpa),
+            ),
+            (
+                "Net Combined Lateral (p_net)".to_string(),
+                "pw + |pl| vs 3.20 kPa facade benchmark".to_string(),
+                format!("{:.3} kPa (DCR {:.2})", p_net_kpa, dcr_curtain),
+            ),
+        ],
+        recommendation: rec,
+        markdown_memo: md,
+    }
+}
+
+/// Deterministic ISO 14040 / EN 15978 Structural Embodied Carbon Minimizer
+pub fn solve_iso14040_carbon(p: &CopilotCarbonParams) -> CalculationMemoResult {
+    // Baseline: Ordinary Portland Cement CEM I (340 kgCO2e/m3) + BOF Steel (2350 kgCO2e/ton)
+    let base_conc_t = p.concrete_vol_m3 * 0.340;
+    let base_steel_t = p.steel_mass_tons * 2.350;
+    let baseline_total_t = (base_conc_t + base_steel_t).max(1.0);
+
+    // Optimized via SCM replacement (slag/fly-ash reduces clinker carbon up to ~62% of replacement share),
+    // EAF recycled steel fraction, and Mass Timber hybrid substitution credit.
+    let conc_factor = 1.0 - 0.62 * (p.scm_replacement_pct.clamp(0.0, 65.0) / 100.0);
+    let steel_ef_t_per_t = 2.350 - 1.750 * (p.eaf_recycled_steel_pct.clamp(0.0, 100.0) / 100.0);
+    let opt_conc_t = base_conc_t * conc_factor * (1.0 - 0.45 * p.timber_hybrid_offset_pct / 100.0);
+    let opt_steel_t = p.steel_mass_tons * steel_ef_t_per_t;
+    let opt_total_t = opt_conc_t + opt_steel_t;
+
+    let reduction_pct = ((baseline_total_t - opt_total_t) / baseline_total_t) * 100.0;
+    let target_ratio = opt_total_t / (baseline_total_t * 0.65); // Benchmark against 35% reduction target (RIBA 2030 path)
+    let is_ok = reduction_pct >= 30.0;
+
+    let rec = format!(
+        "Achieves {:.1}% embodied carbon reduction ({:.0} tCO2e avoided) using {:.0}% SCM concrete & {:.0}% EAF scrap steel.",
+        reduction_pct,
+        baseline_total_t - opt_total_t,
+        p.scm_replacement_pct,
+        p.eaf_recycled_steel_pct
+    );
+
+    let md = format!(
+        "# Engineering Calculation Memo: Whole-Building A1-A3 Carbon Optimization\n\
+        **Standard:** ISO 14040 / EN 15978 Modules A1–A3\n\n\
+        - Concrete Volume: {:.0} m³ | Structural Steel: {:.0} tons\n\
+        - Baseline Emissions: **{:.1} tCO2e** (Concrete {:.1} t + BOF Steel {:.1} t)\n\
+        - Optimized Emissions: **{:.1} tCO2e** (Net Avoidance **{:.1}%**)\n\
+        - Mix Spec: {:.0}% SCM (GGBS/Fly Ash), {:.0}% EAF Recycled Steel, {:.0}% Hybrid Timber Deck\n",
+        p.concrete_vol_m3,
+        p.steel_mass_tons,
+        baseline_total_t,
+        base_conc_t,
+        base_steel_t,
+        opt_total_t,
+        reduction_pct,
+        p.scm_replacement_pct,
+        p.eaf_recycled_steel_pct,
+        p.timber_hybrid_offset_pct
+    );
+
+    CalculationMemoResult {
+        title: "Embodied Carbon Minimization Audit (A1–A3)".to_string(),
+        standard_ref: "ISO 14040 / EN 15978 / RIBA 2030".to_string(),
+        summary_headline: format!(
+            "{:.1} tCO2e (-{:.1}% vs CEM I / BOF Baseline)",
+            opt_total_t, reduction_pct
+        ),
+        dcr_ratio: target_ratio,
+        is_compliant: is_ok,
+        equations: vec![
+            "GWP_A1_A3 = Sum(Qty_i * EF_i * (1 - Decarbonization_i))".to_string(),
+            "Reduction (%) = (GWP_base - GWP_opt) / GWP_base * 100".to_string(),
+        ],
+        substitutions: vec![
+            (
+                "Baseline A1-A3 Total".to_string(),
+                format!("{:.0} m³*0.34 + {:.0} t*2.35", p.concrete_vol_m3, p.steel_mass_tons),
+                format!("{:.1} tCO2e", baseline_total_t),
+            ),
+            (
+                "Low-Carbon Concrete (SCM)".to_string(),
+                format!("{:.0}% GGBS/Fly-Ash blend", p.scm_replacement_pct),
+                format!("{:.1} tCO2e", opt_conc_t),
+            ),
+            (
+                "Electric Arc Furnace Steel".to_string(),
+                format!("{:.0}% recycled scrap ({:.2} tCO2/t)", p.eaf_recycled_steel_pct, steel_ef_t_per_t),
+                format!("{:.1} tCO2e", opt_steel_t),
+            ),
+            (
+                "Net Carbon Savings".to_string(),
+                format!("{:.1} - {:.1} tCO2e avoided", baseline_total_t, opt_total_t),
+                format!("-{:.1}% ({:.1} tCO2e saved)", reduction_pct, baseline_total_t - opt_total_t),
+            ),
+        ],
+        recommendation: rec,
+        markdown_memo: md,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ParametricGeneratorPreset {
+    DiagridTower,
+    GeodesicDome,
+    VoronoiCanopy,
+}
+
+impl ParametricGeneratorPreset {
+    pub fn all() -> &'static [Self] {
+        &[Self::DiagridTower, Self::GeodesicDome, Self::VoronoiCanopy]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::DiagridTower => "🏢 Twisting Diagrid Tower",
+            Self::GeodesicDome => "🌐 Geodesic Space Dome",
+            Self::VoronoiCanopy => "🕸️ Freeform Canopy Shell",
+        }
+    }
+
+    pub fn param_labels(&self) -> [&'static str; 4] {
+        match self {
+            Self::DiagridTower => [
+                "Tower Height (m)",
+                "Base Radius (m)",
+                "Helical Twist (°)",
+                "Radial Sides",
+            ],
+            Self::GeodesicDome => [
+                "Dome Span Dia. (m)",
+                "Apex Rise (m)",
+                "Frequency Rings",
+                "Meridian Sectors",
+            ],
+            Self::VoronoiCanopy => [
+                "Canopy Span L (m)",
+                "Arch Depth B (m)",
+                "Edge Lift Camber (m)",
+                "Grid Divisions",
+            ],
+        }
+    }
+
+    pub fn default_params(&self) -> [f32; 4] {
+        match self {
+            Self::DiagridTower => [48.0, 11.0, 45.0, 10.0],
+            Self::GeodesicDome => [28.0, 11.0, 4.0, 14.0],
+            Self::VoronoiCanopy => [26.0, 18.0, 3.8, 8.0],
+        }
+    }
+}
+
+impl VisualNodeGraph {
+    pub fn from_preset(
+        preset: ParametricGeneratorPreset,
+        p1: f32,
+        p2: f32,
+        p3: f32,
+        p4: f32,
+    ) -> Self {
+        let labels = preset.param_labels();
+        let divisions = (p4.round() as usize).max(3);
+        let elem_count = match preset {
+            ParametricGeneratorPreset::DiagridTower => divisions * 3 * 3 + divisions * 3,
+            ParametricGeneratorPreset::GeodesicDome => {
+                let rings = (p3.round() as usize).max(2);
+                rings * divisions * 3
+            }
+            ParametricGeneratorPreset::VoronoiCanopy => divisions * divisions * 3,
+        };
+        let total_steel_ton = match preset {
+            ParametricGeneratorPreset::DiagridTower => (p1 * p2 * 0.42) + (p3 * 0.15),
+            ParametricGeneratorPreset::GeodesicDome => (p1 * p2 * 0.18) + (divisions as f32 * 0.9),
+            ParametricGeneratorPreset::VoronoiCanopy => (p1 * p2 * 0.09) + (p3 * 2.4),
+        };
+
+        Self {
+            nodes: vec![
+                VisualGraphNode {
+                    id: 1,
+                    title: format!("Input: {}", labels[0]),
+                    category: VisualNodeCategory::Input,
+                    pos: [30.0, 45.0],
+                    inputs: vec![],
+                    outputs: vec!["Val A".to_string()],
+                    value_display: format!("{:.1}", p1),
+                    is_active: true,
+                },
+                VisualGraphNode {
+                    id: 2,
+                    title: format!("Input: {}", labels[1]),
+                    category: VisualNodeCategory::Input,
+                    pos: [30.0, 175.0],
+                    inputs: vec![],
+                    outputs: vec!["Val B".to_string()],
+                    value_display: format!("{:.1}", p2),
+                    is_active: true,
+                },
+                VisualGraphNode {
+                    id: 3,
+                    title: format!("Transform: {}", labels[2]),
+                    category: VisualNodeCategory::MathLogic,
+                    pos: [275.0, 45.0],
+                    inputs: vec!["A".to_string()],
+                    outputs: vec!["Param K".to_string()],
+                    value_display: format!("{:.1} ({} seg)", p3, divisions),
+                    is_active: true,
+                },
+                VisualGraphNode {
+                    id: 4,
+                    title: format!("Gen: {}", preset.label()),
+                    category: VisualNodeCategory::GeometryGen,
+                    pos: [520.0, 95.0],
+                    inputs: vec!["K".to_string(), "B".to_string()],
+                    outputs: vec!["3D Mesh".to_string(), "Mass".to_string()],
+                    value_display: format!("{} Struts ({:.1}t)", elem_count, total_steel_ton),
+                    is_active: true,
+                },
+                VisualGraphNode {
+                    id: 5,
+                    title: "Bake to BIM 3D Scene".to_string(),
+                    category: VisualNodeCategory::BimBake,
+                    pos: [770.0, 105.0],
+                    inputs: vec!["Geometry".to_string()],
+                    outputs: vec!["IfcExport".to_string()],
+                    value_display: "Live Preview Sync".to_string(),
+                    is_active: true,
+                },
+            ],
+            wires: vec![
+                VisualGraphWire { from_node: 1, from_socket: 0, to_node: 3, to_socket: 0 },
+                VisualGraphWire { from_node: 3, from_socket: 0, to_node: 4, to_socket: 0 },
+                VisualGraphWire { from_node: 2, from_socket: 0, to_node: 4, to_socket: 1 },
+                VisualGraphWire { from_node: 4, from_socket: 0, to_node: 5, to_socket: 0 },
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LpsWeeklyPpcRecord {
+    pub week_label: String,
+    pub planned_commitments: u32,
+    pub completed_on_time: u32,
+    pub ppc_pct: f32,
+    pub primary_variance_reason: String,
+}
+
+impl LpsWeeklyPpcRecord {
+    pub fn default_history() -> Vec<Self> {
+        vec![
+            Self {
+                week_label: "W-01".to_string(),
+                planned_commitments: 12,
+                completed_on_time: 10,
+                ppc_pct: 83.3,
+                primary_variance_reason: "Weather Rain Delay".to_string(),
+            },
+            Self {
+                week_label: "W-02".to_string(),
+                planned_commitments: 14,
+                completed_on_time: 11,
+                ppc_pct: 78.6,
+                primary_variance_reason: "Rebar Delivery Late".to_string(),
+            },
+            Self {
+                week_label: "W-03".to_string(),
+                planned_commitments: 15,
+                completed_on_time: 13,
+                ppc_pct: 86.7,
+                primary_variance_reason: "RFI Design Change".to_string(),
+            },
+            Self {
+                week_label: "W-04".to_string(),
+                planned_commitments: 16,
+                completed_on_time: 14,
+                ppc_pct: 87.5,
+                primary_variance_reason: "Crane Hook Conflict".to_string(),
+            },
+            Self {
+                week_label: "W-05".to_string(),
+                planned_commitments: 15,
+                completed_on_time: 14,
+                ppc_pct: 93.3,
+                primary_variance_reason: "Minor Grout Curing".to_string(),
+            },
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LpsConstraintCategory {
+    ConstraintFree,
+    EngineeringRfi,
+    MaterialSupply,
+    CraneLogistics,
+    CrewAvailability,
+}
+
+impl LpsConstraintCategory {
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::ConstraintFree,
+            Self::EngineeringRfi,
+            Self::MaterialSupply,
+            Self::CraneLogistics,
+            Self::CrewAvailability,
+        ]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::ConstraintFree => "Sound (Constraint-Free)",
+            Self::EngineeringRfi => "Engineering / RFI Hold",
+            Self::MaterialSupply => "Material Delivery Pending",
+            Self::CraneLogistics => "Crane Hook / Rigging Access",
+            Self::CrewAvailability => "Crew Calibration / Certification",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LpsLookaheadTask {
+    pub id: usize,
+    pub wbs_code: String,
+    pub week_bucket: String,
+    pub activity_name: String,
+    pub trade_crew: String,
+    pub constraint_category: LpsConstraintCategory,
+    pub constraint_note: String,
+    pub is_sound: bool,
+    pub committed_in_wwp: bool,
+    pub completed_on_time: bool,
+    pub variance_reason: String,
+}
+
+impl LpsLookaheadTask {
+    pub fn default_tasks() -> Vec<Self> {
+        vec![
+            Self {
+                id: 1,
+                wbs_code: "05.12.01".to_string(),
+                week_bucket: "W-01".to_string(),
+                activity_name: "Warren Truss Modules 1–2 Pre-Assembly".to_string(),
+                trade_crew: "Structural Steel Crew A".to_string(),
+                constraint_category: LpsConstraintCategory::ConstraintFree,
+                constraint_note: "Shop drawings IFC stamped & jigs cleared".to_string(),
+                is_sound: true,
+                committed_in_wwp: true,
+                completed_on_time: true,
+                variance_reason: "None".to_string(),
+            },
+            Self {
+                id: 2,
+                wbs_code: "03.31.02".to_string(),
+                week_bucket: "W-02".to_string(),
+                activity_name: "Abutment Pile Cap & Embed Plates Cast".to_string(),
+                trade_crew: "Concrete Team C1".to_string(),
+                constraint_category: LpsConstraintCategory::ConstraintFree,
+                constraint_note: "Survey coordinates verified by total station".to_string(),
+                is_sound: true,
+                committed_in_wwp: true,
+                completed_on_time: true,
+                variance_reason: "None".to_string(),
+            },
+            Self {
+                id: 3,
+                wbs_code: "05.12.04".to_string(),
+                week_bucket: "W-03".to_string(),
+                activity_name: "50T Crawler Hoisting of 12 m Span Segments".to_string(),
+                trade_crew: "Rigging & Crane Team".to_string(),
+                constraint_category: LpsConstraintCategory::ConstraintFree,
+                constraint_note: "Wind window < 12 m/s & SVD stable".to_string(),
+                is_sound: true,
+                committed_in_wwp: true,
+                completed_on_time: true,
+                variance_reason: "None".to_string(),
+            },
+            Self {
+                id: 4,
+                wbs_code: "05.05.23".to_string(),
+                week_bucket: "W-04".to_string(),
+                activity_name: "ASTM F3125 A325 HTB Torque Calibration".to_string(),
+                trade_crew: "Bolting Specialists B2".to_string(),
+                constraint_category: LpsConstraintCategory::CrewAvailability,
+                constraint_note: "Skidmore-Wilhelm tension calibrator check".to_string(),
+                is_sound: false,
+                committed_in_wwp: true,
+                completed_on_time: false,
+                variance_reason: "Tool Calibration Hold".to_string(),
+            },
+            Self {
+                id: 5,
+                wbs_code: "09.97.13".to_string(),
+                week_bucket: "W-04".to_string(),
+                activity_name: "C5-High Intumescent Coating Touch-Up".to_string(),
+                trade_crew: "Protective Coating Crew".to_string(),
+                constraint_category: LpsConstraintCategory::ConstraintFree,
+                constraint_note: "Dew point & DFT gauge check approved".to_string(),
+                is_sound: true,
+                committed_in_wwp: true,
+                completed_on_time: true,
+                variance_reason: "None".to_string(),
+            },
+            Self {
+                id: 6,
+                wbs_code: "08.44.13".to_string(),
+                week_bucket: "W-05".to_string(),
+                activity_name: "Unitized Curtain Wall Pod Installation L4–L6".to_string(),
+                trade_crew: "Facade Glazing Unit".to_string(),
+                constraint_category: LpsConstraintCategory::MaterialSupply,
+                constraint_note: "Awaiting Low-E unit batch #14 port release".to_string(),
+                is_sound: false,
+                committed_in_wwp: true,
+                completed_on_time: false,
+                variance_reason: "Material Delivery Late".to_string(),
+            },
+            Self {
+                id: 7,
+                wbs_code: "23.31.13".to_string(),
+                week_bucket: "W-05".to_string(),
+                activity_name: "Level 3 Overhead Chilled Water & Duct Riser".to_string(),
+                trade_crew: "MEP Coordination Crew".to_string(),
+                constraint_category: LpsConstraintCategory::EngineeringRfi,
+                constraint_note: "Pending BCF-101 flat oval duct approval".to_string(),
+                is_sound: false,
+                committed_in_wwp: false,
+                completed_on_time: false,
+                variance_reason: "RFI / Clash Resolution".to_string(),
+            },
+            Self {
+                id: 8,
+                wbs_code: "03.41.13".to_string(),
+                week_bucket: "W-06".to_string(),
+                activity_name: "Precast Stair Core Module Flight 6 Placement".to_string(),
+                trade_crew: "Precast Erection Crew".to_string(),
+                constraint_category: LpsConstraintCategory::CraneLogistics,
+                constraint_note: "Requires TC-1 hook clear window 13:00–16:00".to_string(),
+                is_sound: true,
+                committed_in_wwp: true,
+                completed_on_time: true,
+                variance_reason: "None".to_string(),
+            },
+        ]
+    }
+
+    pub fn compute_live_ppc(tasks: &[Self]) -> (u32, u32, f32) {
+        let committed: u32 = tasks.iter().filter(|t| t.committed_in_wwp).count() as u32;
+        if committed == 0 {
+            return (0, 0, 0.0);
+        }
+        let completed: u32 = tasks
+            .iter()
+            .filter(|t| t.committed_in_wwp && t.completed_on_time)
+            .count() as u32;
+        let pct = (completed as f32 / committed as f32) * 100.0;
+        (committed, completed, pct)
+    }
+
+    pub fn compute_variance_pareto(tasks: &[Self]) -> Vec<(String, u32)> {
+        let mut counts: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
+        for t in tasks {
+            if t.committed_in_wwp && !t.completed_on_time {
+                let reason = if t.variance_reason.trim().is_empty() || t.variance_reason == "None" {
+                    t.constraint_category.label().to_string()
+                } else {
+                    t.variance_reason.clone()
+                };
+                *counts.entry(reason).or_insert(0) += 1;
+            }
+        }
+        let mut list: Vec<(String, u32)> = counts.into_iter().collect();
+        list.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        list
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PrefabSupplyStage {
+    ShopDrawingApproved,
+    FactoryCastingWeld,
+    QaNdtInspection,
+    InTransitFleet,
+    SiteLaydownStaging,
+    ErectedAndTorqued,
+}
+
+impl PrefabSupplyStage {
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::ShopDrawingApproved,
+            Self::FactoryCastingWeld,
+            Self::QaNdtInspection,
+            Self::InTransitFleet,
+            Self::SiteLaydownStaging,
+            Self::ErectedAndTorqued,
+        ]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::ShopDrawingApproved => "1. Shop Drawing",
+            Self::FactoryCastingWeld => "2. Factory Fab/Cast",
+            Self::QaNdtInspection => "3. QA / NDT Check",
+            Self::InTransitFleet => "4. In-Transit Fleet",
+            Self::SiteLaydownStaging => "5. Site Laydown",
+            Self::ErectedAndTorqued => "6. Erected & Torqued",
+        }
+    }
+
+    pub fn step_index(&self) -> usize {
+        match self {
+            Self::ShopDrawingApproved => 0,
+            Self::FactoryCastingWeld => 1,
+            Self::QaNdtInspection => 2,
+            Self::InTransitFleet => 3,
+            Self::SiteLaydownStaging => 4,
+            Self::ErectedAndTorqued => 5,
+        }
+    }
+
+    pub fn next(&self) -> Option<Self> {
+        match self {
+            Self::ShopDrawingApproved => Some(Self::FactoryCastingWeld),
+            Self::FactoryCastingWeld => Some(Self::QaNdtInspection),
+            Self::QaNdtInspection => Some(Self::InTransitFleet),
+            Self::InTransitFleet => Some(Self::SiteLaydownStaging),
+            Self::SiteLaydownStaging => Some(Self::ErectedAndTorqued),
+            Self::ErectedAndTorqued => None,
+        }
+    }
+
+    pub fn color_rgb(&self) -> (u8, u8, u8) {
+        match self {
+            Self::ShopDrawingApproved => (148, 163, 184),
+            Self::FactoryCastingWeld => (59, 130, 246),
+            Self::QaNdtInspection => (168, 85, 247),
+            Self::InTransitFleet => (245, 158, 11),
+            Self::SiteLaydownStaging => (14, 165, 233),
+            Self::ErectedAndTorqued => (16, 185, 129),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PrefabModuleType {
+    PrecastCorePanel,
+    VolumetricSteelPod,
+    CompositeTrussSegment,
+    UnitizedCurtainPanel,
+}
+
+impl PrefabModuleType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::PrecastCorePanel => "Precast Core Panel",
+            Self::VolumetricSteelPod => "Volumetric Steel Pod",
+            Self::CompositeTrussSegment => "Composite Truss Segment",
+            Self::UnitizedCurtainPanel => "Unitized Curtain Wall",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PrefabModuleUnit {
+    pub tag_id: String,
+    pub rfid_code: String,
+    pub name: String,
+    pub module_type: PrefabModuleType,
+    pub dimensions_m: [f32; 3],
+    pub mass_tons: f32,
+    pub crane_swl_tons: f32,
+    pub target_zone: String,
+    pub stage: PrefabSupplyStage,
+    pub qa_passed: bool,
+    pub last_scan_timestamp: String,
+}
+
+impl PrefabModuleUnit {
+    pub fn crane_utilization_pct(&self) -> f32 {
+        (self.mass_tons / self.crane_swl_tons.max(0.5)) * 100.0
+    }
+
+    pub fn default_units() -> Vec<Self> {
+        vec![
+            Self {
+                tag_id: "MOD-TR-014".to_string(),
+                rfid_code: "RFID-EG-88412".to_string(),
+                name: "24 m Warren Truss Half-Segment T14".to_string(),
+                module_type: PrefabModuleType::CompositeTrussSegment,
+                dimensions_m: [12.0, 2.4, 2.2],
+                mass_tons: 8.4,
+                crane_swl_tons: 12.0,
+                target_zone: "Grid B/1-3 Level 12".to_string(),
+                stage: PrefabSupplyStage::InTransitFleet,
+                qa_passed: true,
+                last_scan_timestamp: "GPS Gate +08:42 UTC".to_string(),
+            },
+            Self {
+                tag_id: "MOD-PC-208".to_string(),
+                rfid_code: "RFID-EG-71904".to_string(),
+                name: "Precast Shear Core Spandrel Wall PC-208".to_string(),
+                module_type: PrefabModuleType::PrecastCorePanel,
+                dimensions_m: [6.2, 0.35, 3.6],
+                mass_tons: 10.2,
+                crane_swl_tons: 12.0,
+                target_zone: "Core South L06".to_string(),
+                stage: PrefabSupplyStage::QaNdtInspection,
+                qa_passed: true,
+                last_scan_timestamp: "Ultrasonic NDT Pass".to_string(),
+            },
+            Self {
+                tag_id: "MOD-VP-042".to_string(),
+                rfid_code: "RFID-EG-55219".to_string(),
+                name: "Volumetric MEP Core Toilet Pod VP-42".to_string(),
+                module_type: PrefabModuleType::VolumetricSteelPod,
+                dimensions_m: [4.8, 2.4, 3.1],
+                mass_tons: 6.1,
+                crane_swl_tons: 12.0,
+                target_zone: "Bay C-3 Level 04".to_string(),
+                stage: PrefabSupplyStage::SiteLaydownStaging,
+                qa_passed: true,
+                last_scan_timestamp: "Yard Bay #3 Staged".to_string(),
+            },
+            Self {
+                tag_id: "MOD-CW-311".to_string(),
+                rfid_code: "RFID-EG-92044".to_string(),
+                name: "Double Low-E Curtain Wall Pod CW-311".to_string(),
+                module_type: PrefabModuleType::UnitizedCurtainPanel,
+                dimensions_m: [3.2, 0.25, 4.0],
+                mass_tons: 1.85,
+                crane_swl_tons: 5.0,
+                target_zone: "East Facade L08".to_string(),
+                stage: PrefabSupplyStage::ErectedAndTorqued,
+                qa_passed: true,
+                last_scan_timestamp: "As-Built Scan Verified".to_string(),
+            },
+            Self {
+                tag_id: "MOD-TR-015".to_string(),
+                rfid_code: "RFID-EG-88413".to_string(),
+                name: "24 m Warren Truss Half-Segment T15".to_string(),
+                module_type: PrefabModuleType::CompositeTrussSegment,
+                dimensions_m: [12.0, 2.4, 2.2],
+                mass_tons: 8.6,
+                crane_swl_tons: 12.0,
+                target_zone: "Grid B/3-5 Level 12".to_string(),
+                stage: PrefabSupplyStage::FactoryCastingWeld,
+                qa_passed: false,
+                last_scan_timestamp: "Robotic Cell #2 Welding".to_string(),
+            },
+            Self {
+                tag_id: "MOD-PC-212".to_string(),
+                rfid_code: "RFID-EG-71910".to_string(),
+                name: "Precast Twin-Tee Hollowcore Slab PC-212".to_string(),
+                module_type: PrefabModuleType::PrecastCorePanel,
+                dimensions_m: [9.0, 2.4, 0.4],
+                mass_tons: 7.5,
+                crane_swl_tons: 12.0,
+                target_zone: "Podium Roof Bay D".to_string(),
+                stage: PrefabSupplyStage::ShopDrawingApproved,
+                qa_passed: true,
+                last_scan_timestamp: "Tekla NC1 Released".to_string(),
+            },
+        ]
+    }
+}
+
+#[cfg(test)]
+mod phase29_tests {
+    use super::*;
+
+    #[test]
+    fn test_clash_tolerance_filtering_and_bcf_xml_export() {
+        let clashes = ClashDetectionItem::default_clashes();
+        // CLASH-004 has -18 mm overlap: active at 15 mm, ignored above 18 mm
+        let triggered_15 = clashes.iter().filter(|c| c.is_triggered_at_tolerance(15.0)).count();
+        let triggered_30 = clashes.iter().filter(|c| c.is_triggered_at_tolerance(30.0)).count();
+        assert!(triggered_15 > triggered_30);
+
+        let topics = BcfTopicRecord::default_topics();
+        let xml = BcfTopicRecord::export_bcf_xml(&topics, "EigenGraph Test Tower");
+        assert!(xml.contains("<BcfArchive Version=\"2.1\""));
+        assert!(xml.contains("BCF-101"));
+        assert!(xml.contains("<EigenGraphOrbit"));
+    }
+
+    #[test]
+    fn test_ai_copilot_deterministic_solvers() {
+        let sw = solve_aci318_shear_wall(&CopilotShearWallParams::default());
+        assert!(sw.dcr_ratio > 0.0 && sw.markdown_memo.contains("ACI 318-19"));
+
+        let wind = solve_asce7_wind(&CopilotWindParams::default());
+        assert!(wind.summary_headline.contains("kPa"));
+        assert!(wind.markdown_memo.contains("ASCE 7-22"));
+
+        let carbon = solve_iso14040_carbon(&CopilotCarbonParams::default());
+        assert!(carbon.is_compliant);
+        assert!(carbon.markdown_memo.contains("ISO 14040"));
+    }
+
+    #[test]
+    fn test_lps_ppc_calculation_and_prefab_stages() {
+        let mut tasks = LpsLookaheadTask::default_tasks();
+        let (committed, completed, pct) = LpsLookaheadTask::compute_live_ppc(&tasks);
+        assert_eq!(committed, 7);
+        assert_eq!(completed, 5);
+        assert!((pct - (500.0 / 7.0)).abs() < 0.01);
+
+        // Removing constraint & marking completed raises PPC
+        tasks[3].is_sound = true;
+        tasks[3].completed_on_time = true;
+        let (_, completed2, pct2) = LpsLookaheadTask::compute_live_ppc(&tasks);
+        assert_eq!(completed2, 6);
+        assert!(pct2 > pct);
+
+        let units = PrefabModuleUnit::default_units();
+        assert_eq!(
+            PrefabSupplyStage::ShopDrawingApproved.next(),
+            Some(PrefabSupplyStage::FactoryCastingWeld)
+        );
+        assert!(units[0].crane_utilization_pct() < 100.0);
+    }
+
+    #[test]
+    fn test_parametric_preset_graph_generation() {
+        let graph = VisualNodeGraph::from_preset(
+            ParametricGeneratorPreset::DiagridTower,
+            60.0,
+            12.0,
+            60.0,
+            12.0,
+        );
+        assert_eq!(graph.nodes.len(), 5);
+        assert_eq!(graph.wires.len(), 4);
+        assert!(graph.nodes[3].value_display.contains("Struts"));
+    }
+}

@@ -309,7 +309,7 @@ impl EigenGraphApp {
             .inner_margin(Margin::symmetric(8, 4))
             .show(ui, |ui| {
                 ui.label(
-                    RichText::new(format!("v{} • Phase 28", env!("CARGO_PKG_VERSION")))
+                    RichText::new(format!("v{} • Phase 29", env!("CARGO_PKG_VERSION")))
                         .size(10.5)
                         .strong()
                         .color(self.theme.accent_blue),
@@ -605,6 +605,8 @@ impl App for EigenGraphApp {
                                 != crate::views::planning::PlanningSubTab::TakeoffQto
                             && self.planning_view.active_subtab
                                 != crate::views::planning::PlanningSubTab::CostAriTradeoff
+                            && self.planning_view.active_subtab
+                                != crate::views::planning::PlanningSubTab::WbsHierarchy
                         {
                             self.planning_view.active_subtab =
                                 crate::views::planning::PlanningSubTab::DynamicRab;

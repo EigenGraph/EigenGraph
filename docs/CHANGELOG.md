@@ -7,6 +7,34 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.2.9] - 2026-11-12 — Phase 29: Stateful 3D Clash & BCF 2.1 Coordination Hub, Autonomous AI Copilot Studio, Parametric Algorithmic Dynamo Preview & Lean/DfMA Supply Chain Trackers
+
+### Added
+- **Multi-Disciplinary Clash Detection & BCF 2.1 Coordination Hub (`src/views/build.rs`, `src/models.rs`)**:
+  - Added stateful clash models (`ClashDetectionItem`, `ClashSeverity`, `ClashStatus`) and BCF 2.1 issue records (`BcfTopicRecord`, `BcfComment`, `BcfPriority`, `BcfTopicStatus`) with deterministic tolerance filtering (`is_triggered_at_tolerance`) and volumetric clash estimation (`clash_volume_m3`).
+  - Upgraded the left Clash Manager tab, Bottom Deck Clash Manager, and 3D Viewport with tolerance-driven clash solvers, discipline/severity filters, clickable status workflows (`Active -> In Review -> Resolved`), `👁️ Focus 3D` / `💬 Log BCF` actions, camera-viewpoint-capturing BCF issue creation, comment threads, viewpoint restoration (`📷 Restore Viewpoint`), and `BCF 2.1 XML` export via `DiskExporter`.
+  - Projected 3D wireframe clash bounding boxes, center halo markers, and selected highlight rings directly into the 3D orbit canvas with a viewport `⚔️ Clashes` overlay toggle.
+- **Autonomous AI Civil Engineering Copilot Studio (`src/views/ai_firm.rs`, `src/models.rs`)**:
+  - Added `AiFirmSubTab::CopilotStudio` with interactive engineering parameter sliders, deterministic structural calculation solvers, full variable substitution breakdowns, and one-click `.md` Calculation Memo downloads:
+    - **ACI 318-19 Chapter 18 / Eurocode 2 Shear Wall Designer** (`solve_aci318_shear_wall`): Aspect coefficient $\alpha_c$, web shear ratio $\rho_t$, $\phi V_n$, bar curtain selection, and special boundary element compressive stress check ($0.2 f'_c$).
+    - **ASCE 7-22 Chapter 27 MWFRS Wind Load Solver** (`solve_asce7_wind`): Velocity pressure coefficient $K_z$, velocity pressure $q_z$, windward/leeward net facade design pressure $p_{net}$, and curtain-wall DCR check.
+    - **ISO 14040 / EN 15978 A1–A3 Embodied Carbon Minimizer** (`solve_iso14040_carbon`): SCM slag/fly-ash concrete blend, EAF recycled steel fraction, and mass-timber hybrid deck optimization.
+  - Added `"📢 Push Summary to Firm Board"` integration and responsive wrapping/stacking across all `AI Firm` sub-tabs.
+- **Parametric Dynamo / Grasshopper Algorithmic Studio (`src/views/parametric.rs`, `src/models.rs`)**:
+  - Added `ParametricGeneratorPreset` (`DiagridTower`, `GeodesicDome`, `VoronoiCanopy`) paired with 4 live geometric parameter sliders and dynamic `VisualNodeGraph::from_preset(...)` rebuilding.
+  - Added an orbitable **Real-Time 3D Wireframe Mesh Preview** alongside the interactive draggable Dynamo node canvas, plus a real `"⚡ Bake to BIM Scene"` executor (`BimCommand::AddColumn` & `AddBeamRun` via `BimCommandBus`) with full Undo support and live ARI evaluation.
+- **Lean Last Planner System (LPS) & Modular Prefab Supply Chain Tracker (`src/views/lean.rs`, `src/views/industrialized.rs`, `src/models.rs`)**:
+  - Upgraded **Lean Construction (`lean.rs`)**: Interactive 6-week Make-Ready lookahead & Weekly Work Plan board (`LpsLookaheadTask`), constraint clearing, live Percent Plan Complete (PPC %) header indicator, painted Weekly PPC Trend chart vs. 80% reliability benchmark, dynamic Variance Root-Cause Pareto (`compute_variance_pareto`), responsive card grids, and Indonesian Rupiah (`Rp`) currency formatting fix.
+  - Upgraded **10D Modular DfMA (`industrialized.rs`)**: 6-stage prefabricated supply chain pipeline (`PrefabSupplyStage`, `PrefabModuleUnit`), simulated QR/RFID Scanner & Gate Check-In Console, crane hoist Safe Working Load (`SWL %`) utilization gauges, stage advancement workflows, responsive mobile/tablet card & pane stacking, and browser-safe `wasm32` guards on local IFC file reads.
+- **Automated Unit Verification (`src/models.rs`)**:
+  - Added `mod phase29_tests` covering clash tolerance filtering & BCF 2.1 XML export, deterministic AI Copilot calculators (shear wall, wind, carbon), live PPC & variance Pareto aggregation, and parametric preset / crane SWL bounds.
+
+### Fixed
+- **Planning 5D WBS Sub-Tab Navigation Regression (`src/app.rs`)**: Preserved `PlanningSubTab::WbsHierarchy` alongside `QuantityTakeoff5D` and `EarnedValueEvm` when activating `NavigationPillar::CostBudgeting`.
+- **Responsive Wrapping Across Engineering Workbenches (`src/views/build.rs`, `src/views/ai_firm.rs`, `src/views/lean.rs`, `src/views/industrialized.rs`, `src/views/parametric.rs`)**: Replaced fixed horizontal toolbars and unstacked split containers with `horizontal_wrapped` controls and viewport-width-aware vertical stacking below tablet breakpoints.
+
+---
+
 ## [v0.2.8] - 2026-11-12 — Phase 28: 4D-7D BIM Superstation (4D Synchro Simulation, 5D Dynamic WBS & Multi-Currency Explorer, 6D ISO 14040 Whole-Life Carbon Assessment & 7D COBie 3.0 Digital Twin Telemetry)
 
 ### Added

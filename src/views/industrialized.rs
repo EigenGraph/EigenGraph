@@ -2,13 +2,13 @@
 //! The integration of Industry 4.0 technologies: Prefabrication DfMA, Robotics,
 //! Autonomous Erection, and Native OpenBIM IFC (IFC2x3 / IFC4 / IFC4.3) Reader & Inspector.
 
-use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui, Vec2};
+use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, Rect, RichText, ScrollArea, Sense, Stroke, Ui, Vec2};
 use crate::core::{
     IfcAuditStatus, IfcBcfTopic, IfcClashItem, IfcClashReport, IfcClashSeverity, IfcDiffKind,
     IfcEditCommand, IfcEditSession, IfcElementCreationSpec, IfcElementDiff, IfcElementSummary,
     IfcIdsReport, IfcIdsRuleCheck, IfcModel, IfcModelDiff, IfcSchemaVersion, IfcSpatialNode,
 };
-use crate::models::StructuralMember;
+use crate::models::{PrefabModuleUnit, PrefabSupplyStage, StructuralMember};
 use crate::theme::MacTheme;
 use std::collections::HashMap;
 
@@ -90,6 +90,13 @@ pub struct IndustrializedView {
     pub model_diff: Option<IfcModelDiff>,
     pub ids_report: Option<IfcIdsReport>,
     pub diff_subtab: u8, // 0 = Clash, 1 = Diff, 2 = IDS & BCF
+
+    // Phase 29: Modular Prefab Supply Chain & QR/RFID Scanner Tracker
+    pub prefab_units: Vec<PrefabModuleUnit>,
+    pub prefab_stage_filter: Option<PrefabSupplyStage>,
+    pub scanner_input: String,
+    pub selected_module_tag: String,
+    pub scanner_log: Vec<String>,
 }
 
 impl Default for IndustrializedView {
@@ -144,6 +151,15 @@ impl Default for IndustrializedView {
             model_diff: None,
             ids_report: None,
             diff_subtab: 0,
+
+            prefab_units: PrefabModuleUnit::default_units(),
+            prefab_stage_filter: None,
+            scanner_input: "MOD-TR-014".to_string(),
+            selected_module_tag: "MOD-TR-014".to_string(),
+            scanner_log: vec![
+                "Fleet GPS Beacon: MOD-TR-014 departed plant; ETA Site Laydown Bay B-1.".to_string(),
+                "QA NDT Release: MOD-PC-208 Ultrasonic shear-weld scan passed (Zero defects).".to_string(),
+            ],
         }
     }
 }
@@ -234,15 +250,14 @@ impl IndustrializedView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(18))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("🌐 10D BIM MULTI-DISCIPLINE LIFECYCLE MASTER HUB").size(15.0).strong().color(theme.text_primary));
-                            ui.label(RichText::new("ISO 19650 / IPD COMPLIANT").size(10.0).strong().color(theme.accent_blue));
-                        });
-                        ui.label(RichText::new("Unified Cross-Discipline Lifecycle Command Center spanning 1D Project Scope to 10D Industrialized Prefabrication.").size(11.0).color(theme.text_secondary));
+                ui.vertical(|ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(RichText::new("🌐 10D BIM MULTI-DISCIPLINE LIFECYCLE MASTER HUB").size(15.0).strong().color(theme.text_primary));
+                        ui.label(RichText::new("ISO 19650 / IPD COMPLIANT").size(10.0).strong().color(theme.accent_blue));
                     });
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.label(RichText::new("Unified Cross-Discipline Lifecycle Command Center spanning 1D Project Scope to 10D Industrialized Prefabrication.").size(11.0).color(theme.text_secondary));
+                    ui.add_space(8.0);
+                    ui.horizontal_wrapped(|ui| {
                         if ui.add(egui::Button::new(RichText::new("📥 Export 10D Audit Report (PDF)").size(11.0).strong().color(Color32::WHITE))
                             .fill(theme.accent_green)
                             .corner_radius(CornerRadius::same(6))).clicked() {
@@ -456,41 +471,725 @@ impl IndustrializedView {
             });
     }
 
+    fn render_responsive_cards(
+        &self,
+        ui: &mut Ui,
+        cards: &[(&str, String, String, Color32)],
+        theme: &MacTheme,
+    ) {
+        let avail_w = ui.available_width();
+        if cards.is_empty() {
+            return;
+        }
+        if avail_w >= 860.0 {
+            ui.columns(cards.len(), |cols| {
+                for (i, (title, val, sub, col)) in cards.iter().enumerate() {
+                    self.render_stat_card(&mut cols[i], theme, title, val, sub, *col);
+                }
+            });
+        } else if avail_w >= 520.0 && cards.len() >= 2 {
+            for chunk in cards.chunks(2) {
+                if chunk.len() == 2 {
+                    ui.columns(2, |cols| {
+                        self.render_stat_card(&mut cols[0], theme, chunk[0].0, &chunk[0].1, &chunk[0].2, chunk[0].3);
+                        self.render_stat_card(&mut cols[1], theme, chunk[1].0, &chunk[1].1, &chunk[1].2, chunk[1].3);
+                    });
+                } else {
+                    self.render_stat_card(ui, theme, chunk[0].0, &chunk[0].1, &chunk[0].2, chunk[0].3);
+                }
+                ui.add_space(6.0);
+            }
+        } else {
+            for (title, val, sub, col) in cards {
+                self.render_stat_card(ui, theme, title, val, sub, *col);
+                ui.add_space(6.0);
+            }
+        }
+    }
+
     fn render_modular_dfma(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        ui.columns(4, |cols| {
-            self.render_stat_card(&mut cols[0], theme, "OFF-SITE FABRICATION RATIO", "82.5%", "Precision Factory Pre-Assembly", theme.accent_green);
-            self.render_stat_card(&mut cols[1], theme, "STANDARDIZATION INDEX", "91.5%", "Modular Gusset Node Repetition", theme.accent_blue);
-            self.render_stat_card(&mut cols[2], theme, "TRANSPORT MODULE ENVELOPE", "12.0 x 2.4 m", "Highway Trailer Gauge Compliant", theme.text_primary);
-            self.render_stat_card(&mut cols[3], theme, "ON-SITE ASSEMBLY TIME", "-60% Days", "Rapid HTB High-Strength Bolting", theme.accent_green);
-        });
+        let total_units = self.prefab_units.len();
+        let erected_count = self
+            .prefab_units
+            .iter()
+            .filter(|u| u.stage == PrefabSupplyStage::ErectedAndTorqued)
+            .count();
+        let erected_pct = if total_units > 0 {
+            (erected_count as f32 / total_units as f32) * 100.0
+        } else {
+            0.0
+        };
+        let transit_or_staged = self
+            .prefab_units
+            .iter()
+            .filter(|u| {
+                matches!(
+                    u.stage,
+                    PrefabSupplyStage::InTransitFleet | PrefabSupplyStage::SiteLaydownStaging
+                )
+            })
+            .count();
+        let qa_passed = self.prefab_units.iter().filter(|u| u.qa_passed).count();
+        let max_swl_pct = self
+            .prefab_units
+            .iter()
+            .map(|u| u.crane_utilization_pct())
+            .fold(0.0f32, f32::max);
 
-        ui.add_space(16.0);
+        let kpis = [
+            (
+                "ERECTION PROGRESS",
+                format!("{}/{} ({:.0}%)", erected_count, total_units, erected_pct),
+                "Torqued & As-Built Verified".to_string(),
+                theme.accent_green,
+            ),
+            (
+                "OFF-SITE PREFAB RATIO",
+                format!("{:.1}%", self.offsite_ratio_pct),
+                "Factory Volumetric & Panels".to_string(),
+                theme.accent_blue,
+            ),
+            (
+                "IN-TRANSIT & STAGING",
+                format!("{} Modules", transit_or_staged),
+                format!("QA Passed: {}/{} Units", qa_passed, total_units),
+                theme.accent_orange,
+            ),
+            (
+                "PEAK CRANE SWL LOAD",
+                format!("{:.0}% SWL", max_swl_pct),
+                "12.0T Jib Rigging Safety Guard".to_string(),
+                if max_swl_pct > 85.0 {
+                    theme.accent_red
+                } else {
+                    theme.accent_green
+                },
+            ),
+        ];
+        self.render_responsive_cards(ui, &kpis, theme);
 
+        ui.add_space(14.0);
+
+        // 6-Stage DfMA Supply Chain Pipeline Funnel
         Frame::new()
             .fill(theme.bg_card)
             .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(16))
+            .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("🏭 Modular DfMA (Design for Manufacture and Assembly) Matrix").size(13.5).strong().color(theme.text_primary));
-                ui.add_space(6.0);
-                ui.label(RichText::new("Optimization of precast concrete panels, volumetric steel pods, and standardized connection joints to eliminate wet trades and minimize on-site labor.").size(11.5).color(theme.text_secondary));
-                ui.add_space(12.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        RichText::new("🏭 6-STAGE DfMA SUPPLY CHAIN PIPELINE")
+                            .size(12.5)
+                            .strong()
+                            .color(theme.text_primary),
+                    );
+                    ui.label(
+                        RichText::new("Click any stage to filter modular prefabricated elements")
+                            .size(10.0)
+                            .color(theme.text_muted),
+                    );
+                });
+                ui.add_space(8.0);
 
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Target Prefabrication Ratio:").size(11.5).color(theme.text_secondary));
-                    ui.add(egui::Slider::new(&mut self.offsite_ratio_pct, 50.0..=95.0).suffix(" %").text(""));
+                ui.horizontal_wrapped(|ui| {
+                    let all_sel = self.prefab_stage_filter.is_none();
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new(format!("All ({})", total_units))
+                                    .size(10.5)
+                                    .strong()
+                                    .color(if all_sel { Color32::WHITE } else { theme.text_secondary }),
+                            )
+                            .fill(if all_sel { theme.accent_blue } else { theme.bg_canvas })
+                            .corner_radius(CornerRadius::same(6)),
+                        )
+                        .clicked()
+                    {
+                        self.prefab_stage_filter = None;
+                    }
+
+                    for stage in PrefabSupplyStage::all() {
+                        let count = self.prefab_units.iter().filter(|u| u.stage == *stage).count();
+                        let (r, g, b) = stage.color_rgb();
+                        let st_col = Color32::from_rgb(r, g, b);
+                        let is_sel = self.prefab_stage_filter == Some(*stage);
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    RichText::new(format!("{} ({})", stage.label(), count))
+                                        .size(10.0)
+                                        .strong()
+                                        .color(if is_sel { Color32::WHITE } else { st_col }),
+                                )
+                                .fill(if is_sel { st_col } else { theme.bg_canvas })
+                                .corner_radius(CornerRadius::same(6)),
+                            )
+                            .clicked()
+                        {
+                            self.prefab_stage_filter = if is_sel { None } else { Some(*stage) };
+                        }
+                    }
+                });
+
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        RichText::new("Target Prefabrication Ratio:")
+                            .size(11.0)
+                            .color(theme.text_secondary),
+                    );
+                    ui.add(egui::Slider::new(&mut self.offsite_ratio_pct, 50.0..=95.0).suffix(" %"));
                 });
             });
+
+        ui.add_space(12.0);
+
+        // Simulated QR / RFID Scanner & Check-In Console
+        let mut scan_trigger = false;
+        let mut advance_selected_trigger = false;
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::same(14))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.label(
+                    RichText::new("📡 SIMULATED QR / RFID SCANNER & SITE GATE CHECK-IN CONSOLE")
+                        .size(12.0)
+                        .strong()
+                        .color(theme.accent_blue),
+                );
+                ui.add_space(6.0);
+
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        RichText::new("Barcode / RFID Tag:")
+                            .size(11.0)
+                            .color(theme.text_secondary),
+                    );
+                    let edit_res = ui.add(
+                        egui::TextEdit::singleline(&mut self.scanner_input)
+                            .hint_text("Scan tag e.g. MOD-TR-014 or RFID-EG-88412")
+                            .desired_width(210.0),
+                    );
+                    if edit_res.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        scan_trigger = true;
+                    }
+
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("📡 Scan & Check-In")
+                                    .size(10.5)
+                                    .strong()
+                                    .color(Color32::WHITE),
+                            )
+                            .fill(theme.accent_blue)
+                            .corner_radius(CornerRadius::same(6)),
+                        )
+                        .clicked()
+                    {
+                        scan_trigger = true;
+                    }
+
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("⏭️ Advance Stage")
+                                    .size(10.5)
+                                    .strong()
+                                    .color(Color32::WHITE),
+                            )
+                            .fill(theme.accent_green)
+                            .corner_radius(CornerRadius::same(6)),
+                        )
+                        .clicked()
+                    {
+                        advance_selected_trigger = true;
+                    }
+                });
+
+                ui.add_space(6.0);
+                let tags: Vec<String> = self.prefab_units.iter().map(|u| u.tag_id.clone()).collect();
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Quick Tap Tag:").size(10.0).color(theme.text_muted));
+                    for tag in tags {
+                        let is_sel = self.selected_module_tag == tag;
+                        if ui
+                            .selectable_label(is_sel, RichText::new(&tag).size(10.0).monospace())
+                            .clicked()
+                        {
+                            self.scanner_input = tag.clone();
+                            self.selected_module_tag = tag;
+                        }
+                    }
+                });
+
+                ui.add_space(6.0);
+                Frame::new()
+                    .fill(theme.bg_canvas)
+                    .corner_radius(CornerRadius::same(6))
+                    .inner_margin(Margin::symmetric(10, 6))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        for log in self.scanner_log.iter().rev().take(3) {
+                            ui.label(
+                                RichText::new(format!("• {}", log))
+                                    .size(9.5)
+                                    .monospace()
+                                    .color(theme.text_secondary),
+                            );
+                        }
+                    });
+            });
+
+        if scan_trigger {
+            let query = self.scanner_input.trim().to_uppercase();
+            let now = crate::core::web_bridge::unix_timestamp_label();
+            if let Some(unit) = self.prefab_units.iter_mut().find(|u| {
+                u.tag_id.to_uppercase() == query || u.rfid_code.to_uppercase() == query
+            }) {
+                unit.last_scan_timestamp = now.clone();
+                self.selected_module_tag = unit.tag_id.clone();
+                let msg = format!(
+                    "Checked in {} ({}) @ stage '{}' [{}].",
+                    unit.tag_id,
+                    unit.rfid_code,
+                    unit.stage.label(),
+                    now
+                );
+                self.scanner_log.push(msg.clone());
+                self.export_status = Some(msg);
+            } else {
+                let err = format!(
+                    "RFID Lookup Miss: '{}' did not match any prefabricated module tag.",
+                    self.scanner_input.trim()
+                );
+                self.scanner_log.push(err.clone());
+                self.export_status = Some(err);
+            }
+        }
+
+        if advance_selected_trigger {
+            let query = if !self.scanner_input.trim().is_empty() {
+                self.scanner_input.trim().to_uppercase()
+            } else {
+                self.selected_module_tag.to_uppercase()
+            };
+            let now = crate::core::web_bridge::unix_timestamp_label();
+            if let Some(unit) = self.prefab_units.iter_mut().find(|u| {
+                u.tag_id.to_uppercase() == query || u.rfid_code.to_uppercase() == query
+            }) {
+                self.selected_module_tag = unit.tag_id.clone();
+                if let Some(next_stage) = unit.stage.next() {
+                    unit.stage = next_stage;
+                    if next_stage.step_index() >= PrefabSupplyStage::QaNdtInspection.step_index() {
+                        unit.qa_passed = true;
+                    }
+                    unit.last_scan_timestamp = now.clone();
+                    let msg = format!(
+                        "{} advanced to '{}' (Crane SWL {:.0}%) [{}].",
+                        unit.tag_id,
+                        unit.stage.label(),
+                        unit.crane_utilization_pct(),
+                        now
+                    );
+                    self.scanner_log.push(msg.clone());
+                    self.export_status = Some(msg);
+                } else {
+                    let msg = format!(
+                        "{} is already Erected & Torqued at {}.",
+                        unit.tag_id, unit.target_zone
+                    );
+                    self.scanner_log.push(msg.clone());
+                    self.export_status = Some(msg);
+                }
+            }
+        }
+
+        ui.add_space(12.0);
+
+        // Filtered Modular Prefab Unit Cards
+        let filtered_indices: Vec<usize> = self
+            .prefab_units
+            .iter()
+            .enumerate()
+            .filter_map(|(i, u)| {
+                if self.prefab_stage_filter.map_or(true, |st| u.stage == st) {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mut card_advance_idx: Option<usize> = None;
+        let mut card_select_tag: Option<String> = None;
+        let is_two_col = ui.available_width() >= 680.0;
+
+        if filtered_indices.is_empty() {
+            theme.card_frame().show(ui, |ui| {
+                ui.label(
+                    RichText::new("No prefabricated units match the selected pipeline stage filter.")
+                        .size(11.0)
+                        .color(theme.text_muted),
+                );
+            });
+        } else if is_two_col {
+            for pair in filtered_indices.chunks(2) {
+                ui.columns(2, |cols| {
+                    for (slot, &u_idx) in pair.iter().enumerate() {
+                        let unit = &self.prefab_units[u_idx];
+                        let (r, g, b) = unit.stage.color_rgb();
+                        let st_col = Color32::from_rgb(r, g, b);
+                        let is_sel = self.selected_module_tag == unit.tag_id;
+                        let swl_pct = unit.crane_utilization_pct();
+                        let swl_col = if swl_pct > 85.0 {
+                            theme.accent_red
+                        } else if swl_pct > 65.0 {
+                            theme.accent_orange
+                        } else {
+                            theme.accent_green
+                        };
+
+                        Frame::new()
+                            .fill(theme.bg_card)
+                            .corner_radius(CornerRadius::same(10))
+                            .inner_margin(Margin::same(12))
+                            .stroke(Stroke::new(
+                                if is_sel { 1.6 } else { 1.0 },
+                                if is_sel { theme.accent_blue } else { theme.border_subtle },
+                            ))
+                            .show(&mut cols[slot], |ui| {
+                                ui.set_width(ui.available_width());
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label(
+                                        RichText::new(&unit.tag_id)
+                                            .size(12.0)
+                                            .strong()
+                                            .monospace()
+                                            .color(theme.accent_blue),
+                                    );
+                                    ui.label(
+                                        RichText::new(&unit.rfid_code)
+                                            .size(9.5)
+                                            .monospace()
+                                            .color(theme.text_muted),
+                                    );
+                                    Frame::new()
+                                        .fill(st_col.gamma_multiply(0.18))
+                                        .corner_radius(CornerRadius::same(4))
+                                        .inner_margin(Margin::symmetric(6, 2))
+                                        .show(ui, |ui| {
+                                            ui.label(
+                                                RichText::new(unit.stage.label())
+                                                    .size(9.5)
+                                                    .strong()
+                                                    .color(st_col),
+                                            );
+                                        });
+                                    ui.label(
+                                        RichText::new(if unit.qa_passed {
+                                            "✅ QA Passed"
+                                        } else {
+                                            "⏳ Pending QA"
+                                        })
+                                        .size(9.5)
+                                        .strong()
+                                        .color(if unit.qa_passed {
+                                            theme.accent_green
+                                        } else {
+                                            theme.accent_orange
+                                        }),
+                                    );
+                                });
+
+                                ui.add_space(4.0);
+                                ui.label(
+                                    RichText::new(&unit.name)
+                                        .size(11.5)
+                                        .strong()
+                                        .color(theme.text_primary),
+                                );
+                                ui.label(
+                                    RichText::new(format!(
+                                        "{} • Zone: {} • Envelope: {:.1}×{:.2}×{:.1} m",
+                                        unit.module_type.label(),
+                                        unit.target_zone,
+                                        unit.dimensions_m[0],
+                                        unit.dimensions_m[1],
+                                        unit.dimensions_m[2]
+                                    ))
+                                    .size(9.5)
+                                    .color(theme.text_secondary),
+                                );
+
+                                ui.add_space(6.0);
+                                ui.label(
+                                    RichText::new(format!(
+                                        "Crane Hoist Check: {:.2} t / {:.1} t Max SWL ({:.0}%)",
+                                        unit.mass_tons, unit.crane_swl_tons, swl_pct
+                                    ))
+                                    .size(9.5)
+                                    .color(swl_col),
+                                );
+                                ui.add(
+                                    egui::ProgressBar::new((swl_pct / 100.0).clamp(0.0, 1.0))
+                                        .desired_height(6.0)
+                                        .fill(swl_col),
+                                );
+
+                                ui.add_space(6.0);
+                                // 6-Step Visual Pipeline Stepper
+                                let step_idx = unit.stage.step_index();
+                                let (bar_resp, bar_painter) = ui.allocate_painter(
+                                    Vec2::new(ui.available_width().max(120.0), 8.0),
+                                    Sense::hover(),
+                                );
+                                let b_rect = bar_resp.rect;
+                                let seg_w = ((b_rect.width() - 10.0) / 6.0).max(8.0);
+                                for s in 0..6 {
+                                    let sx = b_rect.left() + (s as f32) * (seg_w + 2.0);
+                                    let seg_rect = Rect::from_min_size(
+                                        egui::pos2(sx, b_rect.top()),
+                                        Vec2::new(seg_w, 6.0),
+                                    );
+                                    let seg_col = if s <= step_idx {
+                                        st_col
+                                    } else {
+                                        Color32::from_rgb(42, 48, 60)
+                                    };
+                                    bar_painter.rect_filled(seg_rect, CornerRadius::same(2), seg_col);
+                                }
+
+                                ui.add_space(4.0);
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label(
+                                        RichText::new(format!("Scan: {}", unit.last_scan_timestamp))
+                                            .size(9.0)
+                                            .color(theme.text_muted),
+                                    );
+                                    if ui
+                                        .add(
+                                            egui::Button::new(
+                                                RichText::new("📡 Select")
+                                                    .size(9.5)
+                                                    .color(theme.accent_blue),
+                                            )
+                                            .fill(theme.bg_canvas)
+                                            .corner_radius(CornerRadius::same(4)),
+                                        )
+                                        .clicked()
+                                    {
+                                        card_select_tag = Some(unit.tag_id.clone());
+                                    }
+                                    if let Some(next_st) = unit.stage.next() {
+                                        if ui
+                                            .add(
+                                                egui::Button::new(
+                                                    RichText::new(format!("⏭️ {}", next_st.label()))
+                                                        .size(9.5)
+                                                        .color(theme.accent_green),
+                                                )
+                                                .fill(theme.bg_canvas)
+                                                .corner_radius(CornerRadius::same(4)),
+                                            )
+                                            .clicked()
+                                        {
+                                            card_advance_idx = Some(u_idx);
+                                        }
+                                    }
+                                });
+                            });
+                    }
+                });
+                ui.add_space(8.0);
+            }
+        } else {
+            for &u_idx in &filtered_indices {
+                let unit = &self.prefab_units[u_idx];
+                let (r, g, b) = unit.stage.color_rgb();
+                let st_col = Color32::from_rgb(r, g, b);
+                let is_sel = self.selected_module_tag == unit.tag_id;
+                let swl_pct = unit.crane_utilization_pct();
+                let swl_col = if swl_pct > 85.0 {
+                    theme.accent_red
+                } else if swl_pct > 65.0 {
+                    theme.accent_orange
+                } else {
+                    theme.accent_green
+                };
+
+                Frame::new()
+                    .fill(theme.bg_card)
+                    .corner_radius(CornerRadius::same(10))
+                    .inner_margin(Margin::same(12))
+                    .stroke(Stroke::new(
+                        if is_sel { 1.6 } else { 1.0 },
+                        if is_sel { theme.accent_blue } else { theme.border_subtle },
+                    ))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(
+                                RichText::new(&unit.tag_id)
+                                    .size(12.0)
+                                    .strong()
+                                    .monospace()
+                                    .color(theme.accent_blue),
+                            );
+                            ui.label(
+                                RichText::new(&unit.rfid_code)
+                                    .size(9.5)
+                                    .monospace()
+                                    .color(theme.text_muted),
+                            );
+                            Frame::new()
+                                .fill(st_col.gamma_multiply(0.18))
+                                .corner_radius(CornerRadius::same(4))
+                                .inner_margin(Margin::symmetric(6, 2))
+                                .show(ui, |ui| {
+                                    ui.label(
+                                        RichText::new(unit.stage.label())
+                                            .size(9.5)
+                                            .strong()
+                                            .color(st_col),
+                                    );
+                                });
+                            ui.label(
+                                RichText::new(if unit.qa_passed {
+                                    "✅ QA Passed"
+                                } else {
+                                    "⏳ Pending QA"
+                                })
+                                .size(9.5)
+                                .strong()
+                                .color(if unit.qa_passed {
+                                    theme.accent_green
+                                } else {
+                                    theme.accent_orange
+                                }),
+                            );
+                        });
+                        ui.label(
+                            RichText::new(&unit.name)
+                                .size(11.5)
+                                .strong()
+                                .color(theme.text_primary),
+                        );
+                        ui.label(
+                            RichText::new(format!(
+                                "{} • Zone: {} • Crane: {:.2} t / {:.1} t ({:.0}%)",
+                                unit.module_type.label(),
+                                unit.target_zone,
+                                unit.mass_tons,
+                                unit.crane_swl_tons,
+                                swl_pct
+                            ))
+                            .size(9.5)
+                            .color(swl_col),
+                        );
+                        ui.add(
+                            egui::ProgressBar::new((swl_pct / 100.0).clamp(0.0, 1.0))
+                                .desired_height(6.0)
+                                .fill(swl_col),
+                        );
+                        ui.add_space(4.0);
+                        ui.horizontal_wrapped(|ui| {
+                            if ui
+                                .add(
+                                    egui::Button::new(
+                                        RichText::new("📡 Select")
+                                            .size(9.5)
+                                            .color(theme.accent_blue),
+                                    )
+                                    .fill(theme.bg_canvas)
+                                    .corner_radius(CornerRadius::same(4)),
+                                )
+                                .clicked()
+                            {
+                                card_select_tag = Some(unit.tag_id.clone());
+                            }
+                            if let Some(next_st) = unit.stage.next() {
+                                if ui
+                                    .add(
+                                        egui::Button::new(
+                                            RichText::new(format!("⏭️ {}", next_st.label()))
+                                                .size(9.5)
+                                                .color(theme.accent_green),
+                                        )
+                                        .fill(theme.bg_canvas)
+                                        .corner_radius(CornerRadius::same(4)),
+                                    )
+                                    .clicked()
+                                {
+                                    card_advance_idx = Some(u_idx);
+                                }
+                            }
+                        });
+                    });
+                ui.add_space(8.0);
+            }
+        }
+
+        if let Some(tag) = card_select_tag {
+            self.scanner_input = tag.clone();
+            self.selected_module_tag = tag;
+        }
+        if let Some(idx) = card_advance_idx {
+            let now = crate::core::web_bridge::unix_timestamp_label();
+            if let Some(unit) = self.prefab_units.get_mut(idx) {
+                if let Some(next_stage) = unit.stage.next() {
+                    unit.stage = next_stage;
+                    if next_stage.step_index() >= PrefabSupplyStage::QaNdtInspection.step_index() {
+                        unit.qa_passed = true;
+                    }
+                    unit.last_scan_timestamp = now.clone();
+                    self.selected_module_tag = unit.tag_id.clone();
+                    self.scanner_input = unit.tag_id.clone();
+                    let msg = format!(
+                        "{} moved to '{}' [{}].",
+                        unit.tag_id,
+                        unit.stage.label(),
+                        now
+                    );
+                    self.scanner_log.push(msg.clone());
+                    self.export_status = Some(msg);
+                }
+            }
+        }
     }
 
     fn render_robotic_automation(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        ui.columns(4, |cols| {
-            self.render_stat_card(&mut cols[0], theme, "ROBOTIC WELDING SPEED", &format!("{:.1} mm/s", self.robotic_speed_mm_s), "6-Axis Articulated GMAW", theme.accent_blue);
-            self.render_stat_card(&mut cols[1], theme, "DEFECT RATE", "< 0.04%", "Ultrasonic NDT Verified", theme.accent_green);
-            self.render_stat_card(&mut cols[2], theme, "G-CODE COMPLIANCE", "ISO 6983", "Machine Tool Toolpaths", theme.text_primary);
-            self.render_stat_card(&mut cols[3], theme, "PRODUCTIVITY GAIN", "+320%", "Continuous Arc Operation", theme.accent_green);
-        });
+        let kpis = [
+            (
+                "ROBOTIC WELDING SPEED",
+                format!("{:.1} mm/s", self.robotic_speed_mm_s),
+                "6-Axis Articulated GMAW".to_string(),
+                theme.accent_blue,
+            ),
+            (
+                "DEFECT RATE",
+                "< 0.04%".to_string(),
+                "Ultrasonic NDT Verified".to_string(),
+                theme.accent_green,
+            ),
+            (
+                "G-CODE COMPLIANCE",
+                "ISO 6983".to_string(),
+                "Machine Tool Toolpaths".to_string(),
+                theme.text_primary,
+            ),
+            (
+                "PRODUCTIVITY GAIN",
+                "+320%".to_string(),
+                "Continuous Arc Operation".to_string(),
+                theme.accent_green,
+            ),
+        ];
+        self.render_responsive_cards(ui, &kpis, theme);
 
         ui.add_space(16.0);
 
@@ -503,7 +1202,7 @@ impl IndustrializedView {
                 ui.label(RichText::new("🦾 Automated Structural Steel Robotic Workcell").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(10.0);
 
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("End-Effector Feed Velocity:").size(11.5).color(theme.text_secondary));
                     ui.add(egui::Slider::new(&mut self.robotic_speed_mm_s, 5.0..=30.0).suffix(" mm/s").text(""));
                 });
@@ -520,11 +1219,27 @@ impl IndustrializedView {
                 ui.label(RichText::new("🏗️ Autonomous Crane, Collision-Free Trajectory & LiDAR Drone Inspection").size(13.5).strong().color(theme.text_primary));
                 ui.add_space(10.0);
 
-                ui.columns(3, |cols| {
-                    self.render_stat_card(&mut cols[0], theme, "CRANE TRAJECTORY CLEARANCE", "2.8 m", "Dynamic Boom Collision-Free Zone", theme.accent_green);
-                    self.render_stat_card(&mut cols[1], theme, "DRONE LIDAR AS-BUILT", "± 2.1 mm", "Model vs. As-Built Field Deviation", theme.accent_blue);
-                    self.render_stat_card(&mut cols[2], theme, "SVD ERECTION GUARD", "Full Rank", "All Erection Stages Certified Mechanism-Free", theme.accent_green);
-                });
+                let kpis = [
+                    (
+                        "CRANE TRAJECTORY CLEARANCE",
+                        "2.8 m".to_string(),
+                        "Dynamic Boom Collision-Free Zone".to_string(),
+                        theme.accent_green,
+                    ),
+                    (
+                        "DRONE LIDAR AS-BUILT",
+                        "± 2.1 mm".to_string(),
+                        "Model vs. As-Built Field Deviation".to_string(),
+                        theme.accent_blue,
+                    ),
+                    (
+                        "SVD ERECTION GUARD",
+                        "Full Rank".to_string(),
+                        "All Erection Stages Certified Mechanism-Free".to_string(),
+                        theme.accent_green,
+                    ),
+                ];
+                self.render_responsive_cards(ui, &kpis, theme);
             });
     }
 
@@ -542,12 +1257,33 @@ impl IndustrializedView {
             ("No Model Loaded", 0, 0, "0.0%".to_string(), "Awaiting IFC File Input".to_string())
         };
 
-        ui.columns(4, |cols| {
-            self.render_stat_card(&mut cols[0], theme, "SCHEMA SPECIFICATION", schema_lbl, "buildingSMART International Standard", theme.accent_blue);
-            self.render_stat_card(&mut cols[1], theme, "TOTAL STEP ENTITIES", &format!("{} Entities", ent_count), "ISO 10303-21 Physical File", theme.text_primary);
-            self.render_stat_card(&mut cols[2], theme, "CONTAINED BIM PRODUCTS", &format!("{} Elements", prod_count), "Beams, Columns, Walls, Slabs", theme.accent_green);
-            self.render_stat_card(&mut cols[3], theme, "CONFORMANCE HEALTH", &health_score, "Referential & Spatial Quality", theme.accent_green);
-        });
+        let kpis = [
+            (
+                "SCHEMA SPECIFICATION",
+                schema_lbl.to_string(),
+                "buildingSMART International Standard".to_string(),
+                theme.accent_blue,
+            ),
+            (
+                "TOTAL STEP ENTITIES",
+                format!("{} Entities", ent_count),
+                "ISO 10303-21 Physical File".to_string(),
+                theme.text_primary,
+            ),
+            (
+                "CONTAINED BIM PRODUCTS",
+                format!("{} Elements", prod_count),
+                "Beams, Columns, Walls, Slabs".to_string(),
+                theme.accent_green,
+            ),
+            (
+                "CONFORMANCE HEALTH",
+                health_score,
+                "Referential & Spatial Quality".to_string(),
+                theme.accent_green,
+            ),
+        ];
+        self.render_responsive_cards(ui, &kpis, theme);
 
         ui.add_space(14.0);
 
@@ -558,7 +1294,7 @@ impl IndustrializedView {
             .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("📂 OPEN IFC SOURCE:").size(11.5).strong().color(theme.text_secondary));
 
                     let sources = [
@@ -647,32 +1383,39 @@ impl IndustrializedView {
                     }
                 } else if self.ifc_source_mode == IfcSourceMode::FilePath {
                     ui.add_space(8.0);
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new("Local File Path:").size(11.0).color(theme.text_secondary));
-                        ui.add(egui::TextEdit::singleline(&mut self.custom_ifc_path).desired_width(320.0));
+                        ui.add(egui::TextEdit::singleline(&mut self.custom_ifc_path).desired_width(260.0));
                         if ui.add(egui::Button::new(RichText::new("📂 Read & Inspect").size(11.0).strong().color(Color32::WHITE))
                             .fill(theme.accent_blue)
                             .corner_radius(CornerRadius::same(6))).clicked() {
-                            match std::fs::read_to_string(&self.custom_ifc_path) {
-                                Ok(content) => {
-                                    match IfcModel::parse(&content) {
-                                        Ok(m) => {
-                                            self.export_status = Some(format!("Successfully loaded '{}' ({} elements).", self.custom_ifc_path, m.elements.len()));
-                                            self.selected_element_id = m.elements.first().map(|e| e.step_id);
-                                            self.baseline_model = Some(m.clone());
-                                            self.ifc_model = Some(m);
-                                            self.clash_report = None;
-                                            self.model_diff = None;
-                                            self.ids_report = None;
-                                        }
-                                        Err(e) => {
-                                            self.export_status = Some(format!("IFC Parse Error: {}", e));
+                            #[cfg(not(target_arch = "wasm32"))]
+                            {
+                                match std::fs::read_to_string(&self.custom_ifc_path) {
+                                    Ok(content) => {
+                                        match IfcModel::parse(&content) {
+                                            Ok(m) => {
+                                                self.export_status = Some(format!("Successfully loaded '{}' ({} elements).", self.custom_ifc_path, m.elements.len()));
+                                                self.selected_element_id = m.elements.first().map(|e| e.step_id);
+                                                self.baseline_model = Some(m.clone());
+                                                self.ifc_model = Some(m);
+                                                self.clash_report = None;
+                                                self.model_diff = None;
+                                                self.ids_report = None;
+                                            }
+                                            Err(e) => {
+                                                self.export_status = Some(format!("IFC Parse Error: {}", e));
+                                            }
                                         }
                                     }
+                                    Err(e) => {
+                                        self.export_status = Some(format!("Cannot open file '{}': {}", self.custom_ifc_path, e));
+                                    }
                                 }
-                                Err(e) => {
-                                    self.export_status = Some(format!("Cannot open file '{}': {}", self.custom_ifc_path, e));
-                                }
+                            }
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                self.export_status = Some("Browser WebAssembly sandbox cannot read local file paths directly; switch to 'Paste STEP SPF' above.".to_string());
                             }
                         }
                     });
@@ -681,99 +1424,32 @@ impl IndustrializedView {
 
         ui.add_space(14.0);
 
-        // 3. TWO-PANE WORKBENCH (LEFT: SPATIAL HIERARCHY TREE | RIGHT: INSPECTOR & AUDIT)
+        // 3. TWO-PANE WORKBENCH (Side-by-Side on Desktop, Stacked on Mobile/Tablet)
         let total_avail = ui.available_width();
-        let left_w = (total_avail * 0.44).max(280.0);
-        let right_w = total_avail - left_w - 16.0;
+        let is_wide = total_avail >= 760.0;
 
-        ui.horizontal(|ui| {
-            // LEFT PANE: SPATIAL DECOMPOSITION TREE & PRODUCT NAVIGATOR
-            ui.allocate_ui(Vec2::new(left_w, 480.0), |ui| {
-                Frame::new()
-                    .fill(theme.bg_card)
-                    .corner_radius(CornerRadius::same(10))
-                    .inner_margin(Margin::same(14))
-                    .stroke(Stroke::new(1.0, theme.border_subtle))
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("🌳 SPATIAL HIERARCHY TREE").size(12.0).strong().color(theme.accent_blue));
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if let Some(ref m) = self.ifc_model {
-                                    ui.label(RichText::new(format!("{} Storeys", count_storeys(&m.spatial_root))).size(10.5).color(theme.text_muted));
-                                }
-                            });
-                        });
-                        ui.add_space(6.0);
+        if is_wide {
+            let left_w = (total_avail * 0.42).max(280.0);
+            let right_w = (total_avail - left_w - 14.0).max(260.0);
 
-                        // Element Filter
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("🔍").size(11.0));
-                            ui.add(egui::TextEdit::singleline(&mut self.element_search_query)
-                                .hint_text("Filter elements by name/class...")
-                                .desired_width(f32::INFINITY));
-                        });
-                        ui.add_space(8.0);
-                        ui.separator();
-                        ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                // LEFT PANE: SPATIAL DECOMPOSITION TREE & PRODUCT NAVIGATOR
+                ui.allocate_ui(Vec2::new(left_w, 480.0), |ui| {
+                    self.render_ifc_spatial_tree_pane(ui, theme);
+                });
 
-                        ScrollArea::vertical().id_salt("spatial_tree_scroll").max_height(380.0).show(ui, |ui| {
-                            let spatial_data = self.ifc_model.as_ref().map(|m| (m.spatial_root.clone(), m.elements.clone()));
-                            if let Some((spatial_root, elements)) = spatial_data {
-                                self.render_spatial_node(ui, theme, &spatial_root, &elements);
-                            } else {
-                                ui.label(RichText::new("No IFC Model loaded. Please select a sample or paste file above.").size(11.0).color(theme.text_muted));
-                            }
-                        });
-                    });
+                ui.add_space(10.0);
+
+                // RIGHT PANE: ENTITY INSPECTOR & CONFORMANCE AUDIT
+                ui.allocate_ui(Vec2::new(right_w, 480.0), |ui| {
+                    self.render_ifc_inspector_pane(ui, theme, &verdict_str);
+                });
             });
-
+        } else {
+            self.render_ifc_spatial_tree_pane(ui, theme);
             ui.add_space(12.0);
-
-            // RIGHT PANE: ENTITY INSPECTOR & CONFORMANCE AUDIT
-            ui.allocate_ui(Vec2::new(right_w, 480.0), |ui| {
-                Frame::new()
-                    .fill(theme.bg_card)
-                    .corner_radius(CornerRadius::same(10))
-                    .inner_margin(Margin::same(14))
-                    .stroke(Stroke::new(1.0, theme.border_subtle))
-                    .show(ui, |ui| {
-                        // Sub-Tab Selector for Inspector
-                        ui.horizontal(|ui| {
-                            let tabs = [
-                                (IfcInspectorTab::Properties, "📋 Entity Property Inspector"),
-                                (IfcInspectorTab::HealthAudit, "🛡️ Conformance & Health Audit"),
-                                (IfcInspectorTab::GeometryBbox, "📐 3D Geometry & Bounding Box"),
-                                (IfcInspectorTab::ClashAndDiff, "⚔️ Clash, Diff & IDS"),
-                            ];
-
-                            for (tab, label) in tabs {
-                                let is_active = self.inspector_tab == tab;
-                                let bg = if is_active { theme.accent_blue } else { theme.bg_canvas };
-                                let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
-
-                                if ui.add(egui::Button::new(RichText::new(label).size(11.0).strong().color(fg))
-                                    .fill(bg)
-                                    .corner_radius(CornerRadius::same(6))).clicked() {
-                                    self.inspector_tab = tab;
-                                }
-                            }
-                        });
-
-                        ui.add_space(10.0);
-                        ui.separator();
-                        ui.add_space(8.0);
-
-                        ScrollArea::vertical().id_salt("inspector_tab_scroll").max_height(390.0).show(ui, |ui| {
-                            match self.inspector_tab {
-                                IfcInspectorTab::Properties => self.render_properties_inspector(ui, theme),
-                                IfcInspectorTab::HealthAudit => self.render_health_audit_tab(ui, theme, &verdict_str),
-                                IfcInspectorTab::GeometryBbox => self.render_geometry_bbox_tab(ui, theme),
-                                IfcInspectorTab::ClashAndDiff => self.render_clash_and_diff_tab(ui, theme),
-                            }
-                        });
-                    });
-            });
-        });
+            self.render_ifc_inspector_pane(ui, theme, &verdict_str);
+        }
 
         ui.add_space(16.0);
 
@@ -784,7 +1460,7 @@ impl IndustrializedView {
             .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     if ui.add(egui::Button::new(RichText::new("🚀 Sync to 3D Viewport & Analytical Solver").size(12.0).strong().color(Color32::WHITE))
                         .fill(theme.accent_blue)
                         .corner_radius(CornerRadius::same(6))).clicked() {
@@ -841,6 +1517,87 @@ impl IndustrializedView {
                             let xml = m.export_bcf_xml(clashes);
                             self.export_status = Some(format!("Exported {} BCF issue topics ({} bytes).", clashes.len(), xml.len()));
                         }
+                    }
+                });
+            });
+    }
+
+    fn render_ifc_spatial_tree_pane(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::same(14))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("🌳 SPATIAL HIERARCHY TREE").size(12.0).strong().color(theme.accent_blue));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if let Some(ref m) = self.ifc_model {
+                            ui.label(RichText::new(format!("{} Storeys", count_storeys(&m.spatial_root))).size(10.5).color(theme.text_muted));
+                        }
+                    });
+                });
+                ui.add_space(6.0);
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("🔍").size(11.0));
+                    ui.add(egui::TextEdit::singleline(&mut self.element_search_query)
+                        .hint_text("Filter elements by name/class...")
+                        .desired_width(f32::INFINITY));
+                });
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(6.0);
+
+                ScrollArea::vertical().id_salt("spatial_tree_scroll").max_height(380.0).show(ui, |ui| {
+                    let spatial_data = self.ifc_model.as_ref().map(|m| (m.spatial_root.clone(), m.elements.clone()));
+                    if let Some((spatial_root, elements)) = spatial_data {
+                        self.render_spatial_node(ui, theme, &spatial_root, &elements);
+                    } else {
+                        ui.label(RichText::new("No IFC Model loaded. Please select a sample or paste file above.").size(11.0).color(theme.text_muted));
+                    }
+                });
+            });
+    }
+
+    fn render_ifc_inspector_pane(&mut self, ui: &mut Ui, theme: &MacTheme, verdict_str: &str) {
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(10))
+            .inner_margin(Margin::same(14))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    let tabs = [
+                        (IfcInspectorTab::Properties, "📋 Entity Property Inspector"),
+                        (IfcInspectorTab::HealthAudit, "🛡️ Conformance & Health Audit"),
+                        (IfcInspectorTab::GeometryBbox, "📐 3D Geometry & Bounding Box"),
+                        (IfcInspectorTab::ClashAndDiff, "⚔️ Clash, Diff & IDS"),
+                    ];
+
+                    for (tab, label) in tabs {
+                        let is_active = self.inspector_tab == tab;
+                        let bg = if is_active { theme.accent_blue } else { theme.bg_canvas };
+                        let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
+
+                        if ui.add(egui::Button::new(RichText::new(label).size(11.0).strong().color(fg))
+                            .fill(bg)
+                            .corner_radius(CornerRadius::same(6))).clicked() {
+                            self.inspector_tab = tab;
+                        }
+                    }
+                });
+
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(8.0);
+
+                ScrollArea::vertical().id_salt("inspector_tab_scroll").max_height(390.0).show(ui, |ui| {
+                    match self.inspector_tab {
+                        IfcInspectorTab::Properties => self.render_properties_inspector(ui, theme),
+                        IfcInspectorTab::HealthAudit => self.render_health_audit_tab(ui, theme, verdict_str),
+                        IfcInspectorTab::GeometryBbox => self.render_geometry_bbox_tab(ui, theme),
+                        IfcInspectorTab::ClashAndDiff => self.render_clash_and_diff_tab(ui, theme),
                     }
                 });
             });
