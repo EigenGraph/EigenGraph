@@ -7,8 +7,10 @@ use egui::{
     Stroke, StrokeKind, Ui, Vec2,
 };
 use crate::core::cso::{CuttingStockOptimizer, CsoReport};
+use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::{LpsConstraintCategory, LpsLookaheadTask, LpsWeeklyPpcRecord, StructuralMember};
 use crate::theme::MacTheme;
+use crate::ui_kit;
 use crate::views::planning::format_idr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,7 +57,13 @@ impl Default for LeanView {
 }
 
 impl LeanView {
-    pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
+    pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        members: &[StructuralMember],
+        features: &mut FeatureRegistry,
+    ) {
         let margin_x = if MacTheme::is_mobile(ui.ctx()) { 12 } else { 20 };
         ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
             Frame::new().inner_margin(Margin::symmetric(margin_x, 12)).show(ui, |ui| {
@@ -89,7 +97,7 @@ impl LeanView {
 
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
-                    LeanSubTab::CuttingStock => self.render_cutting_stock(ui, theme, members),
+                    LeanSubTab::CuttingStock => self.render_cutting_stock(ui, theme, members, features),
                     LeanSubTab::LastPlanner => self.render_last_planner(ui, theme),
                     LeanSubTab::ValueStream => self.render_value_stream(ui, theme),
                     LeanSubTab::JitDelivery => self.render_jit_delivery(ui, theme),
@@ -139,38 +147,19 @@ impl LeanView {
     }
 
     fn render_responsive_cards(&self, ui: &mut Ui, theme: &MacTheme, cards: &[(&str, String, String, Color32)]) {
-        let avail_w = ui.available_width();
-        if avail_w >= 860.0 && cards.len() == 4 {
-            ui.columns(4, |cols| {
-                for (i, (title, val, sub, col)) in cards.iter().enumerate() {
-                    self.render_stat_card(&mut cols[i], theme, title, val, sub, *col);
-                }
-            });
-        } else if avail_w >= 560.0 {
-            let col_count = cards.len().min(3);
-            if col_count == 3 && cards.len() == 3 {
-                ui.columns(3, |cols| {
-                    for (i, (title, val, sub, col)) in cards.iter().enumerate() {
-                        self.render_stat_card(&mut cols[i], theme, title, val, sub, *col);
-                    }
-                });
-            } else {
-                ui.columns(2, |cols| {
-                    for (i, (title, val, sub, col)) in cards.iter().enumerate() {
-                        self.render_stat_card(&mut cols[i % 2], theme, title, val, sub, *col);
-                        cols[i % 2].add_space(8.0);
-                    }
-                });
-            }
-        } else {
-            for (title, val, sub, col) in cards {
-                self.render_stat_card(ui, theme, title, val, sub, *col);
-                ui.add_space(8.0);
-            }
-        }
+        ui_kit::responsive_grid_n(ui, cards.len(), 200.0, |ui, idx| {
+            let (title, val, sub, col) = &cards[idx];
+            self.render_stat_card(ui, theme, title, val, sub, *col);
+        });
     }
 
-    fn render_cutting_stock(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
+    fn render_cutting_stock(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        members: &[StructuralMember],
+        features: &mut FeatureRegistry,
+    ) {
         // 1. Dynamic Extraction from active model members
         let items = CuttingStockOptimizer::extract_items_from_members(members);
 
@@ -235,7 +224,17 @@ impl LeanView {
         ];
         self.render_responsive_cards(ui, theme, &cards);
 
-        ui.add_space(16.0);
+        ui.add_space(12.0);
+
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::LiveRebarBbsCuttingSync, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "Source: Active BimProject Bar Marks (D16-D25)");
+                let _ = ui.selectable_label(false, "12m Stock Splice Coupler Pairing");
+                let _ = ui.button("✂️ Optimize BIM Rebar Schedule (1D BFD)");
+            });
+        });
+
+        ui.add_space(14.0);
 
         // 4. Parameter Control & Filter Bar
         Frame::new()
@@ -703,7 +702,6 @@ impl LeanView {
         ui.add_space(16.0);
 
         // PPC Trend Chart + Variance Root-Cause Pareto (Responsive Split)
-        let avail_w = ui.available_width();
         let draw_ppc_chart = |ui: &mut Ui| {
             Frame::new()
                 .fill(theme.bg_card)
@@ -834,16 +832,14 @@ impl LeanView {
                         let total_var: u32 = pareto.iter().map(|(_, c)| *c).sum();
                         for (reason, count) in pareto {
                             let share = (count as f32 / total_var.max(1) as f32).clamp(0.0, 1.0);
-                            ui.horizontal(|ui| {
+                            ui.horizontal_wrapped(|ui| {
                                 ui.label(RichText::new(&reason).size(11.0).strong().color(theme.text_primary));
-                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    ui.label(
-                                        RichText::new(format!("{} holds ({:.0}%)", count, share * 100.0))
-                                            .size(10.5)
-                                            .strong()
-                                            .color(theme.accent_orange),
-                                    );
-                                });
+                                ui.label(
+                                    RichText::new(format!("• {} holds ({:.0}%)", count, share * 100.0))
+                                        .size(10.5)
+                                        .strong()
+                                        .color(theme.accent_orange),
+                                );
                             });
                             let bw = (ui.available_width() - 4.0).max(120.0);
                             let (bar_rect, _) = ui.allocate_exact_size(Vec2::new(bw, 10.0), egui::Sense::hover());
@@ -856,16 +852,7 @@ impl LeanView {
                 });
         };
 
-        if avail_w >= 800.0 {
-            ui.columns(2, |cols| {
-                draw_ppc_chart(&mut cols[0]);
-                draw_pareto_chart(&mut cols[1]);
-            });
-        } else {
-            draw_ppc_chart(ui);
-            ui.add_space(12.0);
-            draw_pareto_chart(ui);
-        }
+        ui_kit::responsive_two_columns(ui, 800.0, draw_ppc_chart, draw_pareto_chart);
     }
 
     fn render_value_stream(&mut self, ui: &mut Ui, theme: &MacTheme) {

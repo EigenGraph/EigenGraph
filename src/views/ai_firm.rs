@@ -7,12 +7,14 @@ use egui::{
     Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui,
 };
 use crate::core::web_bridge;
+use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::{
     CalculationMemoResult, CopilotCarbonParams, CopilotShearWallParams, CopilotWindParams,
     CopilotWorkflowKind, DatabaseComponent, ProjectItem, StructuralMember,
     solve_aci318_shear_wall, solve_asce7_wind, solve_iso14040_carbon,
 };
 use crate::theme::MacTheme;
+use crate::ui_kit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AiFirmSubTab {
@@ -145,8 +147,13 @@ impl AiFirmView {
         _members: &[StructuralMember],
         _projects: &[ProjectItem],
         _db_components: &mut [DatabaseComponent],
+        features: &mut FeatureRegistry,
     ) {
-        let margin_x = if MacTheme::is_mobile(ui.ctx()) { 12 } else { 24 };
+        let margin_x = if ui.available_width() < MacTheme::MOBILE_BREAKPOINT {
+            10
+        } else {
+            20
+        };
         ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
             Frame::new().inner_margin(Margin::symmetric(margin_x, 16)).show(ui, |ui| {
                 // 1. Top Subtabs Bar
@@ -156,7 +163,9 @@ impl AiFirmView {
                 // 2. Active Tab Content
                 match self.active_subtab {
                     AiFirmSubTab::Organigram => self.render_organigram_view(ui, theme),
-                    AiFirmSubTab::CopilotStudio => self.render_copilot_studio(ui, theme),
+                    AiFirmSubTab::CopilotStudio => {
+                        self.render_copilot_studio(ui, theme, features)
+                    }
                     AiFirmSubTab::CollaborationBoard => self.render_collaboration_board(ui, theme),
                     AiFirmSubTab::DirectivesConsole => self.render_directives_console(ui, theme),
                     AiFirmSubTab::AutonomousTelemetry => self.render_telemetry_view(ui, theme),
@@ -168,53 +177,22 @@ impl AiFirmView {
     }
 
     fn render_header_bar(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        Frame::new()
-            .fill(theme.bg_card)
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(6))
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    let subtabs = [
-                        (AiFirmSubTab::CopilotStudio, "🤖 Engineering Copilot Studio"),
-                        (AiFirmSubTab::Organigram, "👥 Firm Organigram"),
-                        (AiFirmSubTab::CollaborationBoard, "💬 Multi-Agent Dialogue"),
-                        (AiFirmSubTab::DirectivesConsole, "⌨️ Directives Console"),
-                        (AiFirmSubTab::AutonomousTelemetry, "📊 Autonomous Telemetry"),
-                    ];
-
-                    for (tab, label) in subtabs {
-                        let is_active = self.active_subtab == tab;
-                        let text_color = if is_active {
-                            Color32::WHITE
-                        } else {
-                            theme.text_secondary
-                        };
-                        let fill_color = if is_active {
-                            theme.accent_blue
-                        } else {
-                            Color32::TRANSPARENT
-                        };
-
-                        let btn = egui::Button::new(
-                            RichText::new(label)
-                                .size(12.0)
-                                .strong()
-                                .color(text_color),
-                        )
-                        .fill(fill_color)
-                        .corner_radius(CornerRadius::same(6));
-
-                        if ui.add(btn).clicked() {
-                            self.active_subtab = tab;
-                        }
-                        ui.add_space(4.0);
-                    }
-                });
-            });
+        let subtabs = [
+            (AiFirmSubTab::CopilotStudio, "🤖 Engineering Copilot Studio"),
+            (AiFirmSubTab::Organigram, "👥 Firm Organigram"),
+            (AiFirmSubTab::CollaborationBoard, "💬 Multi-Agent Dialogue"),
+            (AiFirmSubTab::DirectivesConsole, "⌨️ Directives Console"),
+            (AiFirmSubTab::AutonomousTelemetry, "📊 Autonomous Telemetry"),
+        ];
+        ui_kit::subtab_bar(ui, theme, "ai_firm_subtab_bar", &mut self.active_subtab, &subtabs);
     }
 
-    fn render_copilot_studio(&mut self, ui: &mut Ui, theme: &MacTheme) {
+    fn render_copilot_studio(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
         // 1. Studio Hero Banner & Workflow Switcher
         Frame::new()
             .fill(theme.bg_card)
@@ -302,28 +280,39 @@ impl AiFirmView {
             CopilotWorkflowKind::CarbonMinimizerIso14040 => solve_iso14040_carbon(&self.carbon_params),
         };
 
-        let avail_w = ui.available_width();
-        let is_wide = avail_w >= 820.0;
+        ui_kit::split_workspace_panes(
+            ui,
+            820.0,
+            0.40,
+            290.0,
+            420.0,
+            240.0,
+            |ui, pane, _| match pane {
+                0 => self.render_copilot_inputs(ui, theme),
+                _ => self.render_copilot_memo_panel(ui, theme, &memo),
+            },
+        );
 
-        if is_wide {
-            let left_w = (avail_w * 0.40).clamp(300.0, 420.0);
-            let right_w = (avail_w - left_w - 14.0).max(320.0);
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.set_width(left_w);
-                    self.render_copilot_inputs(ui, theme);
+        ui.add_space(12.0);
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::LiveGeminiToolOrchestrator,
+            |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        RichText::new("Endpoint: Gemini 2.5 Flash • Function Calling (BimCommandBus)")
+                            .size(11.0)
+                            .strong()
+                            .color(theme.text_primary),
+                    );
+                    let _ = ui.button("🔗 Connect API Key");
+                    let _ = ui.button("🛠️ Preview Tool Schema (12 BIM Commands)");
+                    let _ = ui.button("🚀 Dispatch Live Agent Orchestration");
                 });
-                ui.add_space(12.0);
-                ui.vertical(|ui| {
-                    ui.set_width(right_w);
-                    self.render_copilot_memo_panel(ui, theme, &memo);
-                });
-            });
-        } else {
-            self.render_copilot_inputs(ui, theme);
-            ui.add_space(12.0);
-            self.render_copilot_memo_panel(ui, theme, &memo);
-        }
+            },
+        );
     }
 
     fn render_copilot_inputs(&mut self, ui: &mut Ui, theme: &MacTheme) {
@@ -360,10 +349,11 @@ impl AiFirmView {
                 ui.separator();
                 ui.add_space(8.0);
 
+                let field_w = ui.available_width().clamp(160.0, 360.0);
                 match self.active_copilot {
                     CopilotWorkflowKind::ShearWallAci318 => {
                         ui.label(RichText::new("Shear Wall Mark:").size(10.5).color(theme.text_muted));
-                        ui.add(egui::TextEdit::singleline(&mut self.shear_wall_params.wall_id).desired_width(f32::INFINITY));
+                        ui.add(egui::TextEdit::singleline(&mut self.shear_wall_params.wall_id).desired_width(field_w));
                         ui.add_space(6.0);
 
                         ui.label(RichText::new("Wall Length lw (m):").size(10.5).color(theme.text_secondary));
@@ -393,7 +383,7 @@ impl AiFirmView {
                     }
                     CopilotWorkflowKind::WindLoadAsce7 => {
                         ui.label(RichText::new("Project / Structure Ref:").size(10.5).color(theme.text_muted));
-                        ui.add(egui::TextEdit::singleline(&mut self.wind_params.project_ref).desired_width(f32::INFINITY));
+                        ui.add(egui::TextEdit::singleline(&mut self.wind_params.project_ref).desired_width(field_w));
                         ui.add_space(6.0);
 
                         ui.label(RichText::new("Basic 3-sec Gust Speed V (m/s):").size(10.5).color(theme.text_secondary));
@@ -663,7 +653,6 @@ impl AiFirmView {
             FirmRole::QsSpecialist,
         ];
 
-        let avail_w = ui.available_width();
         let draw_role_card = |ui: &mut Ui, role: FirmRole, selected: &mut Option<FirmRole>| {
             let is_selected = *selected == Some(role);
             Frame::new()
@@ -683,7 +672,8 @@ impl AiFirmView {
                 .corner_radius(CornerRadius::same(10))
                 .inner_margin(Margin::same(16))
                 .show(ui, |ui| {
-                    ui.horizontal(|ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new(role.icon()).size(26.0));
                         ui.vertical(|ui| {
                             ui.label(
@@ -736,19 +726,9 @@ impl AiFirmView {
                 });
         };
 
-        if avail_w >= 700.0 {
-            ui.columns(2, |cols| {
-                for (idx, role) in roles.iter().enumerate() {
-                    draw_role_card(&mut cols[idx % 2], *role, &mut self.selected_agent);
-                    cols[idx % 2].add_space(14.0);
-                }
-            });
-        } else {
-            for role in roles {
-                draw_role_card(ui, role, &mut self.selected_agent);
-                ui.add_space(10.0);
-            }
-        }
+        ui_kit::responsive_grid_n(ui, roles.len(), 320.0, |ui, idx| {
+            draw_role_card(ui, roles[idx], &mut self.selected_agent);
+        });
 
         // Detail Inspector for Selected Agent
         if let Some(role) = self.selected_agent {
@@ -941,8 +921,8 @@ impl AiFirmView {
                 ui.add_space(14.0);
 
                 // Text Input
-                ui.horizontal(|ui| {
-                    let field_w = (ui.available_width() - 105.0).max(120.0);
+                ui.horizontal_wrapped(|ui| {
+                    let field_w = (ui.available_width() - 105.0).clamp(160.0, 520.0);
                     let text_edit = ui.add(
                         egui::TextEdit::singleline(&mut self.directive_input)
                             .hint_text("Type engineering directive (e.g., 'check seismic drift on story 3')...")
@@ -1047,40 +1027,10 @@ impl AiFirmView {
                     ("Directives Cleared", "18 / 18", "100% Resolved", theme.text_primary),
                 ];
 
-                let draw_kpi = |ui: &mut Ui, title: &str, val: &str, sub: &str, col: Color32| {
-                    Frame::new()
-                        .fill(theme.bg_canvas)
-                        .corner_radius(CornerRadius::same(8))
-                        .stroke(Stroke::new(0.8, theme.border_subtle))
-                        .inner_margin(Margin::same(12))
-                        .show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            ui.label(RichText::new(title).size(11.0).color(theme.text_muted));
-                            ui.label(RichText::new(val).size(20.0).strong().color(col));
-                            ui.label(RichText::new(sub).size(10.0).color(theme.text_secondary));
-                        });
-                };
-
-                let avail_w = ui.available_width();
-                if avail_w >= 840.0 {
-                    ui.columns(4, |cols| {
-                        for (idx, (title, val, sub, col)) in kpis.iter().enumerate() {
-                            draw_kpi(&mut cols[idx], title, val, sub, *col);
-                        }
-                    });
-                } else if avail_w >= 500.0 {
-                    ui.columns(2, |cols| {
-                        for (idx, (title, val, sub, col)) in kpis.iter().enumerate() {
-                            draw_kpi(&mut cols[idx % 2], title, val, sub, *col);
-                            cols[idx % 2].add_space(8.0);
-                        }
-                    });
-                } else {
-                    for (title, val, sub, col) in kpis {
-                        draw_kpi(ui, title, val, sub, col);
-                        ui.add_space(8.0);
-                    }
-                }
+                ui_kit::responsive_grid_n(ui, kpis.len(), 200.0, |ui, idx| {
+                    let (title, val, sub, col) = kpis[idx];
+                    ui_kit::stat_card(ui, theme, title, val, sub, col);
+                });
             });
     }
 }
