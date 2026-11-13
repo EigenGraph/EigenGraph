@@ -2,8 +2,10 @@
 //! Advanced AI failure risk forecasting, progressive collapse simulation (DoD UFC 4-023-03), and structural serviceability degradation curves.
 
 use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText, ScrollArea, Sense, Stroke, Ui, Vec2};
+use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::StructuralMember;
 use crate::theme::MacTheme;
+use crate::ui_kit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PredictionSubTab {
@@ -42,9 +44,18 @@ impl Default for PredictionView {
 }
 
 impl PredictionView {
-    pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
+    pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        members: &[StructuralMember],
+        features: &mut FeatureRegistry,
+    ) {
+        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
+        let pad = if is_mobile { 12 } else { 20 };
+
         ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-            Frame::new().inner_margin(Margin::symmetric(20, 12)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
                 // 1. TOP SUBTABS SELECTOR
                 self.render_header_bar(ui, theme);
 
@@ -52,7 +63,7 @@ impl PredictionView {
                 if let Some(ref status_msg) = self.simulation_status {
                     ui.add_space(10.0);
                     theme.card_frame().show(ui, |ui| {
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new("🔮 PREDICTION COMPLETE:").size(11.5).strong().color(theme.accent_blue));
                             ui.label(RichText::new(status_msg).size(11.5).color(theme.text_primary));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -73,7 +84,7 @@ impl PredictionView {
 
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
-                    PredictionSubTab::FailureRisk => self.render_failure_risk(ui, theme, members),
+                    PredictionSubTab::FailureRisk => self.render_failure_risk(ui, theme, members, features),
                     PredictionSubTab::ProgressiveCollapse => self.render_progressive_collapse(ui, theme, members),
                     PredictionSubTab::ErectionBottleneck => self.render_erection_bottleneck(ui, theme),
                     PredictionSubTab::LifetimeDegradation => self.render_lifetime_degradation(ui, theme),
@@ -85,39 +96,33 @@ impl PredictionView {
     }
 
     fn render_header_bar(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        Frame::new()
-            .fill(theme.bg_card)
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(6))
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .show(ui, |ui| {
-                let tabs = [
-                    (PredictionSubTab::FailureRisk, "🔮 AI Failure Risk & Vulnerability"),
-                    (PredictionSubTab::ProgressiveCollapse, "⚡ Progressive Collapse (DoD UFC)"),
-                    (PredictionSubTab::ErectionBottleneck, "🏗️ 4D Erection Bottleneck"),
-                    (PredictionSubTab::LifetimeDegradation, "📉 50-Year Serviceability"),
-                ];
-
-                ui.columns(4, |cols| {
-                    for (i, (tab, label)) in tabs.iter().enumerate() {
-                        let is_active = self.active_subtab == *tab;
-                        let bg = if is_active { theme.accent_blue } else { Color32::TRANSPARENT };
-                        let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
-
-                        if cols[i].add(egui::Button::new(RichText::new(*label).size(11.5).strong().color(fg))
-                            .fill(bg)
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(cols[i].available_width(), 30.0))).clicked() {
-                            self.active_subtab = *tab;
-                        }
-                    }
-                });
-            });
+        let tabs = [
+            (PredictionSubTab::FailureRisk, "🔮 AI Failure Risk & Vulnerability"),
+            (PredictionSubTab::ProgressiveCollapse, "⚡ Progressive Collapse (DoD UFC)"),
+            (PredictionSubTab::ErectionBottleneck, "🏗️ 4D Erection Bottleneck"),
+            (PredictionSubTab::LifetimeDegradation, "📉 50-Year Serviceability"),
+        ];
+        ui_kit::subtab_bar(ui, theme, "prediction_subtab_bar", &mut self.active_subtab, &tabs);
     }
 
-    fn render_failure_risk(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
+    fn render_failure_risk(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        members: &[StructuralMember],
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::LiveShmAnomalyForecasting, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "Inputs: Live FEA Forces + 7D SHM Strain");
+                let _ = ui.selectable_label(false, "Drift Threshold Alerting (β < 3.8)");
+                let _ = ui.button("🔮 Run Live Stress Anomaly Ranker");
+            });
+        });
+        ui.add_space(12.0);
+
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("🔮 AI STRUCTURAL FAILURE FORECASTING").size(14.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("Target Reliability β = 3.80 (Class I Structure)").size(11.0).color(theme.accent_blue));
@@ -128,10 +133,10 @@ impl PredictionView {
                 .size(11.5).color(theme.text_secondary));
 
             ui.add_space(12.0);
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("Target Reliability Index (β):").size(11.5).color(theme.text_primary));
                 ui.add(egui::Slider::new(&mut self.target_reliability_beta, 2.5..=5.0).step_by(0.1));
-                ui.add_space(16.0);
+                ui.add_space(12.0);
                 if ui.add(egui::Button::new(RichText::new("⚡ Evaluate FOSM β & FEMA P-58 Fragility Curves").size(11.0).color(Color32::WHITE))
                     .fill(theme.accent_blue)
                     .corner_radius(CornerRadius::same(6))).clicked() {
@@ -167,32 +172,15 @@ impl PredictionView {
                 ("7.23 × 10⁻⁵".to_string(), "β_min = 3.80 (ISO 2394)".to_string(), "0.86 g".to_string())
             };
 
-            // Risk Cards Grid
-            ui.columns(3, |cols| {
-                cols[0].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Failure Probability (Pf)").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new(pf_str).size(18.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new(beta_str).size(10.0).color(theme.text_muted));
-                    });
-                });
-                cols[1].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Median Collapse PGA (θ_collapse)").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new(med_pga_str).size(18.0).strong().color(theme.accent_blue));
-                        ui.label(RichText::new("FEMA P-58 Seismic Fragility Capacity").size(10.0).color(theme.text_muted));
-                    });
-                });
-                cols[2].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Predicted Failure Mechanism").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new("Ductile Mid-span Yield").size(16.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("Non-brittle (Safe from sudden buckling)").size(10.0).color(theme.text_muted));
-                    });
-                });
+            // Risk Cards Grid (Responsive)
+            let risk_cards = [
+                ("Failure Probability (Pf)", pf_str, beta_str, theme.accent_green),
+                ("Median Collapse PGA (θ_collapse)", med_pga_str, "FEMA P-58 Seismic Fragility Capacity".to_string(), theme.accent_blue),
+                ("Predicted Failure Mechanism", "Ductile Mid-span Yield".to_string(), "Non-brittle (Safe from sudden buckling)".to_string(), theme.accent_green),
+            ];
+            ui_kit::responsive_grid_n(ui, risk_cards.len(), 210.0, |ui, idx| {
+                let (title, val, sub, col) = &risk_cards[idx];
+                ui_kit::stat_card(ui, theme, title, val, sub, *col);
             });
 
             ui.add_space(16.0);
@@ -204,55 +192,57 @@ impl PredictionView {
             ui.label(RichText::new("STRUCTURAL ELEMENT VULNERABILITY RANKING (AI VULNERABILITY SCORE)").size(12.0).strong().color(theme.text_primary));
             ui.add_space(6.0);
 
-            egui::Grid::new("failure_risk_grid").striped(true).min_col_width(90.0).spacing(Vec2::new(12.0, 6.0)).show(ui, |ui| {
-                ui.label(RichText::new("Member ID").size(11.0).strong().color(theme.text_muted));
-                ui.label(RichText::new("Type").size(11.0).strong().color(theme.text_muted));
-                ui.label(RichText::new("Stress Demand").size(11.0).strong().color(theme.text_muted));
-                ui.label(RichText::new("Vulnerability").size(11.0).strong().color(theme.text_muted));
-                ui.label(RichText::new("Predicted Mechanism").size(11.0).strong().color(theme.text_muted));
-                ui.label(RichText::new("Action Priority").size(11.0).strong().color(theme.text_muted));
-                ui.end_row();
+            ScrollArea::horizontal()
+                .id_salt("failure_risk_grid_scroll")
+                .show(ui, |ui| {
+                    egui::Grid::new("failure_risk_grid").striped(true).min_col_width(90.0).spacing(Vec2::new(12.0, 6.0)).show(ui, |ui| {
+                        ui.label(RichText::new("Member ID").size(11.0).strong().color(theme.text_muted));
+                        ui.label(RichText::new("Type").size(11.0).strong().color(theme.text_muted));
+                        ui.label(RichText::new("Stress Demand").size(11.0).strong().color(theme.text_muted));
+                        ui.label(RichText::new("Vulnerability").size(11.0).strong().color(theme.text_muted));
+                        ui.label(RichText::new("Predicted Mechanism").size(11.0).strong().color(theme.text_muted));
+                        ui.label(RichText::new("Action Priority").size(11.0).strong().color(theme.text_muted));
+                        ui.end_row();
 
-                let count = members.len().min(6);
-                for i in 0..count {
-                    let m = &members[i];
-                    let vuln_score = if i == 0 { 0.42 } else if i == 1 { 0.31 } else { 0.18 + (i as f32 * 0.03) };
-                    let vuln_color = if vuln_score > 0.40 { theme.accent_orange } else { theme.accent_green };
-                    let action = if vuln_score > 0.40 { "Monitor SHM" } else { "Nominal" };
+                        let count = members.len().min(6);
+                        for i in 0..count {
+                            let m = &members[i];
+                            let vuln_score = if i == 0 { 0.42 } else if i == 1 { 0.31 } else { 0.18 + (i as f32 * 0.03) };
+                            let vuln_color = if vuln_score > 0.40 { theme.accent_orange } else { theme.accent_green };
+                            let action = if vuln_score > 0.40 { "Monitor SHM" } else { "Nominal" };
 
-                    ui.label(RichText::new(format!("#{}", m.id)).size(11.0).color(theme.text_primary));
-                    ui.label(RichText::new(m.name.clone()).size(11.0).color(theme.text_secondary));
-                    ui.label(RichText::new(format!("{:.1} kN", m.force_kn)).size(11.0).color(theme.text_secondary));
-                    ui.label(RichText::new(format!("{:.2}", vuln_score)).size(11.0).strong().color(vuln_color));
-                    ui.label(RichText::new(if i % 2 == 0 { "Flexural Yield" } else { "Tension Flow" }).size(11.0).color(theme.text_secondary));
-                    ui.label(RichText::new(action).size(11.0).color(vuln_color));
-                    ui.end_row();
-                }
-            });
+                            ui.label(RichText::new(format!("#{}", m.id)).size(11.0).color(theme.text_primary));
+                            ui.label(RichText::new(m.name.clone()).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("{:.1} kN", m.force_kn)).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("{:.2}", vuln_score)).size(11.0).strong().color(vuln_color));
+                            ui.label(RichText::new(if i % 2 == 0 { "Flexural Yield" } else { "Tension Flow" }).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(action).size(11.0).color(vuln_color));
+                            ui.end_row();
+                        }
+                    });
+                });
         });
     }
 
     fn render_progressive_collapse(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("⚡ NONLINEAR PROGRESSIVE COLLAPSE SIMULATION (APM)").size(14.0).strong().color(theme.text_primary));
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("Standard: DoD UFC 4-023-03 / ASCE 7-22").size(11.0).color(theme.accent_blue));
-                });
+                ui.label(RichText::new("• Standard: DoD UFC 4-023-03 / ASCE 7-22").size(11.0).color(theme.accent_blue));
             });
             ui.add_space(4.0);
             ui.label(RichText::new("The Alternate Path Method (APM) forecasts whether the sudden removal of a critical column or support member will trigger a cascading progressive collapse.")
                 .size(11.5).color(theme.text_secondary));
 
             ui.add_space(12.0);
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("Dynamic Amplification Factor (DAF):").size(11.5).color(theme.text_primary));
                 ui.add(egui::Slider::new(&mut self.daf_multiplier, 1.0..=2.0).step_by(0.05));
-                ui.add_space(12.0);
+                ui.add_space(8.0);
                 ui.label(RichText::new("Initial Removed Member:").size(11.5).color(theme.text_primary));
                 let max_id = members.len().max(1);
                 ui.add(egui::DragValue::new(&mut self.initial_disrupt_member_id).range(1..=max_id));
-                ui.add_space(12.0);
+                ui.add_space(8.0);
                 if ui.add(egui::Button::new(RichText::new("💥 Simulate Collapse (Newmark-β Transient)").size(11.0).color(Color32::WHITE))
                     .fill(theme.accent_orange)
                     .corner_radius(CornerRadius::same(6))).clicked() {
@@ -287,16 +277,21 @@ impl PredictionView {
             ui.label(RichText::new("PROGRESSIVE LOAD REDISTRIBUTION TIMELINE").size(12.0).strong().color(theme.text_primary));
             ui.add_space(8.0);
 
+            let stage_1_desc = format!(
+                "Member #{} removed. Dynamic spike DAF {:.2}x occurs at adjacent nodes.",
+                self.initial_disrupt_member_id, self.daf_multiplier
+            );
             let stages = [
                 ("Stage 0: Full Gravity Load State", "Intact structure under nominal elastic condition. Maximum DCR 0.58 at mid-span chord.", "NORMAL", theme.accent_green),
-                ("Stage 1: Sudden Member Removal", format!("Member #{} removed. Dynamic spike DAF {:.2}x occurs at adjacent nodes.", self.initial_disrupt_member_id, self.daf_multiplier).leak(), "DISRUPTED", theme.accent_orange),
+                ("Stage 1: Sudden Member Removal", stage_1_desc.as_str(), "DISRUPTED", theme.accent_orange),
                 ("Stage 2: Alternative Load Path Formation", "Gravity loads transferred to flanking diagonal members via Vierendeel/truss mechanism.", "REDISTRIBUTE", theme.accent_blue),
                 ("Stage 3: New Static Equilibrium", "Deformation stabilized at 28.4 mm (< 150 mm collapse limit). System proven redundant (ARI > 0.70).", "STABLE SAFE", theme.accent_green),
             ];
 
             for (title, desc, badge, color) in stages {
                 Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(6)).inner_margin(Margin::same(10)).show(ui, |ui| {
-                    ui.horizontal(|ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new(badge).size(10.0).strong().color(color));
                         ui.label(RichText::new(title).size(11.5).strong().color(theme.text_primary));
                     });
@@ -309,63 +304,42 @@ impl PredictionView {
 
     fn render_erection_bottleneck(&mut self, ui: &mut Ui, theme: &MacTheme) {
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("🏗️ 4D ERECTION BOTTLENECK & STABILITY FORECASTING").size(14.0).strong().color(theme.text_primary));
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("SVD Guard & Wind Risk Engine").size(11.0).color(theme.accent_blue));
-                });
+                ui.label(RichText::new("• SVD Guard & Wind Risk Engine").size(11.0).color(theme.accent_blue));
             });
             ui.add_space(4.0);
             ui.label(RichText::new("Predicts field erection stages vulnerable to temporary structural instability, crane margin limits, or weather delay risks.")
                 .size(11.5).color(theme.text_secondary));
 
             ui.add_space(14.0);
-            ui.columns(3, |cols| {
-                cols[0].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Critical Erection Stage").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new("Stage 3: Cantilever").size(16.0).strong().color(theme.accent_orange));
-                        ui.label(RichText::new("Temporary shoring required").size(10.0).color(theme.text_muted));
-                    });
-                });
-                cols[1].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Crane Utilization Margin").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new("76.4% Safe").size(16.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("18m lift radius, 12.8 Ton load").size(10.0).color(theme.text_muted));
-                    });
-                });
-                cols[2].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Predicted Erection Duration").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new("18 Work Days").size(16.0).strong().color(theme.accent_blue));
-                        ui.label(RichText::new("Monte Carlo 92% confidence level").size(10.0).color(theme.text_muted));
-                    });
-                });
+            let cards = [
+                ("Critical Erection Stage", "Stage 3: Cantilever", "Temporary shoring required", theme.accent_orange),
+                ("Crane Utilization Margin", "76.4% Safe", "18m lift radius, 12.8 Ton load", theme.accent_green),
+                ("Predicted Erection Duration", "18 Work Days", "Monte Carlo 92% confidence level", theme.accent_blue),
+            ];
+            ui_kit::responsive_grid_n(ui, cards.len(), 210.0, |ui, idx| {
+                let (title, val, sub, col) = cards[idx];
+                ui_kit::stat_card(ui, theme, title, val, sub, col);
             });
         });
     }
 
     fn render_lifetime_degradation(&mut self, ui: &mut Ui, theme: &MacTheme) {
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("📉 50-YEAR SERVICEABILITY & FATIGUE PREDICTION (LIFE-CYCLE DEGRADATION)").size(14.0).strong().color(theme.text_primary));
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("ISO 9223 Corrosion Model & Miner's Rule").size(11.0).color(theme.accent_blue));
-                });
+                ui.label(RichText::new("• ISO 9223 Corrosion Model & Miner's Rule").size(11.0).color(theme.accent_blue));
             });
             ui.add_space(4.0);
             ui.label(RichText::new("Simulates structural capacity evolution across a 50-year service life accounting for atmospheric corrosion rates and cyclic fatigue accumulation.")
                 .size(11.5).color(theme.text_secondary));
 
             ui.add_space(12.0);
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("Target Design Life:").size(11.5).color(theme.text_primary));
                 ui.add(egui::Slider::new(&mut self.service_years, 10..=100).suffix(" Years"));
-                ui.add_space(16.0);
+                ui.add_space(8.0);
                 ui.label(RichText::new("Atmospheric Corrosion Rate:").size(11.5).color(theme.text_primary));
                 ui.add(egui::Slider::new(&mut self.corrosion_rate_mm_yr, 0.01..=0.15).suffix(" mm/year"));
             });
@@ -376,31 +350,14 @@ impl PredictionView {
             let remaining_capacity_pct = (100.0 - total_loss_mm * 4.2).max(60.0);
             let degraded_ari = (0.942 * (remaining_capacity_pct / 100.0)).max(0.60);
 
-            ui.columns(3, |cols| {
-                cols[0].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Total Plate Thickness Reduction").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new(format!("{:.2} mm", total_loss_mm)).size(18.0).strong().color(theme.accent_orange));
-                        ui.label(RichText::new("Estimated effective section loss").size(10.0).color(theme.text_muted));
-                    });
-                });
-                cols[1].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Residual Structural Capacity").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new(format!("{:.1}%", remaining_capacity_pct)).size(18.0).strong().color(theme.accent_blue));
-                        ui.label(RichText::new("Adequate for nominal design loads").size(10.0).color(theme.text_muted));
-                    });
-                });
-                cols[2].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Predicted Adjusted Redundancy Index").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new(format!("{:.4}", degraded_ari)).size(18.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("Remains above critical threshold of 0.70").size(10.0).color(theme.text_muted));
-                    });
-                });
+            let life_cards = [
+                ("Total Plate Thickness Reduction", format!("{:.2} mm", total_loss_mm), "Estimated effective section loss", theme.accent_orange),
+                ("Residual Structural Capacity", format!("{:.1}%", remaining_capacity_pct), "Adequate for nominal design loads", theme.accent_blue),
+                ("Predicted Adjusted Redundancy Index", format!("{:.4}", degraded_ari), "Remains above critical threshold of 0.70", theme.accent_green),
+            ];
+            ui_kit::responsive_grid_n(ui, life_cards.len(), 210.0, |ui, idx| {
+                let (title, val, sub, col) = &life_cards[idx];
+                ui_kit::stat_card(ui, theme, title, val, sub, *col);
             });
 
             ui.add_space(16.0);
@@ -415,11 +372,9 @@ impl PredictionView {
             .inner_margin(Margin::same(12))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("📈 LOG-NORMAL SEISMIC FRAGILITY CURVES (FEMA P-58 / HAZUS)").size(11.5).strong().color(theme.text_primary));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("■ Complete (Collapse)   ■ Extensive   ■ Moderate   ■ Slight").size(10.0).color(theme.text_secondary));
-                    });
+                    ui.label(RichText::new("■ Complete (Collapse)   ■ Extensive   ■ Moderate   ■ Slight").size(10.0).color(theme.text_secondary));
                 });
                 ui.add_space(6.0);
 
@@ -487,11 +442,9 @@ impl PredictionView {
             .inner_margin(Margin::same(12))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("🌊 NEWMARK-β TRANSIENT OSCILLATION TIME HISTORY POST SUDDEN MEMBER REMOVAL").size(11.5).strong().color(theme.text_primary));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new(format!("Active DAF = {:.2}x", self.daf_multiplier)).size(10.5).strong().color(theme.accent_orange));
-                    });
+                    ui.label(RichText::new(format!("Active DAF = {:.2}x", self.daf_multiplier)).size(10.5).strong().color(theme.accent_orange));
                 });
                 ui.add_space(6.0);
 
@@ -558,11 +511,9 @@ impl PredictionView {
             .inner_margin(Margin::same(12))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("📉 ARI(t) DEGRADATION EVOLUTION CURVE OVER SERVICE LIFE (ISO 9223)").size(11.5).strong().color(theme.text_primary));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("■ ARI(t) Curve   --- Safe Redundancy Threshold ARI = 0.70").size(10.0).color(theme.text_secondary));
-                    });
+                    ui.label(RichText::new("■ ARI(t) Curve   --- Safe Redundancy Threshold ARI = 0.70").size(10.0).color(theme.text_secondary));
                 });
                 ui.add_space(6.0);
 

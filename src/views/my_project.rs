@@ -1,6 +1,8 @@
 use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui, Vec2};
+use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::{BimFamilyItem, NavigationPillar, ProjectItem};
 use crate::theme::MacTheme;
+use crate::ui_kit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibraryViewMode {
@@ -40,7 +42,14 @@ impl Default for MyProjectView {
 }
 
 impl MyProjectView {
-    pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme, projects: &[ProjectItem], active_pillar: &mut NavigationPillar) {
+    pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        projects: &[ProjectItem],
+        active_pillar: &mut NavigationPillar,
+        features: &mut FeatureRegistry,
+    ) {
         let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
         let outer_margin = Margin::symmetric(if is_mobile { 10 } else { 20 }, 12);
 
@@ -93,7 +102,7 @@ impl MyProjectView {
                     ui.add_space(16.0);
 
                     // 1B. SELF-CONTAINED PACKAGE VAULT & SELF-LEARNING MEMORY PANEL
-                    self.render_internal_vault_panel(ui, theme);
+                    self.render_internal_vault_panel(ui, theme, features);
 
                     ui.add_space(20.0);
 
@@ -248,7 +257,22 @@ impl MyProjectView {
         });
     }
 
-    fn render_internal_vault_panel(&mut self, ui: &mut Ui, theme: &MacTheme) {
+    fn render_internal_vault_panel(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::BrowserIndexedDbPersistence, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "Storage Engine: Browser IndexedDB");
+                let _ = ui.selectable_label(false, "Schema: eigengraph_vault_v3");
+                let _ = ui.button("💾 Save IndexedDB Snapshot");
+                let _ = ui.button("📥 Restore Offline Workspace");
+            });
+        });
+        ui.add_space(12.0);
+
         let vault_root = crate::core::InternalVault::vault_root_dir();
         let mem = crate::core::InternalVault::load_knowledge_memory();
         let categories = crate::core::InternalVault::list_all_vault_categories();
@@ -317,35 +341,19 @@ impl MyProjectView {
                     Color32::WHITE,
                 ),
             ];
-            let render_stat = |ui: &mut Ui, title: &str, value: &str, sub: &str, col: Color32| {
-                ui.vertical(|ui| {
-                    ui.label(RichText::new(title).size(10.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new(value).size(14.5).strong().color(col));
-                    ui.label(RichText::new(sub).size(10.5).color(theme.text_secondary));
-                });
-            };
-            let vault_w = ui.available_width();
-            if vault_w >= 820.0 {
-                ui.columns(4, |cols| {
-                    for (idx, (t, v, s, c)) in stats.iter().enumerate() {
-                        render_stat(&mut cols[idx], t, v, s, *c);
-                    }
-                });
-            } else if vault_w >= 500.0 {
-                for row in stats.chunks(2) {
-                    ui.columns(2, |cols| {
-                        for (idx, (t, v, s, c)) in row.iter().enumerate() {
-                            render_stat(&mut cols[idx], t, v, s, *c);
-                        }
+            ui_kit::responsive_grid_n(ui, stats.len(), 190.0, |ui, idx| {
+                let (title, value, sub, col) = &stats[idx];
+                Frame::new()
+                    .fill(theme.bg_sidebar)
+                    .corner_radius(CornerRadius::same(8))
+                    .inner_margin(Margin::same(10))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.label(RichText::new(*title).size(10.0).strong().color(theme.text_muted));
+                        ui.label(RichText::new(value).size(14.5).strong().color(*col));
+                        ui.label(RichText::new(sub).size(10.5).color(theme.text_secondary));
                     });
-                    ui.add_space(6.0);
-                }
-            } else {
-                for (t, v, s, c) in &stats {
-                    render_stat(ui, t, v, s, *c);
-                    ui.add_space(6.0);
-                }
-            }
+            });
 
             ui.add_space(8.0);
             let dir_input_w = (ui.available_width() - 80.0).clamp(160.0, 320.0);
@@ -372,9 +380,7 @@ impl MyProjectView {
             let conv = crate::core::InternalVault::evaluate_nvw_multi_lod_convergence();
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("📈 MULTI-LOD REDUNDANCY CONVERGENCE AUDIT (LOD 100 ➔ LOD 200 ➔ LOD 300)").size(11.5).strong().color(theme.accent_green));
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new(format!("ΔARI: +{:.1}% • κ(K) Reduction: {:.1}x", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)).size(11.0).strong().color(theme.accent_blue));
-                });
+                ui.label(RichText::new(format!("• ΔARI: +{:.1}% • κ(K) Reduction: {:.1}x", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)).size(11.0).strong().color(theme.accent_blue));
             });
             ui.add_space(4.0);
             ScrollArea::horizontal()
@@ -524,21 +530,9 @@ impl MyProjectView {
     }
 
     fn render_projects_grid(&self, ui: &mut Ui, theme: &MacTheme, projects: &[ProjectItem], active_pillar: &mut NavigationPillar) {
-        if ui.available_width() >= 680.0 {
-            for chunk in projects.chunks(2) {
-                ui.columns(2, |columns| {
-                    for (col_idx, p) in chunk.iter().enumerate() {
-                        self.render_project_card(&mut columns[col_idx], theme, p, active_pillar);
-                    }
-                });
-                ui.add_space(14.0);
-            }
-        } else {
-            for p in projects {
-                self.render_project_card(ui, theme, p, active_pillar);
-                ui.add_space(12.0);
-            }
-        }
+        ui_kit::responsive_grid_n(ui, projects.len(), 320.0, |ui, idx| {
+            self.render_project_card(ui, theme, &projects[idx], active_pillar);
+        });
     }
 
     fn render_dossier_modal(&mut self, ui: &mut Ui, theme: &MacTheme) {
@@ -716,7 +710,8 @@ impl MyProjectView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("🔍 Search:").size(11.0).color(theme.text_secondary));
-                    ui.add(egui::TextEdit::singleline(&mut self.family_search_query).desired_width(160.0).hint_text("Filter families..."));
+                    let search_w = (ui.available_width() - 90.0).clamp(120.0, 180.0);
+                    ui.add(egui::TextEdit::singleline(&mut self.family_search_query).desired_width(search_w).hint_text("Filter families..."));
 
                     ui.add_space(8.0);
                     ui.separator();
@@ -768,9 +763,6 @@ impl MyProjectView {
 
         ui.add_space(14.0);
 
-        let avail_w = ui.available_width();
-        let is_wide = avail_w >= 840.0;
-
         // Filter families
         let query = self.family_search_query.to_lowercase();
         let cat_filter = &self.family_category_filter;
@@ -786,27 +778,13 @@ impl MyProjectView {
             .map(|(i, _)| i)
             .collect();
 
-        if is_wide {
-            let left_w = (avail_w - 16.0) * 0.58;
-            let right_w = (avail_w - 16.0) * 0.42;
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.set_width(left_w);
-                    self.render_family_card_list(ui, theme, &filtered_indices);
-                });
-                ui.add_space(16.0);
-                ui.vertical(|ui| {
-                    ui.set_width(right_w);
-                    self.render_family_inspector_panel(ui, theme);
-                });
-            });
-        } else {
-            ui.vertical(|ui| {
+        ui_kit::split_workspace_panes(ui, 840.0, 0.58, 280.0, 660.0, 0.0, |ui, pane, _w| {
+            if pane == 0 {
                 self.render_family_card_list(ui, theme, &filtered_indices);
-                ui.add_space(16.0);
+            } else {
                 self.render_family_inspector_panel(ui, theme);
-            });
-        }
+            }
+        });
     }
 
     fn render_family_card_list(&mut self, ui: &mut Ui, theme: &MacTheme, indices: &[usize]) {
@@ -823,11 +801,7 @@ impl MyProjectView {
                 Stroke::new(1.0, theme.border_card)
             };
 
-            let bg = if is_sel {
-                theme.bg_card
-            } else {
-                theme.bg_card
-            };
+            let bg = theme.bg_card;
 
             Frame::new()
                 .fill(bg)
@@ -835,46 +809,9 @@ impl MyProjectView {
                 .stroke(border_stroke)
                 .inner_margin(Margin::same(14))
                 .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.vertical(|ui| {
-                            ui.label(RichText::new(&fam.name).size(13.0).strong().color(theme.text_primary));
-                            ui.add_space(2.0);
-                            ui.label(RichText::new(&fam.classification).size(10.0).color(theme.text_secondary));
-                            ui.label(RichText::new(&fam.dimensions_desc).size(10.0).color(theme.text_muted));
-                            ui.add_space(6.0);
-
-                            ui.horizontal_wrapped(|ui| {
-                                Frame::new()
-                                    .fill(theme.accent_blue.linear_multiply(0.2))
-                                    .corner_radius(CornerRadius::same(4))
-                                    .inner_margin(Margin::symmetric(6, 2))
-                                    .show(ui, |ui| {
-                                        ui.label(RichText::new(&fam.ifc_entity).size(9.5).strong().color(theme.accent_blue));
-                                    });
-                                Frame::new()
-                                    .fill(theme.accent_green.linear_multiply(0.2))
-                                    .corner_radius(CornerRadius::same(4))
-                                    .inner_margin(Margin::symmetric(6, 2))
-                                    .show(ui, |ui| {
-                                        ui.label(RichText::new(&fam.lod).size(9.5).strong().color(theme.accent_green));
-                                    });
-                                Frame::new()
-                                    .fill(theme.bg_sidebar)
-                                    .corner_radius(CornerRadius::same(4))
-                                    .inner_margin(Margin::symmetric(6, 2))
-                                    .show(ui, |ui| {
-                                        ui.label(RichText::new(format!("CO2e: {:.1} kg", fam.embodied_carbon_kg)).size(9.0).color(theme.text_secondary));
-                                    });
-                                Frame::new()
-                                    .fill(theme.bg_sidebar)
-                                    .corner_radius(CornerRadius::same(4))
-                                    .inner_margin(Margin::symmetric(6, 2))
-                                    .show(ui, |ui| {
-                                        ui.label(RichText::new(format!("Fire: {:.1}h", fam.fire_rating_hr)).size(9.0).color(theme.text_secondary));
-                                    });
-                            });
-                        });
-
+                    ui.set_width(ui.available_width());
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(RichText::new(&fam.name).size(13.0).strong().color(theme.text_primary));
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if ui.add(egui::Button::new(RichText::new(if is_sel { "✓ Selected" } else { "Inspect" }).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_primary }))
                                 .fill(if is_sel { theme.accent_blue } else { theme.bg_sidebar })
@@ -882,6 +819,41 @@ impl MyProjectView {
                                 self.selected_family_idx = *idx;
                             }
                         });
+                    });
+                    ui.add_space(2.0);
+                    ui.label(RichText::new(&fam.classification).size(10.0).color(theme.text_secondary));
+                    ui.label(RichText::new(&fam.dimensions_desc).size(10.0).color(theme.text_muted));
+                    ui.add_space(6.0);
+
+                    ui.horizontal_wrapped(|ui| {
+                        Frame::new()
+                            .fill(theme.accent_blue.linear_multiply(0.2))
+                            .corner_radius(CornerRadius::same(4))
+                            .inner_margin(Margin::symmetric(6, 2))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(&fam.ifc_entity).size(9.5).strong().color(theme.accent_blue));
+                            });
+                        Frame::new()
+                            .fill(theme.accent_green.linear_multiply(0.2))
+                            .corner_radius(CornerRadius::same(4))
+                            .inner_margin(Margin::symmetric(6, 2))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(&fam.lod).size(9.5).strong().color(theme.accent_green));
+                            });
+                        Frame::new()
+                            .fill(theme.bg_sidebar)
+                            .corner_radius(CornerRadius::same(4))
+                            .inner_margin(Margin::symmetric(6, 2))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(format!("CO2e: {:.1} kg", fam.embodied_carbon_kg)).size(9.0).color(theme.text_secondary));
+                            });
+                        Frame::new()
+                            .fill(theme.bg_sidebar)
+                            .corner_radius(CornerRadius::same(4))
+                            .inner_margin(Margin::symmetric(6, 2))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new(format!("Fire: {:.1}h", fam.fire_rating_hr)).size(9.0).color(theme.text_secondary));
+                            });
                     });
                 });
             ui.add_space(8.0);
@@ -897,7 +869,8 @@ impl MyProjectView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(16))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
                         ui.label(RichText::new("📋 PARAMETER INSPECTOR").size(10.5).strong().color(theme.accent_blue));
                         ui.label(RichText::new(&active_fam.name).size(13.0).strong().color(theme.text_primary));
@@ -921,7 +894,7 @@ impl MyProjectView {
                 ui.label(RichText::new("TYPE PARAMETERS (FAMILY DEFINITION)").size(10.5).strong().color(theme.text_secondary));
                 ui.add_space(4.0);
                 for (param, val) in &active_fam.type_params {
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new(param).size(10.5).color(theme.text_secondary));
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(RichText::new(val).size(10.5).strong().color(theme.text_primary));
@@ -936,7 +909,7 @@ impl MyProjectView {
                 ui.label(RichText::new("INSTANCE PARAMETERS (PROJECT PLACEMENT)").size(10.5).strong().color(theme.text_secondary));
                 ui.add_space(4.0);
                 for (param, val) in &active_fam.instance_params {
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new(param).size(10.5).color(theme.text_secondary));
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(RichText::new(val).size(10.5).strong().color(theme.accent_blue));
@@ -974,8 +947,8 @@ impl MyProjectView {
                         self.export_success_msg = Some(format!("Family '{}' successfully instantiated into active BIM model at Grid Intersection A-1.", active_fam.name));
                     }
                     ui.add_space(6.0);
-                    ui.horizontal(|ui| {
-                        let btn_w = (ui.available_width() - 8.0) * 0.5;
+                    let btn_w = ((ui.available_width() - 8.0) * 0.5).clamp(130.0, 220.0);
+                    ui.horizontal_wrapped(|ui| {
                         if ui.add(egui::Button::new(RichText::new("📋 Duplicate Type").size(11.0).color(theme.text_primary))
                             .fill(theme.bg_sidebar)
                             .corner_radius(CornerRadius::same(6))

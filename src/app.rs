@@ -6,12 +6,13 @@ use egui::{
     Panel, Pos2, Rect, RichText, ScrollArea, Stroke, StrokeKind, Vec2,
 };
 
+use crate::features::FeatureRegistry;
 use crate::models::{DatabaseComponent, NavigationPillar, ProjectItem, StructuralMember};
 use crate::theme::MacTheme;
 use crate::views::{
-    AiAssistantView, AiFirmView, AnalyzeView, BuildView, FacilityView, IndustrializedView,
-    LeanView, MyProjectView, ParametricView, PlanningView, PredictionView, ResearchConceptView,
-    ResultsView, SafetyView, SettingsView, SustainabilityView,
+    settings::SettingsSubTab, AiAssistantView, AiFirmView, AnalyzeView, BuildView, FacilityView,
+    IndustrializedView, LeanView, MyProjectView, ParametricView, PlanningView, PredictionView,
+    ResearchConceptView, ResultsView, SafetyView, SettingsView, SustainabilityView,
 };
 
 pub struct EigenGraphApp {
@@ -22,6 +23,9 @@ pub struct EigenGraphApp {
     pub sidebar_open: bool,
     layout_initialized: bool,
     last_compact_layout: bool,
+
+    // Centralized Feature Gate & Phase 31+ Unlock Roadmap Registry
+    pub feature_registry: FeatureRegistry,
 
     // 15-Pillar Master Shell High-Fidelity Views
     pub my_project_view: MyProjectView,         // Pillar 1: 📁 My Library (Obsidian-Style Vault)
@@ -57,6 +61,8 @@ impl Default for EigenGraphApp {
             sidebar_open: true,
             layout_initialized: false,
             last_compact_layout: false,
+
+            feature_registry: FeatureRegistry::default(),
 
             my_project_view: MyProjectView::default(),
             ai_firm_view: AiFirmView::default(),
@@ -286,8 +292,34 @@ impl EigenGraphApp {
         });
     }
 
-    /// Renders compact status and build version pills inside the workspace header.
-    fn render_header_badges(&self, ui: &mut egui::Ui) {
+    /// Renders compact status, feature roadmap gate, and build version pills inside the workspace header.
+    fn render_header_badges(&mut self, ui: &mut egui::Ui) {
+        let active_features = self.feature_registry.active_count();
+        let total_features = self.feature_registry.total_count();
+        let roadmap_label = format!("🔓 {active_features}/{total_features} Active • 📋 Roadmap");
+
+        if ui
+            .add(
+                egui::Button::new(
+                    RichText::new(roadmap_label)
+                        .size(10.5)
+                        .strong()
+                        .color(self.theme.accent_blue),
+                )
+                .fill(self.theme.accent_blue.gamma_multiply(0.14))
+                .stroke(Stroke::new(
+                    1.0,
+                    self.theme.accent_blue.gamma_multiply(0.55),
+                ))
+                .corner_radius(CornerRadius::same(7)),
+            )
+            .on_hover_text("Open Feature Unlock Roadmap & Workspace Settings")
+            .clicked()
+        {
+            self.settings_view.active_subtab = SettingsSubTab::FeatureRegistry;
+            self.show_settings = true;
+        }
+
         Frame::new()
             .fill(self.theme.accent_green.gamma_multiply(0.14))
             .stroke(Stroke::new(1.0, self.theme.accent_green.gamma_multiply(0.6)))
@@ -309,7 +341,7 @@ impl EigenGraphApp {
             .inner_margin(Margin::symmetric(8, 4))
             .show(ui, |ui| {
                 ui.label(
-                    RichText::new(format!("v{} • Phase 29", env!("CARGO_PKG_VERSION")))
+                    RichText::new(format!("v{} • Phase 30", env!("CARGO_PKG_VERSION")))
                         .size(10.5)
                         .strong()
                         .color(self.theme.accent_blue),
@@ -552,6 +584,7 @@ impl App for EigenGraphApp {
                             &self.theme,
                             &self.projects,
                             &mut self.active_pillar,
+                            &mut self.feature_registry,
                         );
                     }
                     NavigationPillar::AiAgent => {
@@ -561,11 +594,16 @@ impl App for EigenGraphApp {
                             &self.members,
                             &self.projects,
                             &mut self.db_components,
+                            &mut self.feature_registry,
                         );
                     }
                     NavigationPillar::ResearchConcept => {
-                        self.research_view
-                            .show(ui, &self.theme, &mut self.active_pillar);
+                        self.research_view.show(
+                            ui,
+                            &self.theme,
+                            &mut self.active_pillar,
+                            &mut self.feature_registry,
+                        );
                     }
                     NavigationPillar::ParametricDED => {
                         self.parametric_view.show(
@@ -573,14 +611,25 @@ impl App for EigenGraphApp {
                             &self.theme,
                             &mut self.db_components,
                             &mut self.active_pillar,
+                            &mut self.feature_registry,
                         );
                     }
                     NavigationPillar::GeometryAssembly => {
-                        self.build_view
-                            .show(ui, &self.theme, &self.members, &self.db_components);
+                        self.build_view.show(
+                            ui,
+                            &self.theme,
+                            &self.members,
+                            &self.db_components,
+                            &mut self.feature_registry,
+                        );
                     }
                     NavigationPillar::AnalysisSimulation => {
-                        self.analyze_view.show(ui, &self.theme, &self.members);
+                        self.analyze_view.show(
+                            ui,
+                            &self.theme,
+                            &self.members,
+                            &mut self.feature_registry,
+                        );
                     }
                     NavigationPillar::TimeScheduling => {
                         if self.planning_view.active_subtab
@@ -596,6 +645,7 @@ impl App for EigenGraphApp {
                             &self.theme,
                             &self.parametric_view.variables,
                             &self.members,
+                            &mut self.feature_registry,
                         );
                     }
                     NavigationPillar::CostBudgeting => {
@@ -616,30 +666,64 @@ impl App for EigenGraphApp {
                             &self.theme,
                             &self.parametric_view.variables,
                             &self.members,
+                            &mut self.feature_registry,
                         );
                     }
                     NavigationPillar::SustainabilityEnergy => {
-                        self.sustainability_view
-                            .show(ui, &self.theme, &self.members);
+                        self.sustainability_view.show(
+                            ui,
+                            &self.theme,
+                            &self.members,
+                            &mut self.feature_registry,
+                        );
                     }
                     NavigationPillar::FacilityManagement => {
-                        self.facility_view.show(ui, &self.theme, &self.members);
+                        self.facility_view.show(
+                            ui,
+                            &self.theme,
+                            &self.members,
+                            &mut self.feature_registry,
+                        );
                     }
                     NavigationPillar::SafetyHealth => {
-                        self.safety_view.show(ui, &self.theme, &self.members);
+                        self.safety_view.show(
+                            ui,
+                            &self.theme,
+                            &self.members,
+                            &mut self.feature_registry,
+                        );
                     }
                     NavigationPillar::LeanConstruction => {
-                        self.lean_view.show(ui, &self.theme, &self.members);
+                        self.lean_view.show(
+                            ui,
+                            &self.theme,
+                            &self.members,
+                            &mut self.feature_registry,
+                        );
                     }
                     NavigationPillar::IndustrializedAutomation => {
-                        self.industrialized_view
-                            .show(ui, &self.theme, &self.members);
+                        self.industrialized_view.show(
+                            ui,
+                            &self.theme,
+                            &self.members,
+                            &mut self.feature_registry,
+                        );
                     }
                     NavigationPillar::Prediction => {
-                        self.prediction_view.show(ui, &self.theme, &self.members);
+                        self.prediction_view.show(
+                            ui,
+                            &self.theme,
+                            &self.members,
+                            &mut self.feature_registry,
+                        );
                     }
                     NavigationPillar::ReportPublishing => {
-                        self.results_view.show(ui, &self.theme, &self.members);
+                        self.results_view.show(
+                            ui,
+                            &self.theme,
+                            &self.members,
+                            &mut self.feature_registry,
+                        );
                     }
                 }
             });
@@ -703,27 +787,35 @@ impl App for EigenGraphApp {
             }
         }
 
-        // 5. SETTINGS MODAL (Responsive to Mobile, Tablet & Desktop)
+        // 5. SETTINGS & FEATURE ROADMAP MODAL (Responsive to Mobile, Tablet & Desktop)
         if self.show_settings {
             let mut open = self.show_settings;
-            egui::Window::new("⚙️ System Preferences")
+            let mut close_after_jump = false;
+            egui::Window::new("⚙️ Workspace Settings & Feature Roadmap")
                 .open(&mut open)
                 .collapsible(false)
                 .resizable(true)
                 .anchor(Align2::CENTER_CENTER, Vec2::new(0.0, 0.0))
-                .default_size(MacTheme::clamp_modal_size(&ctx, Vec2::new(540.0, 580.0)))
+                .default_size(MacTheme::clamp_modal_size(&ctx, Vec2::new(820.0, 650.0)))
                 .max_size(MacTheme::modal_max_size(&ctx))
                 .frame(
                     Frame::new()
                         .fill(self.theme.bg_card)
                         .stroke(Stroke::new(1.0, self.theme.border_subtle))
                         .corner_radius(CornerRadius::same(12))
-                        .inner_margin(Margin::same(if is_mobile { 14 } else { 20 })),
+                        .inner_margin(Margin::same(if is_mobile { 12 } else { 18 })),
                 )
                 .show(&ctx, |ui| {
-                    self.settings_view.show(ui, &self.theme);
+                    if self.settings_view.show(
+                        ui,
+                        &self.theme,
+                        &mut self.feature_registry,
+                        &mut self.active_pillar,
+                    ) {
+                        close_after_jump = true;
+                    }
                 });
-            self.show_settings = open;
+            self.show_settings = open && !close_after_jump;
         }
 
         // 8. SCREENSHOT HOOK (AUTOMATED QA & PREVIEWS)

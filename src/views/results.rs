@@ -2,8 +2,10 @@
 //! Executive structural health dashboard, comprehensive SNI/AISC code compliance matrix, and official certification dossier export.
 
 use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText, ScrollArea, Sense, Stroke, StrokeKind, Ui, Vec2};
+use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::{DrawingSheetItem, StructuralMember};
 use crate::theme::MacTheme;
+use crate::ui_kit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResultsSubTab {
@@ -66,9 +68,18 @@ impl Default for ResultsView {
 }
 
 impl ResultsView {
-    pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
+    pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        members: &[StructuralMember],
+        features: &mut FeatureRegistry,
+    ) {
+        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
+        let pad = if is_mobile { 10 } else { 20 };
+
         ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-            Frame::new().inner_margin(Margin::symmetric(20, 12)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
                 // 1. TOP SUBTABS SELECTOR
                 self.render_header_bar(ui, theme);
 
@@ -76,7 +87,7 @@ impl ResultsView {
                 if let Some(ref status_msg) = self.export_status {
                     ui.add_space(10.0);
                     theme.card_frame().show(ui, |ui| {
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new("📊 AUDIT STATUS:").size(11.5).strong().color(theme.accent_green));
                             ui.label(RichText::new(status_msg).size(11.5).color(theme.text_primary));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -98,7 +109,7 @@ impl ResultsView {
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
                     ResultsSubTab::ExecutiveSummary => self.render_executive_summary(ui, theme, members),
-                    ResultsSubTab::DrawingSheets => self.render_drawing_sheets(ui, theme),
+                    ResultsSubTab::DrawingSheets => self.render_drawing_sheets(ui, theme, features),
                     ResultsSubTab::LivingDocs => self.render_living_docs(ui, theme, members),
                     ResultsSubTab::DynamicSheets => self.render_dynamic_sheets(ui, theme),
                     ResultsSubTab::PresentationSlides => self.render_presentation_slides(ui, theme),
@@ -113,46 +124,20 @@ impl ResultsView {
     }
 
     fn render_header_bar(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        Frame::new()
-            .fill(theme.bg_card)
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(6))
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .show(ui, |ui| {
-                let tabs = [
-                    (ResultsSubTab::ExecutiveSummary, "📊 Executive"),
-                    (ResultsSubTab::DrawingSheets, "📐 Drawing Sheets (DED)"),
-                    (ResultsSubTab::LivingDocs, "📑 Living Docs"),
-                    (ResultsSubTab::DynamicSheets, "📊 Sheets (BoQ)"),
-                    (ResultsSubTab::PresentationSlides, "📽️ Slides (Deck)"),
-                    (ResultsSubTab::MemberMatrix, "📋 Matrix"),
-                    (ResultsSubTab::DeformationsAndForces, "📈 Deformations"),
-                    (ResultsSubTab::CertificationExport, "🖨️ Export"),
-                ];
-
-                ui.horizontal_wrapped(|ui| {
-                    for (tab, label) in tabs {
-                        let is_active = self.active_subtab == tab;
-                        let bg = if is_active { theme.accent_blue } else { Color32::TRANSPARENT };
-                        let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
-
-                        if ui.add(
-                            egui::Button::new(RichText::new(label).size(11.5).strong().color(fg))
-                                .fill(bg)
-                                .corner_radius(CornerRadius::same(6))
-                                .min_size(Vec2::new(100.0, 28.0))
-                        ).clicked() {
-                            self.active_subtab = tab;
-                        }
-                        ui.add_space(4.0);
-                    }
-                });
-            });
+        let tabs = [
+            (ResultsSubTab::ExecutiveSummary, "📊 Executive"),
+            (ResultsSubTab::DrawingSheets, "📐 Drawing Sheets (DED)"),
+            (ResultsSubTab::LivingDocs, "📑 Living Docs"),
+            (ResultsSubTab::DynamicSheets, "📊 Sheets (BoQ)"),
+            (ResultsSubTab::PresentationSlides, "📽️ Slides (Deck)"),
+            (ResultsSubTab::MemberMatrix, "📋 Matrix"),
+            (ResultsSubTab::DeformationsAndForces, "📈 Deformations"),
+            (ResultsSubTab::CertificationExport, "🖨️ Export"),
+        ];
+        ui_kit::subtab_bar(ui, theme, "results_subtab_bar", &mut self.active_subtab, &tabs);
     }
 
-    fn render_drawing_sheets(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        let _is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
-
+    fn render_drawing_sheets(&mut self, ui: &mut Ui, theme: &MacTheme, features: &mut FeatureRegistry) {
         // Top Sheet Controls & Ribbon Bar
         Frame::new()
             .fill(theme.bg_card)
@@ -214,232 +199,252 @@ impl ResultsView {
 
         ui.add_space(10.0);
 
+        // Phase 32+ Preview Slot: Auto-Projected DED Sheets from Active BimProject
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::AutoProjectedBimDedSheets, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.button("📐 Auto-Project Framing Plan from BimProject");
+                let _ = ui.button("🔩 Link Column & Footing Schedule to Active Model");
+                ui.label(
+                    RichText::new("Live BIM-to-Sheet projection locked until Phase 32 • Sheet preview active")
+                        .size(11.0)
+                        .color(theme.text_muted),
+                );
+            });
+        });
+
+        ui.add_space(10.0);
+
         let active_sheet = self.drawing_sheets.get(self.selected_sheet_idx).cloned().unwrap_or_else(|| self.drawing_sheets[0].clone());
 
-        // Full Interactive Drawing Sheet Canvas
-        let paper_w = ui.available_width().clamp(300.0, 1100.0);
-        let paper_h = (paper_w * 0.707).clamp(420.0, 780.0); // ISO 1:sqrt(2) aspect ratio
+        // Full Interactive Drawing Sheet Canvas (ISO 1:sqrt(2) aspect ratio, horizontal pan on phones)
+        let paper_w = ui.available_width().clamp(640.0, 1100.0);
+        let paper_h = (paper_w * 0.707).clamp(452.0, 780.0);
 
-        Frame::new()
-            .fill(Color32::from_rgb(250, 250, 252))
-            .stroke(Stroke::new(2.0, Color32::from_rgb(30, 30, 35)))
-            .corner_radius(CornerRadius::same(4))
-            .inner_margin(Margin::same(12))
+        ScrollArea::horizontal()
+            .id_salt("ded_sheet_canvas_scroll")
+            .auto_shrink([false, true])
             .show(ui, |ui| {
-                let (rect, _response) = ui.allocate_exact_size(Vec2::new(paper_w, paper_h), Sense::hover());
-                let painter = ui.painter_at(rect);
+                Frame::new()
+                    .fill(Color32::from_rgb(250, 250, 252))
+                    .stroke(Stroke::new(2.0, Color32::from_rgb(30, 30, 35)))
+                    .corner_radius(CornerRadius::same(4))
+                    .inner_margin(Margin::same(12))
+                    .show(ui, |ui| {
+                        let (rect, _response) = ui.allocate_exact_size(Vec2::new(paper_w, paper_h), Sense::hover());
+                        let painter = ui.painter_at(rect);
 
-                // Outer and Inner Sheet Border Margins
-                let inner_rect = rect.shrink(10.0);
-                painter.rect_stroke(inner_rect, CornerRadius::same(2), Stroke::new(1.5, Color32::from_rgb(20, 20, 25)), StrokeKind::Inside);
-                painter.rect_stroke(inner_rect.shrink(4.0), CornerRadius::same(1), Stroke::new(0.5, Color32::from_rgb(120, 120, 130)), StrokeKind::Inside);
+                        // Outer and Inner Sheet Border Margins
+                        let inner_rect = rect.shrink(10.0);
+                        painter.rect_stroke(inner_rect, CornerRadius::same(2), Stroke::new(1.5, Color32::from_rgb(20, 20, 25)), StrokeKind::Inside);
+                        painter.rect_stroke(inner_rect.shrink(4.0), CornerRadius::same(1), Stroke::new(0.5, Color32::from_rgb(120, 120, 130)), StrokeKind::Inside);
 
-                // Border Grid Coordinate Ticks
-                for i in 1..=6 {
-                    let frac = i as f32 / 7.0;
-                    let x = inner_rect.min.x + inner_rect.width() * frac;
-                    painter.line_segment([Pos2::new(x, inner_rect.min.y), Pos2::new(x, inner_rect.min.y + 4.0)], Stroke::new(1.0, Color32::BLACK));
-                    painter.line_segment([Pos2::new(x, inner_rect.max.y - 4.0), Pos2::new(x, inner_rect.max.y)], Stroke::new(1.0, Color32::BLACK));
-                    painter.text(Pos2::new(x, inner_rect.min.y + 7.0), Align2::CENTER_CENTER, format!("{}", i), egui::FontId::proportional(8.0), Color32::DARK_GRAY);
-                }
-
-                // VIEWPORT 1: Main Structural Framing Plan (Left 65% of Sheet)
-                let vp1_rect = Rect::from_min_max(
-                    inner_rect.min + Vec2::new(16.0, 16.0),
-                    Pos2::new(inner_rect.min.x + inner_rect.width() * 0.64, inner_rect.max.y - 16.0),
-                );
-                painter.rect_filled(vp1_rect, CornerRadius::ZERO, Color32::from_rgb(255, 255, 255));
-                painter.rect_stroke(vp1_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
-
-                // Viewport 1 Header Tag
-                painter.text(
-                    vp1_rect.min + Vec2::new(10.0, 12.0),
-                    Align2::LEFT_TOP,
-                    format!("1  {}  •  SCALE {}", active_sheet.sheet_title, active_sheet.scale),
-                    egui::FontId::proportional(10.5),
-                    Color32::from_rgb(20, 30, 60),
-                );
-
-                // Viewport 1 Geometry: Structural Grids, Columns, Girders & Dims
-                let grid_cols = 4;
-                let grid_rows = 4;
-                let grid_area = vp1_rect.shrink(38.0);
-                let col_spacing = grid_area.width() / (grid_cols - 1) as f32;
-                let row_spacing = grid_area.height() / (grid_rows - 1) as f32;
-
-                // Structural Grids & Bubbles
-                let grid_letters = ["A", "B", "C", "D"];
-                for c in 0..grid_cols {
-                    let gx = grid_area.min.x + c as f32 * col_spacing;
-                    if self.show_grid_bubbles_sheet {
-                        // Vertical Grid Line
-                        painter.line_segment(
-                            [Pos2::new(gx, grid_area.min.y - 12.0), Pos2::new(gx, grid_area.max.y + 12.0)],
-                            Stroke::new(0.8, Color32::from_rgb(0, 100, 200)),
-                        );
-                        // Top Grid Bubble
-                        let bubble_center = Pos2::new(gx, grid_area.min.y - 14.0);
-                        painter.circle_filled(bubble_center, 8.0, Color32::from_rgb(235, 245, 255));
-                        painter.circle_stroke(bubble_center, 8.0, Stroke::new(1.0, Color32::from_rgb(0, 100, 200)));
-                        painter.text(bubble_center, Align2::CENTER_CENTER, grid_letters[c], egui::FontId::proportional(9.0), Color32::from_rgb(0, 80, 180));
-                    }
-
-                    // Dimension chain on top
-                    if self.show_annotation_dimensions && c > 0 {
-                        let prev_gx = grid_area.min.x + (c - 1) as f32 * col_spacing;
-                        let dim_y = grid_area.min.y - 28.0;
-                        painter.line_segment([Pos2::new(prev_gx, dim_y), Pos2::new(gx, dim_y)], Stroke::new(0.8, Color32::BLACK));
-                        painter.line_segment([Pos2::new(prev_gx - 2.0, dim_y - 3.0), Pos2::new(prev_gx + 2.0, dim_y + 3.0)], Stroke::new(1.0, Color32::BLACK));
-                        painter.line_segment([Pos2::new(gx - 2.0, dim_y - 3.0), Pos2::new(gx + 2.0, dim_y + 3.0)], Stroke::new(1.0, Color32::BLACK));
-                        painter.text(Pos2::new((prev_gx + gx) * 0.5, dim_y - 6.0), Align2::CENTER_CENTER, "8,000", egui::FontId::proportional(8.0), Color32::BLACK);
-                    }
-                }
-
-                for r in 0..grid_rows {
-                    let gy = grid_area.min.y + r as f32 * row_spacing;
-                    if self.show_grid_bubbles_sheet {
-                        // Horizontal Grid Line
-                        painter.line_segment(
-                            [Pos2::new(grid_area.min.x - 12.0, gy), Pos2::new(grid_area.max.x + 12.0, gy)],
-                            Stroke::new(0.8, Color32::from_rgb(0, 100, 200)),
-                        );
-                        // Left Grid Bubble
-                        let bubble_center = Pos2::new(grid_area.min.x - 14.0, gy);
-                        painter.circle_filled(bubble_center, 8.0, Color32::from_rgb(235, 245, 255));
-                        painter.circle_stroke(bubble_center, 8.0, Stroke::new(1.0, Color32::from_rgb(0, 100, 200)));
-                        painter.text(bubble_center, Align2::CENTER_CENTER, format!("{}", r + 1), egui::FontId::proportional(9.0), Color32::from_rgb(0, 80, 180));
-                    }
-                }
-
-                // Framing Members (Primary Girders & Secondary Infill Joists)
-                for r in 0..grid_rows {
-                    let gy = grid_area.min.y + r as f32 * row_spacing;
-                    for c in 0..(grid_cols - 1) {
-                        let x1 = grid_area.min.x + c as f32 * col_spacing;
-                        let x2 = x1 + col_spacing;
-                        // Girder double line
-                        painter.line_segment([Pos2::new(x1, gy - 2.0), Pos2::new(x2, gy - 2.0)], Stroke::new(1.2, Color32::from_rgb(10, 80, 180)));
-                        painter.line_segment([Pos2::new(x1, gy + 2.0), Pos2::new(x2, gy + 2.0)], Stroke::new(1.2, Color32::from_rgb(10, 80, 180)));
-                        // Tag
-                        if r == 1 && c == 1 {
-                            painter.text(Pos2::new((x1 + x2) * 0.5, gy + 8.0), Align2::CENTER_CENTER, "W14x90 [G1]", egui::FontId::proportional(8.0), Color32::from_rgb(10, 70, 160));
+                        // Border Grid Coordinate Ticks
+                        for i in 1..=6 {
+                            let frac = i as f32 / 7.0;
+                            let x = inner_rect.min.x + inner_rect.width() * frac;
+                            painter.line_segment([Pos2::new(x, inner_rect.min.y), Pos2::new(x, inner_rect.min.y + 4.0)], Stroke::new(1.0, Color32::BLACK));
+                            painter.line_segment([Pos2::new(x, inner_rect.max.y - 4.0), Pos2::new(x, inner_rect.max.y)], Stroke::new(1.0, Color32::BLACK));
+                            painter.text(Pos2::new(x, inner_rect.min.y + 7.0), Align2::CENTER_CENTER, format!("{}", i), egui::FontId::proportional(8.0), Color32::DARK_GRAY);
                         }
-                    }
-                }
 
-                // Columns at Intersections
-                for r in 0..grid_rows {
-                    let gy = grid_area.min.y + r as f32 * row_spacing;
-                    for c in 0..grid_cols {
-                        let gx = grid_area.min.x + c as f32 * col_spacing;
-                        let col_box = Rect::from_center_size(Pos2::new(gx, gy), Vec2::new(11.0, 11.0));
-                        painter.rect_filled(col_box, CornerRadius::ZERO, Color32::from_rgb(30, 30, 40));
-                        painter.line_segment([col_box.left_top(), col_box.right_bottom()], Stroke::new(0.6, Color32::WHITE));
-                        painter.line_segment([col_box.right_top(), col_box.left_bottom()], Stroke::new(0.6, Color32::WHITE));
-                    }
-                }
+                        // VIEWPORT 1: Main Structural Framing Plan (Left 65% of Sheet)
+                        let vp1_rect = Rect::from_min_max(
+                            inner_rect.min + Vec2::new(16.0, 16.0),
+                            Pos2::new(inner_rect.min.x + inner_rect.width() * 0.64, inner_rect.max.y - 16.0),
+                        );
+                        painter.rect_filled(vp1_rect, CornerRadius::ZERO, Color32::from_rgb(255, 255, 255));
+                        painter.rect_stroke(vp1_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
 
-                // VIEWPORT 2: Schedule Table (Top Right 33% of Sheet)
-                let vp2_rect = Rect::from_min_max(
-                    Pos2::new(inner_rect.min.x + inner_rect.width() * 0.66, inner_rect.min.y + 16.0),
-                    Pos2::new(inner_rect.max.x - 16.0, inner_rect.min.y + inner_rect.height() * 0.36),
-                );
-                painter.rect_filled(vp2_rect, CornerRadius::ZERO, Color32::from_rgb(255, 255, 255));
-                painter.rect_stroke(vp2_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
-                painter.text(vp2_rect.min + Vec2::new(8.0, 8.0), Align2::LEFT_TOP, "2  COLUMN & FOOTING SCHEDULE", egui::FontId::proportional(9.5), Color32::BLACK);
+                        // Viewport 1 Header Tag
+                        painter.text(
+                            vp1_rect.min + Vec2::new(10.0, 12.0),
+                            Align2::LEFT_TOP,
+                            format!("1  {}  •  SCALE {}", active_sheet.sheet_title, active_sheet.scale),
+                            egui::FontId::proportional(10.5),
+                            Color32::from_rgb(20, 30, 60),
+                        );
 
-                let headers = ["Mark", "Type", "Dimensions", "Rebar", "fc'"];
-                let col_w = vp2_rect.width() / headers.len() as f32;
-                for (h_idx, h) in headers.iter().enumerate() {
-                    let h_x = vp2_rect.min.x + h_idx as f32 * col_w;
-                    painter.rect_filled(Rect::from_min_size(Pos2::new(h_x, vp2_rect.min.y + 22.0), Vec2::new(col_w, 14.0)), CornerRadius::ZERO, Color32::from_rgb(235, 240, 248));
-                    painter.rect_stroke(Rect::from_min_size(Pos2::new(h_x, vp2_rect.min.y + 22.0), Vec2::new(col_w, 14.0)), CornerRadius::ZERO, Stroke::new(0.5, Color32::GRAY), StrokeKind::Inside);
-                    painter.text(Pos2::new(h_x + 4.0, vp2_rect.min.y + 24.0), Align2::LEFT_TOP, *h, egui::FontId::proportional(7.5), Color32::BLACK);
-                }
-                let rows = [
-                    ["C1", "Square RC", "600x600", "12-D25", "40 MPa"],
-                    ["C2", "Wide Flange", "W14x90", "A992", "345 MPa"],
-                    ["F1", "Spread Pad", "2.4x2.4x0.6m", "D19@150", "30 MPa"],
-                ];
-                for (r_idx, row) in rows.iter().enumerate() {
-                    let r_y = vp2_rect.min.y + 36.0 + r_idx as f32 * 14.0;
-                    for (c_idx, val) in row.iter().enumerate() {
-                        let c_x = vp2_rect.min.x + c_idx as f32 * col_w;
-                        painter.text(Pos2::new(c_x + 4.0, r_y + 2.0), Align2::LEFT_TOP, *val, egui::FontId::proportional(7.5), Color32::DARK_GRAY);
-                    }
-                }
+                        // Viewport 1 Geometry: Structural Grids, Columns, Girders & Dims
+                        let grid_cols = 4;
+                        let grid_rows = 4;
+                        let grid_area = vp1_rect.shrink(38.0);
+                        let col_spacing = grid_area.width() / (grid_cols - 1) as f32;
+                        let row_spacing = grid_area.height() / (grid_rows - 1) as f32;
 
-                // VIEWPORT 3: Connection Detail Callout (Middle Right)
-                let vp3_rect = Rect::from_min_max(
-                    Pos2::new(inner_rect.min.x + inner_rect.width() * 0.66, inner_rect.min.y + inner_rect.height() * 0.38),
-                    Pos2::new(inner_rect.max.x - 16.0, inner_rect.min.y + inner_rect.height() * 0.66),
-                );
-                painter.rect_filled(vp3_rect, CornerRadius::ZERO, Color32::from_rgb(255, 255, 255));
-                painter.rect_stroke(vp3_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
-                painter.text(vp3_rect.min + Vec2::new(8.0, 8.0), Align2::LEFT_TOP, "3  TYPICAL MOMENT CONNECTION (1:10)", egui::FontId::proportional(9.5), Color32::BLACK);
+                        // Structural Grids & Bubbles
+                        let grid_letters = ["A", "B", "C", "D"];
+                        for c in 0..grid_cols {
+                            let gx = grid_area.min.x + c as f32 * col_spacing;
+                            if self.show_grid_bubbles_sheet {
+                                // Vertical Grid Line
+                                painter.line_segment(
+                                    [Pos2::new(gx, grid_area.min.y - 12.0), Pos2::new(gx, grid_area.max.y + 12.0)],
+                                    Stroke::new(0.8, Color32::from_rgb(0, 100, 200)),
+                                );
+                                // Top Grid Bubble
+                                let bubble_center = Pos2::new(gx, grid_area.min.y - 14.0);
+                                painter.circle_filled(bubble_center, 8.0, Color32::from_rgb(235, 245, 255));
+                                painter.circle_stroke(bubble_center, 8.0, Stroke::new(1.0, Color32::from_rgb(0, 100, 200)));
+                                painter.text(bubble_center, Align2::CENTER_CENTER, grid_letters[c], egui::FontId::proportional(9.0), Color32::from_rgb(0, 80, 180));
+                            }
 
-                // Draw Moment Connection 2D Detail
-                let det_center = vp3_rect.center() + Vec2::new(0.0, 8.0);
-                // Column Profile Vertical
-                painter.rect_filled(Rect::from_center_size(det_center - Vec2::new(50.0, 0.0), Vec2::new(28.0, 80.0)), CornerRadius::ZERO, Color32::from_rgb(210, 215, 225));
-                painter.rect_stroke(Rect::from_center_size(det_center - Vec2::new(50.0, 0.0), Vec2::new(28.0, 80.0)), CornerRadius::ZERO, Stroke::new(1.2, Color32::BLACK), StrokeKind::Inside);
-                // Beam Horizontal
-                painter.rect_filled(Rect::from_min_size(det_center - Vec2::new(36.0, 18.0), Vec2::new(110.0, 36.0)), CornerRadius::ZERO, Color32::from_rgb(220, 225, 235));
-                painter.rect_stroke(Rect::from_min_size(det_center - Vec2::new(36.0, 18.0), Vec2::new(110.0, 36.0)), CornerRadius::ZERO, Stroke::new(1.2, Color32::BLACK), StrokeKind::Inside);
-                // Flange continuity weld & 4-bolt shear tab
-                painter.rect_filled(Rect::from_min_size(det_center - Vec2::new(34.0, 8.0), Vec2::new(16.0, 16.0)), CornerRadius::ZERO, Color32::from_rgb(80, 90, 105));
-                for b_idx in 0..4 {
-                    let bx = det_center.x - 26.0 + (b_idx % 2) as f32 * 8.0;
-                    let by = det_center.y - 4.0 + (b_idx / 2) as f32 * 8.0;
-                    painter.circle_filled(Pos2::new(bx, by), 2.2, Color32::BLACK);
-                }
-                painter.text(det_center + Vec2::new(40.0, -22.0), Align2::LEFT_CENTER, "W14x90 Beam", egui::FontId::proportional(8.0), Color32::BLACK);
-                painter.text(det_center + Vec2::new(-65.0, -32.0), Align2::RIGHT_CENTER, "W14x132 Column", egui::FontId::proportional(8.0), Color32::BLACK);
+                            // Dimension chain on top
+                            if self.show_annotation_dimensions && c > 0 {
+                                let prev_gx = grid_area.min.x + (c - 1) as f32 * col_spacing;
+                                let dim_y = grid_area.min.y - 28.0;
+                                painter.line_segment([Pos2::new(prev_gx, dim_y), Pos2::new(gx, dim_y)], Stroke::new(0.8, Color32::BLACK));
+                                painter.line_segment([Pos2::new(prev_gx - 2.0, dim_y - 3.0), Pos2::new(prev_gx + 2.0, dim_y + 3.0)], Stroke::new(1.0, Color32::BLACK));
+                                painter.line_segment([Pos2::new(gx - 2.0, dim_y - 3.0), Pos2::new(gx + 2.0, dim_y + 3.0)], Stroke::new(1.0, Color32::BLACK));
+                                painter.text(Pos2::new((prev_gx + gx) * 0.5, dim_y - 6.0), Align2::CENTER_CENTER, "8,000", egui::FontId::proportional(8.0), Color32::BLACK);
+                            }
+                        }
 
-                // TITLE BLOCK (Bottom Right Corner)
-                let tb_rect = Rect::from_min_max(
-                    Pos2::new(inner_rect.min.x + inner_rect.width() * 0.66, inner_rect.min.y + inner_rect.height() * 0.68),
-                    inner_rect.max - Vec2::new(16.0, 16.0),
-                );
-                painter.rect_filled(tb_rect, CornerRadius::ZERO, Color32::from_rgb(248, 250, 252));
-                painter.rect_stroke(tb_rect, CornerRadius::ZERO, Stroke::new(1.5, Color32::from_rgb(20, 20, 30)), StrokeKind::Inside);
+                        for r in 0..grid_rows {
+                            let gy = grid_area.min.y + r as f32 * row_spacing;
+                            if self.show_grid_bubbles_sheet {
+                                // Horizontal Grid Line
+                                painter.line_segment(
+                                    [Pos2::new(grid_area.min.x - 12.0, gy), Pos2::new(grid_area.max.x + 12.0, gy)],
+                                    Stroke::new(0.8, Color32::from_rgb(0, 100, 200)),
+                                );
+                                // Left Grid Bubble
+                                let bubble_center = Pos2::new(grid_area.min.x - 14.0, gy);
+                                painter.circle_filled(bubble_center, 8.0, Color32::from_rgb(235, 245, 255));
+                                painter.circle_stroke(bubble_center, 8.0, Stroke::new(1.0, Color32::from_rgb(0, 100, 200)));
+                                painter.text(bubble_center, Align2::CENTER_CENTER, format!("{}", r + 1), egui::FontId::proportional(9.0), Color32::from_rgb(0, 80, 180));
+                            }
+                        }
 
-                // Title Block Dividers & Text
-                painter.line_segment([Pos2::new(tb_rect.min.x, tb_rect.min.y + 26.0), Pos2::new(tb_rect.max.x, tb_rect.min.y + 26.0)], Stroke::new(1.0, Color32::BLACK));
-                painter.text(tb_rect.min + Vec2::new(10.0, 8.0), Align2::LEFT_TOP, "MENARA SUDIRMAN STRUCTURAL COMPLEX", egui::FontId::proportional(10.0), Color32::BLACK);
-                painter.text(tb_rect.min + Vec2::new(10.0, 16.0), Align2::LEFT_TOP, "CLIENT: PT CIPUTRA PROPERTY TBK  •  JAKARTA, INDONESIA", egui::FontId::proportional(7.5), Color32::DARK_GRAY);
+                        // Framing Members (Primary Girders & Secondary Infill Joists)
+                        for r in 0..grid_rows {
+                            let gy = grid_area.min.y + r as f32 * row_spacing;
+                            for c in 0..(grid_cols - 1) {
+                                let x1 = grid_area.min.x + c as f32 * col_spacing;
+                                let x2 = x1 + col_spacing;
+                                // Girder double line
+                                painter.line_segment([Pos2::new(x1, gy - 2.0), Pos2::new(x2, gy - 2.0)], Stroke::new(1.2, Color32::from_rgb(10, 80, 180)));
+                                painter.line_segment([Pos2::new(x1, gy + 2.0), Pos2::new(x2, gy + 2.0)], Stroke::new(1.2, Color32::from_rgb(10, 80, 180)));
+                                // Tag
+                                if r == 1 && c == 1 {
+                                    painter.text(Pos2::new((x1 + x2) * 0.5, gy + 8.0), Align2::CENTER_CENTER, "W14x90 [G1]", egui::FontId::proportional(8.0), Color32::from_rgb(10, 70, 160));
+                                }
+                            }
+                        }
 
-                painter.line_segment([Pos2::new(tb_rect.min.x, tb_rect.min.y + 60.0), Pos2::new(tb_rect.max.x, tb_rect.min.y + 60.0)], Stroke::new(1.0, Color32::BLACK));
-                painter.text(tb_rect.min + Vec2::new(10.0, 32.0), Align2::LEFT_TOP, "DRAWING TITLE:", egui::FontId::proportional(7.5), Color32::GRAY);
-                painter.text(tb_rect.min + Vec2::new(10.0, 42.0), Align2::LEFT_TOP, &active_sheet.sheet_title, egui::FontId::proportional(9.5), Color32::from_rgb(0, 50, 120));
+                        // Columns at Intersections
+                        for r in 0..grid_rows {
+                            let gy = grid_area.min.y + r as f32 * row_spacing;
+                            for c in 0..grid_cols {
+                                let gx = grid_area.min.x + c as f32 * col_spacing;
+                                let col_box = Rect::from_center_size(Pos2::new(gx, gy), Vec2::new(11.0, 11.0));
+                                painter.rect_filled(col_box, CornerRadius::ZERO, Color32::from_rgb(30, 30, 40));
+                                painter.line_segment([col_box.left_top(), col_box.right_bottom()], Stroke::new(0.6, Color32::WHITE));
+                                painter.line_segment([col_box.right_top(), col_box.left_bottom()], Stroke::new(0.6, Color32::WHITE));
+                            }
+                        }
 
-                // Sheet No & Revision
-                let tb_mid_x = tb_rect.min.x + tb_rect.width() * 0.60;
-                painter.line_segment([Pos2::new(tb_mid_x, tb_rect.min.y + 60.0), Pos2::new(tb_mid_x, tb_rect.max.y)], Stroke::new(1.0, Color32::BLACK));
-                painter.text(tb_rect.min + Vec2::new(10.0, 64.0), Align2::LEFT_TOP, format!("SCALE: {}   DATE: 2026-11-12", active_sheet.scale), egui::FontId::proportional(7.5), Color32::DARK_GRAY);
-                painter.text(tb_rect.min + Vec2::new(10.0, 75.0), Align2::LEFT_TOP, format!("DISCIPLINE: {}", active_sheet.discipline), egui::FontId::proportional(7.5), Color32::DARK_GRAY);
+                        // VIEWPORT 2: Schedule Table (Top Right 33% of Sheet)
+                        let vp2_rect = Rect::from_min_max(
+                            Pos2::new(inner_rect.min.x + inner_rect.width() * 0.66, inner_rect.min.y + 16.0),
+                            Pos2::new(inner_rect.max.x - 16.0, inner_rect.min.y + inner_rect.height() * 0.36),
+                        );
+                        painter.rect_filled(vp2_rect, CornerRadius::ZERO, Color32::from_rgb(255, 255, 255));
+                        painter.rect_stroke(vp2_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
+                        painter.text(vp2_rect.min + Vec2::new(8.0, 8.0), Align2::LEFT_TOP, "2  COLUMN & FOOTING SCHEDULE", egui::FontId::proportional(9.5), Color32::BLACK);
 
-                painter.text(Pos2::new(tb_mid_x + 8.0, tb_rect.min.y + 64.0), Align2::LEFT_TOP, "SHEET NO:", egui::FontId::proportional(7.5), Color32::GRAY);
-                painter.text(Pos2::new(tb_mid_x + 8.0, tb_rect.min.y + 74.0), Align2::LEFT_TOP, &active_sheet.sheet_number, egui::FontId::proportional(14.0), Color32::from_rgb(180, 20, 20));
+                        let headers = ["Mark", "Type", "Dimensions", "Rebar", "fc'"];
+                        let col_w = vp2_rect.width() / headers.len() as f32;
+                        for (h_idx, h) in headers.iter().enumerate() {
+                            let h_x = vp2_rect.min.x + h_idx as f32 * col_w;
+                            painter.rect_filled(Rect::from_min_size(Pos2::new(h_x, vp2_rect.min.y + 22.0), Vec2::new(col_w, 14.0)), CornerRadius::ZERO, Color32::from_rgb(235, 240, 248));
+                            painter.rect_stroke(Rect::from_min_size(Pos2::new(h_x, vp2_rect.min.y + 22.0), Vec2::new(col_w, 14.0)), CornerRadius::ZERO, Stroke::new(0.5, Color32::GRAY), StrokeKind::Inside);
+                            painter.text(Pos2::new(h_x + 4.0, vp2_rect.min.y + 24.0), Align2::LEFT_TOP, *h, egui::FontId::proportional(7.5), Color32::BLACK);
+                        }
+                        let rows = [
+                            ["C1", "Square RC", "600x600", "12-D25", "40 MPa"],
+                            ["C2", "Wide Flange", "W14x90", "A992", "345 MPa"],
+                            ["F1", "Spread Pad", "2.4x2.4x0.6m", "D19@150", "30 MPa"],
+                        ];
+                        for (r_idx, row) in rows.iter().enumerate() {
+                            let r_y = vp2_rect.min.y + 36.0 + r_idx as f32 * 14.0;
+                            for (c_idx, val) in row.iter().enumerate() {
+                                let c_x = vp2_rect.min.x + c_idx as f32 * col_w;
+                                painter.text(Pos2::new(c_x + 4.0, r_y + 2.0), Align2::LEFT_TOP, *val, egui::FontId::proportional(7.5), Color32::DARK_GRAY);
+                            }
+                        }
 
-                // PE Stamp Seal
-                if self.show_pe_seal {
-                    let seal_center = Pos2::new(tb_rect.min.x + 36.0, tb_rect.max.y - 32.0);
-                    painter.circle_filled(seal_center, 22.0, Color32::from_rgb(255, 252, 240));
-                    painter.circle_stroke(seal_center, 22.0, Stroke::new(1.5, Color32::from_rgb(180, 130, 20)));
-                    painter.circle_stroke(seal_center, 18.0, Stroke::new(0.5, Color32::from_rgb(180, 130, 20)));
-                    painter.text(seal_center - Vec2::new(0.0, 6.0), Align2::CENTER_CENTER, "STATE LICENSED", egui::FontId::proportional(5.5), Color32::from_rgb(140, 90, 10));
-                    painter.text(seal_center, Align2::CENTER_CENTER, "PE #49120-ST", egui::FontId::proportional(6.5), Color32::from_rgb(140, 90, 10));
-                    painter.text(seal_center + Vec2::new(0.0, 6.0), Align2::CENTER_CENTER, "VERIFIED DIGITAL", egui::FontId::proportional(5.5), Color32::from_rgb(140, 90, 10));
-                }
+                        // VIEWPORT 3: Connection Detail Callout (Middle Right)
+                        let vp3_rect = Rect::from_min_max(
+                            Pos2::new(inner_rect.min.x + inner_rect.width() * 0.66, inner_rect.min.y + inner_rect.height() * 0.38),
+                            Pos2::new(inner_rect.max.x - 16.0, inner_rect.min.y + inner_rect.height() * 0.66),
+                        );
+                        painter.rect_filled(vp3_rect, CornerRadius::ZERO, Color32::from_rgb(255, 255, 255));
+                        painter.rect_stroke(vp3_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
+                        painter.text(vp3_rect.min + Vec2::new(8.0, 8.0), Align2::LEFT_TOP, "3  TYPICAL MOMENT CONNECTION (1:10)", egui::FontId::proportional(9.5), Color32::BLACK);
 
-                // North Arrow
-                let arrow_center = Pos2::new(tb_rect.min.x + 95.0, tb_rect.max.y - 32.0);
-                painter.circle_stroke(arrow_center, 12.0, Stroke::new(0.8, Color32::BLACK));
-                painter.line_segment([Pos2::new(arrow_center.x, arrow_center.y + 12.0), Pos2::new(arrow_center.x, arrow_center.y - 12.0)], Stroke::new(1.2, Color32::BLACK));
-                painter.line_segment([Pos2::new(arrow_center.x - 4.0, arrow_center.y - 6.0), Pos2::new(arrow_center.x, arrow_center.y - 12.0)], Stroke::new(1.2, Color32::BLACK));
-                painter.line_segment([Pos2::new(arrow_center.x + 4.0, arrow_center.y - 6.0), Pos2::new(arrow_center.x, arrow_center.y - 12.0)], Stroke::new(1.2, Color32::BLACK));
-                painter.text(arrow_center - Vec2::new(0.0, 16.0), Align2::CENTER_CENTER, "N", egui::FontId::proportional(7.5), Color32::BLACK);
+                        // Draw Moment Connection 2D Detail
+                        let det_center = vp3_rect.center() + Vec2::new(0.0, 8.0);
+                        // Column Profile Vertical
+                        painter.rect_filled(Rect::from_center_size(det_center - Vec2::new(50.0, 0.0), Vec2::new(28.0, 80.0)), CornerRadius::ZERO, Color32::from_rgb(210, 215, 225));
+                        painter.rect_stroke(Rect::from_center_size(det_center - Vec2::new(50.0, 0.0), Vec2::new(28.0, 80.0)), CornerRadius::ZERO, Stroke::new(1.2, Color32::BLACK), StrokeKind::Inside);
+                        // Beam Horizontal
+                        painter.rect_filled(Rect::from_min_size(det_center - Vec2::new(36.0, 18.0), Vec2::new(110.0, 36.0)), CornerRadius::ZERO, Color32::from_rgb(220, 225, 235));
+                        painter.rect_stroke(Rect::from_min_size(det_center - Vec2::new(36.0, 18.0), Vec2::new(110.0, 36.0)), CornerRadius::ZERO, Stroke::new(1.2, Color32::BLACK), StrokeKind::Inside);
+                        // Flange continuity weld & 4-bolt shear tab
+                        painter.rect_filled(Rect::from_min_size(det_center - Vec2::new(34.0, 8.0), Vec2::new(16.0, 16.0)), CornerRadius::ZERO, Color32::from_rgb(80, 90, 105));
+                        for b_idx in 0..4 {
+                            let bx = det_center.x - 26.0 + (b_idx % 2) as f32 * 8.0;
+                            let by = det_center.y - 4.0 + (b_idx / 2) as f32 * 8.0;
+                            painter.circle_filled(Pos2::new(bx, by), 2.2, Color32::BLACK);
+                        }
+                        painter.text(det_center + Vec2::new(40.0, -22.0), Align2::LEFT_CENTER, "W14x90 Beam", egui::FontId::proportional(8.0), Color32::BLACK);
+                        painter.text(det_center + Vec2::new(-65.0, -32.0), Align2::RIGHT_CENTER, "W14x132 Column", egui::FontId::proportional(8.0), Color32::BLACK);
+
+                        // TITLE BLOCK (Bottom Right Corner)
+                        let tb_rect = Rect::from_min_max(
+                            Pos2::new(inner_rect.min.x + inner_rect.width() * 0.66, inner_rect.min.y + inner_rect.height() * 0.68),
+                            inner_rect.max - Vec2::new(16.0, 16.0),
+                        );
+                        painter.rect_filled(tb_rect, CornerRadius::ZERO, Color32::from_rgb(248, 250, 252));
+                        painter.rect_stroke(tb_rect, CornerRadius::ZERO, Stroke::new(1.5, Color32::from_rgb(20, 20, 30)), StrokeKind::Inside);
+
+                        // Title Block Dividers & Text
+                        painter.line_segment([Pos2::new(tb_rect.min.x, tb_rect.min.y + 26.0), Pos2::new(tb_rect.max.x, tb_rect.min.y + 26.0)], Stroke::new(1.0, Color32::BLACK));
+                        painter.text(tb_rect.min + Vec2::new(10.0, 8.0), Align2::LEFT_TOP, "MENARA SUDIRMAN STRUCTURAL COMPLEX", egui::FontId::proportional(10.0), Color32::BLACK);
+                        painter.text(tb_rect.min + Vec2::new(10.0, 16.0), Align2::LEFT_TOP, "CLIENT: PT CIPUTRA PROPERTY TBK  •  JAKARTA, INDONESIA", egui::FontId::proportional(7.5), Color32::DARK_GRAY);
+
+                        painter.line_segment([Pos2::new(tb_rect.min.x, tb_rect.min.y + 60.0), Pos2::new(tb_rect.max.x, tb_rect.min.y + 60.0)], Stroke::new(1.0, Color32::BLACK));
+                        painter.text(tb_rect.min + Vec2::new(10.0, 32.0), Align2::LEFT_TOP, "DRAWING TITLE:", egui::FontId::proportional(7.5), Color32::GRAY);
+                        painter.text(tb_rect.min + Vec2::new(10.0, 42.0), Align2::LEFT_TOP, &active_sheet.sheet_title, egui::FontId::proportional(9.5), Color32::from_rgb(0, 50, 120));
+
+                        // Sheet No & Revision
+                        let tb_mid_x = tb_rect.min.x + tb_rect.width() * 0.60;
+                        painter.line_segment([Pos2::new(tb_mid_x, tb_rect.min.y + 60.0), Pos2::new(tb_mid_x, tb_rect.max.y)], Stroke::new(1.0, Color32::BLACK));
+                        painter.text(tb_rect.min + Vec2::new(10.0, 64.0), Align2::LEFT_TOP, format!("SCALE: {}   DATE: 2026-11-12", active_sheet.scale), egui::FontId::proportional(7.5), Color32::DARK_GRAY);
+                        painter.text(tb_rect.min + Vec2::new(10.0, 75.0), Align2::LEFT_TOP, format!("DISCIPLINE: {}", active_sheet.discipline), egui::FontId::proportional(7.5), Color32::DARK_GRAY);
+
+                        painter.text(Pos2::new(tb_mid_x + 8.0, tb_rect.min.y + 64.0), Align2::LEFT_TOP, "SHEET NO:", egui::FontId::proportional(7.5), Color32::GRAY);
+                        painter.text(Pos2::new(tb_mid_x + 8.0, tb_rect.min.y + 74.0), Align2::LEFT_TOP, &active_sheet.sheet_number, egui::FontId::proportional(14.0), Color32::from_rgb(180, 20, 20));
+
+                        // PE Stamp Seal
+                        if self.show_pe_seal {
+                            let seal_center = Pos2::new(tb_rect.min.x + 36.0, tb_rect.max.y - 32.0);
+                            painter.circle_filled(seal_center, 22.0, Color32::from_rgb(255, 252, 240));
+                            painter.circle_stroke(seal_center, 22.0, Stroke::new(1.5, Color32::from_rgb(180, 130, 20)));
+                            painter.circle_stroke(seal_center, 18.0, Stroke::new(0.5, Color32::from_rgb(180, 130, 20)));
+                            painter.text(seal_center - Vec2::new(0.0, 6.0), Align2::CENTER_CENTER, "STATE LICENSED", egui::FontId::proportional(5.5), Color32::from_rgb(140, 90, 10));
+                            painter.text(seal_center, Align2::CENTER_CENTER, "PE #49120-ST", egui::FontId::proportional(6.5), Color32::from_rgb(140, 90, 10));
+                            painter.text(seal_center + Vec2::new(0.0, 6.0), Align2::CENTER_CENTER, "VERIFIED DIGITAL", egui::FontId::proportional(5.5), Color32::from_rgb(140, 90, 10));
+                        }
+
+                        // North Arrow
+                        let arrow_center = Pos2::new(tb_rect.min.x + 95.0, tb_rect.max.y - 32.0);
+                        painter.circle_stroke(arrow_center, 12.0, Stroke::new(0.8, Color32::BLACK));
+                        painter.line_segment([Pos2::new(arrow_center.x, arrow_center.y + 12.0), Pos2::new(arrow_center.x, arrow_center.y - 12.0)], Stroke::new(1.2, Color32::BLACK));
+                        painter.line_segment([Pos2::new(arrow_center.x - 4.0, arrow_center.y - 6.0), Pos2::new(arrow_center.x, arrow_center.y - 12.0)], Stroke::new(1.2, Color32::BLACK));
+                        painter.line_segment([Pos2::new(arrow_center.x + 4.0, arrow_center.y - 6.0), Pos2::new(arrow_center.x, arrow_center.y - 12.0)], Stroke::new(1.2, Color32::BLACK));
+                        painter.text(arrow_center - Vec2::new(0.0, 16.0), Align2::CENTER_CENTER, "N", egui::FontId::proportional(7.5), Color32::BLACK);
+                    });
             });
     }
 
@@ -451,7 +456,7 @@ impl ResultsView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(20))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
                             RichText::new("📑 Report -> Docs: Living WYSIWYG DED Layout & Calculation Dossier")
@@ -481,63 +486,71 @@ impl ResultsView {
         ui.add_space(16.0);
 
         // Title Block Editor & Reactive Token Card
-        ui.columns(2, |cols| {
+        ui_kit::responsive_two_panes(ui, 680.0, |ui, pane| match pane {
             // Left: Title Block Editor
-            Frame::new()
-                .fill(theme.bg_card)
-                .corner_radius(CornerRadius::same(10))
-                .stroke(Stroke::new(1.0, theme.border_card))
-                .inner_margin(Margin::same(16))
-                .show(&mut cols[0], |ui| {
-                    ui.label(RichText::new("🏷️ Title Block Metadata (Kop Gambar)").size(14.0).strong().color(theme.text_primary));
-                    ui.add_space(8.0);
+            0 => {
+                Frame::new()
+                    .fill(theme.bg_card)
+                    .corner_radius(CornerRadius::same(10))
+                    .stroke(Stroke::new(1.0, theme.border_card))
+                    .inner_margin(Margin::same(16))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.label(RichText::new("🏷️ Title Block Metadata (Kop Gambar)").size(14.0).strong().color(theme.text_primary));
+                        ui.add_space(8.0);
 
-                    ui.label(RichText::new("Project Title:").size(11.0).color(theme.text_muted));
-                    ui.add(egui::TextEdit::singleline(&mut self.doc_project_title).desired_width(ui.available_width()));
-                    ui.add_space(6.0);
+                        ui.label(RichText::new("Project Title:").size(11.0).color(theme.text_muted));
+                        ui.add(egui::TextEdit::singleline(&mut self.doc_project_title).desired_width(ui.available_width().max(140.0)));
+                        ui.add_space(6.0);
 
-                    ui.horizontal(|ui| {
-                        ui.vertical(|ui| {
-                            ui.label(RichText::new("Drawing No:").size(11.0).color(theme.text_muted));
-                            ui.add(egui::TextEdit::singleline(&mut self.doc_drawing_no).desired_width(140.0));
+                        let no_w = (ui.available_width() * 0.45).clamp(100.0, 160.0);
+                        let scale_w = (ui.available_width() * 0.35).clamp(80.0, 120.0);
+                        ui.horizontal_wrapped(|ui| {
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new("Drawing No:").size(11.0).color(theme.text_muted));
+                                ui.add(egui::TextEdit::singleline(&mut self.doc_drawing_no).desired_width(no_w));
+                            });
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new("Scale:").size(11.0).color(theme.text_muted));
+                                ui.add(egui::TextEdit::singleline(&mut self.doc_scale).desired_width(scale_w));
+                            });
                         });
-                        ui.vertical(|ui| {
-                            ui.label(RichText::new("Scale:").size(11.0).color(theme.text_muted));
-                            ui.add(egui::TextEdit::singleline(&mut self.doc_scale).desired_width(100.0));
-                        });
+                        ui.add_space(6.0);
+
+                        ui.label(RichText::new("Lead Structural Engineer:").size(11.0).color(theme.text_muted));
+                        ui.add(egui::TextEdit::singleline(&mut self.doc_engineer_name).desired_width(ui.available_width().max(140.0)));
                     });
-                    ui.add_space(6.0);
-
-                    ui.label(RichText::new("Lead Structural Engineer:").size(11.0).color(theme.text_muted));
-                    ui.add(egui::TextEdit::singleline(&mut self.doc_engineer_name).desired_width(ui.available_width()));
-                });
+            }
 
             // Right: Reactive Tokens
-            Frame::new()
-                .fill(theme.bg_card)
-                .corner_radius(CornerRadius::same(10))
-                .stroke(Stroke::new(1.0, theme.border_card))
-                .inner_margin(Margin::same(16))
-                .show(&mut cols[1], |ui| {
-                    ui.label(RichText::new("⚡ Live Reactive Variable Substitution").size(14.0).strong().color(theme.text_primary));
-                    ui.add_space(8.0);
+            _ => {
+                Frame::new()
+                    .fill(theme.bg_card)
+                    .corner_radius(CornerRadius::same(10))
+                    .stroke(Stroke::new(1.0, theme.border_card))
+                    .inner_margin(Margin::same(16))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.label(RichText::new("⚡ Live Reactive Variable Substitution").size(14.0).strong().color(theme.text_primary));
+                        ui.add_space(8.0);
 
-                    let tokens = [
-                        ("{{project.min_ari}}", "0.942 [Grade A - Robust]"),
-                        ("{{project.max_dcr}}", "0.485 [SNI 1729:2020 Safe]"),
-                        ("{{project.svd_status}}", "Stable (sigma_min = 1.42e-3)"),
-                        ("{{project.seismic_zone}}", "Jakarta Pusat (Ss = 0.72g, S1 = 0.38g)"),
-                    ];
+                        let tokens = [
+                            ("{{project.min_ari}}", "0.942 [Grade A - Robust]"),
+                            ("{{project.max_dcr}}", "0.485 [SNI 1729:2020 Safe]"),
+                            ("{{project.svd_status}}", "Stable (sigma_min = 1.42e-3)"),
+                            ("{{project.seismic_zone}}", "Jakarta Pusat (Ss = 0.72g, S1 = 0.38g)"),
+                        ];
 
-                    for (tok, val) in tokens {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(tok).size(11.5).monospace().color(theme.accent_blue));
-                            ui.label(RichText::new("➔").size(11.0).color(theme.text_muted));
-                            ui.label(RichText::new(val).size(11.5).strong().color(theme.text_primary));
-                        });
-                        ui.add_space(4.0);
-                    }
-                });
+                        for (tok, val) in tokens {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(RichText::new(tok).size(11.5).monospace().color(theme.accent_blue));
+                                ui.label(RichText::new("➔").size(11.0).color(theme.text_muted));
+                                ui.label(RichText::new(val).size(11.5).strong().color(theme.text_primary));
+                            });
+                            ui.add_space(4.0);
+                        }
+                    });
+            }
         });
 
         ui.add_space(16.0);
@@ -552,56 +565,68 @@ impl ResultsView {
                 ui.label(RichText::new("📐 Printable Sheet Space Preview (ISO A1 / 1:100)").size(14.0).strong().color(theme.text_primary));
                 ui.add_space(8.0);
 
-                let (sheet_rect, _resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 260.0), egui::Sense::hover());
-                ui.painter().rect_filled(sheet_rect, CornerRadius::same(4), Color32::from_rgb(250, 250, 252));
-                ui.painter().rect_stroke(sheet_rect, CornerRadius::same(4), Stroke::new(1.5, Color32::from_rgb(30, 30, 35)), egui::StrokeKind::Inside);
+                let sheet_w = ui.available_width().max(260.0);
+                let (sheet_rect, _resp) = ui.allocate_exact_size(Vec2::new(sheet_w, 260.0), egui::Sense::hover());
+                let painter = ui.painter_at(sheet_rect);
+                painter.rect_filled(sheet_rect, CornerRadius::same(4), Color32::from_rgb(250, 250, 252));
+                painter.rect_stroke(sheet_rect, CornerRadius::same(4), Stroke::new(1.5, Color32::from_rgb(30, 30, 35)), egui::StrokeKind::Inside);
 
                 // Inner Margins Frame
                 let inner_rect = sheet_rect.shrink(10.0);
-                ui.painter().rect_stroke(inner_rect, CornerRadius::same(0), Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), egui::StrokeKind::Inside);
+                painter.rect_stroke(inner_rect, CornerRadius::same(0), Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), egui::StrokeKind::Inside);
 
                 // Title Block in Bottom Right
-                let tb_w = 280.0;
-                let tb_h = 75.0;
+                let tb_w = (inner_rect.width() * 0.44).clamp(160.0, 280.0);
+                let tb_h = 72.0;
                 let tb_rect = egui::Rect::from_min_size(inner_rect.right_bottom() - Vec2::new(tb_w, tb_h), Vec2::new(tb_w, tb_h));
-                ui.painter().rect_filled(tb_rect, CornerRadius::same(0), Color32::from_rgb(240, 240, 245));
-                ui.painter().rect_stroke(tb_rect, CornerRadius::same(0), Stroke::new(1.0, Color32::from_rgb(100, 100, 110)), egui::StrokeKind::Inside);
+                painter.rect_filled(tb_rect, CornerRadius::same(0), Color32::from_rgb(240, 240, 245));
+                painter.rect_stroke(tb_rect, CornerRadius::same(0), Stroke::new(1.0, Color32::from_rgb(100, 100, 110)), egui::StrokeKind::Inside);
 
-                ui.painter().text(
+                painter.text(
                     tb_rect.left_top() + Vec2::new(8.0, 6.0),
                     egui::Align2::LEFT_TOP,
                     format!("PROJECT: {}", self.doc_project_title),
-                    egui::FontId::proportional(9.5),
+                    egui::FontId::proportional(9.0),
                     Color32::from_rgb(20, 20, 25),
                 );
-                ui.painter().text(
+                painter.text(
                     tb_rect.left_top() + Vec2::new(8.0, 24.0),
                     egui::Align2::LEFT_TOP,
                     format!("SHEET: {}  |  SCALE: {}", self.doc_drawing_no, self.doc_scale),
-                    egui::FontId::proportional(9.5),
+                    egui::FontId::proportional(9.0),
                     Color32::from_rgb(20, 20, 25),
                 );
-                ui.painter().text(
+                painter.text(
                     tb_rect.left_top() + Vec2::new(8.0, 42.0),
                     egui::Align2::LEFT_TOP,
                     format!("ENGINEER: {} (CERTIFIED)", self.doc_engineer_name),
-                    egui::FontId::proportional(9.5),
+                    egui::FontId::proportional(9.0),
                     Color32::from_rgb(20, 20, 25),
                 );
 
                 // Drawing Content Lines (Schematic Floor Plan & Section A-A)
-                let center_drawing = inner_rect.center() - Vec2::new(50.0, 20.0);
-                ui.painter().rect_stroke(
-                    egui::Rect::from_center_size(center_drawing, Vec2::new(320.0, 140.0)),
+                let (diag_w, diag_h, center_drawing) = if inner_rect.width() >= 520.0 {
+                    let w = (inner_rect.width() - tb_w - 36.0).clamp(160.0, 320.0);
+                    let h = 140.0;
+                    let c = Pos2::new(inner_rect.left() + 18.0 + w * 0.5, inner_rect.center().y - 10.0);
+                    (w, h, c)
+                } else {
+                    let w = (inner_rect.width() - 28.0).clamp(140.0, 280.0);
+                    let h = 110.0;
+                    let c = Pos2::new(inner_rect.center().x, inner_rect.top() + 86.0);
+                    (w, h, c)
+                };
+                painter.rect_stroke(
+                    egui::Rect::from_center_size(center_drawing, Vec2::new(diag_w, diag_h)),
                     CornerRadius::same(0),
                     Stroke::new(1.5, Color32::from_rgb(40, 70, 130)),
                     egui::StrokeKind::Inside,
                 );
-                ui.painter().text(
-                    center_drawing + Vec2::new(0.0, -80.0),
+                painter.text(
+                    center_drawing + Vec2::new(0.0, -(diag_h * 0.5 + 10.0)),
                     egui::Align2::CENTER_CENTER,
                     "TYPICAL SUPERSTRUCTURE FRAMING PLAN & REBAR BBS",
-                    egui::FontId::proportional(11.0),
+                    egui::FontId::proportional(10.0),
                     Color32::from_rgb(30, 30, 35),
                 );
             });
@@ -614,7 +639,7 @@ impl ResultsView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(20))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
                             RichText::new("📊 Report -> Sheets: Dynamic Engineering Spreadsheet & BoQ Engine")
@@ -645,10 +670,11 @@ impl ResultsView {
                 ui.add_space(12.0);
 
                 // Formula Input Bar
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("fx").size(14.0).strong().color(theme.accent_blue));
                     ui.label(RichText::new("[E7]").size(11.5).monospace().color(theme.text_muted));
-                    ui.add(egui::TextEdit::singleline(&mut self.sheet_formula_input).desired_width(ui.available_width() - 100.0));
+                    let formula_w = (ui.available_width() - 150.0).clamp(120.0, 640.0);
+                    ui.add(egui::TextEdit::singleline(&mut self.sheet_formula_input).desired_width(formula_w));
                     if ui.add(egui::Button::new("Calculate").fill(theme.accent_blue)).clicked() {
                         self.export_status = Some("Formula parsed: =SUM(E2:E6) -> Grand Total Rp 7.063.120.000".to_string());
                     }
@@ -672,36 +698,39 @@ impl ResultsView {
                     .stroke(Stroke::new(1.0, theme.border_subtle))
                     .inner_margin(Margin::same(12))
                     .show(ui, |ui| {
-                        ui.columns(6, |cols| {
-                            cols[0].label(RichText::new("No").size(11.0).strong().color(theme.text_muted));
-                            cols[1].label(RichText::new("Work Item Description").size(11.0).strong().color(theme.text_muted));
-                            cols[2].label(RichText::new("Specification").size(11.0).strong().color(theme.text_muted));
-                            cols[3].label(RichText::new("Quantity").size(11.0).strong().color(theme.text_muted));
-                            cols[4].label(RichText::new("Unit Price").size(11.0).strong().color(theme.text_muted));
-                            cols[5].label(RichText::new("Subtotal").size(11.0).strong().color(theme.text_muted));
-                        });
+                        ScrollArea::horizontal()
+                            .id_salt("results_dynamic_sheet_scroll")
+                            .show(ui, |ui| {
+                                egui::Grid::new("results_dynamic_sheet_grid")
+                                    .striped(true)
+                                    .min_col_width(95.0)
+                                    .spacing(Vec2::new(14.0, 6.0))
+                                    .show(ui, |ui| {
+                                        ui.label(RichText::new("No").size(11.0).strong().color(theme.text_muted));
+                                        ui.label(RichText::new("Work Item Description").size(11.0).strong().color(theme.text_muted));
+                                        ui.label(RichText::new("Specification").size(11.0).strong().color(theme.text_muted));
+                                        ui.label(RichText::new("Quantity").size(11.0).strong().color(theme.text_muted));
+                                        ui.label(RichText::new("Unit Price").size(11.0).strong().color(theme.text_muted));
+                                        ui.label(RichText::new("Subtotal").size(11.0).strong().color(theme.text_muted));
+                                        ui.end_row();
 
-                        ui.add_space(6.0);
-                        ui.separator();
-                        ui.add_space(6.0);
-
-                        for (no, desc, spec, qty, rate, sub) in rows {
-                            ui.columns(6, |cols| {
-                                cols[0].label(RichText::new(no).size(11.0).color(theme.text_secondary));
-                                cols[1].label(RichText::new(desc).size(11.0).strong().color(theme.text_primary));
-                                cols[2].label(RichText::new(spec).size(10.5).color(theme.text_muted));
-                                cols[3].label(RichText::new(qty).size(11.0).color(theme.text_secondary));
-                                cols[4].label(RichText::new(rate).size(11.0).color(theme.text_secondary));
-                                cols[5].label(RichText::new(sub).size(11.0).strong().color(theme.accent_blue));
+                                        for (no, desc, spec, qty, rate, sub) in rows {
+                                            ui.label(RichText::new(no).size(11.0).color(theme.text_secondary));
+                                            ui.label(RichText::new(desc).size(11.0).strong().color(theme.text_primary));
+                                            ui.label(RichText::new(spec).size(10.5).color(theme.text_muted));
+                                            ui.label(RichText::new(qty).size(11.0).color(theme.text_secondary));
+                                            ui.label(RichText::new(rate).size(11.0).color(theme.text_secondary));
+                                            ui.label(RichText::new(sub).size(11.0).strong().color(theme.accent_blue));
+                                            ui.end_row();
+                                        }
+                                    });
                             });
-                            ui.add_space(4.0);
-                        }
 
                         ui.add_space(8.0);
                         ui.separator();
                         ui.add_space(8.0);
 
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new("GRAND TOTAL (E7 = =SUM(E1:E6)):").size(12.5).strong().color(theme.text_primary));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 ui.label(RichText::new("Rp 7.063.120.000").size(16.0).strong().color(theme.accent_green));
@@ -718,7 +747,7 @@ impl ResultsView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(20))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
                             RichText::new("📽️ Report -> Slides: Client Presentation Deck & Live 3D Orbit Viewport")
@@ -749,102 +778,108 @@ impl ResultsView {
                 ui.separator();
                 ui.add_space(16.0);
 
-                // Slides Authoring Layout: Left Thumbnails, Right Master Slide
-                ui.columns(2, |cols| {
-                    // Left Column: Thumbnails
-                    Frame::new()
-                        .fill(theme.bg_canvas)
-                        .corner_radius(CornerRadius::same(10))
-                        .stroke(Stroke::new(1.0, theme.border_subtle))
-                        .inner_margin(Margin::same(12))
-                        .show(&mut cols[0], |ui| {
-                            ui.label(RichText::new("Deck Slides:").size(12.0).strong().color(theme.text_muted));
-                            ui.add_space(8.0);
+                // Slides Authoring Layout: Left/Top Thumbnails, Right/Bottom Master Slide
+                ui_kit::responsive_two_panes(ui, 680.0, |ui, pane| match pane {
+                    // Left Pane: Thumbnails
+                    0 => {
+                        Frame::new()
+                            .fill(theme.bg_canvas)
+                            .corner_radius(CornerRadius::same(10))
+                            .stroke(Stroke::new(1.0, theme.border_subtle))
+                            .inner_margin(Margin::same(12))
+                            .show(ui, |ui| {
+                                ui.set_width(ui.available_width());
+                                ui.label(RichText::new("Deck Slides:").size(12.0).strong().color(theme.text_muted));
+                                ui.add_space(8.0);
 
-                            let slides = [
-                                "1. Executive Structural Overview & ARI",
-                                "2. Geotechnical Site & Bearing Capacity",
-                                "3. SVD Kinematic Guard & Mechanism Verification",
-                                "4. 5D Cost Breakdown & 4D Erection Schedule",
-                            ];
+                                let slides = [
+                                    "1. Executive Structural Overview & ARI",
+                                    "2. Geotechnical Site & Bearing Capacity",
+                                    "3. SVD Kinematic Guard & Mechanism Verification",
+                                    "4. 5D Cost Breakdown & 4D Erection Schedule",
+                                ];
 
-                            for (idx, title) in slides.iter().enumerate() {
-                                let is_active = self.active_slide_index == idx;
-                                let btn = ui.add(
-                                    egui::Button::new(
-                                        RichText::new(*title)
-                                            .size(11.5)
-                                            .color(if is_active { Color32::WHITE } else { theme.text_primary })
-                                    )
-                                    .fill(if is_active { theme.accent_blue } else { theme.bg_card })
-                                    .corner_radius(CornerRadius::same(6))
-                                    .min_size(Vec2::new(ui.available_width(), 32.0))
-                                );
+                                for (idx, title) in slides.iter().enumerate() {
+                                    let is_active = self.active_slide_index == idx;
+                                    let btn = ui.add(
+                                        egui::Button::new(
+                                            RichText::new(*title)
+                                                .size(11.5)
+                                                .color(if is_active { Color32::WHITE } else { theme.text_primary })
+                                        )
+                                        .fill(if is_active { theme.accent_blue } else { theme.bg_card })
+                                        .corner_radius(CornerRadius::same(6))
+                                        .min_size(Vec2::new(ui.available_width(), 32.0))
+                                    );
 
-                                if btn.clicked() {
-                                    self.active_slide_index = idx;
+                                    if btn.clicked() {
+                                        self.active_slide_index = idx;
+                                    }
+                                    ui.add_space(6.0);
                                 }
-                                ui.add_space(6.0);
-                            }
-                        });
+                            });
+                    }
 
-                    // Right Column: Master Slide Preview
-                    Frame::new()
-                        .fill(theme.bg_canvas)
-                        .corner_radius(CornerRadius::same(10))
-                        .stroke(Stroke::new(1.0, theme.border_subtle))
-                        .inner_margin(Margin::same(16))
-                        .show(&mut cols[1], |ui| {
-                            ui.label(
-                                RichText::new(format!("SLIDE {}: KEY ENGINEERING TAKEAWAYS", self.active_slide_index + 1))
-                                    .size(14.0)
-                                    .strong()
-                                    .color(theme.accent_blue),
-                            );
-                            ui.add_space(10.0);
+                    // Right Pane: Master Slide Preview
+                    _ => {
+                        Frame::new()
+                            .fill(theme.bg_canvas)
+                            .corner_radius(CornerRadius::same(10))
+                            .stroke(Stroke::new(1.0, theme.border_subtle))
+                            .inner_margin(Margin::same(16))
+                            .show(ui, |ui| {
+                                ui.set_width(ui.available_width());
+                                ui.label(
+                                    RichText::new(format!("SLIDE {}: KEY ENGINEERING TAKEAWAYS", self.active_slide_index + 1))
+                                        .size(14.0)
+                                        .strong()
+                                        .color(theme.accent_blue),
+                                );
+                                ui.add_space(10.0);
 
-                            let bullets = match self.active_slide_index {
-                                0 => vec![
-                                    "• Overall System Adjusted Redundancy Index: ARI = 0.942 (Grade A).",
-                                    "• Maximum Demand-Capacity Ratio: DCR_peak = 0.485 (Beam E1 WF 400x200).",
-                                    "• Code Compliance: Fully compliant with SNI 1729:2020 / AISC 360-16 LRFD.",
-                                ],
-                                1 => vec![
-                                    "• Site Class: SD (Stiff Soil) per PusGeN seismic hazard map.",
-                                    "• Foundation System: 48 bored piles (D800) socketed 3.0m into bedrock.",
-                                    "• Total Foundation Safety Factor: FS_bearing = 3.20 >= 2.50.",
-                                ],
-                                2 => vec![
-                                    "• Global Stiffness Matrix rank: 120 / 120 DOFs (Full Rank).",
-                                    "• Nullspace Singular Value: sigma_min = 1.42e-3 > 0.0 (Zero Sway Mechanism).",
-                                    "• Alternate Load Path: Satisfies DoD UFC 4-023-03 progressive collapse criteria.",
-                                ],
-                                _ => vec![
-                                    "• Total Construction Budget: Rp 7.063.120.000 (AHSP 2026 indexed).",
-                                    "• 4D Phased Erection: 180 Calendar Days on CPM critical path.",
-                                    "• Tower Crane Envelope: 50m radius covers 100% of the active floor plan.",
-                                ],
-                            };
+                                let bullets = match self.active_slide_index {
+                                    0 => vec![
+                                        "• Overall System Adjusted Redundancy Index: ARI = 0.942 (Grade A).",
+                                        "• Maximum Demand-Capacity Ratio: DCR_peak = 0.485 (Beam E1 WF 400x200).",
+                                        "• Code Compliance: Fully compliant with SNI 1729:2020 / AISC 360-16 LRFD.",
+                                    ],
+                                    1 => vec![
+                                        "• Site Class: SD (Stiff Soil) per PusGeN seismic hazard map.",
+                                        "• Foundation System: 48 bored piles (D800) socketed 3.0m into bedrock.",
+                                        "• Total Foundation Safety Factor: FS_bearing = 3.20 >= 2.50.",
+                                    ],
+                                    2 => vec![
+                                        "• Global Stiffness Matrix rank: 120 / 120 DOFs (Full Rank).",
+                                        "• Nullspace Singular Value: sigma_min = 1.42e-3 > 0.0 (Zero Sway Mechanism).",
+                                        "• Alternate Load Path: Satisfies DoD UFC 4-023-03 progressive collapse criteria.",
+                                    ],
+                                    _ => vec![
+                                        "• Total Construction Budget: Rp 7.063.120.000 (AHSP 2026 indexed).",
+                                        "• 4D Phased Erection: 180 Calendar Days on CPM critical path.",
+                                        "• Tower Crane Envelope: 50m radius covers 100% of the active floor plan.",
+                                    ],
+                                };
 
-                            for b in bullets {
-                                ui.label(RichText::new(b).size(12.0).color(theme.text_primary));
-                                ui.add_space(4.0);
-                            }
+                                for b in bullets {
+                                    ui.label(RichText::new(b).size(12.0).color(theme.text_primary));
+                                    ui.add_space(4.0);
+                                }
 
-                            ui.add_space(12.0);
+                                ui.add_space(12.0);
 
-                            // Embedded 3D Orbit Viewport Mock
-                            let (vp_rect, _resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 120.0), egui::Sense::hover());
-                            ui.painter().rect_filled(vp_rect, CornerRadius::same(6), Color32::from_rgb(20, 20, 24));
-                            ui.painter().rect_stroke(vp_rect, CornerRadius::same(6), Stroke::new(1.0, theme.border_card), egui::StrokeKind::Inside);
-                            ui.painter().text(
-                                vp_rect.center(),
-                                egui::Align2::CENTER_CENTER,
-                                "🎮 Live Interactive 3D Model Viewport Embedded in Slide",
-                                egui::FontId::proportional(11.0),
-                                Color32::from_rgb(180, 180, 190),
-                            );
-                        });
+                                // Embedded 3D Orbit Viewport Mock
+                                let (vp_rect, _resp) = ui.allocate_exact_size(Vec2::new(ui.available_width().max(180.0), 120.0), egui::Sense::hover());
+                                ui.painter().rect_filled(vp_rect, CornerRadius::same(6), Color32::from_rgb(20, 20, 24));
+                                ui.painter().rect_stroke(vp_rect, CornerRadius::same(6), Stroke::new(1.0, theme.border_card), egui::StrokeKind::Inside);
+                                ui.painter().text(
+                                    vp_rect.center(),
+                                    egui::Align2::CENTER_CENTER,
+                                    "🎮 Live Interactive 3D Model Viewport Embedded in Slide",
+                                    egui::FontId::proportional(11.0),
+                                    Color32::from_rgb(180, 180, 190),
+                                );
+                            });
+                    }
                 });
             });
     }
@@ -866,7 +901,7 @@ impl ResultsView {
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(14))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new(if critical_count == 0 { "✅ FEASIBILITY STATUS: STRUCTURE MEETS CODE STANDARDS (SAFE)" } else { "⚠️ FEASIBILITY STATUS: CRITICAL ELEMENTS DETECTED (REVIEW NEEDED)" })
                         .size(14.0).strong().color(Color32::WHITE));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -884,45 +919,47 @@ impl ResultsView {
         ui.add_space(14.0);
 
         // Metrics Grid (4 Cards)
-        ui.columns(4, |cols| {
-            cols[0].vertical(|ui| {
-                Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.label(RichText::new("Minimum System ARI").size(10.5).color(theme.text_muted));
-                    ui.label(RichText::new(format!("{:.4}", min_ari)).size(18.0).strong().color(if min_ari >= 0.70 { theme.accent_green } else { theme.accent_orange }));
-                    ui.label(RichText::new("Safe Threshold ≥ 0.7000").size(9.5).color(theme.text_muted));
-                });
-            });
-            cols[1].vertical(|ui| {
-                Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.label(RichText::new("Average System ARI").size(10.5).color(theme.text_muted));
-                    ui.label(RichText::new(format!("{:.4}", avg_ari)).size(18.0).strong().color(theme.accent_blue));
-                    ui.label(RichText::new("Average Across 11 Members").size(9.5).color(theme.text_muted));
-                });
-            });
-            cols[2].vertical(|ui| {
-                Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.label(RichText::new("Critical Elements (ARI < 0.7)").size(10.5).color(theme.text_muted));
-                    ui.label(RichText::new(format!("{} Elements", critical_count)).size(18.0).strong().color(if critical_count == 0 { theme.accent_green } else { theme.accent_orange }));
-                    ui.label(RichText::new("Zero Collapse Potential").size(9.5).color(theme.text_muted));
-                });
-            });
-            cols[3].vertical(|ui| {
-                Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.label(RichText::new("Maximum DCR Stress").size(10.5).color(theme.text_muted));
-                    ui.label(RichText::new("0.684 (< 1.0)").size(18.0).strong().color(theme.accent_green));
-                    ui.label(RichText::new("Elastic Capacity Verified").size(9.5).color(theme.text_muted));
-                });
-            });
+        let ari_col = if min_ari >= 0.70 { theme.accent_green } else { theme.accent_orange };
+        let crit_col = if critical_count == 0 { theme.accent_green } else { theme.accent_orange };
+        ui_kit::responsive_grid_n(ui, 4, 210.0, |ui, idx| match idx {
+            0 => ui_kit::stat_card(
+                ui,
+                theme,
+                "MINIMUM SYSTEM ARI",
+                &format!("{:.4}", min_ari),
+                "Safe Threshold ≥ 0.7000",
+                ari_col,
+            ),
+            1 => ui_kit::stat_card(
+                ui,
+                theme,
+                "AVERAGE SYSTEM ARI",
+                &format!("{:.4}", avg_ari),
+                "Average Across 11 Members",
+                theme.accent_blue,
+            ),
+            2 => ui_kit::stat_card(
+                ui,
+                theme,
+                "CRITICAL ELEMENTS (ARI < 0.7)",
+                &format!("{} Elements", critical_count),
+                "Zero Collapse Potential",
+                crit_col,
+            ),
+            _ => ui_kit::stat_card(
+                ui,
+                theme,
+                "MAXIMUM DCR STRESS",
+                "0.684 (< 1.0)",
+                "Elastic Capacity Verified",
+                theme.accent_green,
+            ),
         });
 
         ui.add_space(16.0);
 
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("🌟 MULTI-DIMENSIONAL PROJECT SUMMARY (BIM 1D - 10D INTEGRATION)").size(13.0).strong().color(theme.text_primary));
             });
             ui.add_space(6.0);
@@ -938,7 +975,7 @@ impl ResultsView {
 
             for (dim, desc, status) in dimensions_summary {
                 Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(6)).inner_margin(Margin::same(8)).show(ui, |ui| {
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new(dim).size(11.0).strong().color(theme.accent_blue));
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(RichText::new(status).size(10.0).strong().color(theme.accent_green));
@@ -953,7 +990,7 @@ impl ResultsView {
 
     fn render_member_matrix(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("📋 COMPLETE ELEMENT PERFORMANCE AUDIT TABLE").size(14.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.checkbox(&mut self.filter_critical_only, "Show Critical Elements Only (ARI < 0.70)");
@@ -961,59 +998,63 @@ impl ResultsView {
             });
             ui.add_space(8.0);
 
-            egui::Grid::new("results_member_matrix_grid")
-                .striped(true)
-                .min_col_width(75.0)
-                .spacing(Vec2::new(12.0, 6.0))
+            ScrollArea::horizontal()
+                .id_salt("results_member_matrix_scroll")
                 .show(ui, |ui| {
-                    ui.label(RichText::new("Member ID").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Type").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Section").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Length (L)").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Axial Force (Pu)").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Capacity (φPn)").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("DCR Ratio").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("ARI Score").size(11.0).strong().color(theme.text_muted));
-                    ui.label(RichText::new("Safety Status").size(11.0).strong().color(theme.text_muted));
-                    ui.end_row();
+                    egui::Grid::new("results_member_matrix_grid")
+                        .striped(true)
+                        .min_col_width(75.0)
+                        .spacing(Vec2::new(12.0, 6.0))
+                        .show(ui, |ui| {
+                            ui.label(RichText::new("Member ID").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Type").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Section").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Length (L)").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Axial Force (Pu)").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Capacity (φPn)").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("DCR Ratio").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("ARI Score").size(11.0).strong().color(theme.text_muted));
+                            ui.label(RichText::new("Safety Status").size(11.0).strong().color(theme.text_muted));
+                            ui.end_row();
 
-                    for m in members {
-                        if self.filter_critical_only && m.ari >= 0.70 {
-                            continue;
-                        }
+                            for m in members {
+                                if self.filter_critical_only && m.ari >= 0.70 {
+                                    continue;
+                                }
 
-                        let dcr = if m.capacity_kn > 0.0 {
-                            (m.force_kn.abs() / m.capacity_kn).min(1.0)
-                        } else {
-                            m.utilization.min(1.0)
-                        };
-                        let ari_color = if m.ari >= 0.85 {
-                            theme.accent_green
-                        } else if m.ari >= 0.70 {
-                            theme.accent_blue
-                        } else {
-                            theme.accent_orange
-                        };
+                                let dcr = if m.capacity_kn > 0.0 {
+                                    (m.force_kn.abs() / m.capacity_kn).min(1.0)
+                                } else {
+                                    m.utilization.min(1.0)
+                                };
+                                let ari_color = if m.ari >= 0.85 {
+                                    theme.accent_green
+                                } else if m.ari >= 0.70 {
+                                    theme.accent_blue
+                                } else {
+                                    theme.accent_orange
+                                };
 
-                        let len_str = if m.name.contains("Diagonal") || m.name.contains("Web") { "5.14 m" } else { "6.00 m" };
-                        ui.label(RichText::new(format!("#{}", m.id)).size(11.0).strong().color(theme.text_primary));
-                        ui.label(RichText::new(m.name.clone()).size(11.0).color(theme.text_secondary));
-                        ui.label(RichText::new(m.section.clone()).size(11.0).color(theme.text_secondary));
-                        ui.label(RichText::new(len_str).size(11.0).color(theme.text_secondary));
-                        ui.label(RichText::new(format!("{:.1} kN", m.force_kn)).size(11.0).color(if m.force_kn >= 0.0 { theme.accent_blue } else { theme.accent_orange }));
-                        ui.label(RichText::new(format!("{:.1} kN", m.capacity_kn)).size(11.0).color(theme.text_secondary));
-                        ui.label(RichText::new(format!("{:.3}", dcr)).size(11.0).color(if dcr < 0.85 { theme.accent_green } else { theme.accent_orange }));
-                        ui.label(RichText::new(format!("{:.4}", m.ari)).size(11.0).strong().color(ari_color));
-                        ui.label(RichText::new(if m.ari >= 0.70 { "✅ SAFE" } else { "⚠️ CRITICAL" }).size(11.0).strong().color(ari_color));
-                        ui.end_row();
-                    }
+                                let len_str = if m.name.contains("Diagonal") || m.name.contains("Web") { "5.14 m" } else { "6.00 m" };
+                                ui.label(RichText::new(format!("#{}", m.id)).size(11.0).strong().color(theme.text_primary));
+                                ui.label(RichText::new(m.name.clone()).size(11.0).color(theme.text_secondary));
+                                ui.label(RichText::new(m.section.clone()).size(11.0).color(theme.text_secondary));
+                                ui.label(RichText::new(len_str).size(11.0).color(theme.text_secondary));
+                                ui.label(RichText::new(format!("{:.1} kN", m.force_kn)).size(11.0).color(if m.force_kn >= 0.0 { theme.accent_blue } else { theme.accent_orange }));
+                                ui.label(RichText::new(format!("{:.1} kN", m.capacity_kn)).size(11.0).color(theme.text_secondary));
+                                ui.label(RichText::new(format!("{:.3}", dcr)).size(11.0).color(if dcr < 0.85 { theme.accent_green } else { theme.accent_orange }));
+                                ui.label(RichText::new(format!("{:.4}", m.ari)).size(11.0).strong().color(ari_color));
+                                ui.label(RichText::new(if m.ari >= 0.70 { "✅ SAFE" } else { "⚠️ CRITICAL" }).size(11.0).strong().color(ari_color));
+                                ui.end_row();
+                            }
+                        });
                 });
         });
     }
 
     fn render_deformations_and_forces(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("📈 DEFORMATION ENVELOPES, LRFD COMBINATIONS & SUPPORT REACTIONS").size(14.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("6 SNI 1727:2020 / ASCE 7-22 LRFD Load Combinations").size(11.0).color(theme.accent_blue));
@@ -1021,31 +1062,31 @@ impl ResultsView {
             });
             ui.add_space(8.0);
 
-            ui.columns(3, |cols| {
-                cols[0].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Maximum Mid-Span Deflection (Δy)").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new("14.8 mm").size(18.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("Allowable Limit L/360 = 66.7 mm (Pass 22.2%)").size(10.0).color(theme.text_muted));
-                    });
-                });
-                cols[1].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Horizontal Lateral Drift (Δx)").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new("3.2 mm").size(18.0).strong().color(theme.accent_green));
-                        ui.label(RichText::new("Allowable Limit H/400 = 8.0 mm (Pass 40.0%)").size(10.0).color(theme.text_muted));
-                    });
-                });
-                cols[2].vertical(|ui| {
-                    Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new("Total Vertical Reaction (Σ Ry)").size(11.0).color(theme.text_muted));
-                        ui.label(RichText::new("342.6 kN").size(18.0).strong().color(theme.accent_blue));
-                        ui.label(RichText::new("Governing Combo: LC2 (1.2D + 1.6L)").size(10.0).color(theme.text_muted));
-                    });
-                });
+            ui_kit::responsive_grid_n(ui, 3, 210.0, |ui, idx| match idx {
+                0 => ui_kit::stat_card(
+                    ui,
+                    theme,
+                    "MAXIMUM MID-SPAN DEFLECTION (Δy)",
+                    "14.8 mm",
+                    "Allowable Limit L/360 = 66.7 mm (Pass 22.2%)",
+                    theme.accent_green,
+                ),
+                1 => ui_kit::stat_card(
+                    ui,
+                    theme,
+                    "HORIZONTAL LATERAL DRIFT (Δx)",
+                    "3.2 mm",
+                    "Allowable Limit H/400 = 8.0 mm (Pass 40.0%)",
+                    theme.accent_green,
+                ),
+                _ => ui_kit::stat_card(
+                    ui,
+                    theme,
+                    "TOTAL VERTICAL REACTION (Σ Ry)",
+                    "342.6 kN",
+                    "Governing Combo: LC2 (1.2D + 1.6L)",
+                    theme.accent_blue,
+                ),
             });
 
             ui.add_space(16.0);
@@ -1059,33 +1100,37 @@ impl ResultsView {
             if let Ok(model) = engine.generate_warren_truss() {
                 let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
                 if let Ok(conn_rep) = crate::core::ConnectionEngine::evaluate_model_connections(&model, ari.as_ref()) {
-                    egui::Grid::new("sni_1729_connection_audit_grid")
-                        .striped(true)
-                        .min_col_width(82.0)
-                        .spacing(Vec2::new(12.0, 6.0))
+                    ScrollArea::horizontal()
+                        .id_salt("results_connection_audit_scroll")
                         .show(ui, |ui| {
-                            ui.label(RichText::new("Member").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Ω_ARI").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Joint Demand Pu").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Bolt Configuration").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Bolt Shear Capacity").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Gusset Plate & Block Shear").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Fillet Weld E70XX").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Joint DCR").size(10.5).strong().color(theme.text_muted));
-                            ui.end_row();
+                            egui::Grid::new("sni_1729_connection_audit_grid")
+                                .striped(true)
+                                .min_col_width(82.0)
+                                .spacing(Vec2::new(12.0, 6.0))
+                                .show(ui, |ui| {
+                                    ui.label(RichText::new("Member").size(10.5).strong().color(theme.text_muted));
+                                    ui.label(RichText::new("Ω_ARI").size(10.5).strong().color(theme.text_muted));
+                                    ui.label(RichText::new("Joint Demand Pu").size(10.5).strong().color(theme.text_muted));
+                                    ui.label(RichText::new("Bolt Configuration").size(10.5).strong().color(theme.text_muted));
+                                    ui.label(RichText::new("Bolt Shear Capacity").size(10.5).strong().color(theme.text_muted));
+                                    ui.label(RichText::new("Gusset Plate & Block Shear").size(10.5).strong().color(theme.text_muted));
+                                    ui.label(RichText::new("Fillet Weld E70XX").size(10.5).strong().color(theme.text_muted));
+                                    ui.label(RichText::new("Joint DCR").size(10.5).strong().color(theme.text_muted));
+                                    ui.end_row();
 
-                            for c in conn_rep.member_connections.iter().take(8) {
-                                let dcr_col = if c.governing_dcr <= 0.85 { theme.accent_green } else { theme.accent_orange };
-                                ui.label(RichText::new(format!("E{}", c.element_id)).size(11.0).strong().color(theme.text_primary));
-                                ui.label(RichText::new(format!("{:.2}x", c.overstrength_omega)).size(11.0).color(theme.accent_blue));
-                                ui.label(RichText::new(format!("{:.1} kN", c.design_demand_kn)).size(11.0).color(theme.text_primary));
-                                ui.label(RichText::new(format!("{}x {}", c.bolt_count, c.bolt_grade.label())).size(11.0).color(theme.text_secondary));
-                                ui.label(RichText::new(format!("{:.1} kN", c.bolt_shear_capacity_kn)).size(11.0).color(theme.text_secondary));
-                                ui.label(RichText::new(format!("t={:.0}mm ({:.0} kN)", c.gusset_thickness_mm, c.block_shear_capacity_kn)).size(11.0).color(theme.text_secondary));
-                                ui.label(RichText::new(format!("a={:.0}mm, L={:.0}mm", c.weld_leg_mm, c.weld_length_mm)).size(11.0).color(theme.text_secondary));
-                                ui.label(RichText::new(format!("{:.3} ✅", c.governing_dcr)).size(11.0).strong().color(dcr_col));
-                                ui.end_row();
-                            }
+                                    for c in conn_rep.member_connections.iter().take(8) {
+                                        let dcr_col = if c.governing_dcr <= 0.85 { theme.accent_green } else { theme.accent_orange };
+                                        ui.label(RichText::new(format!("E{}", c.element_id)).size(11.0).strong().color(theme.text_primary));
+                                        ui.label(RichText::new(format!("{:.2}x", c.overstrength_omega)).size(11.0).color(theme.accent_blue));
+                                        ui.label(RichText::new(format!("{:.1} kN", c.design_demand_kn)).size(11.0).color(theme.text_primary));
+                                        ui.label(RichText::new(format!("{}x {}", c.bolt_count, c.bolt_grade.label())).size(11.0).color(theme.text_secondary));
+                                        ui.label(RichText::new(format!("{:.1} kN", c.bolt_shear_capacity_kn)).size(11.0).color(theme.text_secondary));
+                                        ui.label(RichText::new(format!("t={:.0}mm ({:.0} kN)", c.gusset_thickness_mm, c.block_shear_capacity_kn)).size(11.0).color(theme.text_secondary));
+                                        ui.label(RichText::new(format!("a={:.0}mm, L={:.0}mm", c.weld_leg_mm, c.weld_length_mm)).size(11.0).color(theme.text_secondary));
+                                        ui.label(RichText::new(format!("{:.3} ✅", c.governing_dcr)).size(11.0).strong().color(dcr_col));
+                                        ui.end_row();
+                                    }
+                                });
                         });
                 }
             }
@@ -1094,7 +1139,7 @@ impl ResultsView {
 
     fn render_certification_export(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("📑 OFFICIAL AUDIT DOCUMENTS, LATEX PUBLICATION TABLES & MULTI-FORMAT EXPORT").size(14.0).strong().color(theme.text_primary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("Platform EigenGraph 2026 • SHA-256 Sealed").size(11.0).color(theme.accent_blue));
@@ -1106,8 +1151,8 @@ impl ResultsView {
 
             ui.add_space(14.0);
 
-            ui.columns(2, |cols| {
-                cols[0].vertical(|ui| {
+            ui_kit::responsive_two_panes(ui, 700.0, |ui, pane| match pane {
+                0 => {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
                         ui.label(RichText::new("📜 AUDIT REPORTS, LATEX JOURNALS & .EIGEN ARCHIVES").size(12.0).strong().color(theme.text_primary));
@@ -1394,9 +1439,8 @@ impl ResultsView {
                             }
                         });
                     });
-                });
-
-                cols[1].vertical(|ui| {
+                }
+                _ => {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
                         ui.label(RichText::new("🌐 OPENBIM & CAD TRIAD DISK EXPORT").size(12.0).strong().color(theme.text_primary));
@@ -1476,8 +1520,9 @@ impl ResultsView {
                             }
                         });
                     });
-                });
+                }
             });
         });
     }
 }
+

@@ -13,8 +13,10 @@ use crate::core::gis::{
     ContourPolyline, CutFillVolumeReport, DemTerrainPreset, GeoProjectionEngine, SlippyMapState,
     TileSource, TinSurfaceMesh,
 };
+use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::NavigationPillar;
 use crate::theme::MacTheme;
+use crate::ui_kit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResearchSubTab {
@@ -128,9 +130,18 @@ impl ResearchConceptView {
             .compute_cut_fill_report(self.tin_datum_elevation_m, self.tin_slope_hazard_deg);
     }
 
-    pub fn show(&mut self, ui: &mut Ui, theme: &MacTheme, active_pillar: &mut NavigationPillar) {
+    pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        active_pillar: &mut NavigationPillar,
+        features: &mut FeatureRegistry,
+    ) {
+        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
+        let pad = if is_mobile { 10 } else { 20 };
+
         ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-            Frame::new().inner_margin(Margin::symmetric(20, 10)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(pad, 10)).show(ui, |ui| {
                 // 1. TOP SUBTABS SELECTOR (Re-Ordered: GIS & DEM TIN Studio First)
                 self.render_header_bar(ui, theme);
 
@@ -138,7 +149,7 @@ impl ResearchConceptView {
 
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
-                    ResearchSubTab::SurveyingSite => self.render_surveying_site(ui, theme),
+                    ResearchSubTab::SurveyingSite => self.render_surveying_site(ui, theme, features),
                     ResearchSubTab::ConceptFeasibility => {
                         self.render_concept_feasibility(ui, theme, active_pillar)
                     }
@@ -152,63 +163,28 @@ impl ResearchConceptView {
     }
 
     fn render_header_bar(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        Frame::new()
-            .fill(theme.bg_card)
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(6))
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .show(ui, |ui| {
-                let tabs = [
-                    (
-                        ResearchSubTab::SurveyingSite,
-                        "⛰️ GIS, DEM TIN Mesh & Geodetic Survey (Phases 23–25)",
-                    ),
-                    (
-                        ResearchSubTab::ConceptFeasibility,
-                        "💡 Feasibility Study & Concept Matrix",
-                    ),
-                    (
-                        ResearchSubTab::RegulatoryCodes,
-                        "📜 Design Codes (SNI / AISC / UFC)",
-                    ),
-                    (
-                        ResearchSubTab::AriFormulations,
-                        "🔬 Official ARI Formulations",
-                    ),
-                ];
-
-                ui.columns(4, |cols| {
-                    for (idx, (tab, label)) in tabs.into_iter().enumerate() {
-                        let is_active = self.active_subtab == tab;
-                        let bg = if is_active {
-                            theme.accent_blue
-                        } else {
-                            Color32::TRANSPARENT
-                        };
-                        let fg = if is_active {
-                            Color32::WHITE
-                        } else {
-                            theme.text_secondary
-                        };
-
-                        let w = cols[idx].available_width();
-                        if cols[idx]
-                            .add(
-                                egui::Button::new(RichText::new(label).size(11.5).strong().color(fg))
-                                    .fill(bg)
-                                    .corner_radius(CornerRadius::same(7))
-                                    .min_size(Vec2::new(w, 30.0)),
-                            )
-                            .clicked()
-                        {
-                            self.active_subtab = tab;
-                        }
-                    }
-                });
-            });
+        let tabs = [
+            (
+                ResearchSubTab::SurveyingSite,
+                "⛰️ GIS, DEM TIN Mesh & Geodetic Survey",
+            ),
+            (
+                ResearchSubTab::ConceptFeasibility,
+                "💡 Feasibility & Concept Matrix",
+            ),
+            (
+                ResearchSubTab::RegulatoryCodes,
+                "📜 Design Codes (SNI / AISC / UFC)",
+            ),
+            (
+                ResearchSubTab::AriFormulations,
+                "🔬 Official ARI Formulations",
+            ),
+        ];
+        ui_kit::subtab_bar(ui, theme, "research_subtab_bar", &mut self.active_subtab, &tabs);
     }
 
-    fn render_surveying_site(&mut self, ui: &mut Ui, theme: &MacTheme) {
+    fn render_surveying_site(&mut self, ui: &mut Ui, theme: &MacTheme, features: &mut FeatureRegistry) {
         // =========================================================================
         // SECTION 1 (TOP OF WORKSPACE): PHASE 25 — DIGITAL ELEVATION MODEL (DEM)
         // & TOPOGRAPHIC TIN MESH (500m x 500m, 10,082 Triangles @ 60 FPS)
@@ -219,7 +195,7 @@ impl ResearchConceptView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.2, theme.accent_blue.gamma_multiply(0.55)))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
                             RichText::new("⛰️ PHASE 25 — DIGITAL ELEVATION MODEL (DEM) & TOPOGRAPHIC TIN MESH")
@@ -438,7 +414,7 @@ impl ResearchConceptView {
             .corner_radius(CornerRadius::same(12))
             .stroke(Stroke::new(1.0, theme.border_card))
             .show(ui, |ui| {
-                let avail_w = ui.available_width();
+                let avail_w = ui.available_width().max(240.0);
                 let (rect, response) =
                     ui.allocate_exact_size(Vec2::new(avail_w, 420.0), Sense::click_and_drag());
 
@@ -455,9 +431,16 @@ impl ResearchConceptView {
 
         // Phase 25 KPI Telemetry Cards (TIN Topology, Cut/Fill Volumes, Slope Hazard, Elevation Range)
         let rep = &self.tin_cut_fill_report;
-        ui.columns(4, |cols| {
-            self.render_stat_card(
-                &mut cols[0],
+        let hazard_col = if rep.steep_hazard_ratio_pct > 15.0 {
+            theme.accent_red
+        } else if rep.steep_hazard_ratio_pct > 3.0 {
+            theme.accent_orange
+        } else {
+            theme.accent_green
+        };
+        ui_kit::responsive_grid_n(ui, 4, 210.0, |ui, idx| match idx {
+            0 => ui_kit::stat_card(
+                ui,
                 theme,
                 "TIN DELAUNAY MESH (500×500m)",
                 &format!("{} Triangles", self.tin_mesh.triangles.len()),
@@ -468,9 +451,9 @@ impl ResearchConceptView {
                     self.tin_mesh.grid_rows
                 ),
                 theme.accent_blue,
-            );
-            self.render_stat_card(
-                &mut cols[1],
+            ),
+            1 => ui_kit::stat_card(
+                ui,
                 theme,
                 "EARTHWORK CUT / FILL VOLUME",
                 &format!("Net {:+.0} m³", rep.net_balance_m3),
@@ -479,16 +462,9 @@ impl ResearchConceptView {
                     rep.cut_volume_m3, rep.fill_volume_m3, rep.datum_elevation_m
                 ),
                 theme.accent_green,
-            );
-            let hazard_col = if rep.steep_hazard_ratio_pct > 15.0 {
-                theme.accent_red
-            } else if rep.steep_hazard_ratio_pct > 3.0 {
-                theme.accent_orange
-            } else {
-                theme.accent_green
-            };
-            self.render_stat_card(
-                &mut cols[2],
+            ),
+            2 => ui_kit::stat_card(
+                ui,
                 theme,
                 "SLOPE HAZARD (> 30° SNI 8460)",
                 &format!("{:.1}% Hazard Area", rep.steep_hazard_ratio_pct),
@@ -497,9 +473,9 @@ impl ResearchConceptView {
                     rep.max_slope_deg, rep.mean_slope_deg, rep.steep_hazard_area_m2
                 ),
                 hazard_col,
-            );
-            self.render_stat_card(
-                &mut cols[3],
+            ),
+            _ => ui_kit::stat_card(
+                ui,
                 theme,
                 "ORTHOMETRIC ELEVATION & CONTOURS",
                 &format!(
@@ -513,7 +489,7 @@ impl ResearchConceptView {
                     self.tin_major_contour_m
                 ),
                 theme.text_primary,
-            );
+            ),
         });
 
         ui.add_space(18.0);
@@ -527,7 +503,7 @@ impl ResearchConceptView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
                             RichText::new("🗺️ PHASE 23 — GIS SITE INCEPTION & GEODETIC LOCATION STUDIO")
@@ -553,6 +529,22 @@ impl ResearchConceptView {
                     });
                 });
             });
+
+        ui.add_space(10.0);
+
+        // Phase 31+ Preview Slot: Live Raster Map Tile Cache & GeoTIFF/CSV DEM Importer
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::LiveRasterMapTileFetcher, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.button("🌐 Stream OSM / Esri Live Raster Tiles (0 / 512 MB Cache)");
+                let _ = ui.button("🗺️ Import GeoTIFF DEM (.tif)");
+                let _ = ui.button("📄 Load Survey Point Cloud (.csv / .xyz)");
+                ui.label(
+                    RichText::new("Pipeline ready for async WASM fetch + DEM resampling into the 72×72 TIN grid")
+                        .size(11.0)
+                        .color(theme.text_muted),
+                );
+            });
+        });
 
         ui.add_space(10.0);
 
@@ -600,16 +592,17 @@ impl ResearchConceptView {
                 ui.separator();
                 ui.add_space(8.0);
 
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(
                         RichText::new("🌐 Basemap:")
                             .size(12.0)
                             .strong()
                             .color(theme.text_primary),
                     );
+                    let combo_w = ui.available_width().clamp(140.0, 230.0);
                     egui::ComboBox::from_id_salt("tile_provider_select")
                         .selected_text(self.slippy_map.tile_provider.display_name())
-                        .width(230.0)
+                        .width(combo_w)
                         .show_ui(ui, |ui| {
                             ui.selectable_value(
                                 &mut self.slippy_map.tile_provider,
@@ -746,7 +739,7 @@ impl ResearchConceptView {
             .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(
                         RichText::new("🛰️ REAL-TIME GEODETIC TELEMETRY (EPSG:3857 / WGS84)")
                             .size(11.5)
@@ -763,11 +756,11 @@ impl ResearchConceptView {
                 });
                 ui.add_space(8.0);
 
-                ui.columns(4, |cols| {
-                    let lat_dir = if telem.lat >= 0.0 { 'N' } else { 'S' };
-                    let lon_dir = if telem.lon >= 0.0 { 'E' } else { 'W' };
-                    self.render_stat_card(
-                        &mut cols[0],
+                let lat_dir = if telem.lat >= 0.0 { 'N' } else { 'S' };
+                let lon_dir = if telem.lon >= 0.0 { 'E' } else { 'W' };
+                ui_kit::responsive_grid_n(ui, 4, 210.0, |ui, idx| match idx {
+                    0 => ui_kit::stat_card(
+                        ui,
                         theme,
                         "GEODETIC WGS84 (φ, λ)",
                         &format!(
@@ -779,31 +772,31 @@ impl ResearchConceptView {
                         ),
                         "BIM Geographic Reference",
                         theme.text_primary,
-                    );
-                    self.render_stat_card(
-                        &mut cols[1],
+                    ),
+                    1 => ui_kit::stat_card(
+                        ui,
                         theme,
                         "WEB MERCATOR (X, Y)",
                         &format!("{:.0} m, {:.0} m", telem.mercator_x, telem.mercator_y),
                         "EPSG:3857 Projected",
                         theme.accent_blue,
-                    );
-                    self.render_stat_card(
-                        &mut cols[2],
+                    ),
+                    2 => ui_kit::stat_card(
+                        ui,
                         theme,
                         "QUADTREE TILE [Z, X, Y]",
                         &format!("[{}, {}, {}]", telem.tile_z, telem.tile_x, telem.tile_y),
                         "256x256 Slippy Index",
                         theme.text_primary,
-                    );
-                    self.render_stat_card(
-                        &mut cols[3],
+                    ),
+                    _ => ui_kit::stat_card(
+                        ui,
                         theme,
                         "GROUND RESOLUTION",
                         &format!("{:.2} m / pixel", telem.ground_resolution_m_px),
                         "Scale 1 : 32,500",
                         theme.accent_green,
-                    );
+                    ),
                 });
             });
 
@@ -818,7 +811,7 @@ impl ResearchConceptView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
                             RichText::new("📐 PHASE 24 — GEODETIC CRS & UTM PROJECTION ENGINE (proj4rs Pure-Rust)")
@@ -846,307 +839,316 @@ impl ResearchConceptView {
 
                 ui.add_space(12.0);
 
-                ui.columns(2, |cols| {
+                ui_kit::responsive_two_panes(ui, 780.0, |ui, pane| match pane {
                     // Forward Transformation
-                    Frame::new()
-                        .fill(theme.bg_canvas)
-                        .corner_radius(CornerRadius::same(8))
-                        .inner_margin(Margin::same(12))
-                        .stroke(Stroke::new(1.0, theme.border_subtle))
-                        .show(&mut cols[0], |ui| {
-                            ui.label(
-                                RichText::new("🌐 WGS84 Geodetic ➔ UTM Projected (Forward)")
-                                    .size(13.0)
-                                    .strong()
-                                    .color(theme.accent_blue),
-                            );
-                            ui.add_space(8.0);
-
-                            ui.horizontal(|ui| {
+                    0 => {
+                        Frame::new()
+                            .fill(theme.bg_canvas)
+                            .corner_radius(CornerRadius::same(8))
+                            .inner_margin(Margin::same(12))
+                            .stroke(Stroke::new(1.0, theme.border_subtle))
+                            .show(ui, |ui| {
+                                ui.set_width(ui.available_width());
                                 ui.label(
-                                    RichText::new("Latitude φ (°):")
-                                        .size(11.5)
-                                        .color(theme.text_secondary),
+                                    RichText::new("🌐 WGS84 Geodetic ➔ UTM Projected (Forward)")
+                                        .size(13.0)
+                                        .strong()
+                                        .color(theme.accent_blue),
                                 );
-                                ui.add(
-                                    egui::TextEdit::singleline(&mut self.crs_input_lat)
-                                        .desired_width(110.0),
-                                );
-                                ui.label(
-                                    RichText::new("Longitude λ (°):")
-                                        .size(11.5)
-                                        .color(theme.text_secondary),
-                                );
-                                ui.add(
-                                    egui::TextEdit::singleline(&mut self.crs_input_lon)
-                                        .desired_width(110.0),
-                                );
-                            });
+                                ui.add_space(8.0);
 
-                            ui.add_space(6.0);
+                                let field_w = (ui.available_width() * 0.42).clamp(80.0, 120.0);
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label(
+                                        RichText::new("Latitude φ (°):")
+                                            .size(11.5)
+                                            .color(theme.text_secondary),
+                                    );
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.crs_input_lat)
+                                            .desired_width(field_w),
+                                    );
+                                    ui.label(
+                                        RichText::new("Longitude λ (°):")
+                                            .size(11.5)
+                                            .color(theme.text_secondary),
+                                    );
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.crs_input_lon)
+                                            .desired_width(field_w),
+                                    );
+                                });
 
-                            ui.horizontal(|ui| {
-                                ui.label(
-                                    RichText::new("Target Zone:")
-                                        .size(11.5)
-                                        .color(theme.text_secondary),
-                                );
-                                let current_zone_text = format!(
-                                    "Zone {} {}",
-                                    self.crs_selected_zone,
-                                    if self.crs_is_south { "S" } else { "N" }
-                                );
-                                egui::ComboBox::from_id_salt("utm_zone_dropdown")
-                                    .selected_text(current_zone_text)
-                                    .width(180.0)
-                                    .show_ui(ui, |ui| {
-                                        for z_info in GeoProjectionEngine::regional_zones_table() {
-                                            let label = format!(
-                                                "Zone {}S ({} - EPSG:{})",
-                                                z_info.zone, z_info.region_name, z_info.epsg_code
+                                ui.add_space(6.0);
+
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label(
+                                        RichText::new("Target Zone:")
+                                            .size(11.5)
+                                            .color(theme.text_secondary),
+                                    );
+                                    let current_zone_text = format!(
+                                        "Zone {} {}",
+                                        self.crs_selected_zone,
+                                        if self.crs_is_south { "S" } else { "N" }
+                                    );
+                                    let zone_w = (ui.available_width() - 95.0).clamp(120.0, 190.0);
+                                    egui::ComboBox::from_id_salt("utm_zone_dropdown")
+                                        .selected_text(current_zone_text)
+                                        .width(zone_w)
+                                        .show_ui(ui, |ui| {
+                                            for z_info in GeoProjectionEngine::regional_zones_table() {
+                                                let label = format!(
+                                                    "Zone {}S ({} - EPSG:{})",
+                                                    z_info.zone, z_info.region_name, z_info.epsg_code
+                                                );
+                                                if ui
+                                                    .selectable_label(
+                                                        self.crs_selected_zone == z_info.zone
+                                                            && self.crs_is_south == z_info.is_south,
+                                                        label,
+                                                    )
+                                                    .clicked()
+                                                {
+                                                    self.crs_selected_zone = z_info.zone;
+                                                    self.crs_is_south = z_info.is_south;
+                                                }
+                                            }
+                                        });
+
+                                    ui.checkbox(
+                                        &mut self.crs_is_south,
+                                        RichText::new("South").size(11.0).color(theme.text_secondary),
+                                    );
+                                });
+
+                                ui.add_space(10.0);
+
+                                ui.horizontal_wrapped(|ui| {
+                                    if ui
+                                        .add(
+                                            egui::Button::new(
+                                                RichText::new("🔄 Compute UTM")
+                                                    .size(11.5)
+                                                    .strong()
+                                                    .color(Color32::WHITE),
+                                            )
+                                            .fill(theme.accent_blue)
+                                            .corner_radius(CornerRadius::same(6)),
+                                        )
+                                        .clicked()
+                                    {
+                                        if let (Ok(lat), Ok(lon)) = (
+                                            self.crs_input_lat.trim().parse::<f64>(),
+                                            self.crs_input_lon.trim().parse::<f64>(),
+                                        ) {
+                                            let engine = GeoProjectionEngine::new(
+                                                self.crs_selected_zone,
+                                                self.crs_is_south,
                                             );
-                                            if ui
-                                                .selectable_label(
-                                                    self.crs_selected_zone == z_info.zone
-                                                        && self.crs_is_south == z_info.is_south,
-                                                    label,
-                                                )
-                                                .clicked()
-                                            {
-                                                self.crs_selected_zone = z_info.zone;
-                                                self.crs_is_south = z_info.is_south;
+                                            let (e, n, conv) = engine.wgs84_to_utm(lat, lon);
+                                            let scale = engine.point_scale_factor(lat, lon);
+                                            self.crs_input_easting = format!("{:.2}", e);
+                                            self.crs_input_northing = format!("{:.2}", n);
+                                            self.projection_engine = engine;
+                                            self.projection_engine.meridian_convergence_deg = conv;
+
+                                            let log_entry = format!(
+                                                "✅ WGS84 ({:.6}°, {:.6}°) ➔ UTM Zone {}{}: E = {:.2} m, N = {:.2} m (γ = {:.4}°, k = {:.6})",
+                                                lat,
+                                                lon,
+                                                self.crs_selected_zone,
+                                                if self.crs_is_south { "S" } else { "N" },
+                                                e,
+                                                n,
+                                                conv,
+                                                scale
+                                            );
+                                            self.crs_conversion_log.insert(0, log_entry);
+                                            if self.crs_conversion_log.len() > 8 {
+                                                self.crs_conversion_log.pop();
                                             }
                                         }
-                                    });
+                                    }
 
-                                ui.checkbox(
-                                    &mut self.crs_is_south,
-                                    RichText::new("South").size(11.0).color(theme.text_secondary),
-                                );
-                            });
-
-                            ui.add_space(10.0);
-
-                            ui.horizontal(|ui| {
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("🔄 Compute UTM")
-                                                .size(11.5)
-                                                .strong()
-                                                .color(Color32::WHITE),
+                                    if ui
+                                        .add(
+                                            egui::Button::new(
+                                                RichText::new("🧭 Auto-Detect")
+                                                    .size(11.0)
+                                                    .color(theme.text_secondary),
+                                            )
+                                            .fill(theme.bg_card)
+                                            .corner_radius(CornerRadius::same(6)),
                                         )
-                                        .fill(theme.accent_blue)
-                                        .corner_radius(CornerRadius::same(6)),
-                                    )
-                                    .clicked()
-                                {
-                                    if let (Ok(lat), Ok(lon)) = (
-                                        self.crs_input_lat.trim().parse::<f64>(),
-                                        self.crs_input_lon.trim().parse::<f64>(),
-                                    ) {
+                                        .clicked()
+                                    {
+                                        if let Ok(lon) = self.crs_input_lon.trim().parse::<f64>() {
+                                            self.crs_selected_zone =
+                                                GeoProjectionEngine::auto_detect_zone(lon);
+                                        }
+                                    }
+
+                                    if ui
+                                        .add(
+                                            egui::Button::new(
+                                                RichText::new("📍 Sync Pin")
+                                                    .size(11.0)
+                                                    .color(theme.text_secondary),
+                                            )
+                                            .fill(theme.bg_card)
+                                            .corner_radius(CornerRadius::same(6)),
+                                        )
+                                        .clicked()
+                                    {
+                                        let (plat, plon) = self
+                                            .slippy_map
+                                            .active_pin
+                                            .unwrap_or(self.slippy_map.center_lat_lon);
+                                        self.crs_input_lat = format!("{:.6}", plat);
+                                        self.crs_input_lon = format!("{:.6}", plon);
+                                        self.crs_selected_zone =
+                                            GeoProjectionEngine::auto_detect_zone(plon);
+                                        self.crs_is_south = plat < 0.0;
                                         let engine = GeoProjectionEngine::new(
                                             self.crs_selected_zone,
                                             self.crs_is_south,
                                         );
-                                        let (e, n, conv) = engine.wgs84_to_utm(lat, lon);
-                                        let scale = engine.point_scale_factor(lat, lon);
+                                        let (e, n, conv) = engine.wgs84_to_utm(plat, plon);
                                         self.crs_input_easting = format!("{:.2}", e);
                                         self.crs_input_northing = format!("{:.2}", n);
                                         self.projection_engine = engine;
                                         self.projection_engine.meridian_convergence_deg = conv;
-
-                                        let log_entry = format!(
-                                            "✅ WGS84 ({:.6}°, {:.6}°) ➔ UTM Zone {}{}: E = {:.2} m, N = {:.2} m (γ = {:.4}°, k = {:.6})",
-                                            lat,
-                                            lon,
-                                            self.crs_selected_zone,
-                                            if self.crs_is_south { "S" } else { "N" },
-                                            e,
-                                            n,
-                                            conv,
-                                            scale
-                                        );
-                                        self.crs_conversion_log.insert(0, log_entry);
-                                        if self.crs_conversion_log.len() > 8 {
-                                            self.crs_conversion_log.pop();
-                                        }
                                     }
-                                }
-
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("🧭 Auto-Detect")
-                                                .size(11.0)
-                                                .color(theme.text_secondary),
-                                        )
-                                        .fill(theme.bg_card)
-                                        .corner_radius(CornerRadius::same(6)),
-                                    )
-                                    .clicked()
-                                {
-                                    if let Ok(lon) = self.crs_input_lon.trim().parse::<f64>() {
-                                        self.crs_selected_zone =
-                                            GeoProjectionEngine::auto_detect_zone(lon);
-                                    }
-                                }
-
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("📍 Sync Pin")
-                                                .size(11.0)
-                                                .color(theme.text_secondary),
-                                        )
-                                        .fill(theme.bg_card)
-                                        .corner_radius(CornerRadius::same(6)),
-                                    )
-                                    .clicked()
-                                {
-                                    let (plat, plon) = self
-                                        .slippy_map
-                                        .active_pin
-                                        .unwrap_or(self.slippy_map.center_lat_lon);
-                                    self.crs_input_lat = format!("{:.6}", plat);
-                                    self.crs_input_lon = format!("{:.6}", plon);
-                                    self.crs_selected_zone =
-                                        GeoProjectionEngine::auto_detect_zone(plon);
-                                    self.crs_is_south = plat < 0.0;
-                                    let engine = GeoProjectionEngine::new(
-                                        self.crs_selected_zone,
-                                        self.crs_is_south,
-                                    );
-                                    let (e, n, conv) = engine.wgs84_to_utm(plat, plon);
-                                    self.crs_input_easting = format!("{:.2}", e);
-                                    self.crs_input_northing = format!("{:.2}", n);
-                                    self.projection_engine = engine;
-                                    self.projection_engine.meridian_convergence_deg = conv;
-                                }
+                                });
                             });
-                        });
+                    }
 
                     // Reverse Transformation
-                    Frame::new()
-                        .fill(theme.bg_canvas)
-                        .corner_radius(CornerRadius::same(8))
-                        .inner_margin(Margin::same(12))
-                        .stroke(Stroke::new(1.0, theme.border_subtle))
-                        .show(&mut cols[1], |ui| {
-                            ui.label(
-                                RichText::new("🗺️ UTM Projected ➔ WGS84 Geodetic (Reverse)")
-                                    .size(13.0)
-                                    .strong()
-                                    .color(theme.accent_green),
-                            );
-                            ui.add_space(8.0);
-
-                            ui.horizontal(|ui| {
+                    _ => {
+                        Frame::new()
+                            .fill(theme.bg_canvas)
+                            .corner_radius(CornerRadius::same(8))
+                            .inner_margin(Margin::same(12))
+                            .stroke(Stroke::new(1.0, theme.border_subtle))
+                            .show(ui, |ui| {
+                                ui.set_width(ui.available_width());
                                 ui.label(
-                                    RichText::new("Easting X (m):")
-                                        .size(11.5)
-                                        .color(theme.text_secondary),
+                                    RichText::new("🗺️ UTM Projected ➔ WGS84 Geodetic (Reverse)")
+                                        .size(13.0)
+                                        .strong()
+                                        .color(theme.accent_green),
                                 );
-                                ui.add(
-                                    egui::TextEdit::singleline(&mut self.crs_input_easting)
-                                        .desired_width(110.0),
-                                );
-                                ui.label(
-                                    RichText::new("Northing Y (m):")
-                                        .size(11.5)
-                                        .color(theme.text_secondary),
-                                );
-                                ui.add(
-                                    egui::TextEdit::singleline(&mut self.crs_input_northing)
-                                        .desired_width(110.0),
-                                );
-                            });
+                                ui.add_space(8.0);
 
-                            ui.add_space(6.0);
+                                let field_w = (ui.available_width() * 0.42).clamp(80.0, 120.0);
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label(
+                                        RichText::new("Easting X (m):")
+                                            .size(11.5)
+                                            .color(theme.text_secondary),
+                                    );
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.crs_input_easting)
+                                            .desired_width(field_w),
+                                    );
+                                    ui.label(
+                                        RichText::new("Northing Y (m):")
+                                            .size(11.5)
+                                            .color(theme.text_secondary),
+                                    );
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.crs_input_northing)
+                                            .desired_width(field_w),
+                                    );
+                                });
 
-                            ui.horizontal(|ui| {
-                                ui.label(
-                                    RichText::new(format!(
-                                        "Active Grid: UTM Zone {}{} (EPSG:{})",
-                                        self.crs_selected_zone,
-                                        if self.crs_is_south { "S" } else { "N" },
-                                        if self.crs_is_south {
-                                            32700 + self.crs_selected_zone as u32
-                                        } else {
-                                            32600 + self.crs_selected_zone as u32
-                                        }
-                                    ))
-                                    .size(11.5)
-                                    .color(theme.text_secondary),
-                                );
-                            });
+                                ui.add_space(6.0);
 
-                            ui.add_space(10.0);
-
-                            ui.horizontal(|ui| {
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("🔄 Compute WGS84")
-                                                .size(11.5)
-                                                .strong()
-                                                .color(Color32::WHITE),
-                                        )
-                                        .fill(theme.accent_green)
-                                        .corner_radius(CornerRadius::same(6)),
-                                    )
-                                    .clicked()
-                                {
-                                    if let (Ok(e), Ok(n)) = (
-                                        self.crs_input_easting.trim().parse::<f64>(),
-                                        self.crs_input_northing.trim().parse::<f64>(),
-                                    ) {
-                                        let engine = GeoProjectionEngine::new(
-                                            self.crs_selected_zone,
-                                            self.crs_is_south,
-                                        );
-                                        let (lat_back, lon_back) = engine.utm_to_wgs84(e, n);
-                                        self.crs_input_lat = format!("{:.6}", lat_back);
-                                        self.crs_input_lon = format!("{:.6}", lon_back);
-
-                                        let log_entry = format!(
-                                            "✅ UTM (E={:.2} m, N={:.2} m, Zone {}{}) ➔ WGS84: φ = {:.6}°, λ = {:.6}° [Error < 0.05 mm]",
-                                            e,
-                                            n,
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label(
+                                        RichText::new(format!(
+                                            "Active Grid: UTM Zone {}{} (EPSG:{})",
                                             self.crs_selected_zone,
                                             if self.crs_is_south { "S" } else { "N" },
-                                            lat_back,
-                                            lon_back
-                                        );
-                                        self.crs_conversion_log.insert(0, log_entry);
-                                        if self.crs_conversion_log.len() > 8 {
-                                            self.crs_conversion_log.pop();
+                                            if self.crs_is_south {
+                                                32700 + self.crs_selected_zone as u32
+                                            } else {
+                                                32600 + self.crs_selected_zone as u32
+                                            }
+                                        ))
+                                        .size(11.5)
+                                        .color(theme.text_secondary),
+                                    );
+                                });
+
+                                ui.add_space(10.0);
+
+                                ui.horizontal_wrapped(|ui| {
+                                    if ui
+                                        .add(
+                                            egui::Button::new(
+                                                RichText::new("🔄 Compute WGS84")
+                                                    .size(11.5)
+                                                    .strong()
+                                                    .color(Color32::WHITE),
+                                            )
+                                            .fill(theme.accent_green)
+                                            .corner_radius(CornerRadius::same(6)),
+                                        )
+                                        .clicked()
+                                    {
+                                        if let (Ok(e), Ok(n)) = (
+                                            self.crs_input_easting.trim().parse::<f64>(),
+                                            self.crs_input_northing.trim().parse::<f64>(),
+                                        ) {
+                                            let engine = GeoProjectionEngine::new(
+                                                self.crs_selected_zone,
+                                                self.crs_is_south,
+                                            );
+                                            let (lat_back, lon_back) = engine.utm_to_wgs84(e, n);
+                                            self.crs_input_lat = format!("{:.6}", lat_back);
+                                            self.crs_input_lon = format!("{:.6}", lon_back);
+
+                                            let log_entry = format!(
+                                                "✅ UTM (E={:.2} m, N={:.2} m, Zone {}{}) ➔ WGS84: φ = {:.6}°, λ = {:.6}° [Error < 0.05 mm]",
+                                                e,
+                                                n,
+                                                self.crs_selected_zone,
+                                                if self.crs_is_south { "S" } else { "N" },
+                                                lat_back,
+                                                lon_back
+                                            );
+                                            self.crs_conversion_log.insert(0, log_entry);
+                                            if self.crs_conversion_log.len() > 8 {
+                                                self.crs_conversion_log.pop();
+                                            }
                                         }
                                     }
-                                }
 
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("🎯 Center Map")
-                                                .size(11.0)
-                                                .color(theme.text_secondary),
+                                    if ui
+                                        .add(
+                                            egui::Button::new(
+                                                RichText::new("🎯 Center Map")
+                                                    .size(11.0)
+                                                    .color(theme.text_secondary),
+                                            )
+                                            .fill(theme.bg_card)
+                                            .corner_radius(CornerRadius::same(6)),
                                         )
-                                        .fill(theme.bg_card)
-                                        .corner_radius(CornerRadius::same(6)),
-                                    )
-                                    .clicked()
-                                {
-                                    if let (Ok(lat), Ok(lon)) = (
-                                        self.crs_input_lat.trim().parse::<f64>(),
-                                        self.crs_input_lon.trim().parse::<f64>(),
-                                    ) {
-                                        self.slippy_map.set_center(lat, lon);
-                                        self.slippy_map.active_pin = Some((lat, lon));
+                                        .clicked()
+                                    {
+                                        if let (Ok(lat), Ok(lon)) = (
+                                            self.crs_input_lat.trim().parse::<f64>(),
+                                            self.crs_input_lon.trim().parse::<f64>(),
+                                        ) {
+                                            self.slippy_map.set_center(lat, lon);
+                                            self.slippy_map.active_pin = Some((lat, lon));
+                                        }
                                     }
-                                }
+                                });
                             });
-                        });
+                    }
                 });
 
                 ui.add_space(12.0);
@@ -1175,7 +1177,7 @@ impl ResearchConceptView {
                     .inner_margin(Margin::same(12))
                     .stroke(Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.35)))
                     .show(ui, |ui| {
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.label(
                                 RichText::new(
                                     "🏛️ ISO 16739 / IFC4 IfcMapConversion BIM Georeferencing Ledger",
@@ -1195,39 +1197,39 @@ impl ResearchConceptView {
                         });
                         ui.add_space(6.0);
 
-                        ui.columns(4, |cols| {
-                            self.render_stat_card(
-                                &mut cols[0],
+                        ui_kit::responsive_grid_n(ui, 4, 210.0, |ui, idx| match idx {
+                            0 => ui_kit::stat_card(
+                                ui,
                                 theme,
                                 "PROJECT ORIGIN EASTING",
                                 &format!("{:.3} m", map_conv.easting_m),
                                 "UTM False Origin E₀",
                                 theme.text_primary,
-                            );
-                            self.render_stat_card(
-                                &mut cols[1],
+                            ),
+                            1 => ui_kit::stat_card(
+                                ui,
                                 theme,
                                 "PROJECT ORIGIN NORTHING",
                                 &format!("{:.3} m", map_conv.northing_m),
                                 "UTM False Origin N₀",
                                 theme.accent_blue,
-                            );
-                            self.render_stat_card(
-                                &mut cols[2],
+                            ),
+                            2 => ui_kit::stat_card(
+                                ui,
                                 theme,
                                 "TRUE NORTH ROTATION (γ)",
                                 &format!("{:+.4}°", map_conv.rotation_angle_deg),
                                 "Meridian Convergence",
                                 theme.text_primary,
-                            );
-                            self.render_stat_card(
-                                &mut cols[3],
+                            ),
+                            _ => ui_kit::stat_card(
+                                ui,
                                 theme,
                                 "ORTHOMETRIC DATUM (H)",
                                 &format!("{:.2} m MSL", map_conv.orthogonal_height_m),
                                 "Phase 25 TIN Pad Elevation",
                                 theme.accent_green,
-                            );
+                            ),
                         });
 
                         ui.add_space(8.0);
@@ -1435,7 +1437,9 @@ impl ResearchConceptView {
 
                 let badge_rect = Rect::from_min_size(
                     Pos2::new(
-                        (mouse_pos.x + 14.0).min(rect.right() - 220.0),
+                        (mouse_pos.x + 14.0)
+                            .min(rect.right() - 220.0)
+                            .max(rect.left() + 8.0),
                         (mouse_pos.y - 44.0).max(rect.top() + 10.0),
                     ),
                     Vec2::new(210.0, 42.0),
@@ -1473,7 +1477,8 @@ impl ResearchConceptView {
         }
 
         // 5. Top-Left & Bottom-Right HUD Overlays
-        let hud_tl = Rect::from_min_size(rect.left_top() + Vec2::new(12.0, 12.0), Vec2::new(310.0, 52.0));
+        let hud_w = (rect.width() - 24.0).clamp(180.0, 310.0);
+        let hud_tl = Rect::from_min_size(rect.left_top() + Vec2::new(12.0, 12.0), Vec2::new(hud_w, 52.0));
         painter.rect_filled(
             hud_tl,
             CornerRadius::same(8),
@@ -1527,7 +1532,7 @@ impl ResearchConceptView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.4)))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
                             RichText::new("💡 INITIAL CONCEPTUAL STAGE (1D BIM)")
@@ -1576,39 +1581,39 @@ impl ResearchConceptView {
 
         ui.add_space(16.0);
 
-        ui.columns(4, |cols| {
-            self.render_stat_card(
-                &mut cols[0],
+        ui_kit::responsive_grid_n(ui, 4, 210.0, |ui, idx| match idx {
+            0 => ui_kit::stat_card(
+                ui,
                 theme,
                 "TECHNICAL FEASIBILITY",
                 "96.5% FEASIBLE",
                 "24m Clear Span Without Central Pier",
                 theme.accent_green,
-            );
-            self.render_stat_card(
-                &mut cols[1],
+            ),
+            1 => ui_kit::stat_card(
+                ui,
                 theme,
                 "REDUNDANCY TARGET",
                 "ARI ≥ 0.85",
                 "Grade A Criteria: Free of Single Point of Failure",
                 theme.accent_blue,
-            );
-            self.render_stat_card(
-                &mut cols[2],
+            ),
+            2 => ui_kit::stat_card(
+                ui,
                 theme,
                 "COST FEASIBILITY",
                 "IDR 3.84 B",
                 "Max Budget Cap: IDR 4.20 B (Safe)",
                 theme.text_primary,
-            );
-            self.render_stat_card(
-                &mut cols[3],
+            ),
+            _ => ui_kit::stat_card(
+                ui,
                 theme,
                 "SCHEDULE TIMELINE",
                 "140 Days",
                 "6 SVD-Verified Erection Stages",
                 theme.text_primary,
-            );
+            ),
         });
 
         ui.add_space(16.0);
@@ -1672,9 +1677,9 @@ impl ResearchConceptView {
                         .inner_margin(Margin::same(12))
                         .stroke(stroke)
                         .show(ui, |ui| {
-                            ui.horizontal(|ui| {
+                            ui.horizontal_wrapped(|ui| {
                                 ui.vertical(|ui| {
-                                    ui.horizontal(|ui| {
+                                    ui.horizontal_wrapped(|ui| {
                                         ui.label(
                                             RichText::new(name).size(12.5).strong().color(
                                                 if is_best {
@@ -1772,7 +1777,7 @@ impl ResearchConceptView {
                 ];
 
                 for (code, title, details, status) in codes {
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         ui.vertical(|ui| {
                             ui.label(
                                 RichText::new(code)
@@ -1813,7 +1818,7 @@ impl ResearchConceptView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(
                         RichText::new(
                             "🔬 Official Theoretical Foundation: Adjusted Redundancy Index (EigenGraph 2026)",
@@ -1886,39 +1891,6 @@ impl ResearchConceptView {
                         });
                     ui.add_space(8.0);
                 }
-            });
-    }
-
-    fn render_stat_card(
-        &self,
-        ui: &mut Ui,
-        theme: &MacTheme,
-        title: &str,
-        val: &str,
-        subtitle: &str,
-        val_color: Color32,
-    ) {
-        Frame::new()
-            .fill(theme.bg_card)
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(14))
-            .stroke(Stroke::new(1.0, theme.border_card))
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.label(
-                    RichText::new(title)
-                        .size(10.0)
-                        .strong()
-                        .color(theme.text_muted),
-                );
-                ui.add_space(4.0);
-                ui.label(RichText::new(val).size(17.5).strong().color(val_color));
-                ui.add_space(4.0);
-                ui.label(
-                    RichText::new(subtitle)
-                        .size(10.5)
-                        .color(theme.text_secondary),
-                );
             });
     }
 }

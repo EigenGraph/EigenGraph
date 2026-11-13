@@ -7,6 +7,26 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.0] - 2026-11-13 — Phase 30: Frozen Responsive 15-Pillar Master Workspace Architecture & Centralized Feature Unlock Registry
+
+### Added
+- **Centralized Feature Gate & Unlock Roadmap Registry (`src/features.rs`, `src/lib.rs`, `src/app.rs`, `src/views/settings.rs`)**:
+  - Added `FeatureId` (44 capability identifiers), `FeatureStatus` (`Active` / `Locked { target_phase }`), and `FeatureRegistry` covering every active capability and upcoming Phase 31–33 slot across all 15 engineering navigation pillars.
+  - Upgraded **Settings Modal (`src/views/settings.rs`)** into a 3-tab hub featuring a live **Feature Registry & Unlock Roadmap** dashboard (`All`, `Locked Only`, `Prioritized`, `Active Only`, pillar readiness cards with one-click domain jump, batch Phase 31 prioritization, per-feature priority queueing, and `EigenGraph_Unlock_Backlog.md` export).
+  - Added a clickable header pill (`🔓 Active/Total • 📋 Roadmap`) in `src/app.rs` opening the Feature Registry directly from any workspace screen.
+- **Shared Responsive UI Primitive Kit (`src/ui_kit.rs`)**:
+  - Replaced rigid multi-column layouts across all 15 views with shared viewport-aware primitives (`responsive_grid_n`, `responsive_two_columns`, `responsive_two_panes`, `split_workspace`, `split_workspace_panes`, `subtab_bar`, `stat_card`, `feature_status_badge`, `locked_feature_slot`, `feature_slot_card`).
+- **Inline Locked Feature Slots Across All 15 Engineering Domains**:
+  - Wired standardized locked preview slots (`BrowserIndexedDbPersistence`, `LiveGeminiToolOrchestrator`, `LiveRasterMapTileFetcher`, `ParametricBidirectionalSync`, `LiveBvhGeometricClashSolver`, `LiveBimToFemAutoSync`, `BimDriven4DCriticalPathSync`, `LiveBimQtoBoqSync`, `BimMaterialLcaAutoSync`, `LiveIotTelemetryIngestion`, `SitePerimeter3DCraneCollision`, `LiveRebarBbsCuttingSync`, `WasmLocalIfcFileDropPicker`, `LiveShmAnomalyForecasting`, and `AutoProjectedBimDedSheets`) inline within their destination view layouts so future logic unlocks require zero layout restructuring.
+- **Modular View Architecture Cleanup (`src/views/`)**:
+  - Split oversized monolithic views into clean submodule directories: `src/views/analyze/` (`mod.rs`, `header.rs`, `core_fea.rs`, `seismic_dynamic.rs`, `member_design.rs`, `extreme_hazards.rs`), `src/views/build/` (`mod.rs`, `ribbon.rs`, `sidebar.rs`, `clash_bcf.rs`, `bottom_deck.rs`, `viewport_3d.rs`), `src/views/parametric/` (`mod.rs`, `ribbon.rs`, `inspector.rs`, `canvas_2d.rs`, `dynamo_studio.rs`), and `src/views/industrialized/` (`mod.rs`, `openbim_studio.rs`, `ifc_inspector.rs`, `dfma_robotics.rs`, `lifecycle_10d.rs`).
+
+### Fixed
+- **Viewport-Safe Grids, Scrollable Matrix Tables & Clamped Canvas Inputs Across All Views**:
+  - Eliminated remaining `ui.columns(...)` calls across views in favor of `ui_kit` adaptive cards and panes, wrapped wide member/QTO/DED matrices in horizontal `ScrollArea` containers, prevented title-block/schematic overlaps on narrow viewports in `src/views/results.rs`, removed dead helper helpers, and clamped unrestricted `TextEdit` / `ComboBox` widths across mobile, tablet, and desktop breakpoints.
+
+---
+
 ## [v0.2.9] - 2026-11-12 — Phase 29: Stateful 3D Clash & BCF 2.1 Coordination Hub, Autonomous AI Copilot Studio, Parametric Algorithmic Dynamo Preview & Lean/DfMA Supply Chain Trackers
 
 ### Added
