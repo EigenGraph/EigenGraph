@@ -58,7 +58,7 @@ impl BuildView {
                     SidebarTab::BcfIssues => self.render_bcf_tab(ui, theme),
                     SidebarTab::Geometry => self.render_geometry_tab(ui, theme),
                     SidebarTab::Modify => self.render_modify_tab(ui, theme),
-                    SidebarTab::Layers => self.render_layers_tab(ui, theme),
+                    SidebarTab::Layers => self.render_layers_tab(ui, theme, features),
                     _ => {}
                 }
             });
@@ -817,7 +817,7 @@ impl BuildView {
         }
     }
 
-    fn render_layers_tab(&mut self, ui: &mut Ui, theme: &MacTheme) {
+    fn render_layers_tab(&mut self, ui: &mut Ui, theme: &MacTheme, features: &mut FeatureRegistry) {
         ui.label(RichText::new("DISPLAY LAYERS & HEATMAP MODES").size(12.0).strong().color(theme.text_secondary));
         ui.add_space(6.0);
 
@@ -862,6 +862,23 @@ impl BuildView {
             });
             ui.checkbox(&mut self.animate_vibration, "🌀 Mode 1 Vibration Animation");
         }
+
+        ui.add_space(10.0);
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::FederatedLayersAxisSlicer, |ui| {
+            ui.label(RichText::new("Federated Discipline Isolation").size(10.5).strong().color(theme.accent_blue));
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "🏛️ ARC (Walls/Glazing)");
+                let _ = ui.selectable_label(true, "🏗️ STR (Frame/Core)");
+                let _ = ui.selectable_label(true, "⚡ MEP (Risers/Ducts)");
+                let _ = ui.selectable_label(false, "🕳️ GEO (Soil/Piles)");
+            });
+            ui.add_space(6.0);
+            let mut x_slice = 24.0_f32;
+            let mut y_slice = 18.0_f32;
+            ui.add(egui::Slider::new(&mut x_slice, 0.0..=30.0).text("Clip X (m)"));
+            ui.add(egui::Slider::new(&mut y_slice, 0.0..=24.0).text("Clip Y (m)"));
+            let _ = ui.button("🔪 Apply Multi-Axis Section Box Crop");
+        });
     }
 
 

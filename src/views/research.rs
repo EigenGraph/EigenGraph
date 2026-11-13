@@ -21,6 +21,8 @@ use crate::ui_kit;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResearchSubTab {
     SurveyingSite,
+    GeotechBorehole,
+    HydrologyFloodplain,
     ConceptFeasibility,
     RegulatoryCodes,
     AriFormulations,
@@ -150,6 +152,10 @@ impl ResearchConceptView {
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
                     ResearchSubTab::SurveyingSite => self.render_surveying_site(ui, theme, features),
+                    ResearchSubTab::GeotechBorehole => self.render_geotech_borehole(ui, theme, features),
+                    ResearchSubTab::HydrologyFloodplain => {
+                        self.render_hydrology_floodplain(ui, theme, features)
+                    }
                     ResearchSubTab::ConceptFeasibility => {
                         self.render_concept_feasibility(ui, theme, active_pillar)
                     }
@@ -167,6 +173,14 @@ impl ResearchConceptView {
             (
                 ResearchSubTab::SurveyingSite,
                 "⛰️ GIS, DEM TIN Mesh & Geodetic Survey",
+            ),
+            (
+                ResearchSubTab::GeotechBorehole,
+                "🕳️ Geotech Borehole & SPT (1D-05)",
+            ),
+            (
+                ResearchSubTab::HydrologyFloodplain,
+                "🌊 Hydrology IDF & Floodplain (1D-06)",
             ),
             (
                 ResearchSubTab::ConceptFeasibility,
@@ -1892,5 +1906,177 @@ impl ResearchConceptView {
                     ui.add_space(8.0);
                 }
             });
+    }
+
+    fn render_geotech_borehole(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::GeotechBoreholeStratigraphy, |ui| {
+            let stats = [
+                ("SITE CLASS (SNI 1726)", "Class SD (Medium)", "Vs30 = 248 m/s Weighted Avg", theme.accent_blue),
+                ("GROUNDWATER TABLE", "-3.20 m BGS", "Piezometer BH-02 Reading", theme.accent_orange),
+                ("LIQUEFACTION SCREEN", "Fs = 1.48 (SAFE)", "Seed-Idriss CRR/CSR @ Mw 7.8", theme.accent_green),
+                ("BEARING STRATUM TOE", "-24.0 m Bored Pile", "Dense Sand / Limestone N60 > 50", theme.text_primary),
+            ];
+            ui_kit::responsive_grid_n(ui, stats.len(), 175.0, |ui, idx| {
+                let (title, val, sub, col) = stats[idx];
+                ui_kit::stat_card(ui, theme, title, val, sub, col);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "Borehole BH-01");
+                let _ = ui.selectable_label(false, "BH-02 (Corner)");
+                let _ = ui.selectable_label(false, "CPT-04 Sounding");
+                let _ = ui.button("📥 Import AGS / CSV Boring Log");
+            });
+            ui.add_space(10.0);
+
+            ui_kit::responsive_two_panes(ui, 620.0, |ui, pane| match pane {
+                0 => {
+                    ui.label(RichText::new("SUBSURFACE STRATIGRAPHY PROFILE (0m – 30m)").size(11.0).strong().color(theme.accent_blue));
+                    ui.add_space(6.0);
+                    let desired = Vec2::new(ui.available_width(), 170.0);
+                    let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                    let painter = ui.painter_at(rect);
+                    painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
+
+                    let strata = [
+                        (0.0_f32, 0.20_f32, "0–6m Engineered Fill (N=11)", Color32::from_rgb(132, 114, 92)),
+                        (0.20, 0.50, "6–15m Soft Silty Clay (N=6, Vs=155 m/s)", Color32::from_rgb(92, 112, 128)),
+                        (0.50, 0.80, "15–24m Dense Cemented Sand (N=34, Vs=295 m/s)", Color32::from_rgb(176, 146, 86)),
+                        (0.80, 1.00, "24–30m Limestone Bedrock (N>50, Vs=540 m/s)", Color32::from_rgb(104, 108, 120)),
+                    ];
+                    let col_x = rect.left() + 18.0;
+                    let col_w = 56.0;
+                    for (t0, t1, label, col) in strata {
+                        let band = Rect::from_min_max(
+                            Pos2::new(col_x, rect.top() + 10.0 + t0 * (rect.height() - 20.0)),
+                            Pos2::new(col_x + col_w, rect.top() + 10.0 + t1 * (rect.height() - 20.0)),
+                        );
+                        painter.rect_filled(band, CornerRadius::ZERO, col);
+                        painter.rect_stroke(band, CornerRadius::ZERO, Stroke::new(0.8, Color32::BLACK), StrokeKind::Inside);
+                        painter.text(
+                            Pos2::new(col_x + col_w + 12.0, band.center().y),
+                            Align2::LEFT_CENTER,
+                            label,
+                            FontId::proportional(10.5),
+                            theme.text_primary,
+                        );
+                    }
+                    let gwt_y = rect.top() + 10.0 + 0.11 * (rect.height() - 20.0);
+                    painter.line_segment(
+                        [Pos2::new(col_x - 6.0, gwt_y), Pos2::new(col_x + col_w + 6.0, gwt_y)],
+                        Stroke::new(1.5, theme.accent_blue),
+                    );
+                }
+                _ => {
+                    ui.label(RichText::new("SPT BLOW COUNT (N60) & PILE DESIGN").size(11.0).strong().color(theme.accent_blue));
+                    ui.add_space(6.0);
+                    ScrollArea::horizontal().id_salt("geotech_spt_table").show(ui, |ui| {
+                        egui::Grid::new("geotech_spt_grid")
+                            .striped(true)
+                            .spacing(Vec2::new(14.0, 6.0))
+                            .show(ui, |ui| {
+                                for h in ["Depth (m)", "Soil Description", "N60", "cu / phi'", "Allowed Axial"] {
+                                    ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                                }
+                                ui.end_row();
+                                for (d, desc, n60, str_p, cap) in [
+                                    ("3.0m", "Compacted Silty Fill", "11", "phi' = 28 deg", "Skin 34 kPa"),
+                                    ("10.0m", "Alluvial Silty Clay", "6", "cu = 32 kPa", "Skin 28 kPa"),
+                                    ("18.0m", "Dense Silty Sand", "34", "phi' = 37 deg", "Skin 96 kPa"),
+                                    ("26.0m", "Hard Limestone", "50+", "qu = 3.8 MPa", "End 1,950 kPa"),
+                                ] {
+                                    ui.label(RichText::new(d).size(10.5).monospace().color(theme.text_primary));
+                                    ui.label(RichText::new(desc).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(n60).size(10.5).strong().color(theme.accent_orange));
+                                    ui.label(RichText::new(str_p).size(10.5).color(theme.text_muted));
+                                    ui.label(RichText::new(cap).size(10.5).strong().color(theme.accent_green));
+                                    ui.end_row();
+                                }
+                            });
+                    });
+                }
+            });
+        });
+    }
+
+    fn render_hydrology_floodplain(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::HydrologyIdfFloodplain, |ui| {
+            let cards = [
+                ("DESIGN STORM (T = 100 YR)", "I = 142.8 mm/hr", "tc = 22 min • IDF Log-Pearson III", theme.accent_blue),
+                ("PEAK RUNOFF (Q = C·I·A)", "1.84 m³/s", "Catchment 6.2 ha • C = 0.75", theme.accent_orange),
+                ("DETENTION BASIN VOLUME", "1,420 m³ Required", "Zero-Runoff Delta Policy Compliant", theme.accent_green),
+                ("RECOMMENDED MIN FFE", "+2.15 m ASL", "+0.65m Freeboard Above Q100 Flood", theme.accent_green),
+            ];
+            ui_kit::responsive_grid_n(ui, cards.len(), 175.0, |ui, idx| {
+                let (title, val, sub, col) = cards[idx];
+                ui_kit::stat_card(ui, theme, title, val, sub, col);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(false, "10-Yr Storm");
+                let _ = ui.selectable_label(false, "25-Yr Storm");
+                let _ = ui.selectable_label(true, "100-Yr Critical Storm");
+                let _ = ui.button("🌊 Compute Rational Hydrograph & Detention Size");
+            });
+            ui.add_space(10.0);
+
+            let desired = Vec2::new(ui.available_width(), 145.0);
+            let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+            let painter = ui.painter_at(rect);
+            painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
+            let plot = rect.shrink(28.0);
+            painter.line_segment(
+                [Pos2::new(plot.left(), plot.bottom()), Pos2::new(plot.right(), plot.bottom())],
+                Stroke::new(1.0, theme.text_muted),
+            );
+            painter.line_segment(
+                [Pos2::new(plot.left(), plot.bottom()), Pos2::new(plot.left(), plot.top())],
+                Stroke::new(1.0, theme.text_muted),
+            );
+            for (scale, col, lbl) in [
+                (1.00_f32, theme.accent_red, "T = 100 yr"),
+                (0.76, theme.accent_orange, "T = 25 yr"),
+                (0.58, theme.accent_blue, "T = 10 yr"),
+            ] {
+                let mut pts = Vec::with_capacity(20);
+                for i in 0..20 {
+                    let frac = i as f32 / 19.0;
+                    let intensity = scale * (0.95 / (1.0 + 3.8 * frac)).clamp(0.10, 1.0);
+                    pts.push(Pos2::new(
+                        plot.left() + frac * plot.width(),
+                        plot.bottom() - intensity * plot.height(),
+                    ));
+                }
+                for w in pts.windows(2) {
+                    painter.line_segment([w[0], w[1]], Stroke::new(2.0, col));
+                }
+                painter.text(
+                    pts[2],
+                    Align2::LEFT_BOTTOM,
+                    lbl,
+                    FontId::proportional(9.5),
+                    col,
+                );
+            }
+            painter.text(
+                Pos2::new(plot.center().x, rect.bottom() - 8.0),
+                Align2::CENTER_CENTER,
+                "IDF Rainfall Duration tc (5 min -> 180 min) ➔",
+                FontId::proportional(9.5),
+                theme.text_muted,
+            );
+        });
     }
 }

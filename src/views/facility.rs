@@ -17,6 +17,8 @@ pub enum FacilitySubTab {
     AssetRegistry,
     PredictiveMaintenance,
     LifecycleCosting,
+    MepIsolationAndSpace,
+    DroneInspectionMapper,
 }
 
 pub struct FacilityView {
@@ -96,6 +98,12 @@ impl FacilityView {
                         self.render_predictive_maintenance(ui, theme)
                     }
                     FacilitySubTab::LifecycleCosting => self.render_lifecycle_costing(ui, theme),
+                    FacilitySubTab::MepIsolationAndSpace => {
+                        self.render_mep_isolation_space(ui, theme, features);
+                    }
+                    FacilitySubTab::DroneInspectionMapper => {
+                        self.render_drone_inspection_mapper(ui, theme, features);
+                    }
                 }
 
                 ui.add_space(24.0);
@@ -109,6 +117,8 @@ impl FacilityView {
             (FacilitySubTab::AssetRegistry, "📑 COBie 3.0 Asset Registry"),
             (FacilitySubTab::PredictiveMaintenance, "🛠️ Predictive Maintenance & CMMS"),
             (FacilitySubTab::LifecycleCosting, "💵 30-Year Lifecycle Cost (LCC)"),
+            (FacilitySubTab::MepIsolationAndSpace, "🚱 MEP Valve Tree & Space KPI"),
+            (FacilitySubTab::DroneInspectionMapper, "🛸 UAV Crack & Spalling Mapper"),
         ];
         ui_kit::subtab_bar(ui, theme, "facility_subtab_bar", &mut self.active_subtab, &tabs);
     }
@@ -614,6 +624,166 @@ impl FacilityView {
                     self.render_sensor_card(ui, theme, title, val, sub, col);
                 });
             });
+    }
+
+    fn render_mep_isolation_space(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::MepIsolationSpaceUtilization, |ui| {
+            let cards = [
+                ("VALVE ISOLATION NODES", "42 Smart Valves", "Chilled Water, Domestic & Fire Standpipes", theme.accent_blue),
+                ("GROSS-TO-NET EFFICIENCY", "84.6% Net Usable", "24,200 m² Leasable / 28,600 m² GFA", theme.accent_green),
+                ("PEAK FLOOR OCCUPANCY", "72% Nominal", "BMS CO₂ Demand Ventilation Linked", theme.accent_orange),
+                ("CRITICAL RISER SHUTOFF", "VLV-CHW-04", "Impacts Levels L05–L08 East Wing", theme.text_primary),
+            ];
+            ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
+                let (t, v, s, c) = cards[idx];
+                self.render_sensor_card(ui, theme, t, v, s, c);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "System: Chilled Water Loop (CHW)");
+                let _ = ui.selectable_label(false, "Fire Sprinkler Zones");
+                let _ = ui.button("🚱 Trace Downstream Impacted Spaces");
+            });
+            ui.add_space(10.0);
+
+            ScrollArea::horizontal().id_salt("mep_valve_scroll").show(ui, |ui| {
+                egui::Grid::new("mep_valve_grid")
+                    .striped(true)
+                    .min_col_width(90.0)
+                    .spacing(Vec2::new(14.0, 6.0))
+                    .show(ui, |ui| {
+                        for h in ["Valve Tag", "System Line", "Floor Zone", "Downstream Rooms", "Space Occupancy", "State"] {
+                            ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                        }
+                        ui.end_row();
+                        for (tag, sys, flr, rms, occ, st, col) in [
+                            ("VLV-CHW-04", "Chilled Water Riser E", "L05–L08", "14 Office Bays (1,820 m²)", "78%", "OPEN", theme.accent_green),
+                            ("VLV-DOM-11", "Domestic Potable North", "L01–L04", "Core Restrooms & Pantry", "64%", "OPEN", theme.accent_green),
+                            ("VLV-SPR-02", "NFPA Wet Standpipe #2", "B01–L04", "Parking + Lobby Atrium", "45%", "TEST ISOLATED", theme.accent_orange),
+                        ] {
+                            ui.label(RichText::new(tag).size(10.5).monospace().color(theme.accent_blue));
+                            ui.label(RichText::new(sys).size(10.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(flr).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(rms).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(occ).size(10.5).color(theme.accent_blue));
+                            ui.label(RichText::new(st).size(10.5).strong().color(col));
+                            ui.end_row();
+                        }
+                    });
+            });
+        });
+    }
+
+    fn render_drone_inspection_mapper(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::DroneDefectCrackMapper, |ui| {
+            let cards = [
+                ("UAV CAPTURED FRAMES", "418 Ortho Tiles", "RTK Accuracy ±4 mm @ 6m Standoff", theme.accent_blue),
+                ("MAX CRACK WIDTH FOUND", "0.28 mm (ACI 224R)", "Allowable Coastal Exposure <= 0.30 mm", theme.accent_orange),
+                ("DELAMINATION / SPALLING", "2 Minor Patches", "Pier Cap P-03 West Face (< 0.4 m²)", theme.accent_red),
+                ("CMMS TICKETS SYNCED", "2 Auto-Logged", "Linked to COBie Asset GUIDs", theme.accent_green),
+            ];
+            ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
+                let (t, v, s, c) = cards[idx];
+                self.render_sensor_card(ui, theme, t, v, s, c);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "AI Vision: ACI 224R Crack Thresholds");
+                let _ = ui.selectable_label(false, "Thermal Spall Overlay");
+                let _ = ui.button("🛸 Import UAV Defect CSV & Auto-Pin 3D Markers");
+            });
+            ui.add_space(10.0);
+
+            ui_kit::responsive_two_panes(ui, 640.0, |ui, pane| match pane {
+                0 => {
+                    ui.label(
+                        RichText::new("FACADE & PIER ORTHOMOSAIC DEFECT OVERLAY")
+                            .size(11.0)
+                            .strong()
+                            .color(theme.accent_blue),
+                    );
+                    ui.add_space(6.0);
+                    let desired = Vec2::new(ui.available_width(), 155.0);
+                    let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                    let painter = ui.painter_at(rect);
+                    painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
+                    let elev = rect.shrink(22.0);
+                    painter.rect_stroke(
+                        elev,
+                        CornerRadius::ZERO,
+                        Stroke::new(1.5, theme.text_secondary),
+                        egui::StrokeKind::Inside,
+                    );
+                    for i in 1..4 {
+                        let gx = elev.left() + (i as f32 / 4.0) * elev.width();
+                        painter.line_segment(
+                            [Pos2::new(gx, elev.top()), Pos2::new(gx, elev.bottom())],
+                            Stroke::new(0.8, theme.border_subtle),
+                        );
+                    }
+                    let defects = [
+                        (0.32_f32, 0.48_f32, "CRK-01 (0.28mm)", theme.accent_orange),
+                        (0.72, 0.76, "SPL-02 (0.4 m²)", theme.accent_red),
+                    ];
+                    for (fx, fy, tag, col) in defects {
+                        let p = Pos2::new(elev.left() + fx * elev.width(), elev.top() + fy * elev.height());
+                        painter.circle_stroke(p, 8.0, Stroke::new(1.8, col));
+                        painter.circle_filled(p, 3.0, col);
+                        painter.text(
+                            p + Vec2::new(10.0, -4.0),
+                            egui::Align2::LEFT_CENTER,
+                            tag,
+                            egui::FontId::monospace(9.5),
+                            col,
+                        );
+                    }
+                }
+                _ => {
+                    ui.label(
+                        RichText::new("UAV STRUCTURAL DEFECT LEDGER (ACI 224R)")
+                            .size(11.0)
+                            .strong()
+                            .color(theme.accent_blue),
+                    );
+                    ui.add_space(6.0);
+                    ScrollArea::horizontal().id_salt("uav_defect_scroll").show(ui, |ui| {
+                        egui::Grid::new("uav_defect_grid")
+                            .striped(true)
+                            .spacing(Vec2::new(12.0, 5.0))
+                            .show(ui, |ui| {
+                                for h in ["Defect ID", "Member", "Width / Area", "Severity", "CMMS WO"] {
+                                    ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                                }
+                                ui.end_row();
+                                for (id, mem, meas, sev, wo, col) in [
+                                    ("UAV-CRK-01", "Shear Wall Core L04", "0.28 mm Flexural", "Monitor", "WO-2026-102", theme.accent_orange),
+                                    ("UAV-SPL-02", "Pier Cap P-03 West", "0.40 m² Cover Spall", "Epoxy Patch", "WO-2026-105", theme.accent_red),
+                                    ("UAV-CRK-03", "Parapet Beam R-12", "0.12 mm Shrinkage", "Nominal", "No Action", theme.accent_green),
+                                ] {
+                                    ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
+                                    ui.label(RichText::new(mem).size(10.5).strong().color(theme.text_primary));
+                                    ui.label(RichText::new(meas).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(sev).size(10.5).strong().color(col));
+                                    ui.label(RichText::new(wo).size(10.5).color(theme.text_muted));
+                                    ui.end_row();
+                                }
+                            });
+                    });
+                }
+            });
+        });
     }
 
     fn render_sensor_card(

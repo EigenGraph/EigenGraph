@@ -1,7 +1,10 @@
 //! sustainability.rs — Pillar 6: 6D BIM Sustainability & Energy.
 //! Analysis of energy efficiency, carbon footprint, environmental impact, and green building certification requirements.
 
-use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui, Vec2};
+use egui::{
+    Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText,
+    ScrollArea, Sense, Stroke, Ui, Vec2,
+};
 use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::{GreenBuildingCredit, LcaStageEmission, StructuralMember};
 use crate::theme::MacTheme;
@@ -13,6 +16,8 @@ pub enum SustainabilitySubTab {
     CarbonAriTradeoff,
     GreenCertification,
     EnergyLifecycle,
+    SolarOttvDaylight,
+    CircularDfdPassport,
 }
 
 pub struct SustainabilityView {
@@ -85,6 +90,12 @@ impl SustainabilityView {
                     SustainabilitySubTab::EnergyLifecycle => {
                         self.render_energy_lifecycle(ui, theme)
                     }
+                    SustainabilitySubTab::SolarOttvDaylight => {
+                        self.render_solar_ottv_daylight(ui, theme, features);
+                    }
+                    SustainabilitySubTab::CircularDfdPassport => {
+                        self.render_circular_dfd_passport(ui, theme, features);
+                    }
                 }
 
                 ui.add_space(24.0);
@@ -98,6 +109,8 @@ impl SustainabilityView {
             (SustainabilitySubTab::CarbonAriTradeoff, "📈 Carbon vs ARI Trade-Off"),
             (SustainabilitySubTab::GreenCertification, "🏅 Green Certification (LEED/Greenship)"),
             (SustainabilitySubTab::EnergyLifecycle, "⚡ Thermal & Lifecycle Durability"),
+            (SustainabilitySubTab::SolarOttvDaylight, "☀️ Solar OTTV & Daylight"),
+            (SustainabilitySubTab::CircularDfdPassport, "♻️ Circular Passport (DfD)"),
         ];
         ui_kit::subtab_bar(ui, theme, "sust_subtab_bar", &mut self.active_subtab, &tabs);
     }
@@ -541,6 +554,167 @@ impl SustainabilityView {
                     self.render_stat_card(ui, theme, title, val, sub, col);
                 });
             });
+    }
+
+    fn render_solar_ottv_daylight(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::SolarOttvThermalDaylight, |ui| {
+            let cards = [
+                ("OVERALL OTTV (SNI 6389)", "31.4 W/m² (PASS)", "Max Allowed Cap = 35.0 W/m²", theme.accent_green),
+                ("SOLAR HEAT GAIN (SHGC)", "0.32 Double Low-E", "WWR = 42% w/ External Louvers", theme.accent_blue),
+                ("DAYLIGHT AUTONOMY (sDA)", "68.5% Floor Area", "Target >= 55% @ 300 lux Occupied", theme.accent_green),
+                ("COOLING LOAD REDUCTION", "-184 kW Peak Chiller", "Annual HVAC Savings ≈ 240 MWh/yr", theme.accent_orange),
+            ];
+            ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
+                let (t, v, s, c) = cards[idx];
+                self.render_stat_card(ui, theme, t, v, s, c);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "Climate Zone: Tropical Marine (-6.2° S)");
+                let _ = ui.selectable_label(false, "Include 600mm Horizontal Sunshades");
+                let _ = ui.button("☀️ Compute N/E/S/W Facade OTTV & Glare Audit");
+            });
+            ui.add_space(12.0);
+
+            ui_kit::responsive_two_panes(ui, 640.0, |ui, pane| match pane {
+                0 => {
+                    ui.label(
+                        RichText::new("FACADE ORIENTATION SOLAR FLUX COMPASS (W/m²)")
+                            .size(11.0)
+                            .strong()
+                            .color(theme.accent_blue),
+                    );
+                    ui.add_space(6.0);
+                    let desired = Vec2::new(ui.available_width(), 165.0);
+                    let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                    let painter = ui.painter_at(rect);
+                    painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
+                    let c = rect.center();
+                    let r_max = (rect.width().min(rect.height()) * 0.36).max(28.0);
+                    painter.circle_stroke(c, r_max, Stroke::new(1.0, theme.border_subtle));
+                    painter.circle_stroke(c, r_max * 0.65, Stroke::new(0.8, theme.accent_green.gamma_multiply(0.5)));
+
+                    let dirs = [
+                        ("N: 24.8", 0.0_f32, -1.0_f32, 0.56_f32, theme.accent_green),
+                        ("E: 33.9", 1.0, 0.0, 0.85, theme.accent_orange),
+                        ("S: 27.1", 0.0, 1.0, 0.62, theme.accent_blue),
+                        ("W: 34.6", -1.0, 0.0, 0.88, theme.accent_red),
+                    ];
+                    let poly: Vec<Pos2> = dirs
+                        .iter()
+                        .map(|(_, dx, dy, frac, _)| c + Vec2::new(*dx * r_max * *frac, *dy * r_max * *frac))
+                        .collect();
+                    for i in 0..poly.len() {
+                        painter.line_segment(
+                            [poly[i], poly[(i + 1) % poly.len()]],
+                            Stroke::new(2.0, theme.accent_orange),
+                        );
+                    }
+                    for (lbl, dx, dy, _, col) in dirs {
+                        painter.text(
+                            c + Vec2::new(dx * (r_max + 22.0), dy * (r_max + 12.0)),
+                            Align2::CENTER_CENTER,
+                            lbl,
+                            egui::FontId::monospace(9.5),
+                            col,
+                        );
+                    }
+                }
+                _ => {
+                    ui.label(
+                        RichText::new("FACADE ORIENTATION THERMAL BREAKDOWN")
+                            .size(11.0)
+                            .strong()
+                            .color(theme.accent_blue),
+                    );
+                    ui.add_space(6.0);
+                    ScrollArea::horizontal().id_salt("ottv_facade_scroll").show(ui, |ui| {
+                        egui::Grid::new("ottv_facade_grid")
+                            .striped(true)
+                            .spacing(Vec2::new(12.0, 5.0))
+                            .show(ui, |ui| {
+                                for h in ["Orientation", "WWR", "SHGC", "OTTV (W/m²)", "SNI 6389"] {
+                                    ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                                }
+                                ui.end_row();
+                                for (dir, wwr, shgc, ottv, st, col) in [
+                                    ("North Facade", "38%", "0.34", "24.8", "PASS", theme.accent_green),
+                                    ("East Facade", "44%", "0.32", "33.9", "PASS (Marginal)", theme.accent_orange),
+                                    ("South Facade", "40%", "0.34", "27.1", "PASS", theme.accent_green),
+                                    ("West Facade", "46%", "0.28 + Fin", "34.6", "PASS (<35.0)", theme.accent_orange),
+                                ] {
+                                    ui.label(RichText::new(dir).size(10.5).strong().color(theme.text_primary));
+                                    ui.label(RichText::new(wwr).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(shgc).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(ottv).size(10.5).strong().color(col));
+                                    ui.label(RichText::new(st).size(10.5).color(col));
+                                    ui.end_row();
+                                }
+                            });
+                    });
+                }
+            });
+        });
+    }
+
+    fn render_circular_dfd_passport(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::CircularMaterialPassportDfd, |ui| {
+            let cards = [
+                ("REVERSIBLE BOLTED STEEL", "76.4% by Mass", "A325 Bolted End-Plates (Reuse Ready)", theme.accent_green),
+                ("EN 15978 MODULE D OFFSET", "-14.8 t CO₂e", "Circular Salvage & Recycling Credit", theme.accent_blue),
+                ("MATERIAL CIRCULARITY (MCI)", "0.68 Index", "Target >= 0.60 Urban Mining Tier", theme.accent_green),
+                ("PASSPORT INVENTORY TAGS", "142 Tagged Batches", "Mill Heat # & EPD Serials Archived", theme.text_primary),
+            ];
+            ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
+                let (t, v, s, c) = cards[idx];
+                self.render_stat_card(ui, theme, t, v, s, c);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "Include Bolted Deconstruction Pathways");
+                let _ = ui.selectable_label(false, "EU Madaster / ISO 20887 Schema");
+                let _ = ui.button("♻️ Export Circular Material Passport (.JSON / QR)");
+            });
+            ui.add_space(10.0);
+
+            ScrollArea::horizontal().id_salt("dfd_passport_scroll").show(ui, |ui| {
+                egui::Grid::new("dfd_passport_grid")
+                    .striped(true)
+                    .min_col_width(90.0)
+                    .spacing(Vec2::new(14.0, 6.0))
+                    .show(ui, |ui| {
+                        for h in ["Batch ID", "Structural Material", "Mass (Ton)", "Joint Type", "Reuse Pathway", "Module D Credit"] {
+                            ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                        }
+                        ui.end_row();
+                        for (id, mat, mass, jnt, path, cr) in [
+                            ("MAT-ST-01", "W14x90 ASTM A992 (EAF)", "38.2 T", "Bolted Splice", "100% Direct Reuse", "-11.4 t CO₂e"),
+                            ("MAT-ST-02", "HSS 8x8x1/2 Diagonals", "10.3 T", "Pinned Gusset", "92% Direct Reuse", "-2.9 t CO₂e"),
+                            ("MAT-RC-01", "Pile Cap Concrete K-350", "168.0 T", "Cast In-Situ", "Crushed Aggregate", "-0.5 t CO₂e"),
+                        ] {
+                            ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
+                            ui.label(RichText::new(mat).size(10.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(mass).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(jnt).size(10.5).color(theme.accent_green));
+                            ui.label(RichText::new(path).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(cr).size(10.5).strong().color(theme.accent_green));
+                            ui.end_row();
+                        }
+                    });
+            });
+        });
     }
 
     fn render_stat_card(

@@ -8,6 +8,8 @@ use crate::ui_kit;
 pub enum LibraryViewMode {
     ProjectsAndPortfolios,
     GlobalBimFamilyCatalog,
+    Iso19650CdeHub,
+    TypologyTemplateLauncher,
 }
 
 pub struct MyProjectView {
@@ -55,64 +57,63 @@ impl MyProjectView {
 
         ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
             Frame::new().inner_margin(outer_margin).show(ui, |ui| {
-                // Top Library Mode Selector (Phase 27)
-                Frame::new()
-                    .fill(theme.bg_card)
-                    .corner_radius(CornerRadius::same(8))
-                    .inner_margin(Margin::same(6))
-                    .stroke(Stroke::new(1.0, theme.border_subtle))
-                    .show(ui, |ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            let is_proj = self.library_mode == LibraryViewMode::ProjectsAndPortfolios;
-                            let is_fam = self.library_mode == LibraryViewMode::GlobalBimFamilyCatalog;
-
-                            if ui.add(egui::Button::new(RichText::new("📁 Project Portfolios & Vault").size(12.0).strong().color(if is_proj { Color32::WHITE } else { theme.text_secondary }))
-                                .fill(if is_proj { theme.accent_blue } else { Color32::TRANSPARENT })
-                                .corner_radius(CornerRadius::same(6))).clicked() {
-                                self.library_mode = LibraryViewMode::ProjectsAndPortfolios;
-                            }
-                            if ui.add(egui::Button::new(RichText::new("🧱 Global BIM Families & Parameter Inspector (Revit RFA / IFC Style)").size(12.0).strong().color(if is_fam { Color32::WHITE } else { theme.text_secondary }))
-                                .fill(if is_fam { theme.accent_blue } else { Color32::TRANSPARENT })
-                                .corner_radius(CornerRadius::same(6))).clicked() {
-                                self.library_mode = LibraryViewMode::GlobalBimFamilyCatalog;
-                            }
-                        });
-                    });
+                // Top Library Mode Selector (Phase 31 Responsive Sub-Tab Bar)
+                ui_kit::subtab_bar(
+                    ui,
+                    theme,
+                    "my_library_mode_subtabs",
+                    &mut self.library_mode,
+                    &[
+                        (LibraryViewMode::ProjectsAndPortfolios, "📁 Project Portfolios & Vault"),
+                        (LibraryViewMode::GlobalBimFamilyCatalog, "🧱 Global BIM Families & Parameters"),
+                        (LibraryViewMode::Iso19650CdeHub, "📂 ISO 19650 CDE Hub"),
+                        (LibraryViewMode::TypologyTemplateLauncher, "🏛️ Structural Templates"),
+                    ],
+                );
 
                 ui.add_space(14.0);
 
-                if self.library_mode == LibraryViewMode::GlobalBimFamilyCatalog {
-                    self.render_family_catalog(ui, theme);
-                } else {
-                    // 1. HERO FEATURED BANNER
-                    if let Some(featured) = projects.iter().find(|p| p.is_featured) {
-                        self.render_hero_banner(ui, theme, featured, active_pillar);
+                match self.library_mode {
+                    LibraryViewMode::GlobalBimFamilyCatalog => {
+                        self.render_family_catalog(ui, theme);
                     }
+                    LibraryViewMode::Iso19650CdeHub => {
+                        self.render_cde_iso19650_hub(ui, theme, features);
+                    }
+                    LibraryViewMode::TypologyTemplateLauncher => {
+                        self.render_typology_templates(ui, theme, features);
+                    }
+                    LibraryViewMode::ProjectsAndPortfolios => {
+                        // 1. HERO FEATURED BANNER
+                        if let Some(featured) = projects.iter().find(|p| p.is_featured) {
+                            self.render_hero_banner(ui, theme, featured, active_pillar);
+                        }
 
-                    if let Some(ref msg) = self.export_success_msg {
-                        ui.add_space(10.0);
-                        theme.card_frame().show(ui, |ui| {
-                            ui.horizontal_wrapped(|ui| {
-                                ui.label(RichText::new("✅ INTERNAL VAULT AUTOSAVE:").size(11.5).strong().color(theme.accent_green));
-                                ui.label(RichText::new(msg).size(11.5).color(theme.text_primary));
+                        if let Some(ref msg) = self.export_success_msg {
+                            ui.add_space(10.0);
+                            theme.card_frame().show(ui, |ui| {
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label(RichText::new("✅ INTERNAL VAULT AUTOSAVE:").size(11.5).strong().color(theme.accent_green));
+                                    ui.label(RichText::new(msg).size(11.5).color(theme.text_primary));
+                                });
                             });
-                        });
+                        }
+
+                        ui.add_space(16.0);
+
+                        // 1B. SELF-CONTAINED PACKAGE VAULT & SELF-LEARNING MEMORY PANEL
+                        self.render_internal_vault_panel(ui, theme, features);
+
+                        ui.add_space(20.0);
+
+                        // 2. CATEGORY FILTER PILLS
+                        self.render_category_bar(ui, theme);
+
+                        ui.add_space(16.0);
+
+                        // 3. CURATED PROJECT CARDS (Responsive 1-col / 2-col grid)
+                        self.render_projects_grid(ui, theme, projects, active_pillar);
                     }
-
-                    ui.add_space(16.0);
-
-                    // 1B. SELF-CONTAINED PACKAGE VAULT & SELF-LEARNING MEMORY PANEL
-                    self.render_internal_vault_panel(ui, theme, features);
-
-                    ui.add_space(20.0);
-
-                    // 2. CATEGORY FILTER PILLS
-                    self.render_category_bar(ui, theme);
-
-                    ui.add_space(16.0);
-
-                    // 3. CURATED PROJECT CARDS (Responsive 1-col / 2-col grid)
-                    self.render_projects_grid(ui, theme, projects, active_pillar);
                 }
 
                 ui.add_space(68.0);
@@ -968,5 +969,132 @@ impl MyProjectView {
                     });
                 });
             });
+    }
+
+    fn render_cde_iso19650_hub(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::CdeIso19650DocumentHub, |ui| {
+            let containers = [
+                ("WORK IN PROGRESS (WIP)", "14 Packages", "S0 — Authoring & Internal QA", theme.accent_orange),
+                ("SHARED COORDINATION", "9 Packages", "S1–S4 — Interdisciplinary BIM Check", theme.accent_blue),
+                ("PUBLISHED RECORD (IFC4/DED)", "6 Packages", "A1 — Authorized Construction Issue", theme.accent_green),
+                ("IMMUTABLE ARCHIVE", "23 Snapshots", "SHA-256 Tamper-Evident Vault", theme.text_primary),
+            ];
+            ui_kit::responsive_grid_n(ui, containers.len(), 175.0, |ui, idx| {
+                let (title, val, sub, col) = containers[idx];
+                ui_kit::stat_card(ui, theme, title, val, sub, col);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "Active Container: SHARED");
+                let _ = ui.selectable_label(false, "WIP Team Folders");
+                let _ = ui.selectable_label(false, "Transmittal Queue (2 Pending)");
+                let _ = ui.button("📤 Issue Transmittal Package (ISO 19650)");
+            });
+            ui.add_space(10.0);
+
+            ScrollArea::horizontal().id_salt("cde_iso19650_table").show(ui, |ui| {
+                egui::Grid::new("cde_iso19650_grid")
+                    .striped(true)
+                    .spacing(Vec2::new(14.0, 6.0))
+                    .show(ui, |ui| {
+                        for h in ["Document Code", "Originator", "Container", "Suitability", "Revision", "Lead Verifier"] {
+                            ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                        }
+                        ui.end_row();
+
+                        let rows = [
+                            ("EG-STR-MOD-L01-M3-S-001", "STR-TEAM", "Published", "A1 • Authorized Construction", "P04.01", "Senior PE Reviewer"),
+                            ("EG-ARC-PLN-ZZZ-DR-A-101", "ARC-TEAM", "Shared", "S4 • Stage Approval", "P03.02", "Lead Architect"),
+                            ("EG-MEP-HVC-L02-M3-M-204", "MEP-TEAM", "Shared", "S1 • Coordination", "P02.01", "MEP BIM Manager"),
+                            ("EG-GEO-TIN-SITE-SH-G-001", "GEO-TEAM", "WIP", "S0 • Initial Draft", "W01.04", "Geotech Specialist"),
+                        ];
+                        for (doc, orig, cont, suit, rev, lead) in rows {
+                            ui.label(RichText::new(doc).size(10.5).monospace().color(theme.text_primary));
+                            ui.label(RichText::new(orig).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(cont).size(10.5).strong().color(theme.accent_green));
+                            ui.label(RichText::new(suit).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(rev).size(10.5).monospace().color(theme.accent_blue));
+                            ui.label(RichText::new(lead).size(10.5).color(theme.text_muted));
+                            ui.end_row();
+                        }
+                    });
+            });
+        });
+    }
+
+    fn render_typology_templates(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::MultiTypologyProjectTemplates, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "All Structural Typologies");
+                let _ = ui.selectable_label(false, "High-Rise RC / Core Wall");
+                let _ = ui.selectable_label(false, "Long-Span Steel & Bridges");
+                let _ = ui.selectable_label(false, "Industrial Precast DfMA");
+            });
+            ui.add_space(10.0);
+
+            let templates = [
+                (
+                    "🌉 36m Composite Warren Arch Viaduct",
+                    "SNI 1725 / AASHTO LRFD Bridge Spec",
+                    "3×12m spans • W14x90 Chords • HL-93 Moving Load Preset • Baseline ARI 0.94",
+                    "Instantiate Steel Bridge Seed",
+                    theme.accent_blue,
+                ),
+                (
+                    "🏢 24-Storey Dual-System RC Tower",
+                    "SNI 2847 / ACI 318 / SNI 1726 KDS-D",
+                    "C45 Coupled Core Shear Walls + SMF Perimeter • Seismic R=7.0 • Baseline ARI 0.91",
+                    "Instantiate RC Tower Seed",
+                    theme.accent_green,
+                ),
+                (
+                    "🏗️ PT Post-Tensioned Box-Girder Flyover",
+                    "AASHTO Segmental / ACI 318 Ch. 20",
+                    "45m Balanced Cantilever Span • 19-Strand Low-Lax Tendons • Stage-Prestress Preset",
+                    "Instantiate PT Flyover Seed",
+                    theme.accent_orange,
+                ),
+                (
+                    "🏭 Automated Precast Logistics Fulfillment Hub",
+                    "PCI Design Handbook / 10D DfMA Ready",
+                    "18m Clear-Bay Precast Portal • Corbel Columns + Double-Tee Roof • CNC Ready",
+                    "Instantiate Precast Plant Seed",
+                    theme.text_primary,
+                ),
+            ];
+
+            ui_kit::responsive_grid_n(ui, templates.len(), 250.0, |ui, idx| {
+                let (title, code, specs, btn_label, accent) = templates[idx];
+                Frame::new()
+                    .fill(theme.bg_card)
+                    .corner_radius(CornerRadius::same(8))
+                    .stroke(Stroke::new(1.0, theme.border_card))
+                    .inner_margin(Margin::same(12))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.label(RichText::new(title).size(12.5).strong().color(accent));
+                        ui.label(RichText::new(code).size(10.0).strong().color(theme.text_muted));
+                        ui.add_space(6.0);
+                        ui.label(RichText::new(specs).size(11.0).color(theme.text_secondary));
+                        ui.add_space(10.0);
+                        let _ = ui.add(
+                            egui::Button::new(RichText::new(btn_label).size(11.0).strong().color(Color32::WHITE))
+                                .fill(theme.accent_blue)
+                                .corner_radius(CornerRadius::same(6)),
+                        );
+                    });
+            });
+        });
     }
 }

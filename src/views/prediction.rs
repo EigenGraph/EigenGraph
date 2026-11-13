@@ -1,7 +1,7 @@
 //! prediction.rs — Pillar: Prediction & AI Simulation.
 //! Advanced AI failure risk forecasting, progressive collapse simulation (DoD UFC 4-023-03), and structural serviceability degradation curves.
 
-use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText, ScrollArea, Sense, Stroke, Ui, Vec2};
+use egui::{Align, Align2, Color32, CornerRadius, FontId, Frame, Layout, Margin, Pos2, Rect, RichText, ScrollArea, Sense, Stroke, StrokeKind, Ui, Vec2};
 use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::StructuralMember;
 use crate::theme::MacTheme;
@@ -13,6 +13,8 @@ pub enum PredictionSubTab {
     ProgressiveCollapse,
     ErectionBottleneck,
     LifetimeDegradation,
+    ChlorideCarbonation,
+    PostQuakeAtc20,
 }
 
 pub struct PredictionView {
@@ -88,6 +90,12 @@ impl PredictionView {
                     PredictionSubTab::ProgressiveCollapse => self.render_progressive_collapse(ui, theme, members),
                     PredictionSubTab::ErectionBottleneck => self.render_erection_bottleneck(ui, theme),
                     PredictionSubTab::LifetimeDegradation => self.render_lifetime_degradation(ui, theme),
+                    PredictionSubTab::ChlorideCarbonation => {
+                        self.render_chloride_carbonation(ui, theme, features)
+                    }
+                    PredictionSubTab::PostQuakeAtc20 => {
+                        self.render_post_quake_atc20(ui, theme, features)
+                    }
                 }
 
                 ui.add_space(24.0);
@@ -101,6 +109,8 @@ impl PredictionView {
             (PredictionSubTab::ProgressiveCollapse, "⚡ Progressive Collapse (DoD UFC)"),
             (PredictionSubTab::ErectionBottleneck, "🏗️ 4D Erection Bottleneck"),
             (PredictionSubTab::LifetimeDegradation, "📉 50-Year Serviceability"),
+            (PredictionSubTab::ChlorideCarbonation, "🧪 Chloride & Carbonation (PRED-03)"),
+            (PredictionSubTab::PostQuakeAtc20, "🏷️ Post-Quake ATC-20 (PRED-04)"),
         ];
         ui_kit::subtab_bar(ui, theme, "prediction_subtab_bar", &mut self.active_subtab, &tabs);
     }
@@ -555,5 +565,307 @@ impl PredictionView {
                     painter.line_segment([w[0], w[1]], Stroke::new(2.2, theme.accent_green));
                 }
             });
+    }
+
+    fn render_chloride_carbonation(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::ChlorideCorrosionDurability,
+            |ui| {
+                ui_kit::responsive_grid_n(ui, 4, 180.0, |ui, idx| match idx {
+                    0 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "EXPOSURE CLASS (EN 206)",
+                        "XS2 Marine Submerged",
+                        "w/b = 0.38 • 30% GGBFS Blend",
+                        theme.accent_blue,
+                    ),
+                    1 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "TIME TO DEPASSIVATION",
+                        "58.4 Years (t_i)",
+                        "65 mm Clear Cover -> C_crit = 0.05%",
+                        theme.accent_green,
+                    ),
+                    2 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "50-YR REBAR SECTION LOSS",
+                        "1.85% Diameter Loss",
+                        "Fib Bulletin 34 Limit <= 5.0%",
+                        theme.accent_green,
+                    ),
+                    _ => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "CARBONATION FRONT (50 YR)",
+                        "19.4 mm Depth",
+                        "+45.6 mm Passivation Margin Left",
+                        theme.accent_blue,
+                    ),
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "Fick's 2nd Law erfc() Profile");
+                    let _ = ui.selectable_label(false, "Couple Silica Fume Cover Diffusivity");
+                    let _ = ui.button("🧪 Run Chloride Ingress & Service-Life Curve");
+                });
+                ui.add_space(12.0);
+
+                ui_kit::responsive_two_panes(ui, 660.0, |ui, pane| match pane {
+                    0 => {
+                        ui.label(
+                            RichText::new("FICK'S 2ND LAW DIFFUSION & REBAR PASSIVATION DEPTH CURVE")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        let desired = Vec2::new(ui.available_width(), 165.0);
+                        let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                        let painter = ui.painter_at(rect);
+                        painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(12, 16, 23));
+
+                        let plot = Rect::from_min_max(
+                            Pos2::new(rect.left() + 36.0, rect.top() + 18.0),
+                            Pos2::new(rect.right() - 16.0, rect.bottom() - 26.0),
+                        );
+                        // Cover depth threshold line (65 mm mapped at 0.72 height)
+                        let cover_y = plot.bottom() - 0.72 * plot.height();
+                        painter.line_segment(
+                            [Pos2::new(plot.left(), cover_y), Pos2::new(plot.right(), cover_y)],
+                            Stroke::new(1.3, theme.accent_orange),
+                        );
+                        painter.text(
+                            Pos2::new(plot.left() + 6.0, cover_y - 9.0),
+                            Align2::LEFT_CENTER,
+                            "Rebar Cover Depth = 65 mm",
+                            FontId::proportional(9.5),
+                            theme.accent_orange,
+                        );
+
+                        // Chloride front progression sqrt(t) from year 0 to 100
+                        let mut chl_pts = Vec::with_capacity(41);
+                        let mut carb_pts = Vec::with_capacity(41);
+                        for i in 0..=40 {
+                            let frac = i as f32 / 40.0;
+                            let px = plot.left() + frac * plot.width();
+                            let chl_mm = 78.0 * frac.sqrt();
+                            let carb_mm = 27.5 * frac.sqrt();
+                            let py_c = plot.bottom() - (chl_mm / 90.0).clamp(0.0, 0.98) * plot.height();
+                            let py_k = plot.bottom() - (carb_mm / 90.0).clamp(0.0, 0.98) * plot.height();
+                            chl_pts.push(Pos2::new(px, py_c));
+                            carb_pts.push(Pos2::new(px, py_k));
+                        }
+                        for w in chl_pts.windows(2) {
+                            painter.line_segment([w[0], w[1]], Stroke::new(2.2, theme.accent_blue));
+                        }
+                        for w in carb_pts.windows(2) {
+                            painter.line_segment([w[0], w[1]], Stroke::new(1.8, theme.accent_green));
+                        }
+                        painter.text(
+                            Pos2::new(rect.center().x, rect.bottom() - 10.0),
+                            Align2::CENTER_CENTER,
+                            "Blue: Chloride Front x_crit(t) • Green: Carbonation Front x_c(t) [0–100 Years]",
+                            FontId::monospace(8.5),
+                            theme.text_secondary,
+                        );
+                    }
+                    _ => {
+                        ui.label(
+                            RichText::new("ZONE-BY-ZONE CONCRETE DURABILITY MATRIX")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        ScrollArea::horizontal()
+                            .id_salt("chloride_durability_scroll")
+                            .show(ui, |ui| {
+                                egui::Grid::new("chloride_durability_grid")
+                                    .striped(true)
+                                    .min_col_width(82.0)
+                                    .spacing(Vec2::new(12.0, 6.0))
+                                    .show(ui, |ui| {
+                                        for h in ["Zone", "Cover (mm)", "D_app", "Depassiv. Yr", "Status"] {
+                                            ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                                        }
+                                        ui.end_row();
+                                        for (zn, cov, d, yr, st, col) in [
+                                            ("Splash Pile Cap", "75 mm", "3.1e-12", "68 yrs", "SAFE >= 50", theme.accent_green),
+                                            ("Submerged Pier", "65 mm", "4.0e-12", "58 yrs", "SAFE >= 50", theme.accent_green),
+                                            ("Podium Soffit", "40 mm", "6.2e-12", "34 yrs", "COAT EPOXY", theme.accent_orange),
+                                            ("Tower Core Wall", "50 mm", "2.4e-12", "92 yrs", "SAFE >= 50", theme.accent_green),
+                                        ] {
+                                            ui.label(RichText::new(zn).size(10.5).strong().color(theme.text_primary));
+                                            ui.label(RichText::new(cov).size(10.5).color(theme.text_secondary));
+                                            ui.label(RichText::new(d).size(10.5).monospace().color(theme.text_muted));
+                                            ui.label(RichText::new(yr).size(10.5).color(theme.accent_blue));
+                                            ui.label(RichText::new(st).size(10.5).strong().color(col));
+                                            ui.end_row();
+                                        }
+                                    });
+                            });
+                    }
+                });
+            },
+        );
+    }
+
+    fn render_post_quake_atc20(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::PostEarthquakeAtc20Tagging,
+            |ui| {
+                ui_kit::responsive_grid_n(ui, 4, 180.0, |ui, idx| match idx {
+                    0 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "TRIGGERED EVENT",
+                        "Mw 6.8 • 0.34g PGA",
+                        "7D Accelerometer Peak Capture",
+                        theme.accent_orange,
+                    ),
+                    1 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "PEAK INTERSTOREY DRIFT",
+                        "1.12% @ L06 Core",
+                        "Residual Drift = 0.14% (< 0.50%)",
+                        theme.accent_blue,
+                    ),
+                    2 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "GREEN PLACARDS",
+                        "4 / 6 Wings Clear",
+                        "Safe for Immediate Occupancy",
+                        theme.accent_green,
+                    ),
+                    _ => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "RESTRICTED / RED WINGS",
+                        "2 Yellow • 0 Red",
+                        "Podium West & L06 Shoring Check",
+                        theme.accent_orange,
+                    ),
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "Ingest Peak Sensor Drift + Strain");
+                    let _ = ui.selectable_label(false, "Auto-Generate ATC-20 Field Placards");
+                    let _ = ui.button("🏷️ Classify Building Wings & Dispatch Rapid Evaluation");
+                });
+                ui.add_space(12.0);
+
+                ui_kit::responsive_two_panes(ui, 660.0, |ui, pane| match pane {
+                    0 => {
+                        ui.label(
+                            RichText::new("BUILDING WING ATC-20 PLACARD TRIAGE MAP")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        let desired = Vec2::new(ui.available_width(), 162.0);
+                        let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                        let painter = ui.painter_at(rect);
+                        painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 25));
+
+                        let cols = 3;
+                        let rows = 2;
+                        let pad = 12.0;
+                        let cell_w = ((rect.width() - pad * (cols as f32 + 1.0)) / cols as f32).max(50.0);
+                        let cell_h = ((rect.height() - pad * (rows as f32 + 1.0)) / rows as f32).max(40.0);
+                        let wings = [
+                            ("WING A (East)", "GREEN • 0.68%", theme.accent_green),
+                            ("WING B (North)", "GREEN • 0.74%", theme.accent_green),
+                            ("PODIUM WEST", "YELLOW • 1.05%", theme.accent_orange),
+                            ("TOWER L01-L05", "GREEN • 0.88%", theme.accent_green),
+                            ("TOWER L06-L10", "YELLOW • 1.12%", theme.accent_orange),
+                            ("ROOF PENTHOUSE", "GREEN • 0.81%", theme.accent_green),
+                        ];
+                        for (idx, (name, tag, col)) in wings.iter().enumerate() {
+                            let c = idx % cols;
+                            let r = idx / cols;
+                            let x = rect.left() + pad + c as f32 * (cell_w + pad);
+                            let y = rect.top() + pad + r as f32 * (cell_h + pad);
+                            let box_rect = Rect::from_min_size(Pos2::new(x, y), Vec2::new(cell_w, cell_h));
+                            painter.rect_filled(box_rect, CornerRadius::same(6), col.gamma_multiply(0.18));
+                            painter.rect_stroke(box_rect, CornerRadius::same(6), Stroke::new(1.3, *col), StrokeKind::Inside);
+                            painter.text(
+                                box_rect.center() - Vec2::new(0.0, 7.0),
+                                Align2::CENTER_CENTER,
+                                *name,
+                                FontId::proportional(10.0),
+                                theme.text_primary,
+                            );
+                            painter.text(
+                                box_rect.center() + Vec2::new(0.0, 9.0),
+                                Align2::CENTER_CENTER,
+                                *tag,
+                                FontId::monospace(9.5),
+                                *col,
+                            );
+                        }
+                    }
+                    _ => {
+                        ui.label(
+                            RichText::new("ATC-20 RAPID STRUCTURAL TRIAGE CHECKLIST")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        ScrollArea::horizontal()
+                            .id_salt("atc20_triage_scroll")
+                            .show(ui, |ui| {
+                                egui::Grid::new("atc20_triage_grid")
+                                    .striped(true)
+                                    .min_col_width(82.0)
+                                    .spacing(Vec2::new(12.0, 6.0))
+                                    .show(ui, |ui| {
+                                        for h in ["Sector", "Peak Drift", "Residual Strain", "Placard", "Action Required"] {
+                                            ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                                        }
+                                        ui.end_row();
+                                        for (sec, dr, st, plc, act, col) in [
+                                            ("Wing A East", "0.68%", "0.02% Elastic", "GREEN", "Re-occupy", theme.accent_green),
+                                            ("Podium West", "1.05%", "0.18% Yield", "YELLOW", "Barricade Bay 4", theme.accent_orange),
+                                            ("Tower L06-L10", "1.12%", "0.14% Drift", "YELLOW", "Detailed Eval", theme.accent_orange),
+                                            ("Basement B2", "0.21%", "0.00% Elastic", "GREEN", "Nominal", theme.accent_green),
+                                        ] {
+                                            ui.label(RichText::new(sec).size(10.5).strong().color(theme.text_primary));
+                                            ui.label(RichText::new(dr).size(10.5).color(theme.text_secondary));
+                                            ui.label(RichText::new(st).size(10.5).color(theme.text_muted));
+                                            ui.label(RichText::new(plc).size(10.5).strong().color(col));
+                                            ui.label(RichText::new(act).size(10.5).color(theme.text_secondary));
+                                            ui.end_row();
+                                        }
+                                    });
+                            });
+                    }
+                });
+            },
+        );
     }
 }

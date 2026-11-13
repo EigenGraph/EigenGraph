@@ -7,7 +7,8 @@ use egui::{
 };
 use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::{
-    ConstructionSimulationPhase, CurrencyUnit, ParametricVariable, StructuralMember, WbsCostItem,
+    ConstructionSimulationPhase, CurrencyUnit, NavigationPillar, ParametricVariable,
+    StructuralMember, WbsCostItem,
 };
 use crate::theme::MacTheme;
 use crate::ui_kit;
@@ -41,6 +42,10 @@ pub enum PlanningSubTab {
     CostAriTradeoff,
     StagedErectionSvd,
     WbsHierarchy,
+    ScheduleRiskMonteCarlo,
+    ResourceLeveling4d,
+    EarnedValueEvm,
+    ValueEngineeringBid,
 }
 
 pub struct PlanningView {
@@ -256,6 +261,7 @@ impl PlanningView {
         variables: &[ParametricVariable],
         members: &[StructuralMember],
         features: &mut FeatureRegistry,
+        active_pillar: &mut NavigationPillar,
     ) {
         let takeoff = self.compute_takeoff(variables);
         let pad = if ui.available_width() < MacTheme::MOBILE_BREAKPOINT {
@@ -267,7 +273,7 @@ impl PlanningView {
         ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
             Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
                 // 1. TOP SUB-TABS SELECTOR & EXPORT BAR
-                self.render_header_bar(ui, theme, &takeoff);
+                self.render_header_bar(ui, theme, &takeoff, active_pillar);
 
                 ui.add_space(12.0);
 
@@ -294,6 +300,18 @@ impl PlanningView {
                         self.render_staged_erection_svd(ui, theme, &takeoff)
                     }
                     PlanningSubTab::WbsHierarchy => self.render_wbs_hierarchy(ui, theme, &takeoff),
+                    PlanningSubTab::ScheduleRiskMonteCarlo => {
+                        self.render_schedule_risk_monte_carlo(ui, theme, features);
+                    }
+                    PlanningSubTab::ResourceLeveling4d => {
+                        self.render_resource_leveling_4d(ui, theme, features);
+                    }
+                    PlanningSubTab::EarnedValueEvm => {
+                        self.render_earned_value_evm(ui, theme, &takeoff, features);
+                    }
+                    PlanningSubTab::ValueEngineeringBid => {
+                        self.render_value_engineering_bid(ui, theme, &takeoff, features);
+                    }
                 }
 
                 ui.add_space(48.0);
@@ -301,16 +319,33 @@ impl PlanningView {
         });
     }
 
-    fn render_header_bar(&mut self, ui: &mut Ui, theme: &MacTheme, takeoff: &Parametric5DTakeoff) {
-        let tabs = [
-            (PlanningSubTab::DynamicRab, "💰 5D BoQ / Cost"),
-            (PlanningSubTab::WbsHierarchy, "📑 5D WBS Explorer"),
-            (PlanningSubTab::TakeoffQto, "📊 QTO"),
-            (PlanningSubTab::Schedule4d, "⏱️ 4D Synchro Simulation"),
-            (PlanningSubTab::CostAriTradeoff, "📈 Cost vs ARI"),
-            (PlanningSubTab::StagedErectionSvd, "🏗️ Staged Erection Guard"),
-        ];
-        ui_kit::subtab_bar(ui, theme, "planning_subtab_bar", &mut self.active_subtab, &tabs);
+    fn render_header_bar(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        takeoff: &Parametric5DTakeoff,
+        active_pillar: &mut NavigationPillar,
+    ) {
+        let is_time_mode = *active_pillar == NavigationPillar::TimeScheduling;
+        if is_time_mode {
+            let time_tabs = [
+                (PlanningSubTab::Schedule4d, "⏱️ 4D Synchro Simulation"),
+                (PlanningSubTab::StagedErectionSvd, "🏗️ Staged Erection Guard"),
+                (PlanningSubTab::ScheduleRiskMonteCarlo, "🎲 Monte Carlo Risk"),
+                (PlanningSubTab::ResourceLeveling4d, "👷 Crew Leveling"),
+            ];
+            ui_kit::subtab_bar(ui, theme, "planning_time_subtab_bar", &mut self.active_subtab, &time_tabs);
+        } else {
+            let cost_tabs = [
+                (PlanningSubTab::DynamicRab, "💰 5D BoQ / Cost"),
+                (PlanningSubTab::WbsHierarchy, "📑 5D WBS Explorer"),
+                (PlanningSubTab::TakeoffQto, "📊 QTO"),
+                (PlanningSubTab::CostAriTradeoff, "📈 Cost vs ARI"),
+                (PlanningSubTab::EarnedValueEvm, "📈 Earned Value (EVM)"),
+                (PlanningSubTab::ValueEngineeringBid, "⚖️ VE & Bid Leveling"),
+            ];
+            ui_kit::subtab_bar(ui, theme, "planning_cost_subtab_bar", &mut self.active_subtab, &cost_tabs);
+        }
 
         ui.add_space(8.0);
         Frame::new()
@@ -320,6 +355,30 @@ impl PlanningView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
+                    let (switch_lbl, target_pillar, target_tab) = if is_time_mode {
+                        ("💰 Open 5D Budgeting", NavigationPillar::CostBudgeting, PlanningSubTab::DynamicRab)
+                    } else {
+                        ("⏱️ Open 4D Scheduling", NavigationPillar::TimeScheduling, PlanningSubTab::Schedule4d)
+                    };
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new(switch_lbl)
+                                    .size(11.0)
+                                    .strong()
+                                    .color(theme.accent_blue),
+                            )
+                            .fill(theme.accent_blue.gamma_multiply(0.15))
+                            .corner_radius(CornerRadius::same(6)),
+                        )
+                        .clicked()
+                    {
+                        *active_pillar = target_pillar;
+                        self.active_subtab = target_tab;
+                    }
+
+                    ui.separator();
+
                     ui.label(
                         RichText::new("CURRENCY:")
                             .size(10.5)
@@ -1161,6 +1220,583 @@ impl PlanningView {
                 }
             }
         });
+    }
+
+    // -------------------------------------------------------------
+    // SUB-TAB 6: MONTE CARLO & PERT SCHEDULE RISK (4D-03 LOCKED)
+    // -------------------------------------------------------------
+    fn render_schedule_risk_monte_carlo(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::MonteCarloScheduleRiskPert,
+            |ui| {
+                ui_kit::responsive_grid_n(ui, 4, 185.0, |ui, idx| match idx {
+                    0 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "DETERMINISTIC CPM",
+                        "360 Days",
+                        "Baseline Zero-Float Duration",
+                        theme.text_primary,
+                    ),
+                    1 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "P50 MEDIAN COMPLETION",
+                        "374 Days (+14d)",
+                        "50% Joint Confidence Forecast",
+                        theme.accent_blue,
+                    ),
+                    2 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "P80 SCHEDULE BUFFER",
+                        "396 Days (+36d)",
+                        "Recommended Contingency Envelope",
+                        theme.accent_orange,
+                    ),
+                    _ => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "TOP SENSITIVITY DRIVER",
+                        "WBS 05.12 (r=0.78)",
+                        "Structural Steel Erection Criticality",
+                        theme.accent_green,
+                    ),
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "Sampling: 1,000 Latin Hypercube Trials");
+                    let _ = ui.selectable_label(false, "PERT Beta Distribution (O / M / P)");
+                    let _ = ui.button("🎲 Run Monte Carlo Schedule Simulation");
+                });
+                ui.add_space(12.0);
+
+                ui_kit::responsive_two_panes(ui, 660.0, |ui, pane| match pane {
+                    0 => {
+                        ui.label(
+                            RichText::new("CUMULATIVE COMPLETION PROBABILITY (CDF S-CURVE)")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        let desired = Vec2::new(ui.available_width(), 170.0);
+                        let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                        let painter = ui.painter_at(rect);
+                        painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
+                        let plot = rect.shrink(28.0);
+                        for step in 0..=4 {
+                            let frac = step as f32 / 4.0;
+                            let y = plot.bottom() - frac * plot.height();
+                            painter.line_segment(
+                                [Pos2::new(plot.left(), y), Pos2::new(plot.right(), y)],
+                                Stroke::new(0.8, Color32::from_white_alpha(20)),
+                            );
+                        }
+                        let mut cdf_pts = Vec::with_capacity(25);
+                        for i in 0..=24 {
+                            let x_frac = i as f32 / 24.0;
+                            let z = (x_frac - 0.45) * 6.2;
+                            let sig = 1.0 / (1.0 + (-z).exp());
+                            let px = plot.left() + x_frac * plot.width();
+                            let py = plot.bottom() - sig * plot.height();
+                            cdf_pts.push(Pos2::new(px, py));
+                        }
+                        for w in cdf_pts.windows(2) {
+                            painter.line_segment([w[0], w[1]], Stroke::new(2.2, theme.accent_green));
+                        }
+                        let p80_x = plot.left() + 0.68 * plot.width();
+                        let p80_y = plot.bottom() - 0.80 * plot.height();
+                        painter.line_segment(
+                            [Pos2::new(p80_x, plot.bottom()), Pos2::new(p80_x, p80_y)],
+                            Stroke::new(1.5, theme.accent_orange),
+                        );
+                        painter.circle_filled(Pos2::new(p80_x, p80_y), 4.5, theme.accent_orange);
+                        painter.text(
+                            Pos2::new(p80_x + 6.0, p80_y - 4.0),
+                            Align2::LEFT_BOTTOM,
+                            "P80 = 396d",
+                            egui::FontId::monospace(9.5),
+                            theme.accent_orange,
+                        );
+                    }
+                    _ => {
+                        ui.label(
+                            RichText::new("TORNADO CRITICALITY & SCHEDULE SENSITIVITY")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        let drivers = [
+                            ("05.12 Steel Erection & Torque", 0.78, "±18d", theme.accent_red),
+                            ("02.10 Deep Bored Pile Sockets", 0.64, "±14d", theme.accent_orange),
+                            ("08.40 Unitized Curtain Wall Hoist", 0.49, "±11d", theme.accent_blue),
+                            ("23.00 MEP Riser Testing Window", 0.31, "±6d", theme.accent_green),
+                        ];
+                        for (name, corr, swing, col) in drivers {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(RichText::new(name).size(11.0).color(theme.text_primary));
+                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                    ui.label(
+                                        RichText::new(format!("r={:.2} ({})", corr, swing))
+                                            .size(10.5)
+                                            .strong()
+                                            .color(col),
+                                    );
+                                });
+                            });
+                            let (bar_r, _) = ui.allocate_exact_size(
+                                Vec2::new(ui.available_width().max(120.0), 8.0),
+                                Sense::hover(),
+                            );
+                            ui.painter().rect_filled(bar_r, CornerRadius::same(4), theme.bg_canvas);
+                            ui.painter().rect_filled(
+                                Rect::from_min_size(bar_r.min, Vec2::new(bar_r.width() * corr, 8.0)),
+                                CornerRadius::same(4),
+                                col,
+                            );
+                            ui.add_space(6.0);
+                        }
+                    }
+                });
+            },
+        );
+    }
+
+    // -------------------------------------------------------------
+    // SUB-TAB 7: CREW HISTOGRAM & RESOURCE LEVELING (4D-04 LOCKED)
+    // -------------------------------------------------------------
+    fn render_resource_leveling_4d(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::ResourceLevelingCrewHistogram,
+            |ui| {
+                ui_kit::responsive_grid_n(ui, 4, 185.0, |ui, idx| match idx {
+                    0 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "UNSMOOTHED PEAK CREW",
+                        "112 Workers/d",
+                        "Months M05–M06 Concurrent Peaks",
+                        theme.accent_red,
+                    ),
+                    1 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "LEVELED PEAK DEMAND",
+                        "82 Workers/d",
+                        "-26.8% Peak Smoothing (Within Float)",
+                        theme.accent_green,
+                    ),
+                    2 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "SITE HOIST & CRANE DUTY",
+                        "78.4% Utilization",
+                        "Zero Simultaneous Double-Pick Clashes",
+                        theme.accent_blue,
+                    ),
+                    _ => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "TOTAL FLOAT CONSUMED",
+                        "4.5 Days avg",
+                        "Critical Path Unchanged (360d)",
+                        theme.accent_orange,
+                    ),
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "Policy: Level Within Free Float Only");
+                    let _ = ui.selectable_label(false, "Site Crew Cap = 85 Workers");
+                    let _ = ui.button("👷 Recompute Leveled Manpower Histogram");
+                });
+                ui.add_space(10.0);
+
+                let desired = Vec2::new(ui.available_width(), 165.0);
+                let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                let painter = ui.painter_at(rect);
+                painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
+                let plot = rect.shrink(26.0);
+                let cap_y = plot.bottom() - (85.0 / 120.0) * plot.height();
+                painter.line_segment(
+                    [Pos2::new(plot.left(), cap_y), Pos2::new(plot.right(), cap_y)],
+                    Stroke::new(1.5, theme.accent_red),
+                );
+                painter.text(
+                    Pos2::new(plot.left() + 4.0, cap_y - 3.0),
+                    Align2::LEFT_BOTTOM,
+                    "Site Crew Capacity Limit (85 Workers)",
+                    egui::FontId::monospace(9.0),
+                    theme.accent_red,
+                );
+
+                let monthly_crews = [
+                    ("M1", 28.0_f32),
+                    ("M2", 42.0),
+                    ("M3", 58.0),
+                    ("M4", 72.0),
+                    ("M5", 82.0),
+                    ("M6", 81.0),
+                    ("M7", 79.0),
+                    ("M8", 74.0),
+                    ("M9", 68.0),
+                    ("M10", 54.0),
+                    ("M11", 38.0),
+                    ("M12", 22.0),
+                ];
+                let slot_w = plot.width() / monthly_crews.len() as f32;
+                let bar_w = (slot_w * 0.56).clamp(10.0, 28.0);
+                for (idx, (mo, workers)) in monthly_crews.iter().enumerate() {
+                    let cx = plot.left() + slot_w * (idx as f32 + 0.5);
+                    let h = (*workers / 120.0) * plot.height();
+                    let bar = Rect::from_min_max(
+                        Pos2::new(cx - bar_w * 0.5, plot.bottom() - h),
+                        Pos2::new(cx + bar_w * 0.5, plot.bottom()),
+                    );
+                    let col = if *workers > 78.0 {
+                        theme.accent_blue
+                    } else {
+                        theme.accent_green
+                    };
+                    painter.rect_filled(bar, CornerRadius::same(3), col);
+                    painter.text(
+                        Pos2::new(cx, plot.bottom() + 4.0),
+                        Align2::CENTER_TOP,
+                        *mo,
+                        egui::FontId::monospace(8.5),
+                        theme.text_muted,
+                    );
+                }
+            },
+        );
+    }
+
+    // -------------------------------------------------------------
+    // SUB-TAB 8: EARNED VALUE EVM & PROGRESS CLAIM (5D-03 LOCKED)
+    // -------------------------------------------------------------
+    fn render_earned_value_evm(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        t: &Parametric5DTakeoff,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::EarnedValueEvmProgressClaim,
+            |ui| {
+                let curr = self.active_currency;
+                let ev_val = t.grand_total_rab * 0.684;
+                let eac_val = t.grand_total_rab / 0.972;
+                let ev_str = curr.format_value(ev_val);
+                let eac_str = curr.format_value(eac_val);
+
+                ui_kit::responsive_grid_n(ui, 4, 185.0, |ui, idx| match idx {
+                    0 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "SCHEDULE PERF INDEX (SPI)",
+                        "1.04 (Ahead)",
+                        "EV / PV • +4.0% Early Erection Progress",
+                        theme.accent_green,
+                    ),
+                    1 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "COST PERF INDEX (CPI)",
+                        "0.97 (Watch)",
+                        "EV / AC • Fabrication Price Escalation",
+                        theme.accent_orange,
+                    ),
+                    2 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "EARNED VALUE (EV @ M07)",
+                        &ev_str,
+                        "68.4% Cumulative Certified Progress",
+                        theme.accent_blue,
+                    ),
+                    _ => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "ESTIMATE AT COMPLETION (EAC)",
+                        &eac_str,
+                        "BAC / CPI Projection • 5% Retention Held",
+                        theme.text_primary,
+                    ),
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "Reporting Cutoff: Month 07 (IPC-07)");
+                    let _ = ui.selectable_label(false, "Contract Retention: 5.0%");
+                    let _ = ui.button("📈 Certify Monthly Progress Claim (.PDF / .CSV)");
+                });
+                ui.add_space(12.0);
+
+                ui_kit::responsive_two_panes(ui, 660.0, |ui, pane| match pane {
+                    0 => {
+                        ui.label(
+                            RichText::new("PV / EV / AC EARNED VALUE S-CURVE (M01–M12)")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        let desired = Vec2::new(ui.available_width(), 165.0);
+                        let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                        let painter = ui.painter_at(rect);
+                        painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
+                        let plot = rect.shrink(24.0);
+                        let cut_x = plot.left() + 0.58 * plot.width();
+                        painter.line_segment(
+                            [Pos2::new(cut_x, plot.top()), Pos2::new(cut_x, plot.bottom())],
+                            Stroke::new(1.2, theme.text_muted),
+                        );
+                        painter.text(
+                            Pos2::new(cut_x + 4.0, plot.top() + 2.0),
+                            Align2::LEFT_TOP,
+                            "Data Date M07",
+                            egui::FontId::monospace(8.5),
+                            theme.text_muted,
+                        );
+                        // Planned Value S-Curve (Full M01..M12)
+                        let pv_vals = [0.04_f32, 0.09, 0.17, 0.28, 0.42, 0.55, 0.66, 0.77, 0.87, 0.94, 0.98, 1.0];
+                        let pv_pts: Vec<Pos2> = pv_vals
+                            .iter()
+                            .enumerate()
+                            .map(|(i, v)| {
+                                Pos2::new(
+                                    plot.left() + (i as f32 / 11.0) * plot.width(),
+                                    plot.bottom() - *v * plot.height(),
+                                )
+                            })
+                            .collect();
+                        for w in pv_pts.windows(2) {
+                            painter.line_segment([w[0], w[1]], Stroke::new(1.8, theme.accent_blue));
+                        }
+                        // Earned Value through M07
+                        let ev_vals = [0.04_f32, 0.10, 0.18, 0.30, 0.44, 0.58, 0.684];
+                        let ev_pts: Vec<Pos2> = ev_vals
+                            .iter()
+                            .enumerate()
+                            .map(|(i, v)| {
+                                Pos2::new(
+                                    plot.left() + (i as f32 / 11.0) * plot.width(),
+                                    plot.bottom() - *v * plot.height(),
+                                )
+                            })
+                            .collect();
+                        for w in ev_pts.windows(2) {
+                            painter.line_segment([w[0], w[1]], Stroke::new(2.4, theme.accent_green));
+                        }
+                        // Actual Cost through M07
+                        let ac_vals = [0.05_f32, 0.11, 0.20, 0.32, 0.46, 0.60, 0.705];
+                        let ac_pts: Vec<Pos2> = ac_vals
+                            .iter()
+                            .enumerate()
+                            .map(|(i, v)| {
+                                Pos2::new(
+                                    plot.left() + (i as f32 / 11.0) * plot.width(),
+                                    plot.bottom() - *v * plot.height(),
+                                )
+                            })
+                            .collect();
+                        for w in ac_pts.windows(2) {
+                            painter.line_segment([w[0], w[1]], Stroke::new(1.8, theme.accent_orange));
+                        }
+                    }
+                    _ => {
+                        ui.label(
+                            RichText::new("INTERIM PAYMENT CERTIFICATE (IPC-07) BY DIVISION")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        ScrollArea::horizontal().id_salt("evm_ipc_scroll").show(ui, |ui| {
+                            egui::Grid::new("evm_ipc_grid")
+                                .striped(true)
+                                .spacing(Vec2::new(12.0, 5.0))
+                                .show(ui, |ui| {
+                                    for h in ["Division", "BAC %", "Earned %", "CPI", "SPI", "Status"] {
+                                        ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                                    }
+                                    ui.end_row();
+                                    for (div, bac, ev, cpi, spi, st) in [
+                                        ("02 Substructure", "100%", "100.0%", "1.02", "1.00", "Settled"),
+                                        ("03 RC Cores & Slabs", "100%", "84.2%", "0.98", "1.05", "Certified"),
+                                        ("05 Structural Steel", "100%", "71.5%", "0.95", "1.06", "IPC-07 Ready"),
+                                        ("08 Unitized Glazing", "100%", "28.0%", "1.01", "0.96", "Fabricating"),
+                                    ] {
+                                        ui.label(RichText::new(div).size(10.5).strong().color(theme.text_primary));
+                                        ui.label(RichText::new(bac).size(10.5).color(theme.text_muted));
+                                        ui.label(RichText::new(ev).size(10.5).color(theme.accent_green));
+                                        ui.label(RichText::new(cpi).size(10.5).color(theme.text_secondary));
+                                        ui.label(RichText::new(spi).size(10.5).color(theme.accent_blue));
+                                        ui.label(RichText::new(st).size(10.5).color(theme.accent_green));
+                                        ui.end_row();
+                                    }
+                                });
+                        });
+                    }
+                });
+            },
+        );
+    }
+
+    // -------------------------------------------------------------
+    // SUB-TAB 9: VALUE ENGINEERING & BID LEVELING (5D-04 LOCKED)
+    // -------------------------------------------------------------
+    fn render_value_engineering_bid(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        t: &Parametric5DTakeoff,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::ValueEngineeringTenderMatrix,
+            |ui| {
+                let curr = self.active_currency;
+                let oe_str = curr.format_value(t.grand_total_rab);
+                let low_bid_str = curr.format_value(t.grand_total_rab * 0.936);
+                let ve_save_str = curr.format_value(t.grand_total_rab * 0.042);
+
+                ui_kit::responsive_grid_n(ui, 4, 185.0, |ui, idx| match idx {
+                    0 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "OWNER ESTIMATE (OE)",
+                        &oe_str,
+                        "Baseline 5D Cost Model (Parametric)",
+                        theme.text_primary,
+                    ),
+                    1 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "LOWEST COMPLIANT BID",
+                        &low_bid_str,
+                        "Bidder B (-6.4% Below Owner Est.)",
+                        theme.accent_green,
+                    ),
+                    2 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "UNBALANCED RATE ALERTS",
+                        "1 Flagged Line",
+                        "Bidder C Earthwork +28% Front-Loaded",
+                        theme.accent_orange,
+                    ),
+                    _ => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "VE REDESIGN POTENTIAL",
+                        &format!("-{}", ve_save_str),
+                        "Composite Metal Deck Swap (ARI Safe)",
+                        theme.accent_blue,
+                    ),
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "Outlier Threshold: ±15% vs Owner Est");
+                    let _ = ui.selectable_label(false, "Preserve ARI >= 0.90 Constraint");
+                    let _ = ui.button("⚖️ Export Normalized Bid Leveling Matrix (.XLSX/.MD)");
+                });
+                ui.add_space(10.0);
+
+                ScrollArea::horizontal().id_salt("tender_bid_scroll").show(ui, |ui| {
+                    egui::Grid::new("tender_bid_grid")
+                        .striped(true)
+                        .min_col_width(90.0)
+                        .spacing(Vec2::new(14.0, 6.0))
+                        .show(ui, |ui| {
+                            for h in [
+                                "Trade Package",
+                                "Owner Est (OE)",
+                                "Bidder A (SteelFab)",
+                                "Bidder B (Nusantara)",
+                                "Bidder C (GlobalTruss)",
+                                "Outlier Audit",
+                            ] {
+                                ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                            }
+                            ui.end_row();
+                            for (pkg, oe, a, b, c, flag, col) in [
+                                (
+                                    "02 Bored Piles",
+                                    curr.format_value(t.cost_substructure),
+                                    curr.format_value(t.cost_substructure * 0.98),
+                                    curr.format_value(t.cost_substructure * 0.95),
+                                    curr.format_value(t.cost_substructure * 1.28),
+                                    "⚠️ Bidder C +28%",
+                                    theme.accent_orange,
+                                ),
+                                (
+                                    "05 Steel Supply BJ41",
+                                    curr.format_value(t.cost_steel_material),
+                                    curr.format_value(t.cost_steel_material * 0.97),
+                                    curr.format_value(t.cost_steel_material * 0.92),
+                                    curr.format_value(t.cost_steel_material * 0.99),
+                                    "🟢 Balanced",
+                                    theme.accent_green,
+                                ),
+                                (
+                                    "05 Workshop Fab + NDT",
+                                    curr.format_value(t.cost_workshop_fab),
+                                    curr.format_value(t.cost_workshop_fab * 1.03),
+                                    curr.format_value(t.cost_workshop_fab * 0.94),
+                                    curr.format_value(t.cost_workshop_fab * 0.96),
+                                    "🟢 Balanced",
+                                    theme.accent_green,
+                                ),
+                                (
+                                    "05 Crane Erection",
+                                    curr.format_value(t.cost_erection_crane),
+                                    curr.format_value(t.cost_erection_crane * 1.02),
+                                    curr.format_value(t.cost_erection_crane * 0.91),
+                                    curr.format_value(t.cost_erection_crane * 0.95),
+                                    "🟢 Best Value (Bidder B)",
+                                    theme.accent_blue,
+                                ),
+                            ] {
+                                ui.label(RichText::new(pkg).size(10.5).strong().color(theme.text_primary));
+                                ui.label(RichText::new(oe).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(a).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(b).size(10.5).strong().color(theme.accent_green));
+                                ui.label(RichText::new(c).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(flag).size(10.5).strong().color(col));
+                                ui.end_row();
+                            }
+                        });
+                });
+            },
+        );
     }
 
     fn metric_card(&self, ui: &mut Ui, theme: &MacTheme, title: &str, value: &str, subtitle: &str, val_color: Color32) {

@@ -17,6 +17,8 @@ pub enum SafetySubTab {
     FallProtection,
     SiteLogistics,
     SafetyAuditMatrix,
+    ScaffoldingReshoring,
+    PermitToWorkDrills,
 }
 
 pub struct SafetyView {
@@ -78,6 +80,12 @@ impl SafetyView {
                     SafetySubTab::FallProtection => self.render_fall_protection(ui, theme),
                     SafetySubTab::SiteLogistics => self.render_site_logistics(ui, theme),
                     SafetySubTab::SafetyAuditMatrix => self.render_safety_audit_matrix(ui, theme),
+                    SafetySubTab::ScaffoldingReshoring => {
+                        self.render_scaffolding_reshoring(ui, theme, features);
+                    }
+                    SafetySubTab::PermitToWorkDrills => {
+                        self.render_permit_to_work_drills(ui, theme, features);
+                    }
                 }
 
                 ui.add_space(32.0);
@@ -91,6 +99,8 @@ impl SafetyView {
             (SafetySubTab::FallProtection, "🛡️ Slab Edge Fall Hazards"),
             (SafetySubTab::SiteLogistics, "🚑 Emergency Evacuation & Logistics"),
             (SafetySubTab::SafetyAuditMatrix, "📋 8D Safety Audit Matrix"),
+            (SafetySubTab::ScaffoldingReshoring, "🪜 Formwork & Reshoring"),
+            (SafetySubTab::PermitToWorkDrills, "🪪 Digital PTW & Drills"),
         ];
         ui_kit::subtab_bar(ui, theme, "safety_subtab_bar", &mut self.active_subtab, &subtabs);
     }
@@ -529,5 +539,173 @@ impl SafetyView {
                     ui.add_space(8.0);
                 }
             });
+    }
+
+    fn render_scaffolding_reshoring(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::ScaffoldingFormworkReshoring,
+            |ui| {
+                let cards = [
+                    ("STANDARD & SHORE RATIO", "2 Floors Shored + 1 Reshored", "ACI 347-14 Multi-Level Transfer", theme.accent_blue),
+                    ("EARLY CONCRETE MATURITY", "74.2% f'c @ Day 7", "Min Strike Threshold >= 70% (Safe)", theme.accent_green),
+                    ("PEAK PROP AXIAL LOAD", "24.8 kN / Post", "Ring-Lock Capacity = 38.0 kN (DCR 0.65)", theme.accent_green),
+                    ("EULER SLENDERNESS CHECK", "FS_buckling = 2.45", "Braced @ 1.50m Vertical Lifts", theme.accent_orange),
+                ];
+                ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
+                    let (t, v, s, c) = cards[idx];
+                    ui_kit::stat_card(ui, theme, t, v, s, c);
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "ACI 347 Slab Maturity Redistribution");
+                    let _ = ui.selectable_label(false, "300mm Post-Tensioned Transfer Slab");
+                    let _ = ui.button("🪜 Verify Shoring Strip Sequence & Buckling FS");
+                });
+                ui.add_space(10.0);
+
+                ui_kit::responsive_two_panes(ui, 640.0, |ui, pane| match pane {
+                    0 => {
+                        ui.label(
+                            RichText::new("MULTI-FLOOR SHORE & RESHORE LOAD TRANSFER SCHEMATIC")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        let desired = Vec2::new(ui.available_width(), 155.0);
+                        let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                        let painter = ui.painter_at(rect);
+                        painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
+                        let box_r = rect.shrink(22.0);
+                        for lvl in 0..3 {
+                            let y = box_r.top() + (lvl as f32) * (box_r.height() * 0.42);
+                            painter.line_segment(
+                                [egui::Pos2::new(box_r.left(), y), egui::Pos2::new(box_r.right(), y)],
+                                Stroke::new(3.0, theme.text_secondary),
+                            );
+                            if lvl < 2 {
+                                let ny = box_r.top() + ((lvl + 1) as f32) * (box_r.height() * 0.42);
+                                let prop_col = if lvl == 0 { theme.accent_orange } else { theme.accent_green };
+                                for p in 1..6 {
+                                    let px = box_r.left() + (p as f32 / 6.0) * box_r.width();
+                                    painter.line_segment(
+                                        [egui::Pos2::new(px, y + 2.0), egui::Pos2::new(px, ny - 2.0)],
+                                        Stroke::new(2.0, prop_col),
+                                    );
+                                }
+                            }
+                        }
+                        painter.text(
+                            egui::Pos2::new(box_r.left() + 6.0, box_r.bottom() - 2.0),
+                            Align2::LEFT_BOTTOM,
+                            "Fresh Pour (1.35x Shore Load) -> 7-Day Cured Slab -> Reshored Level",
+                            egui::FontId::monospace(8.5),
+                            theme.text_muted,
+                        );
+                    }
+                    _ => {
+                        ui.label(
+                            RichText::new("SHORING BAY VERIFICATION TABLE (ACI 347 / EN 12812)")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        ScrollArea::horizontal().id_salt("shoring_table_scroll").show(ui, |ui| {
+                            egui::Grid::new("shoring_table_grid")
+                                .striped(true)
+                                .spacing(Vec2::new(12.0, 5.0))
+                                .show(ui, |ui| {
+                                    for h in ["Level", "Pour Age", "f'c Ratio", "Shore Ratio", "Status"] {
+                                        ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                                    }
+                                    ui.end_row();
+                                    for (lvl, age, fc, sr, st, col) in [
+                                        ("Level 06 Pour", "0 Days (Wet)", "0% f'c", "1.32x DL -> Shored", "SHORED", theme.accent_orange),
+                                        ("Level 05 Deck", "7 Days", "74% f'c", "0.68x Req Cap", "RESHORE READY", theme.accent_green),
+                                        ("Level 04 Deck", "14 Days", "91% f'c", "0.41x Nominal", "STRIPPED SAFE", theme.accent_green),
+                                    ] {
+                                        ui.label(RichText::new(lvl).size(10.5).strong().color(theme.text_primary));
+                                        ui.label(RichText::new(age).size(10.5).color(theme.text_secondary));
+                                        ui.label(RichText::new(fc).size(10.5).color(theme.accent_blue));
+                                        ui.label(RichText::new(sr).size(10.5).color(theme.text_secondary));
+                                        ui.label(RichText::new(st).size(10.5).strong().color(col));
+                                        ui.end_row();
+                                    }
+                                });
+                        });
+                    }
+                });
+            },
+        );
+    }
+
+    fn render_permit_to_work_drills(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::PermitToWorkEvacuationDrill,
+            |ui| {
+                let cards = [
+                    ("ACTIVE SITE PERMITS (PTW)", "7 Valid Today", "3 Hot-Work • 2 Height • 2 Confined", theme.accent_blue),
+                    ("CRANE WIND LOCKDOWN CAP", "38 km/h Current", "Auto-Hold Threshold = 55 km/h", theme.accent_green),
+                    ("LAST EVACUATION DRILL", "3m 42s @ Muster E", "186/186 Crew RFID Accounted", theme.accent_green),
+                    ("EXPIRING SIGN-OFFS", "1 Pending Renewal", "PTW-HW-09 Expires in 90 min", theme.accent_orange),
+                ];
+                ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
+                    let (t, v, s, c) = cards[idx];
+                    ui_kit::stat_card(ui, theme, t, v, s, c);
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "Enforce Gas Test for Confined Spaces");
+                    let _ = ui.selectable_label(false, "Auto-Suspend Lift PTW @ Wind >= 55 km/h");
+                    let _ = ui.button("🪪 Issue Digital Permit-to-Work & Log Drill Time");
+                });
+                ui.add_space(10.0);
+
+                ScrollArea::horizontal().id_salt("ptw_ledger_scroll").show(ui, |ui| {
+                    egui::Grid::new("ptw_ledger_grid")
+                        .striped(true)
+                        .min_col_width(90.0)
+                        .spacing(Vec2::new(14.0, 6.0))
+                        .show(ui, |ui| {
+                            for h in ["Permit ID", "Hazard Class", "Location", "Competent Sign-Off", "Validity", "Status"] {
+                                ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                            }
+                            ui.end_row();
+                            for (id, cls, loc, sup, val, st, col) in [
+                                ("PTW-HW-09", "🔥 Hot-Work Welding", "Level 08 Truss Splice", "R. Pratama (HSE L3)", "Until 17:00", "RENEW SOON", theme.accent_orange),
+                                ("PTW-WH-14", "🧗 Work-at-Height", "Perimeter Facade West", "S. Wijaya (Rigging)", "Until 18:00", "ACTIVE", theme.accent_green),
+                                ("PTW-CS-03", "🕳️ Confined Space", "Sump Pit B2 (O₂ 20.9%)", "H. Kusuma (Gas Tech)", "Until 16:30", "ACTIVE", theme.accent_green),
+                            ] {
+                                ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
+                                ui.label(RichText::new(cls).size(10.5).strong().color(theme.text_primary));
+                                ui.label(RichText::new(loc).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(sup).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(val).size(10.5).color(theme.text_muted));
+                                ui.label(RichText::new(st).size(10.5).strong().color(col));
+                                ui.end_row();
+                            }
+                        });
+                });
+            },
+        );
     }
 }

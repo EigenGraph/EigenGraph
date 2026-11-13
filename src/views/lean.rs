@@ -3,7 +3,7 @@
 //! Features Dynamic 1D Cutting Stock Optimizer (CSO), Bar Bending Schedule (BBS), and Interactive Last Planner System (LPS).
 
 use egui::{
-    Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText, ScrollArea,
+    Align2, Color32, CornerRadius, Frame, Margin, Pos2, Rect, RichText, ScrollArea,
     Stroke, StrokeKind, Ui, Vec2,
 };
 use crate::core::cso::{CuttingStockOptimizer, CsoReport};
@@ -19,6 +19,8 @@ pub enum LeanSubTab {
     LastPlanner,
     ValueStream,
     JitDelivery,
+    TaktConcreteDispatch,
+    RfiSubmittalTracker,
 }
 
 pub struct LeanView {
@@ -101,6 +103,12 @@ impl LeanView {
                     LeanSubTab::LastPlanner => self.render_last_planner(ui, theme),
                     LeanSubTab::ValueStream => self.render_value_stream(ui, theme),
                     LeanSubTab::JitDelivery => self.render_jit_delivery(ui, theme),
+                    LeanSubTab::TaktConcreteDispatch => {
+                        self.render_takt_concrete_dispatch(ui, theme, features);
+                    }
+                    LeanSubTab::RfiSubmittalTracker => {
+                        self.render_rfi_submittal_tracker(ui, theme, features);
+                    }
                 }
 
                 ui.add_space(64.0);
@@ -122,6 +130,8 @@ impl LeanView {
                     (LeanSubTab::LastPlanner, lps_label),
                     (LeanSubTab::ValueStream, "🌊 Value Stream & 7 Wastes".to_string()),
                     (LeanSubTab::JitDelivery, "🚚 Just-In-Time (JIT) Delivery Buffer".to_string()),
+                    (LeanSubTab::TaktConcreteDispatch, "🚋 Takt Trains & Pour Dispatch".to_string()),
+                    (LeanSubTab::RfiSubmittalTracker, "📝 RFI & Submittal SLA".to_string()),
                 ];
 
                 ui.horizontal_wrapped(|ui| {
@@ -902,6 +912,114 @@ impl LeanView {
                 ];
                 self.render_responsive_cards(ui, theme, &cards);
             });
+    }
+
+    fn render_takt_concrete_dispatch(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::TaktTimeConcretePourDispatch, |ui| {
+            let cards = [
+                ("TAKT ZONE CADENCE", "5 Days / Zone", "Zone A -> B -> C -> D (Floor L07)", theme.accent_blue),
+                ("READY-MIX TRUCK TRANSIT", "38 min Avg (Live GPS)", "Max Slump Expiry Cap = 90 min", theme.accent_green),
+                ("CONTINUOUS POUR VOLUME", "210 m³ / Night Shift", "30 Trucks Scheduled (K-350 Pump)", theme.accent_blue),
+                ("COLD-JOINT RISK MONITOR", "1 Truck Warning", "TM-14 Delayed 12 min in Ringroad Traffic", theme.accent_orange),
+            ];
+            ui_kit::responsive_grid_n(ui, cards.len(), 200.0, |ui, idx| {
+                let (t, v, s, c) = cards[idx];
+                self.render_stat_card(ui, theme, t, v, s, c);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "Takt Rhythm: 5-Day Trade Train");
+                let _ = ui.selectable_label(false, "Alert on Transit > 75 min");
+                let _ = ui.button("🚋 Sync Trade Train & Dispatch Mixer Slot");
+            });
+            ui.add_space(10.0);
+
+            ScrollArea::horizontal().id_salt("takt_wagon_scroll").show(ui, |ui| {
+                egui::Grid::new("takt_wagon_grid")
+                    .striped(true)
+                    .min_col_width(88.0)
+                    .spacing(Vec2::new(14.0, 6.0))
+                    .show(ui, |ui| {
+                        for h in ["Zone / Level", "W1 (Mon-Fri)", "W2 (Mon-Fri)", "W3 (Mon-Fri)", "W4 (Mon-Fri)", "Pour Batching"] {
+                            ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                        }
+                        ui.end_row();
+                        for (zn, w1, w2, w3, w4, pour) in [
+                            ("Zone A (West)", "Rebar Deck", "MEP Sleeves", "Slab Pour ✓", "Strip & MEP", "110 m³ Completed"),
+                            ("Zone B (Center)", "Formwork", "Rebar Deck", "MEP Sleeves", "Slab Pour ▶", "210 m³ Tonight"),
+                            ("Zone C (East)", "Shoring", "Formwork", "Rebar Deck", "MEP Sleeves", "105 m³ Next Week"),
+                        ] {
+                            ui.label(RichText::new(zn).size(10.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(w1).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(w2).size(10.5).color(theme.accent_blue));
+                            ui.label(RichText::new(w3).size(10.5).color(theme.accent_green));
+                            ui.label(RichText::new(w4).size(10.5).color(theme.accent_orange));
+                            ui.label(RichText::new(pour).size(10.5).color(theme.text_muted));
+                            ui.end_row();
+                        }
+                    });
+            });
+        });
+    }
+
+    fn render_rfi_submittal_tracker(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::RfiSubmittalSlaTracker, |ui| {
+            let cards = [
+                ("OPEN STRUCTURAL RFIs", "4 Active RFIs", "Avg Turnaround = 3.2 Business Days", theme.accent_blue),
+                ("SLA ESCALATION BREACH", "1 Overdue (+2d)", "RFI-042 Holding LPS Task 05.08", theme.accent_red),
+                ("SHOP DRAWING APPROVAL", "92% Approved", "Steel Splice Plates & Rebar BBS", theme.accent_green),
+                ("LPS CONSTRAINT COUPLING", "2 Linked Holds", "Auto-Clears Lookahead Task on Sign-Off", theme.accent_orange),
+            ];
+            ui_kit::responsive_grid_n(ui, cards.len(), 200.0, |ui, idx| {
+                let (t, v, s, c) = cards[idx];
+                self.render_stat_card(ui, theme, t, v, s, c);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "5-Day Contractual Consultant SLA");
+                let _ = ui.selectable_label(false, "Auto-Flag LPS Make-Ready Holds");
+                let _ = ui.button("📝 Escalate Overdue RFI & Clear Lookahead Hold");
+            });
+            ui.add_space(10.0);
+
+            ScrollArea::horizontal().id_salt("rfi_sla_scroll").show(ui, |ui| {
+                egui::Grid::new("rfi_sla_grid")
+                    .striped(true)
+                    .min_col_width(90.0)
+                    .spacing(Vec2::new(14.0, 6.0))
+                    .show(ui, |ui| {
+                        for h in ["Ref ID", "Subject & BIM Element", "Ball-in-Court", "Age / SLA", "Linked LPS Task", "Priority"] {
+                            ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                        }
+                        ui.end_row();
+                        for (id, subj, owner, sla, lps, st, col) in [
+                            ("RFI-042", "Shear Wall Core Coupling Rebar Congestion (L07)", "Lead EOR", "7d / 5d (+2d)", "05.08 Hold", "CRITICAL", theme.accent_red),
+                            ("SUB-118", "W14x90 Bolted Splice Slip-Critical Fab Drawings", "QA Reviewer", "3d / 5d", "05.12 Hold", "ON TRACK", theme.accent_green),
+                            ("RFI-045", "Roof Tuned Mass Damper Pocket Embedded Plate Offset", "Arch Lead", "2d / 5d", "08.02 Clear", "OPEN", theme.accent_orange),
+                        ] {
+                            ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
+                            ui.label(RichText::new(subj).size(10.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(owner).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(sla).size(10.5).color(col));
+                            ui.label(RichText::new(lps).size(10.5).color(theme.text_muted));
+                            ui.label(RichText::new(st).size(10.5).strong().color(col));
+                            ui.end_row();
+                        }
+                    });
+            });
+        });
     }
 
     fn render_stat_card(&self, ui: &mut Ui, theme: &MacTheme, title: &str, val: &str, subtitle: &str, val_color: Color32) {

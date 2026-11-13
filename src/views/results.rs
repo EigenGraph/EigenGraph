@@ -17,6 +17,8 @@ pub enum ResultsSubTab {
     MemberMatrix,
     DeformationsAndForces,
     CertificationExport,
+    PbgCalcBookComposer,
+    AsBuiltHandoverPackager,
 }
 
 pub struct ResultsView {
@@ -116,6 +118,8 @@ impl ResultsView {
                     ResultsSubTab::MemberMatrix => self.render_member_matrix(ui, theme, members),
                     ResultsSubTab::DeformationsAndForces => self.render_deformations_and_forces(ui, theme, members),
                     ResultsSubTab::CertificationExport => self.render_certification_export(ui, theme, members),
+                    ResultsSubTab::PbgCalcBookComposer => self.render_pbg_calc_book_composer(ui, theme, features),
+                    ResultsSubTab::AsBuiltHandoverPackager => self.render_as_built_handover_packager(ui, theme, features),
                 }
 
                 ui.add_space(24.0);
@@ -133,6 +137,8 @@ impl ResultsView {
             (ResultsSubTab::MemberMatrix, "📋 Matrix"),
             (ResultsSubTab::DeformationsAndForces, "📈 Deformations"),
             (ResultsSubTab::CertificationExport, "🖨️ Export"),
+            (ResultsSubTab::PbgCalcBookComposer, "🏛️ PBG / IBC Calc Book (PUB-04)"),
+            (ResultsSubTab::AsBuiltHandoverPackager, "📦 As-Built Handover (PUB-05)"),
         ];
         ui_kit::subtab_bar(ui, theme, "results_subtab_bar", &mut self.active_subtab, &tabs);
     }
@@ -1523,6 +1529,249 @@ impl ResultsView {
                 }
             });
         });
+    }
+
+    fn render_pbg_calc_book_composer(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::RegulatoryCalcBookPbgComposer,
+            |ui| {
+                ui_kit::responsive_grid_n(ui, 4, 180.0, |ui, idx| match idx {
+                    0 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "PERMITTING STANDARD",
+                        "PBG / SIMBG + IBC",
+                        "SNI 1726:2019 & ASCE 7-22 Chapters",
+                        theme.accent_blue,
+                    ),
+                    1 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "BOOK OUTLINE",
+                        "12 Chapters • 184p",
+                        "Auto-Numbered TOC & Appendix Index",
+                        theme.accent_green,
+                    ),
+                    2 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "PE / IPTB SEAL",
+                        "L3 SKK Verified",
+                        "Digital Signature & Registration Slot",
+                        theme.accent_blue,
+                    ),
+                    _ => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "SOLVER BINDING",
+                        "FEA + ETABS Linked",
+                        "Drift, Base Shear & P-M Annexes",
+                        theme.accent_orange,
+                    ),
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "Include SNI 1726 Spectral Base Shear");
+                    let _ = ui.selectable_label(true, "Embed SCWB Joint & Drift Envelopes");
+                    let _ = ui.button("🏛️ Assemble Permit Calculation Book (.html / .pdf)");
+                });
+                ui.add_space(12.0);
+
+                ui_kit::responsive_two_panes(ui, 660.0, |ui, pane| match pane {
+                    0 => {
+                        ui.label(
+                            RichText::new("REGULATORY SUBMISSION CHAPTER TREE (PBG / SIMBG)")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        ScrollArea::horizontal()
+                            .id_salt("pbg_chapter_tree_scroll")
+                            .show(ui, |ui| {
+                                egui::Grid::new("pbg_chapter_tree_grid")
+                                    .striped(true)
+                                    .min_col_width(85.0)
+                                    .spacing(Vec2::new(12.0, 6.0))
+                                    .show(ui, |ui| {
+                                        for h in ["Chapter", "Regulatory Section", "Source Solver", "Pages", "Readiness"] {
+                                            ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                                        }
+                                        ui.end_row();
+                                        for (ch, sec, src, pg, st, col) in [
+                                            ("CH-01", "Design Criteria & Load Combos", "SNI 1727 / ASCE 7", "14p", "READY", theme.accent_green),
+                                            ("CH-03", "Site Class SD & Response Spectrum", "1D GIS + SNI 1726", "22p", "READY", theme.accent_green),
+                                            ("CH-06", "Modal Mass, P-Delta & Drift Caps", "FEA + ETABS .e2k", "48p", "READY", theme.accent_green),
+                                            ("CH-09", "Shear Wall, PT Girder & Footing SSI", "SIM-03 Checkers", "64p", "DRAFT", theme.accent_orange),
+                                            ("CH-12", "PE / TPA Peer Review Cover Affidavit", "SHA-256 Stamp", "6p", "SIGNED", theme.accent_blue),
+                                        ] {
+                                            ui.label(RichText::new(ch).size(10.5).monospace().color(theme.accent_blue));
+                                            ui.label(RichText::new(sec).size(10.5).strong().color(theme.text_primary));
+                                            ui.label(RichText::new(src).size(10.5).color(theme.text_secondary));
+                                            ui.label(RichText::new(pg).size(10.5).color(theme.text_muted));
+                                            ui.label(RichText::new(st).size(10.5).strong().color(col));
+                                            ui.end_row();
+                                        }
+                                    });
+                            });
+                    }
+                    _ => {
+                        ui.label(
+                            RichText::new("PERMIT COVER SHEET & DIGITAL PE STAMP PREVIEW")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.accent_blue),
+                        );
+                        ui.add_space(6.0);
+                        let desired = Vec2::new(ui.available_width(), 172.0);
+                        let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                        let painter = ui.painter_at(rect);
+                        painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(245, 247, 250));
+                        painter.rect_stroke(
+                            rect.shrink(8.0),
+                            CornerRadius::same(4),
+                            Stroke::new(1.5, Color32::from_rgb(35, 55, 95)),
+                            StrokeKind::Inside,
+                        );
+                        painter.text(
+                            Pos2::new(rect.left() + 20.0, rect.top() + 24.0),
+                            Align2::LEFT_CENTER,
+                            "STRUCTURAL CALCULATION REPORT — PBG / SIMBG",
+                            egui::FontId::proportional(11.0),
+                            Color32::from_rgb(20, 35, 70),
+                        );
+                        painter.text(
+                            Pos2::new(rect.left() + 20.0, rect.top() + 44.0),
+                            Align2::LEFT_CENTER,
+                            "Doc ID: EG-PBG-2026-REV04 • SNI 1726 / SNI 2847 / AISC 360",
+                            egui::FontId::monospace(9.0),
+                            Color32::from_rgb(80, 95, 120),
+                        );
+                        // Circular PE stamp emblem
+                        let seal_c = Pos2::new(rect.right() - 54.0, rect.bottom() - 48.0);
+                        painter.circle_stroke(seal_c, 28.0, Stroke::new(1.8, Color32::from_rgb(185, 28, 28)));
+                        painter.circle_stroke(seal_c, 23.0, Stroke::new(0.9, Color32::from_rgb(185, 28, 28)));
+                        painter.text(
+                            seal_c,
+                            Align2::CENTER_CENTER,
+                            "PE SEAL\nSKK L3",
+                            egui::FontId::proportional(8.5),
+                            Color32::from_rgb(185, 28, 28),
+                        );
+                        painter.text(
+                            Pos2::new(rect.left() + 20.0, rect.bottom() - 24.0),
+                            Align2::LEFT_CENTER,
+                            "SHA-256 Digest Verified • EigenGraph Publishing Suite",
+                            egui::FontId::monospace(8.5),
+                            Color32::from_rgb(22, 130, 80),
+                        );
+                    }
+                });
+            },
+        );
+    }
+
+    fn render_as_built_handover_packager(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(
+            ui,
+            theme,
+            features,
+            FeatureId::AsBuiltHandoverDossierPackager,
+            |ui| {
+                ui_kit::responsive_grid_n(ui, 4, 180.0, |ui, idx| match idx {
+                    0 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "HANDOVER COMPLETENESS",
+                        "94.2% Verified",
+                        "18 / 19 Contractual Deliverables Signed",
+                        theme.accent_green,
+                    ),
+                    1 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "OPENBIM TWIN SCHEMA",
+                        "IFC 4.3 + COBie 3.0",
+                        "Georeferenced Asset Tag Lineage",
+                        theme.accent_blue,
+                    ),
+                    2 => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "QA MILL & CUBE CERTS",
+                        "142 Batches Indexed",
+                        "28-Day Concrete & Steel EN 10204 3.1",
+                        theme.accent_green,
+                    ),
+                    _ => ui_kit::stat_card(
+                        ui,
+                        theme,
+                        "ARCHIVE SEAL",
+                        "SHA-256 Manifest",
+                        "Tamper-Evident Owner O&M Vault",
+                        theme.accent_blue,
+                    ),
+                });
+
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    let _ = ui.selectable_label(true, "Include IFC4 Record Model + COBie.xlsx");
+                    let _ = ui.selectable_label(true, "Verify SHA-256 Custody Tree");
+                    let _ = ui.button("📦 Package As-Built Handover Dossier & Checksum Ledger");
+                });
+                ui.add_space(10.0);
+
+                ScrollArea::horizontal()
+                    .id_salt("handover_packager_scroll")
+                    .show(ui, |ui| {
+                        egui::Grid::new("handover_packager_grid")
+                            .striped(true)
+                            .min_col_width(95.0)
+                            .spacing(Vec2::new(14.0, 6.0))
+                            .show(ui, |ui| {
+                                for h in [
+                                    "Packet ID",
+                                    "Deliverable Group",
+                                    "Format & Standard",
+                                    "Custody Sign-Off",
+                                    "SHA-256 Prefix",
+                                    "Gate Status",
+                                ] {
+                                    ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                                }
+                                ui.end_row();
+                                for (id, grp, fmt, own, hash, st, col) in [
+                                    ("HND-01", "As-Built Federated BIM", "IFC 4.3 STEP + BCF 2.1", "BIM Manager", "9f4b82e1...", "VERIFIED", theme.accent_green),
+                                    ("HND-02", "Asset Register & O&M Spaces", "COBie 3.0 Spreadsheet", "FM Lead (7D)", "41c7d09a...", "VERIFIED", theme.accent_green),
+                                    ("HND-03", "Red-Line Record Drawing Set", "ISO A1 PDF + DXF", "Lead Structural PE", "c8e12a04...", "VERIFIED", theme.accent_green),
+                                    ("HND-04", "Rebar Mill & Ultrasonic NDT Logs", "EN 10204 3.1 + CSV", "QA/QC Inspector", "Pending Final Lot", "1 PENDING", theme.accent_orange),
+                                ] {
+                                    ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
+                                    ui.label(RichText::new(grp).size(10.5).strong().color(theme.text_primary));
+                                    ui.label(RichText::new(fmt).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(own).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(hash).size(10.5).monospace().color(theme.text_muted));
+                                    ui.label(RichText::new(st).size(10.5).strong().color(col));
+                                    ui.end_row();
+                                }
+                            });
+                    });
+            },
+        );
     }
 }
 

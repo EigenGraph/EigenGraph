@@ -20,6 +20,8 @@ use crate::ui_kit;
 pub enum AiFirmSubTab {
     Organigram,
     CopilotStudio,
+    ComplianceAuditor,
+    ParetoOptimizer,
     CollaborationBoard,
     DirectivesConsole,
     AutonomousTelemetry,
@@ -166,6 +168,12 @@ impl AiFirmView {
                     AiFirmSubTab::CopilotStudio => {
                         self.render_copilot_studio(ui, theme, features)
                     }
+                    AiFirmSubTab::ComplianceAuditor => {
+                        self.render_compliance_auditor(ui, theme, features)
+                    }
+                    AiFirmSubTab::ParetoOptimizer => {
+                        self.render_pareto_optimizer(ui, theme, features)
+                    }
                     AiFirmSubTab::CollaborationBoard => self.render_collaboration_board(ui, theme),
                     AiFirmSubTab::DirectivesConsole => self.render_directives_console(ui, theme),
                     AiFirmSubTab::AutonomousTelemetry => self.render_telemetry_view(ui, theme),
@@ -180,6 +188,8 @@ impl AiFirmView {
         let subtabs = [
             (AiFirmSubTab::CopilotStudio, "🤖 Engineering Copilot Studio"),
             (AiFirmSubTab::Organigram, "👥 Firm Organigram"),
+            (AiFirmSubTab::ComplianceAuditor, "⚖️ Code Compliance Auditor (AI-04)"),
+            (AiFirmSubTab::ParetoOptimizer, "🧬 Pareto Multi-Objective (AI-05)"),
             (AiFirmSubTab::CollaborationBoard, "💬 Multi-Agent Dialogue"),
             (AiFirmSubTab::DirectivesConsole, "⌨️ Directives Console"),
             (AiFirmSubTab::AutonomousTelemetry, "📊 Autonomous Telemetry"),
@@ -1032,5 +1042,138 @@ impl AiFirmView {
                     ui_kit::stat_card(ui, theme, title, val, sub, col);
                 });
             });
+    }
+
+    fn render_compliance_auditor(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::AutomatedCodeComplianceAuditor, |ui| {
+            let kpis = [
+                ("SCWB JOINT RATIO", "ΣMnc/ΣMnb = 1.38", "ACI 318 §18.7.3.2 (Min >= 1.20)", theme.accent_green),
+                ("MAX DRIFT RATIO (X/Y)", "0.0142 h", "SNI 1726 §7.12.1 (Limit <= 0.020)", theme.accent_green),
+                ("SOFT STOREY STIFFNESS", "82% Adjacent", "Above 70% Regularity Threshold", theme.accent_blue),
+                ("FLAGGED EXCEPTIONS", "2 Minor Advisories", "Hoop Spacing Transition at Level 3", theme.accent_orange),
+            ];
+            ui_kit::responsive_grid_n(ui, kpis.len(), 175.0, |ui, idx| {
+                let (title, val, sub, col) = kpis[idx];
+                ui_kit::stat_card(ui, theme, title, val, sub, col);
+            });
+
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                let _ = ui.selectable_label(true, "Code Profile: SNI 2847 + SNI 1726 + AISC 360");
+                let _ = ui.selectable_label(false, "Include Detailing Checklists");
+                let _ = ui.button("⚖️ Execute Automated Code Compliance Sweep");
+            });
+            ui.add_space(10.0);
+
+            ScrollArea::horizontal().id_salt("ai_compliance_table").show(ui, |ui| {
+                egui::Grid::new("ai_compliance_grid")
+                    .striped(true)
+                    .spacing(egui::Vec2::new(14.0, 6.0))
+                    .show(ui, |ui| {
+                        for h in ["Code Standard & Clause", "Check Description", "Computed Value", "Code Limit", "Status"] {
+                            ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
+                        }
+                        ui.end_row();
+
+                        let rows = [
+                            ("ACI 318-19 §18.7.3.2", "Strong-Column Weak-Beam Flexural Ratio", "1.38", ">= 1.20", "PASS"),
+                            ("SNI 1726:2019 §7.12.1", "Inelastic Story Drift Ratio (Cat. II)", "0.0142", "<= 0.0200", "PASS"),
+                            ("SNI 1726:2019 §7.9.1.4", "Dynamic Modal Base Shear Scaling (Vb/Vt)", "1.00", ">= 1.00", "PASS"),
+                            ("ACI 318-19 §18.7.5.3", "Column Confined Zone Hoop Spacing s0", "110 mm", "<= 100 mm", "WARN"),
+                            ("AISC 360-16 §F2.2", "Lateral-Torsional Buckling Capacity", "0.74 DCR", "<= 1.00", "PASS"),
+                        ];
+                        for (clause, desc, val, lim, status) in rows {
+                            let st_col = if status == "PASS" { theme.accent_green } else { theme.accent_orange };
+                            ui.label(RichText::new(clause).size(10.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(desc).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(val).size(10.5).monospace().color(theme.accent_blue));
+                            ui.label(RichText::new(lim).size(10.5).monospace().color(theme.text_muted));
+                            ui.label(RichText::new(status).size(10.5).strong().color(st_col));
+                            ui.end_row();
+                        }
+                    });
+            });
+        });
+    }
+
+    fn render_pareto_optimizer(
+        &self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        features: &mut FeatureRegistry,
+    ) {
+        ui_kit::feature_slot_card(ui, theme, features, FeatureId::ParetoMultiObjectiveOptimizer, |ui| {
+            ui_kit::responsive_two_panes(ui, 620.0, |ui, pane| match pane {
+                0 => {
+                    ui.label(RichText::new("OPTIMIZATION WEIGHTS & CONSTRAINTS").size(11.0).strong().color(theme.accent_blue));
+                    ui.add_space(6.0);
+                    let mut w_cost = 0.40_f32;
+                    let mut w_carbon = 0.35_f32;
+                    let mut w_ari = 0.25_f32;
+                    ui.add(egui::Slider::new(&mut w_cost, 0.0..=1.0).text("Weight Cost (5D Capex)"));
+                    ui.add(egui::Slider::new(&mut w_carbon, 0.0..=1.0).text("Weight Embodied Carbon (CO2e)"));
+                    ui.add(egui::Slider::new(&mut w_ari, 0.0..=1.0).text("Weight Redundancy (ARI Min)"));
+                    ui.add_space(6.0);
+                    ui.label(RichText::new("Constraints: Min ARI >= 0.85 | Max Drift <= h/500 | DCR <= 0.90").size(10.5).color(theme.text_secondary));
+                    ui.add_space(8.0);
+                    let _ = ui.button("🧬 Evolve 50 NSGA-II Generations (40 Pop)");
+                }
+                _ => {
+                    ui.label(RichText::new("NON-DOMINATED PARETO FRONTIER (COST vs CARBON CO2e)").size(11.0).strong().color(theme.accent_blue));
+                    ui.add_space(6.0);
+                    let desired = egui::Vec2::new(ui.available_width(), 155.0);
+                    let (rect, _) = ui.allocate_exact_size(desired, egui::Sense::hover());
+                    let painter = ui.painter_at(rect);
+                    painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
+                    let pad = 26.0;
+                    let plot = rect.shrink(pad);
+                    painter.line_segment(
+                        [egui::Pos2::new(plot.left(), plot.bottom()), egui::Pos2::new(plot.right(), plot.bottom())],
+                        Stroke::new(1.0, theme.text_muted),
+                    );
+                    painter.line_segment(
+                        [egui::Pos2::new(plot.left(), plot.bottom()), egui::Pos2::new(plot.left(), plot.top())],
+                        Stroke::new(1.0, theme.text_muted),
+                    );
+                    let pts = [
+                        (0.12_f32, 0.85_f32, false),
+                        (0.26, 0.63, false),
+                        (0.42, 0.44, true),
+                        (0.62, 0.30, false),
+                        (0.84, 0.20, false),
+                    ];
+                    let screen_pts: Vec<egui::Pos2> = pts
+                        .iter()
+                        .map(|&(nx, ny, _)| egui::Pos2::new(plot.left() + nx * plot.width(), plot.bottom() - ny * plot.height()))
+                        .collect();
+                    for w in screen_pts.windows(2) {
+                        painter.line_segment([w[0], w[1]], Stroke::new(2.0, theme.accent_blue));
+                    }
+                    for (idx, &(_, _, knee)) in pts.iter().enumerate() {
+                        let col = if knee { theme.accent_green } else { theme.accent_orange };
+                        painter.circle_filled(screen_pts[idx], if knee { 6.0 } else { 4.5 }, col);
+                    }
+                    painter.text(
+                        egui::Pos2::new(screen_pts[2].x + 8.0, screen_pts[2].y - 8.0),
+                        egui::Align2::LEFT_BOTTOM,
+                        "★ Knee Sol #14 (ARI 0.942)",
+                        egui::FontId::proportional(10.0),
+                        theme.accent_green,
+                    );
+                    painter.text(
+                        egui::Pos2::new(plot.center().x, rect.bottom() - 8.0),
+                        egui::Align2::CENTER_CENTER,
+                        "5D Structural Capex (IDR Billion) ➔",
+                        egui::FontId::proportional(9.5),
+                        theme.text_muted,
+                    );
+                }
+            });
+        });
     }
 }

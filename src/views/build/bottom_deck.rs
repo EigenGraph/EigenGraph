@@ -305,6 +305,31 @@ impl BuildView {
                                 }
                             });
                         }
+                        BottomDeckTab::PointCloudDeviation => {
+                            ScrollArea::vertical()
+                                .id_salt("point_cloud_deck_scroll")
+                                .max_height(185.0)
+                                .show(ui, |ui| {
+                                    ui_kit::feature_slot_card(ui, theme, features, FeatureId::PointCloudAsBuiltDeviation, |ui| {
+                                        let kpis = [
+                                            ("SCAN POINTS REGISTERED", "14.8M Pts (E57/LAS)", "ICP Alignment RMS = ±3.4 mm", theme.accent_blue),
+                                            ("FLOOR FLATNESS (FF / FL)", "FF 38.2 / FL 29.4", "ASTM E1155 Superflat Slab Spec", theme.accent_green),
+                                            ("COLUMN PLUMBNESS MAX", "4.1 mm @ L4 C-02", "Within ACI 117 (±6.0 mm Limit)", theme.accent_green),
+                                            ("OUT-OF-TOLERANCE ZONES", "2 Localized Slabs", "Grid B-2Edge Camber +7.2 mm", theme.accent_orange),
+                                        ];
+                                        ui_kit::responsive_grid_n(ui, kpis.len(), 170.0, |ui, idx| {
+                                            let (t, v, s, c) = kpis[idx];
+                                            ui_kit::stat_card(ui, theme, t, v, s, c);
+                                        });
+                                        ui.add_space(6.0);
+                                        ui.horizontal_wrapped(|ui| {
+                                            let _ = ui.selectable_label(true, "Heat Band: ±10mm ACI 117");
+                                            let _ = ui.selectable_label(false, "Overlay Laser Scan Voxels");
+                                            let _ = ui.button("📡 Import .E57 / .LAS Point Cloud");
+                                        });
+                                    });
+                                });
+                        }
                     }
                 }
             });

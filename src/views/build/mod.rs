@@ -110,6 +110,7 @@ pub enum BottomDeckTab {
     TimeSimulation4D,
     ClashManager,
     BimConsole,
+    PointCloudDeviation,
 }
 
 impl BottomDeckTab {
@@ -119,6 +120,7 @@ impl BottomDeckTab {
             Self::TimeSimulation4D => "⏱️ 4D Construction Simulation",
             Self::ClashManager => "⚔️ Clash & Coordination Deck",
             Self::BimConsole => "💻 BIM Terminal & Automation",
+            Self::PointCloudDeviation => "📡 LiDAR Point Cloud & Deviation",
         }
     }
 }
