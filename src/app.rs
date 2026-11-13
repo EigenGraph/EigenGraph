@@ -260,6 +260,20 @@ impl EigenGraphApp {
                                     text_color,
                                 );
 
+                                let (p_act, p_tot) = self.feature_registry.pillar_counts(pillar);
+                                let badge_color = if p_act == p_tot {
+                                    self.theme.accent_green
+                                } else {
+                                    self.theme.text_muted
+                                };
+                                ui.painter().text(
+                                    rect.right_center() - Vec2::new(8.0, 0.0),
+                                    Align2::RIGHT_CENTER,
+                                    format!("{p_act}/{p_tot}"),
+                                    egui::FontId::monospace(9.5),
+                                    badge_color,
+                                );
+
                                 ui.add_space(2.0);
                             }
                         });
@@ -295,8 +309,11 @@ impl EigenGraphApp {
     /// Renders compact status, feature roadmap gate, and build version pills inside the workspace header.
     fn render_header_badges(&mut self, ui: &mut egui::Ui) {
         let active_features = self.feature_registry.active_count();
+        let locked_features = self.feature_registry.locked_count();
         let total_features = self.feature_registry.total_count();
-        let roadmap_label = format!("🔓 {active_features}/{total_features} Active • 📋 Roadmap");
+        let roadmap_label = format!(
+            "🔓 {active_features}/{total_features} Active • 🔒 {locked_features} Slots • 📋 Roadmap"
+        );
 
         if ui
             .add(
@@ -341,7 +358,7 @@ impl EigenGraphApp {
             .inner_margin(Margin::symmetric(8, 4))
             .show(ui, |ui| {
                 ui.label(
-                    RichText::new(format!("v{} • Phase 30", env!("CARGO_PKG_VERSION")))
+                    RichText::new(format!("v{} • Phase 31", env!("CARGO_PKG_VERSION")))
                         .size(10.5)
                         .strong()
                         .color(self.theme.accent_blue),
@@ -632,11 +649,13 @@ impl App for EigenGraphApp {
                         );
                     }
                     NavigationPillar::TimeScheduling => {
-                        if self.planning_view.active_subtab
-                            != crate::views::planning::PlanningSubTab::Schedule4d
-                            && self.planning_view.active_subtab
-                                != crate::views::planning::PlanningSubTab::StagedErectionSvd
-                        {
+                        if !matches!(
+                            self.planning_view.active_subtab,
+                            crate::views::planning::PlanningSubTab::Schedule4d
+                                | crate::views::planning::PlanningSubTab::StagedErectionSvd
+                                | crate::views::planning::PlanningSubTab::ScheduleRiskMonteCarlo
+                                | crate::views::planning::PlanningSubTab::ResourceLeveling4d
+                        ) {
                             self.planning_view.active_subtab =
                                 crate::views::planning::PlanningSubTab::Schedule4d;
                         }
@@ -646,18 +665,19 @@ impl App for EigenGraphApp {
                             &self.parametric_view.variables,
                             &self.members,
                             &mut self.feature_registry,
+                            &mut self.active_pillar,
                         );
                     }
                     NavigationPillar::CostBudgeting => {
-                        if self.planning_view.active_subtab
-                            != crate::views::planning::PlanningSubTab::DynamicRab
-                            && self.planning_view.active_subtab
-                                != crate::views::planning::PlanningSubTab::TakeoffQto
-                            && self.planning_view.active_subtab
-                                != crate::views::planning::PlanningSubTab::CostAriTradeoff
-                            && self.planning_view.active_subtab
-                                != crate::views::planning::PlanningSubTab::WbsHierarchy
-                        {
+                        if !matches!(
+                            self.planning_view.active_subtab,
+                            crate::views::planning::PlanningSubTab::DynamicRab
+                                | crate::views::planning::PlanningSubTab::TakeoffQto
+                                | crate::views::planning::PlanningSubTab::CostAriTradeoff
+                                | crate::views::planning::PlanningSubTab::WbsHierarchy
+                                | crate::views::planning::PlanningSubTab::EarnedValueEvm
+                                | crate::views::planning::PlanningSubTab::ValueEngineeringBid
+                        ) {
                             self.planning_view.active_subtab =
                                 crate::views::planning::PlanningSubTab::DynamicRab;
                         }
@@ -667,6 +687,7 @@ impl App for EigenGraphApp {
                             &self.parametric_view.variables,
                             &self.members,
                             &mut self.feature_registry,
+                            &mut self.active_pillar,
                         );
                     }
                     NavigationPillar::SustainabilityEnergy => {

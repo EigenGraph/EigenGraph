@@ -7,6 +7,32 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.1] - 2026-11-13 — Phase 31: Full-Suite 15-Pillar Workspace Layout & 74-Capability Unlock Architecture
+
+### Added
+- **Expanded Centralized Feature Registry (`src/features.rs`)**:
+  - Expanded `FeatureId` and `FeatureRegistry` from 43 to **74 tracked engineering capabilities** (**28 Active + 46 Locked preview slots**) distributed across all **15 Navigation Pillars** and organized cleanly into target unlock milestones (**Phase 32**: 6 slots, **Phase 33**: 10 slots, **Phase 34**: 18 slots, **Phase 35**: 12 slots).
+  - Added `FeatureRegistry::locked_by_phase_count()`, `distinct_target_phases()`, `export_unlock_roadmap_json()`, and updated unit tests verifying full 15-pillar coverage and JSON/Markdown roadmap serialization.
+- **Frozen Full-Suite Locked Feature Preview Slots Across All 15 Domains (`src/views/`)**:
+  - **1. My Library (`my_project.rs`)**: Added `CdeIso19650DocumentHub` (`LIB-04`) WIP/Shared/Published container studio & `MultiTypologyProjectTemplates` (`LIB-05`) quick project seed launcher.
+  - **2. AI Agent (`ai_firm.rs`)**: Added `AutomatedCodeComplianceAuditor` (`AI-04`) clause-by-clause sweep panel & `ParetoMultiObjectiveOptimizer` (`AI-05`) 5D Capex vs. Carbon vs. ARI scatter envelope.
+  - **3. Research & 1D GIS (`research.rs`)**: Added `GeotechBoreholeStratigraphy` (`1D-05`) SPT N60 / Vs30 boring log viewer & `HydrologyIdfFloodplain` (`1D-06`) 100-year IDF runoff & FFE datum dashboard.
+  - **4. Parametric & 2D Studio (`parametric/detailing_2d.rs`)**: Added `AutomatedRcRebarBbsDrafter` (`2D-05`) ACI 318 seismic confinement elevation & shape-code BBS preview, plus `BuildingElevationsMepRiser` (`2D-06`).
+  - **5. Geometry & 3D BIM (`build/sidebar.rs`, `build/bottom_deck.rs`)**: Added `FederatedLayersAxisSlicer` (`3D-05`) discipline layer & X/Y/Z section box controls and `PointCloudAsBuiltDeviation` (`3D-06`) E57/LAS deviation inspector.
+  - **6. Analysis & Multi-Hazard Simulation (`analyze/extended_mechanics.rs`)**: Added `BridgeMovingLoadInfluence` (`SIM-06`), `RetainingWallSlopeStability` (`SIM-07`), and `FloorVibrationSteelFatigue` (`SIM-08`).
+  - **7 & 8. Time 4D & Cost 5D (`planning.rs`, `app.rs`)**: Separated 4D Scheduling tabs (4 tabs) from 5D Budgeting tabs (6 tabs) with one-click cross-pillar switching, and added `MonteCarloScheduleRiskPert` (`4D-03`), `ResourceLevelingCrewHistogram` (`4D-04`), `EarnedValueEvmProgressClaim` (`5D-03`), and `ValueEngineeringTenderMatrix` (`5D-04`).
+  - **9. Sustainability 6D (`sustainability.rs`)**: Added `SolarOttvThermalDaylight` (`6D-03`) N/E/S/W facade compass + SNI 6389 OTTV grid and `CircularMaterialPassportDfd` (`6D-04`).
+  - **10. Facility Management 7D (`facility.rs`)**: Added `MepIsolationSpaceUtilization` (`7D-03`) riser isolation matrix and `DroneDefectCrackMapper` (`7D-04`) UAV crack overlay & ACI 224R ledger.
+  - **11. Safety & Health 8D (`safety.rs`)**: Added `ScaffoldingFormworkReshoring` (`8D-03`) ACI 347 shoring load transfer and `PermitToWorkEvacuationDrill` (`8D-04`).
+  - **12. Lean Construction 9D (`lean.rs`)**: Added `TaktTimeConcretePourDispatch` (`9D-03`) and `RfiSubmittalSlaTracker` (`9D-04`).
+  - **13. Industrialized & 10D OpenBIM (`industrialized/automation_slots.rs`)**: Added `PrecastTrailerJointTolerance` (`10D-04`) and `Concrete3DPrintingGcodeToolpath` (`10D-05`) 3DCP contour preview.
+  - **14. Prediction & AI Aging (`prediction.rs`)**: Added `ChlorideCorrosionDurability` (`PRED-03`) Fick's 2nd Law diffusion plotter and `PostEarthquakeAtc20Tagging` (`PRED-04`) wing placard triage matrix.
+  - **15. Report & Publishing (`results.rs`)**: Added `RegulatoryCalcBookPbgComposer` (`PUB-04`) SIMBG/PBG/IBC cover & PE stamp preview and `AsBuiltHandoverDossierPackager` (`PUB-05`) SHA-256 package verifier.
+- **Roadmap Dashboard & Navigation Telemetry (`src/views/settings.rs`, `src/app.rs`)**:
+  - Added per-pillar capability counters (`Active/Total`) in the sidebar navigation list, active+locked counts in the workspace header pill, Phase 32–35 filter chips in Settings -> Feature Registry, Phase 32/33 batch queue triggers, and structured `EigenGraph_Unlock_Roadmap.json` export.
+
+---
+
 ## [v0.3.0] - 2026-11-13 — Phase 30: Frozen Responsive 15-Pillar Master Workspace Architecture & Centralized Feature Unlock Registry
 
 ### Added

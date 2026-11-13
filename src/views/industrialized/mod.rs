@@ -2,6 +2,7 @@
 //! Integrates Industry 4.0 workflows: Prefabrication DfMA, Robotics, Autonomous Erection,
 //! and Native OpenBIM IFC (IFC2x3 / IFC4 / IFC4.3) Reader, Mutator, Clash, Diff & IDS Studio.
 
+pub mod automation_slots;
 pub mod dfma_robotics;
 pub mod ifc_inspector;
 pub mod lifecycle_10d;
@@ -25,6 +26,8 @@ pub enum IndustrializedSubTab {
     RoboticAutomation,
     AutomatedErection,
     OpenBimIfcStudio,
+    PrecastLogisticsTolerance,
+    Concrete3DPrinting,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -226,6 +229,12 @@ impl IndustrializedView {
                     IndustrializedSubTab::OpenBimIfcStudio => {
                         self.render_openbim_ifc_studio(ui, theme, features)
                     }
+                    IndustrializedSubTab::PrecastLogisticsTolerance => {
+                        self.render_precast_logistics_tolerance(ui, theme, features)
+                    }
+                    IndustrializedSubTab::Concrete3DPrinting => {
+                        self.render_concrete_3d_printing(ui, theme, features)
+                    }
                 }
 
                 ui.add_space(64.0);
@@ -240,6 +249,8 @@ impl IndustrializedView {
             (IndustrializedSubTab::RoboticAutomation, "🦾 Robotics & Automation"),
             (IndustrializedSubTab::AutomatedErection, "🏗️ Autonomous Crane & LiDAR"),
             (IndustrializedSubTab::OpenBimIfcStudio, "🌐 OpenBIM IFC Studio"),
+            (IndustrializedSubTab::PrecastLogisticsTolerance, "🚛 Precast Hauling & Splice (10D-04)"),
+            (IndustrializedSubTab::Concrete3DPrinting, "🖨️ 3DCP G-Code Slicer (10D-05)"),
         ];
         ui_kit::subtab_bar(ui, theme, "ind_subtab_bar", &mut self.active_subtab, &tabs);
     }

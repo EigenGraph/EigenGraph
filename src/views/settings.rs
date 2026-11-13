@@ -33,6 +33,7 @@ pub struct SettingsView {
     pub registry_search: String,
     pub registry_filter: RegistryFilter,
     pub pillar_filter: Option<NavigationPillar>,
+    pub phase_filter: Option<&'static str>,
     pub export_feedback: Option<String>,
 }
 
@@ -49,6 +50,7 @@ impl Default for SettingsView {
             registry_search: String::new(),
             registry_filter: RegistryFilter::All,
             pillar_filter: None,
+            phase_filter: None,
             export_feedback: None,
         }
     }
@@ -119,7 +121,7 @@ impl SettingsView {
         );
         ui.label(
             RichText::new(
-                "Phase 30 locks all 15 workspace UI layouts in place. Queue locked capabilities below to target exact logic unlocks in Phases 31–33 without layout churn.",
+                "Phase 31 locks all 15 workspace UI layouts across 74 capabilities. Queue locked modules below to target Phases 32–35 logic unlocks without layout churn.",
             )
             .size(12.0)
             .color(theme.text_secondary),
@@ -229,10 +231,67 @@ impl SettingsView {
 
             ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
+                ui.label(
+                    RichText::new("TARGET UNLOCK PHASE:")
+                        .size(10.5)
+                        .strong()
+                        .color(theme.text_muted),
+                );
+                let all_phases_sel = self.phase_filter.is_none();
+                if ui
+                    .add(
+                        egui::Button::new(RichText::new("All Phases").size(10.5).color(
+                            if all_phases_sel {
+                                Color32::WHITE
+                            } else {
+                                theme.text_secondary
+                            },
+                        ))
+                        .fill(if all_phases_sel {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_sidebar
+                        })
+                        .corner_radius(CornerRadius::same(6)),
+                    )
+                    .clicked()
+                {
+                    self.phase_filter = None;
+                }
+                for &phase in FeatureRegistry::distinct_target_phases() {
+                    let count = registry.locked_by_phase_count(phase);
+                    let selected = self.phase_filter == Some(phase);
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new(format!("{phase} ({count})")).size(10.5).color(
+                                    if selected {
+                                        Color32::WHITE
+                                    } else {
+                                        theme.text_secondary
+                                    },
+                                ),
+                            )
+                            .fill(if selected {
+                                theme.accent_blue
+                            } else {
+                                theme.bg_sidebar
+                            })
+                            .corner_radius(CornerRadius::same(6)),
+                        )
+                        .clicked()
+                    {
+                        self.phase_filter = if selected { None } else { Some(phase) };
+                    }
+                }
+            });
+
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
                 if ui
                     .add(
                         egui::Button::new(
-                            RichText::new("⭐ Prioritize All Phase 31")
+                            RichText::new("⭐ Prioritize Phase 32")
                                 .size(11.0)
                                 .color(theme.accent_blue),
                         )
@@ -241,7 +300,22 @@ impl SettingsView {
                     )
                     .clicked()
                 {
-                    registry.prioritize_phase("Phase 31");
+                    registry.prioritize_phase("Phase 32");
+                }
+
+                if ui
+                    .add(
+                        egui::Button::new(
+                            RichText::new("⭐ Prioritize Phase 33")
+                                .size(11.0)
+                                .color(theme.accent_blue),
+                        )
+                        .fill(theme.accent_blue.gamma_multiply(0.15))
+                        .corner_radius(CornerRadius::same(6)),
+                    )
+                    .clicked()
+                {
+                    registry.prioritize_phase("Phase 33");
                 }
 
                 if ui
@@ -279,6 +353,30 @@ impl SettingsView {
                         }
                         Err(err) => {
                             self.export_feedback = Some(format!("Export failed: {err}"));
+                        }
+                    }
+                }
+
+                if ui
+                    .add(
+                        egui::Button::new(
+                            RichText::new("📦 Export Unlock Roadmap (.json)")
+                                .size(11.0)
+                                .strong()
+                                .color(Color32::WHITE),
+                        )
+                        .fill(theme.accent_blue)
+                        .corner_radius(CornerRadius::same(6)),
+                    )
+                    .clicked()
+                {
+                    let json = registry.export_unlock_roadmap_json();
+                    match DiskExporter::write_export_file("EigenGraph_Unlock_Roadmap.json", &json) {
+                        Ok(dest) => {
+                            self.export_feedback = Some(format!("Exported structured JSON roadmap -> {dest}"));
+                        }
+                        Err(err) => {
+                            self.export_feedback = Some(format!("JSON export failed: {err}"));
                         }
                     }
                 }
@@ -378,6 +476,15 @@ impl SettingsView {
         for entry in &mut registry.entries {
             if let Some(pf) = self.pillar_filter {
                 if entry.pillar != pf {
+                    continue;
+                }
+            }
+            if let Some(phase_target) = self.phase_filter {
+                if !entry
+                    .status
+                    .target_phase()
+                    .is_some_and(|p| p.eq_ignore_ascii_case(phase_target))
+                {
                     continue;
                 }
             }
@@ -686,7 +793,7 @@ impl SettingsView {
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
                 ui.label(
-                    RichText::new(format!("v{} — Phase 30 Unified Master Workspace", env!("CARGO_PKG_VERSION")))
+                    RichText::new(format!("v{} — Phase 31 Full-Suite Master Workspace", env!("CARGO_PKG_VERSION")))
                         .size(13.0)
                         .color(theme.accent_green)
                         .strong(),

@@ -9,6 +9,7 @@ impl ParametricView {
         theme: &MacTheme,
         _db_components: &[DatabaseComponent],
         _active_pillar: &mut NavigationPillar,
+        features: &mut FeatureRegistry,
         stacked_height: Option<f32>,
     ) {
         ui.vertical(|ui| {
@@ -35,6 +36,22 @@ impl ParametricView {
 
             if self.view_mode == DraftingViewMode::VisualNodeGraphDynamo {
                 self.render_dynamo_algorithmic_studio(ui, theme, available_width, available_height);
+            } else if matches!(
+                self.view_mode,
+                DraftingViewMode::RebarBbsDetailing | DraftingViewMode::ElevationsAndMepRiser
+            ) {
+                egui::ScrollArea::vertical()
+                    .id_salt("parametric_detailing_slots_scroll")
+                    .max_height(available_height)
+                    .show(ui, |ui| match self.view_mode {
+                        DraftingViewMode::RebarBbsDetailing => {
+                            self.render_rebar_bbs_detailing(ui, theme, features);
+                        }
+                        DraftingViewMode::ElevationsAndMepRiser => {
+                            self.render_elevations_mep_riser(ui, theme, features);
+                        }
+                        _ => {}
+                    });
             } else {
                 Frame::new()
                     .fill(Color32::from_rgb(14, 17, 23))
@@ -72,7 +89,9 @@ impl ParametricView {
                             DraftingViewMode::SheetLayoutA101 => {
                                 self.draw_sheet_layout_a101(&painter, rect, theme);
                             }
-                            DraftingViewMode::VisualNodeGraphDynamo => {}
+                            DraftingViewMode::VisualNodeGraphDynamo
+                            | DraftingViewMode::RebarBbsDetailing
+                            | DraftingViewMode::ElevationsAndMepRiser => {}
                         }
                     });
             }

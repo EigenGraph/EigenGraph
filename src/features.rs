@@ -1,5 +1,5 @@
 //! features.rs — Centralized Feature Gate & Unlock Roadmap Registry for EigenGraph.
-//! Catalogs active engineering capabilities and upcoming Phase 31+ locked workspace slots
+//! Catalogs active engineering capabilities and upcoming Phase 32–35 locked workspace slots
 //! across all 15 BIM/Structural domains so layouts stay frozen while capabilities unlock cleanly.
 
 use crate::models::NavigationPillar;
@@ -18,6 +18,13 @@ impl FeatureStatus {
         matches!(self, Self::Active)
     }
 
+    pub fn target_phase(&self) -> Option<&'static str> {
+        match self {
+            Self::Active => None,
+            Self::Locked { target_phase } => Some(target_phase),
+        }
+    }
+
     pub fn badge_label(&self) -> String {
         match self {
             Self::Active => "ACTIVE".to_string(),
@@ -33,29 +40,39 @@ pub enum FeatureId {
     VaultPortfolioManager,
     GlobalBimFamilyCatalog,
     BrowserIndexedDbPersistence,
+    CdeIso19650DocumentHub,
+    MultiTypologyProjectTemplates,
 
     // 2. AI Agent & Virtual Firm
     VirtualEngineeringFirmBoard,
     AutonomousCopilotCalculators,
     LiveGeminiToolOrchestrator,
+    AutomatedCodeComplianceAuditor,
+    ParetoMultiObjectiveOptimizer,
 
     // 3. Research & 1D GIS
     SlippyMapWebMercator,
     GeodeticCrsUtmProjection,
     DemTinMeshCutFill,
     LiveRasterMapTileFetcher,
+    GeotechBoreholeStratigraphy,
+    HydrologyIdfFloodplain,
 
     // 4. Parametric & 2D Studio
     Planar2DCadAuthoring,
     LiveSectionCutPoche,
     DynamoAlgorithmicStudio,
     ParametricBidirectionalSync,
+    AutomatedRcRebarBbsDrafter,
+    BuildingElevationsMepRiser,
 
     // 5. Geometry & 3D BIM
     CsgBrep3DViewport,
     BimMasterRibbonAndBrowser,
     Bcf21CoordinationHub,
     LiveBvhGeometricClashSolver,
+    FederatedLayersAxisSlicer,
+    PointCloudAsBuiltDeviation,
 
     // 6. Analysis & Multi-Hazard Simulation
     LinearFemAndSvdAri,
@@ -63,44 +80,65 @@ pub enum FeatureId {
     MemberCodeDesignSuite,
     ExtremeBlastFireFemaP58,
     LiveBimToFemAutoSync,
+    BridgeMovingLoadInfluence,
+    RetainingWallSlopeStability,
+    FloorVibrationSteelFatigue,
 
     // 7. Time & 4D Scheduling
     Synchro4DErectionPlayer,
     BimDriven4DCriticalPathSync,
+    MonteCarloScheduleRiskPert,
+    ResourceLevelingCrewHistogram,
 
     // 8. Cost & 5D Budgeting
     Parametric5DRabMultiCurrency,
     LiveBimQtoBoqSync,
+    EarnedValueEvmProgressClaim,
+    ValueEngineeringTenderMatrix,
 
     // 9. Sustainability & 6D Energy/LCA
     WholeLifeCarbonEn15978,
     BimMaterialLcaAutoSync,
+    SolarOttvThermalDaylight,
+    CircularMaterialPassportDfd,
 
     // 10. Facility Management & 7D Digital Twin
     DigitalTwinShmCobie3,
     LiveIotTelemetryIngestion,
+    MepIsolationSpaceUtilization,
+    DroneDefectCrackMapper,
 
     // 11. Safety & 8D Site Risk
     TowerCraneFallRiskRadar,
     SitePerimeter3DCraneCollision,
+    ScaffoldingFormworkReshoring,
+    PermitToWorkEvacuationDrill,
 
     // 12. Lean Construction & 9D Logistics
     CuttingStock1DAndLastPlanner,
     LiveRebarBbsCuttingSync,
+    TaktTimeConcretePourDispatch,
+    RfiSubmittalSlaTracker,
 
     // 13. Industrialized & 10D DfMA / OpenBIM
     OpenBimIfcReaderEditorClashDiff,
     DfmaSupplyChainTracker,
     WasmLocalIfcFileDropPicker,
+    PrecastTrailerJointTolerance,
+    Concrete3DPrintingGcodeToolpath,
 
     // 14. Prediction & AI Structural Aging
     FosmReliabilityProgressiveCollapse,
     LiveShmAnomalyForecasting,
+    ChlorideCorrosionDurability,
+    PostEarthquakeAtc20Tagging,
 
     // 15. Report & Publishing Suite
     DedDrawingSheetsPdfDxfSvg,
     LivingDocsSheetsSlides,
     AutoProjectedBimDedSheets,
+    RegulatoryCalcBookPbgComposer,
+    AsBuiltHandoverDossierPackager,
 }
 
 /// Metadata record describing one capability inside the centralized Feature Registry.
@@ -132,7 +170,9 @@ impl FeatureRegistry {
     pub fn new() -> Self {
         use FeatureStatus::{Active, Locked};
         let entries = vec![
-            // 1. My Library
+            // =================================================================
+            // 1. My Library & Vault (2 Active + 3 Locked = 5)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::VaultPortfolioManager,
                 pillar: NavigationPillar::MyLibrary,
@@ -159,12 +199,34 @@ impl FeatureRegistry {
                 code: "LIB-03",
                 title: "Browser IndexedDB & LocalStorage Vault Sync",
                 description: "Automatic client-side WASM persistence across browser reloads with JSON archive import/export.",
-                status: Locked { target_phase: "Phase 31" },
+                status: Locked { target_phase: "Phase 32" },
                 module_hint: "src/core/web_bridge.rs + src/core/vault.rs",
                 prioritized: true,
             },
+            FeatureEntry {
+                id: FeatureId::CdeIso19650DocumentHub,
+                pillar: NavigationPillar::MyLibrary,
+                code: "LIB-04",
+                title: "ISO 19650 Common Data Environment (CDE) Hub",
+                description: "WIP, Shared, Published, and Archive information containers with suitability codes (S0–A4) and transmittal sign-off.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/my_project.rs + src/core/vault.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::MultiTypologyProjectTemplates,
+                pillar: NavigationPillar::MyLibrary,
+                code: "LIB-05",
+                title: "Multi-Typology Structural Project Templates",
+                description: "One-click seed launchers for Long-Span Steel Trusses, Dual-System RC Towers, PT Viaducts, and Precast Logistics.",
+                status: Locked { target_phase: "Phase 33" },
+                module_hint: "src/views/my_project.rs + src/core/parametric.rs",
+                prioritized: false,
+            },
 
-            // 2. AI Agent
+            // =================================================================
+            // 2. AI Agent & Virtual Firm (2 Active + 3 Locked = 5)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::VirtualEngineeringFirmBoard,
                 pillar: NavigationPillar::AiAgent,
@@ -191,12 +253,34 @@ impl FeatureRegistry {
                 code: "AI-03",
                 title: "Live LLM Tool-Calling BIM Orchestrator",
                 description: "Async Gemini REST integration executing validated BimCommand edits against the live structural model.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Locked { target_phase: "Phase 33" },
                 module_hint: "src/core/web_bridge.rs + src/views/ai_assistant.rs",
                 prioritized: false,
             },
+            FeatureEntry {
+                id: FeatureId::AutomatedCodeComplianceAuditor,
+                pillar: NavigationPillar::AiAgent,
+                code: "AI-04",
+                title: "Automated Multi-Code Compliance Auditor",
+                description: "Clause-by-clause SNI 2847 / ACI 318 / AISC 360 / SNI 1726 sweep checking SCWB joints, drift caps, and detailing rules.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/ai_firm.rs + src/core/fem.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::ParetoMultiObjectiveOptimizer,
+                pillar: NavigationPillar::AiAgent,
+                code: "AI-05",
+                title: "NSGA-II Multi-Objective Pareto Optimizer",
+                description: "Simultaneous trade-off optimization across 5D Capex, A1–A3 Embodied Carbon, and global ARI redundancy.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/ai_firm.rs + src/core/parametric.rs",
+                prioritized: false,
+            },
 
-            // 3. Research & 1D GIS
+            // =================================================================
+            // 3. Research & 1D GIS (3 Active + 3 Locked = 6)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::SlippyMapWebMercator,
                 pillar: NavigationPillar::ResearchConcept,
@@ -233,12 +317,34 @@ impl FeatureRegistry {
                 code: "1D-04",
                 title: "Live Raster Tile Cache & GeoTIFF/CSV DEM Importer",
                 description: "Async OSM/Esri raster tile texture streaming and browser survey point-cloud CSV/XYZ ingestion.",
-                status: Locked { target_phase: "Phase 31" },
+                status: Locked { target_phase: "Phase 32" },
                 module_hint: "src/core/gis/map_widget.rs + src/core/web_bridge.rs",
                 prioritized: true,
             },
+            FeatureEntry {
+                id: FeatureId::GeotechBoreholeStratigraphy,
+                pillar: NavigationPillar::ResearchConcept,
+                code: "1D-05",
+                title: "Geotech Borehole Logs, SPT N60 & Vs30 Soil Stratigraphy",
+                description: "Subsurface boring log inspector, SNI 8460 liquefaction screening, and end-bearing pile socket recommendations.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/research.rs + src/core/geotech.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::HydrologyIdfFloodplain,
+                pillar: NavigationPillar::ResearchConcept,
+                code: "1D-06",
+                title: "Site Hydrology, IDF Rainfall Curves & Floodplain Datum",
+                description: "100-year return-period IDF peak runoff (Q = C*I*A), detention sizing, and minimum finished floor elevation (FFE).",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/research.rs + src/core/gis/",
+                prioritized: false,
+            },
 
-            // 4. Parametric & 2D Studio
+            // =================================================================
+            // 4. Parametric & 2D Studio (3 Active + 3 Locked = 6)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::Planar2DCadAuthoring,
                 pillar: NavigationPillar::ParametricDED,
@@ -275,12 +381,34 @@ impl FeatureRegistry {
                 code: "2D-04",
                 title: "Bidirectional 2D/Dynamo <-> 3D BIM Bus Sync",
                 description: "Shares one unified BimCommandBus between Parametric 2D/Dynamo authoring and Geometry 3D viewport.",
-                status: Locked { target_phase: "Phase 31" },
+                status: Locked { target_phase: "Phase 32" },
                 module_hint: "src/app.rs + src/core/bim.rs",
                 prioritized: true,
             },
+            FeatureEntry {
+                id: FeatureId::AutomatedRcRebarBbsDrafter,
+                pillar: NavigationPillar::ParametricDED,
+                code: "2D-05",
+                title: "Automated RC Beam/Column Rebar Elevation & BBS Drafter",
+                description: "Generates ACI 318 / SNI 2847 seismic confinement zones, lap splice zones, and bar-mark shape-code schedules.",
+                status: Locked { target_phase: "Phase 33" },
+                module_hint: "src/views/parametric/detailing_2d.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::BuildingElevationsMepRiser,
+                pillar: NavigationPillar::ParametricDED,
+                code: "2D-06",
+                title: "Automated Building Elevations & MEP Riser Diagrams",
+                description: "Projects N/E/S/W architectural elevations with storey levels and schematic HVAC/Chilled-Water/Fire riser stacks.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/parametric/detailing_2d.rs",
+                prioritized: false,
+            },
 
-            // 5. Geometry & 3D BIM
+            // =================================================================
+            // 5. Geometry & 3D BIM (3 Active + 3 Locked = 6)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::CsgBrep3DViewport,
                 pillar: NavigationPillar::GeometryAssembly,
@@ -317,12 +445,34 @@ impl FeatureRegistry {
                 code: "3D-04",
                 title: "Live Bvh3D Spatial Clash Detection Engine",
                 description: "Real-time BVH/AABB collision solver across active walls, columns, beams, MEP runs, and rebar cages.",
-                status: Locked { target_phase: "Phase 31" },
+                status: Locked { target_phase: "Phase 32" },
                 module_hint: "src/core/csg.rs + src/views/build/clash_bcf.rs",
                 prioritized: true,
             },
+            FeatureEntry {
+                id: FeatureId::FederatedLayersAxisSlicer,
+                pillar: NavigationPillar::GeometryAssembly,
+                code: "3D-05",
+                title: "Federated Discipline Layers & Multi-Axis Section Box",
+                description: "Independent Arch/Struct/MEP/Rebar visibility filters paired with orthogonal X/Y/Z clip-plane sliders.",
+                status: Locked { target_phase: "Phase 33" },
+                module_hint: "src/views/build/sidebar.rs + src/views/build/viewport_3d.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::PointCloudAsBuiltDeviation,
+                pillar: NavigationPillar::GeometryAssembly,
+                code: "3D-06",
+                title: "E57/LAS LiDAR Point-Cloud vs BIM Deviation Inspector",
+                description: "3D ICP scan-to-BIM overlay measuring structural plumbness, slab FF/FL flatness, and millimeter tolerances.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/build/bottom_deck.rs",
+                prioritized: false,
+            },
 
-            // 6. Analysis & Simulation
+            // =================================================================
+            // 6. Analysis & Multi-Hazard Simulation (4 Active + 4 Locked = 8)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::LinearFemAndSvdAri,
                 pillar: NavigationPillar::AnalysisSimulation,
@@ -369,12 +519,44 @@ impl FeatureRegistry {
                 code: "SIM-05",
                 title: "Live BimProject -> FemSolver Reactive Sync",
                 description: "Automatically converts active 3D BIM geometry & 1D GIS seismic parameters into live FEA runs.",
-                status: Locked { target_phase: "Phase 31" },
+                status: Locked { target_phase: "Phase 32" },
                 module_hint: "src/core/bim.rs + src/views/analyze/mod.rs",
                 prioritized: true,
             },
+            FeatureEntry {
+                id: FeatureId::BridgeMovingLoadInfluence,
+                pillar: NavigationPillar::AnalysisSimulation,
+                code: "SIM-06",
+                title: "AASHTO HL-93 / SNI 1725 Bridge Moving Load & Influence Lines",
+                description: "Computes truck/tandem/lane influence line ordinates, impact factor IM, and live-load bending envelopes.",
+                status: Locked { target_phase: "Phase 33" },
+                module_hint: "src/views/analyze/extended_mechanics.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::RetainingWallSlopeStability,
+                pillar: NavigationPillar::AnalysisSimulation,
+                code: "SIM-07",
+                title: "Retaining Wall & Bishop Circular Slope Stability (SNI 8460)",
+                description: "Evaluates Mononobe-Okabe seismic earth pressure, overturning/sliding checks, and method-of-slices slip FS.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/analyze/extended_mechanics.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::FloorVibrationSteelFatigue,
+                pillar: NavigationPillar::AnalysisSimulation,
+                code: "SIM-08",
+                title: "AISC DG-11 Floor Vibration & EN 1993-1-9 Steel Fatigue",
+                description: "Checks footfall resonance peak acceleration (%g) and cyclic Miner cumulative S-N fatigue life.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/analyze/extended_mechanics.rs",
+                prioritized: false,
+            },
 
-            // 7. Time & 4D
+            // =================================================================
+            // 7. Time & 4D Scheduling (1 Active + 3 Locked = 4)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::Synchro4DErectionPlayer,
                 pillar: NavigationPillar::TimeScheduling,
@@ -391,12 +573,34 @@ impl FeatureRegistry {
                 code: "4D-02",
                 title: "Element-Linked 4D WBS & 3D Erection Coupling",
                 description: "Binds WBS tasks directly to active BimProject element IDs to isolate active erection phases in 3D.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Locked { target_phase: "Phase 33" },
                 module_hint: "src/core/schedule.rs + src/views/planning.rs",
                 prioritized: false,
             },
+            FeatureEntry {
+                id: FeatureId::MonteCarloScheduleRiskPert,
+                pillar: NavigationPillar::TimeScheduling,
+                code: "4D-03",
+                title: "PERT 3-Point & Monte Carlo Schedule Risk Simulation",
+                description: "1,000-trial probabilistic completion S-curve (P50/P80/P95) and critical-path sensitivity tornado ranking.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/planning.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::ResourceLevelingCrewHistogram,
+                pillar: NavigationPillar::TimeScheduling,
+                code: "4D-04",
+                title: "Daily Site Crew Histogram & Resource Leveling Engine",
+                description: "Smooths ironworker, formwork carpenter, and crane-hour demand spikes within available float windows.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/planning.rs",
+                prioritized: false,
+            },
 
-            // 8. Cost & 5D
+            // =================================================================
+            // 8. Cost & 5D Budgeting (1 Active + 3 Locked = 4)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::Parametric5DRabMultiCurrency,
                 pillar: NavigationPillar::CostBudgeting,
@@ -413,12 +617,34 @@ impl FeatureRegistry {
                 code: "5D-02",
                 title: "Live BimProject Volume & Rebar QTO Ledger Sync",
                 description: "Extracts concrete, structural steel, wall area, and rebar tonnage dynamically from active 3D BIM.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Locked { target_phase: "Phase 33" },
                 module_hint: "src/core/cost.rs + src/views/planning.rs",
                 prioritized: false,
             },
+            FeatureEntry {
+                id: FeatureId::EarnedValueEvmProgressClaim,
+                pillar: NavigationPillar::CostBudgeting,
+                code: "5D-03",
+                title: "Earned Value Management (EVM) & Progress Claim S-Curve",
+                description: "Tracks PV, EV, AC, CPI/SPI variance, Estimate at Completion (EAC), and monthly payment certificates.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/planning.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::ValueEngineeringTenderMatrix,
+                pillar: NavigationPillar::CostBudgeting,
+                code: "5D-04",
+                title: "Value Engineering Trade Study & Tender Bid Leveling",
+                description: "Compares Owner Engineer Estimate vs vendor unit rates and quantifies structural system VE savings.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/planning.rs",
+                prioritized: false,
+            },
 
-            // 9. Sustainability & 6D
+            // =================================================================
+            // 9. Sustainability & 6D Energy/LCA (1 Active + 3 Locked = 4)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::WholeLifeCarbonEn15978,
                 pillar: NavigationPillar::SustainabilityEnergy,
@@ -435,12 +661,34 @@ impl FeatureRegistry {
                 code: "6D-02",
                 title: "Live BIM Material Embodied Carbon Sync",
                 description: "Computes real-time A1-A3 CO2e intensity directly from active BimProject volumes and steel profiles.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Locked { target_phase: "Phase 33" },
                 module_hint: "src/core/carbon.rs + src/views/sustainability.rs",
                 prioritized: false,
             },
+            FeatureEntry {
+                id: FeatureId::SolarOttvThermalDaylight,
+                pillar: NavigationPillar::SustainabilityEnergy,
+                code: "6D-03",
+                title: "SNI 6389 Solar OTTV & Facade Daylight Simulation",
+                description: "Computes N/E/S/W facade Overall Thermal Transfer Value (OTTV W/m²), SHGC glazing, and shading factors.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/sustainability.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::CircularMaterialPassportDfd,
+                pillar: NavigationPillar::SustainabilityEnergy,
+                code: "6D-04",
+                title: "Circular Material Bank Passport & Design-for-Disassembly",
+                description: "Tracks reversible bolted steel share, EN 15978 Module D reuse credit, and QR circular material tags.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/sustainability.rs",
+                prioritized: false,
+            },
 
-            // 10. Facility & 7D
+            // =================================================================
+            // 10. Facility Management & 7D Digital Twin (1 Active + 3 Locked = 4)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::DigitalTwinShmCobie3,
                 pillar: NavigationPillar::FacilityManagement,
@@ -457,12 +705,34 @@ impl FeatureRegistry {
                 code: "7D-02",
                 title: "Live WebSocket/MQTT IoT Sensor Stream Ingestion",
                 description: "Connects browser WebSocket endpoints for live field strain gauge and accelerometer SHM streaming.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Locked { target_phase: "Phase 34" },
                 module_hint: "src/core/web_bridge.rs + src/views/facility.rs",
                 prioritized: false,
             },
+            FeatureEntry {
+                id: FeatureId::MepIsolationSpaceUtilization,
+                pillar: NavigationPillar::FacilityManagement,
+                code: "7D-03",
+                title: "MEP Riser Valve Isolation Tree & Space Utilization",
+                description: "Maps emergency shutoff valve upstream/downstream dependencies to impacted rooms and gross-to-net KPIs.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/facility.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::DroneDefectCrackMapper,
+                pillar: NavigationPillar::FacilityManagement,
+                code: "7D-04",
+                title: "UAV Orthomosaic Crack Width & Concrete Spalling Mapper",
+                description: "Log-pinned facade & bridge pier crack widths vs ACI 224R limits, spalling severities, and repair triggers.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/facility.rs",
+                prioritized: false,
+            },
 
-            // 11. Safety & 8D
+            // =================================================================
+            // 11. Safety & 8D Site Risk (1 Active + 3 Locked = 4)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::TowerCraneFallRiskRadar,
                 pillar: NavigationPillar::SafetyHealth,
@@ -479,12 +749,34 @@ impl FeatureRegistry {
                 code: "8D-02",
                 title: "3D Crane Jib vs BIM Perimeter Clearance Check",
                 description: "Evaluates 3D swing clearance against active BimProject building envelopes and site boundaries.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Locked { target_phase: "Phase 34" },
                 module_hint: "src/views/safety.rs + src/core/bim.rs",
                 prioritized: false,
             },
+            FeatureEntry {
+                id: FeatureId::ScaffoldingFormworkReshoring,
+                pillar: NavigationPillar::SafetyHealth,
+                code: "8D-03",
+                title: "ACI 347 Slab Formwork Shoring & Reshoring Load Transfer",
+                description: "Checks early-age concrete strength maturity, multi-floor shoring load ratios, and falsework Euler buckling.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/safety.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::PermitToWorkEvacuationDrill,
+                pillar: NavigationPillar::SafetyHealth,
+                code: "8D-04",
+                title: "Digital Permit-to-Work (PTW) & NFPA 101 Muster Telemetry",
+                description: "Hot-work/confined-space/height permit ledger, wind lockdown thresholds, and timed evacuation drill logs.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/safety.rs",
+                prioritized: false,
+            },
 
-            // 12. Lean & 9D
+            // =================================================================
+            // 12. Lean Construction & 9D Logistics (1 Active + 3 Locked = 4)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::CuttingStock1DAndLastPlanner,
                 pillar: NavigationPillar::LeanConstruction,
@@ -501,12 +793,34 @@ impl FeatureRegistry {
                 code: "9D-02",
                 title: "Live BIM Rebar Schedule -> 1D Cutting Sync",
                 description: "Feeds active BimProject rebar bar marks and lengths directly into the 1D cutting stock optimizer.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Locked { target_phase: "Phase 33" },
                 module_hint: "src/core/cso.rs + src/views/lean.rs",
                 prioritized: false,
             },
+            FeatureEntry {
+                id: FeatureId::TaktTimeConcretePourDispatch,
+                pillar: NavigationPillar::LeanConstruction,
+                code: "9D-03",
+                title: "Zone Takt-Time Wagon Cadence & Ready-Mix Dispatch",
+                description: "Balances multi-zone trade trains and monitors ready-mix concrete truck slump & transit intervals.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/lean.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::RfiSubmittalSlaTracker,
+                pillar: NavigationPillar::LeanConstruction,
+                code: "9D-04",
+                title: "BIM-Pinned RFI & Shop-Drawing SLA Turnaround Tracker",
+                description: "Links engineering RFIs and shop drawing submittals to lookahead constraints with SLA escalation timers.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/lean.rs",
+                prioritized: false,
+            },
 
-            // 13. Industrialized & 10D
+            // =================================================================
+            // 13. Industrialized & 10D DfMA / OpenBIM (2 Active + 3 Locked = 5)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::OpenBimIfcReaderEditorClashDiff,
                 pillar: NavigationPillar::IndustrializedAutomation,
@@ -533,12 +847,34 @@ impl FeatureRegistry {
                 code: "10D-03",
                 title: "WASM Browser File Picker & Drag-and-Drop IFC",
                 description: "Imports local .ifc, .json, and .e2k files directly in browser via HTML5 file picker and drop events.",
-                status: Locked { target_phase: "Phase 31" },
+                status: Locked { target_phase: "Phase 32" },
                 module_hint: "src/core/web_bridge.rs + src/views/industrialized/openbim_studio.rs",
                 prioritized: true,
             },
+            FeatureEntry {
+                id: FeatureId::PrecastTrailerJointTolerance,
+                pillar: NavigationPillar::IndustrializedAutomation,
+                code: "10D-04",
+                title: "Precast Trailer Routing Envelope & Grouted Splice Tolerance",
+                description: "Checks highway clearance envelopes, trailer axle weights, and millimeter laser-tracker joint alignment.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/industrialized/automation_slots.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::Concrete3DPrintingGcodeToolpath,
+                pillar: NavigationPillar::IndustrializedAutomation,
+                code: "10D-05",
+                title: "3D Concrete Printing (3DCP) Contour Slicer & G-Code",
+                description: "Continuous print path preview, extrusion bead velocity sync, open-time cold-joint guard, and G-Code output.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/industrialized/automation_slots.rs",
+                prioritized: false,
+            },
 
-            // 14. Prediction
+            // =================================================================
+            // 14. Prediction & AI Structural Aging (1 Active + 3 Locked = 4)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::FosmReliabilityProgressiveCollapse,
                 pillar: NavigationPillar::Prediction,
@@ -555,12 +891,34 @@ impl FeatureRegistry {
                 code: "PRED-02",
                 title: "Live FEA & SHM Stress Anomaly Forecasting",
                 description: "Computes real-time member vulnerability rankings from active FEA forces and 7D SHM sensor trends.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Locked { target_phase: "Phase 34" },
                 module_hint: "src/core/reliability.rs + src/views/prediction.rs",
                 prioritized: false,
             },
+            FeatureEntry {
+                id: FeatureId::ChlorideCorrosionDurability,
+                pillar: NavigationPillar::Prediction,
+                code: "PRED-03",
+                title: "Fick's 2nd Law Chloride & Carbonation Service-Life Forecaster",
+                description: "Models marine chloride penetration, cover depassivation year, and rebar cross-section area decay curves.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/prediction.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::PostEarthquakeAtc20Tagging,
+                pillar: NavigationPillar::Prediction,
+                code: "PRED-04",
+                title: "Post-Earthquake Rapid ATC-20 Placard Triage Matrix",
+                description: "Maps peak accelerometer drift & residual strain into automated Inspected / Restricted / Unsafe wing tags.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/prediction.rs",
+                prioritized: false,
+            },
 
-            // 15. Report & Publishing
+            // =================================================================
+            // 15. Report & Publishing Suite (2 Active + 3 Locked = 5)
+            // =================================================================
             FeatureEntry {
                 id: FeatureId::DedDrawingSheetsPdfDxfSvg,
                 pillar: NavigationPillar::ReportPublishing,
@@ -587,8 +945,28 @@ impl FeatureRegistry {
                 code: "PUB-03",
                 title: "Auto-Projected DED Sheets from Active BimProject",
                 description: "Dynamically projects active plans, section cuts, and rebar/column schedules onto printable sheets.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Locked { target_phase: "Phase 33" },
                 module_hint: "src/core/bim.rs + src/views/results.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::RegulatoryCalcBookPbgComposer,
+                pillar: NavigationPillar::ReportPublishing,
+                code: "PUB-04",
+                title: "PBG / SIMBG & IBC Regulatory Calculation Book Composer",
+                description: "Assembles multi-chapter permitting books combining SNI 1726 spectra, ETABS checks, and PE cover seals.",
+                status: Locked { target_phase: "Phase 34" },
+                module_hint: "src/views/results.rs",
+                prioritized: false,
+            },
+            FeatureEntry {
+                id: FeatureId::AsBuiltHandoverDossierPackager,
+                pillar: NavigationPillar::ReportPublishing,
+                code: "PUB-05",
+                title: "As-Built BIM Digital Handover & SHA-256 Archive Packager",
+                description: "Audits completeness across IFC4, COBie 3.0, record drawings, mill certificates, and O&M warranty manuals.",
+                status: Locked { target_phase: "Phase 35" },
+                module_hint: "src/views/results.rs",
                 prioritized: false,
             },
         ];
@@ -635,6 +1013,21 @@ impl FeatureRegistry {
             .count()
     }
 
+    pub fn locked_by_phase_count(&self, phase: &str) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.status
+                    .target_phase()
+                    .is_some_and(|p| p.eq_ignore_ascii_case(phase))
+            })
+            .count()
+    }
+
+    pub fn distinct_target_phases() -> &'static [&'static str] {
+        &["Phase 32", "Phase 33", "Phase 34", "Phase 35"]
+    }
+
     pub fn prioritize_phase(&mut self, phase_prefix: &str) {
         for entry in &mut self.entries {
             if let FeatureStatus::Locked { target_phase } = entry.status {
@@ -669,7 +1062,8 @@ impl FeatureRegistry {
     pub fn export_unlock_backlog_markdown(&self) -> String {
         let mut out = String::from("# EigenGraph Feature Unlock Queue\n\n");
         out.push_str(&format!(
-            "- Active Capabilities: {}\n- Locked Workspace Slots: {}\n- Prioritized for Next Unlock: {}\n\n",
+            "- Total Registered Capabilities: {}\n- Active Capabilities: {}\n- Locked Workspace Slots: {}\n- Prioritized for Next Unlock: {}\n\n",
+            self.total_count(),
             self.active_count(),
             self.locked_count(),
             self.prioritized_count()
@@ -690,6 +1084,40 @@ impl FeatureRegistry {
         }
         out
     }
+
+    /// Exports a structured JSON unlock roadmap covering all 74 registered capabilities.
+    pub fn export_unlock_roadmap_json(&self) -> String {
+        let items: Vec<serde_json::Value> = self
+            .entries
+            .iter()
+            .map(|e| {
+                serde_json::json!({
+                    "code": e.code,
+                    "pillar": e.pillar.clean_name(),
+                    "title": e.title,
+                    "description": e.description,
+                    "status": if e.status.is_active() { "ACTIVE" } else { "LOCKED" },
+                    "target_phase": e.status.target_phase().unwrap_or("LIVE"),
+                    "prioritized": e.prioritized,
+                    "module_hint": e.module_hint
+                })
+            })
+            .collect();
+
+        let doc = serde_json::json!({
+            "schema": "eigengraph.feature_unlock_roadmap.v2",
+            "version": env!("CARGO_PKG_VERSION"),
+            "summary": {
+                "total": self.total_count(),
+                "active": self.active_count(),
+                "locked": self.locked_count(),
+                "prioritized": self.prioritized_count()
+            },
+            "capabilities": items
+        });
+
+        serde_json::to_string_pretty(&doc).unwrap_or_else(|_| "{}".to_string())
+    }
 }
 
 #[cfg(test)]
@@ -702,18 +1130,24 @@ mod tests {
         for &pillar in NavigationPillar::all() {
             let (active, total) = reg.pillar_counts(pillar);
             assert!(
-                total >= 2 && active >= 1,
-                "Pillar {:?} must track at least 1 active and 2 total capabilities",
+                total >= 4 && active >= 1,
+                "Pillar {:?} must track at least 1 active and 4 total capabilities",
                 pillar
             );
         }
-        assert!(reg.active_count() >= 25);
-        assert!(reg.locked_count() >= 10);
+        assert_eq!(reg.total_count(), 74);
+        assert_eq!(reg.active_count(), 28);
+        assert_eq!(reg.locked_count(), 46);
     }
 
     #[test]
-    fn test_feature_registry_priority_toggle_and_export() {
+    fn test_feature_registry_phases_and_json_export() {
         let mut reg = FeatureRegistry::new();
+        assert_eq!(reg.locked_by_phase_count("Phase 32"), 6);
+        assert_eq!(reg.locked_by_phase_count("Phase 33"), 10);
+        assert_eq!(reg.locked_by_phase_count("Phase 34"), 18);
+        assert_eq!(reg.locked_by_phase_count("Phase 35"), 12);
+
         let before = reg
             .entry(FeatureId::LiveGeminiToolOrchestrator)
             .expect("entry exists")
@@ -727,6 +1161,12 @@ mod tests {
 
         let md = reg.export_unlock_backlog_markdown();
         assert!(md.contains("AI-03"));
-        assert!(md.contains("3D-04"));
+        assert!(md.contains("10D-05"));
+
+        let json_str = reg.export_unlock_roadmap_json();
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json_str).expect("roadmap json parses cleanly");
+        assert_eq!(parsed["summary"]["total"], 74);
+        assert_eq!(parsed["capabilities"].as_array().map(|a| a.len()), Some(74));
     }
 }

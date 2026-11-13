@@ -149,12 +149,14 @@ impl ParametricView {
 
                         ui.separator();
 
-                        // View Mode Switcher: Plan | Section Cut | Sheet Composer 2D
+                        // View Mode Switcher: Plan | Section Cut | Sheet Composer 2D | Dynamo | Rebar BBS | Elevations
                         let views = [
                             (DraftingViewMode::FloorPlanViewRange, "🗺️ Floor Plan (+1200mm)"),
                             (DraftingViewMode::LiveSectionCutPoche, "🔪 Section Cut (Poché)"),
                             (DraftingViewMode::SheetLayoutA101, "📑 Sheet Composer 2D"),
                             (DraftingViewMode::VisualNodeGraphDynamo, "⚡ Dynamo Node Graph"),
+                            (DraftingViewMode::RebarBbsDetailing, "🔩 Rebar & BBS Detailing"),
+                            (DraftingViewMode::ElevationsAndMepRiser, "🏢 Elevations & MEP Riser"),
                         ];
                         for (vm, vlabel) in views {
                             if ui.selectable_label(self.view_mode == vm, vlabel).clicked() {

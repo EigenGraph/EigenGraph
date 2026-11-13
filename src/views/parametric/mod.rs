@@ -22,6 +22,7 @@ use crate::theme::MacTheme;
 use crate::ui_kit;
 
 pub mod canvas_2d;
+pub mod detailing_2d;
 pub mod dynamo_studio;
 pub mod inspector;
 pub mod ribbon;
@@ -32,6 +33,8 @@ pub enum DraftingViewMode {
     LiveSectionCutPoche,
     SheetLayoutA101,
     VisualNodeGraphDynamo,
+    RebarBbsDetailing,
+    ElevationsAndMepRiser,
 }
 
 /// Paper dimensions for Sheet Composer 2D
@@ -292,14 +295,14 @@ impl ParametricView {
                 let panel_w = (avail_w * 0.28).clamp(240.0, 300.0);
                 ui.horizontal(|ui| {
                     self.render_variables_panel(ui, theme, active_pillar, features, Some(panel_w));
-                    self.render_drawing_canvas(ui, theme, db_components, active_pillar, None);
+                    self.render_drawing_canvas(ui, theme, db_components, active_pillar, features, None);
                 });
             } else {
                 let stacked_h = (MacTheme::viewport_size(ui.ctx()).y * 0.45).clamp(260.0, 380.0);
                 egui::ScrollArea::vertical()
                     .id_salt("parametric_compact_scroll")
                     .show(ui, |ui| {
-                        self.render_drawing_canvas(ui, theme, db_components, active_pillar, Some(stacked_h));
+                        self.render_drawing_canvas(ui, theme, db_components, active_pillar, features, Some(stacked_h));
                         ui.add_space(10.0);
                         self.render_variables_panel(ui, theme, active_pillar, features, None);
                         ui.add_space(68.0);

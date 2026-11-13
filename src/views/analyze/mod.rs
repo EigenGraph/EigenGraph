@@ -585,6 +585,9 @@ impl AnalyzeView {
                     AnalyzeSubTab::FemaP58LossAssessment => self.render_fema_p58_assessment(ui, theme),
                     AnalyzeSubTab::BlastResistantDesign => self.render_blast_resistant_design(ui, theme),
                     AnalyzeSubTab::StructuralFireEngineering => self.render_fire_engineering(ui, theme),
+                    AnalyzeSubTab::MovingLoadInfluence => self.render_moving_load_influence(ui, theme, features),
+                    AnalyzeSubTab::SlopeRetainingStability => self.render_slope_retaining_stability(ui, theme, features),
+                    AnalyzeSubTab::FloorVibrationFatigue => self.render_floor_vibration_fatigue(ui, theme, features),
                 }
 
                 ui.add_space(64.0);
