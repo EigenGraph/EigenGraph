@@ -1,7 +1,7 @@
 //! views/analyze/extended_mechanics.rs — Bridge Moving Loads, Retaining Slope Stability & Floor Vibration / Fatigue.
 
 use super::*;
-use egui::{FontId, StrokeKind};
+use egui::{FontId, Rect, StrokeKind};
 
 impl AnalyzeView {
     pub(super) fn render_moving_load_influence(
