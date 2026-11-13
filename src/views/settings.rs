@@ -1,6 +1,6 @@
 //! settings.rs — Workspace Settings, Design Standards & Centralized Feature Unlock Roadmap.
 
-use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, ProgressBar, RichText, ScrollArea, Stroke, Ui, Vec2};
+use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, ProgressBar, RichText, ScrollArea, Stroke, Ui};
 use crate::core::DiskExporter;
 use crate::features::{FeatureRegistry, FeatureStatus};
 use crate::models::NavigationPillar;

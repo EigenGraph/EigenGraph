@@ -168,6 +168,12 @@ impl AiFirmView {
                     AiFirmSubTab::CopilotStudio => {
                         self.render_copilot_studio(ui, theme, features)
                     }
+                    AiFirmSubTab::ComplianceAuditor => {
+                        self.render_compliance_auditor(ui, theme, features)
+                    }
+                    AiFirmSubTab::ParetoOptimizer => {
+                        self.render_pareto_optimizer(ui, theme, features)
+                    }
                     AiFirmSubTab::CollaborationBoard => self.render_collaboration_board(ui, theme),
                     AiFirmSubTab::DirectivesConsole => self.render_directives_console(ui, theme),
                     AiFirmSubTab::AutonomousTelemetry => self.render_telemetry_view(ui, theme),
@@ -182,6 +188,8 @@ impl AiFirmView {
         let subtabs = [
             (AiFirmSubTab::CopilotStudio, "🤖 Engineering Copilot Studio"),
             (AiFirmSubTab::Organigram, "👥 Firm Organigram"),
+            (AiFirmSubTab::ComplianceAuditor, "⚖️ Code Compliance Auditor (AI-04)"),
+            (AiFirmSubTab::ParetoOptimizer, "🧬 Pareto Multi-Objective (AI-05)"),
             (AiFirmSubTab::CollaborationBoard, "💬 Multi-Agent Dialogue"),
             (AiFirmSubTab::DirectivesConsole, "⌨️ Directives Console"),
             (AiFirmSubTab::AutonomousTelemetry, "📊 Autonomous Telemetry"),

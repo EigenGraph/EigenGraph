@@ -3,7 +3,7 @@
 //! Features Dynamic 1D Cutting Stock Optimizer (CSO), Bar Bending Schedule (BBS), and Interactive Last Planner System (LPS).
 
 use egui::{
-    Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText, ScrollArea,
+    Align2, Color32, CornerRadius, Frame, Margin, Pos2, Rect, RichText, ScrollArea,
     Stroke, StrokeKind, Ui, Vec2,
 };
 use crate::core::cso::{CuttingStockOptimizer, CsoReport};
@@ -927,7 +927,10 @@ impl LeanView {
                 ("CONTINUOUS POUR VOLUME", "210 m³ / Night Shift", "30 Trucks Scheduled (K-350 Pump)", theme.accent_blue),
                 ("COLD-JOINT RISK MONITOR", "1 Truck Warning", "TM-14 Delayed 12 min in Ringroad Traffic", theme.accent_orange),
             ];
-            self.render_responsive_cards(ui, theme, &cards);
+            ui_kit::responsive_grid_n(ui, cards.len(), 200.0, |ui, idx| {
+                let (t, v, s, c) = cards[idx];
+                self.render_stat_card(ui, theme, t, v, s, c);
+            });
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
@@ -978,7 +981,10 @@ impl LeanView {
                 ("SHOP DRAWING APPROVAL", "92% Approved", "Steel Splice Plates & Rebar BBS", theme.accent_green),
                 ("LPS CONSTRAINT COUPLING", "2 Linked Holds", "Auto-Clears Lookahead Task on Sign-Off", theme.accent_orange),
             ];
-            self.render_responsive_cards(ui, theme, &cards);
+            ui_kit::responsive_grid_n(ui, cards.len(), 200.0, |ui, idx| {
+                let (t, v, s, c) = cards[idx];
+                self.render_stat_card(ui, theme, t, v, s, c);
+            });
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {

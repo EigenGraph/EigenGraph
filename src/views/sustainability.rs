@@ -2,8 +2,8 @@
 //! Analysis of energy efficiency, carbon footprint, environmental impact, and green building certification requirements.
 
 use egui::{
-    Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText,
-    ScrollArea, Sense, Stroke, StrokeKind, Ui, Vec2,
+    Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText,
+    ScrollArea, Sense, Stroke, Ui, Vec2,
 };
 use crate::features::{FeatureId, FeatureRegistry};
 use crate::models::{GreenBuildingCredit, LcaStageEmission, StructuralMember};

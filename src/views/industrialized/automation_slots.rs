@@ -21,29 +21,32 @@ impl IndustrializedView {
                     (
                         "LOW-LOADER TRAILER AXLE",
                         "58.2 / 64.0 Ton",
-                        "5-Axle Over-Dimension Permit Clear".to_string(),
+                        "5-Axle Over-Dimension Permit Clear",
                         theme.accent_green,
                     ),
                     (
                         "MIN BRIDGE CLEARANCE",
                         "4.82 m vs 4.55 m",
-                        "+270 mm Highway Portal Margin".to_string(),
+                        "+270 mm Highway Portal Margin",
                         theme.accent_blue,
                     ),
                     (
                         "LASER SPLICE TOLERANCE",
                         "±2.4 mm Recorded",
-                        "PCI MNL-135 Cap <= ±4.0 mm".to_string(),
+                        "PCI MNL-135 Cap <= ±4.0 mm",
                         theme.accent_green,
                     ),
                     (
                         "NON-SHRINK GROUT CUBE",
                         "68.5 MPa (7-Day)",
-                        "Grouted Splice Sleeve Full Pullout Verified".to_string(),
+                        "Grouted Splice Sleeve Full Pullout Verified",
                         theme.accent_blue,
                     ),
                 ];
-                self.render_responsive_cards(ui, &cards, theme);
+                ui_kit::responsive_grid_n(ui, cards.len(), 210.0, |ui, idx| {
+                    let (t, v, s, c) = cards[idx];
+                    self.render_stat_card(ui, theme, t, v, s, c);
+                });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
@@ -153,29 +156,32 @@ impl IndustrializedView {
                     (
                         "EXTRUSION NOZZLE",
                         "45 × 15 mm Layer",
-                        "118 Sliced Contours (Total H = 1.77 m)".to_string(),
+                        "118 Sliced Contours (Total H = 1.77 m)",
                         theme.accent_blue,
                     ),
                     (
                         "PRINT HEAD FEED RATE",
                         "185 mm/s Constant",
-                        "Stepover 2-Perimeter Truss Infill".to_string(),
+                        "Stepover 2-Perimeter Truss Infill",
                         theme.accent_green,
                     ),
                     (
                         "OPEN-TIME LAYER WINDOW",
                         "11.4 min / Layer",
-                        "Max Cold-Joint Cap = 18.0 min (Safe)".to_string(),
+                        "Max Cold-Joint Cap = 18.0 min (Safe)",
                         theme.accent_green,
                     ),
                     (
                         "ESTIMATED MORTAR VOLUME",
                         "6.42 m³ Fiber-Mix",
-                        "Pump Pressure = 1.8 MPa @ Hose".to_string(),
+                        "Pump Pressure = 1.8 MPa @ Hose",
                         theme.accent_orange,
                     ),
                 ];
-                self.render_responsive_cards(ui, &cards, theme);
+                ui_kit::responsive_grid_n(ui, cards.len(), 210.0, |ui, idx| {
+                    let (t, v, s, c) = cards[idx];
+                    self.render_stat_card(ui, theme, t, v, s, c);
+                });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {

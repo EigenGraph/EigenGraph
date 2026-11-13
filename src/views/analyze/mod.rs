@@ -2,6 +2,7 @@
 //! Modularized into grouped engineering disciplines for Phase 30 responsive workflows.
 
 pub mod core_fea;
+pub mod extended_mechanics;
 pub mod extreme_hazards;
 pub mod header;
 pub mod member_design;
@@ -17,7 +18,7 @@ use crate::models::StructuralMember;
 use crate::theme::MacTheme;
 use crate::ui_kit;
 
-/// Top-level engineering discipline groupings organizing the 19 Analysis capabilities.
+/// Top-level engineering discipline groupings organizing the 22 Analysis capabilities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnalyzeCategory {
     CoreFeaAndAri,
@@ -62,11 +63,13 @@ impl AnalyzeCategory {
                 (AnalyzeSubTab::DisplacementForces, "📊 Forces & Deflection"),
                 (AnalyzeSubTab::Frame3dInteraction, "📐 3D Frame P-M-V"),
                 (AnalyzeSubTab::CascadingCollapse, "💥 Cascading Collapse"),
+                (AnalyzeSubTab::MovingLoadInfluence, "🌉 Moving Load & Influence (SIM-06)"),
             ],
             Self::SeismicAndDynamics => &[
                 (AnalyzeSubTab::ModalDynamics, "🌊 SNI 1726 Modal"),
                 (AnalyzeSubTab::NonlinearPushover, "📉 Pushover P-Δ"),
                 (AnalyzeSubTab::GeotechSsi, "🌱 Geotech & SSI"),
+                (AnalyzeSubTab::SlopeRetainingStability, "⛰️ Retaining & Slope (SIM-07)"),
                 (AnalyzeSubTab::BaseIsolationDesign, "🛡️ Base Isolation & Dampers"),
                 (AnalyzeSubTab::TimeHistoryAnalysis, "📈 NL-THA Time-History"),
             ],
@@ -77,6 +80,7 @@ impl AnalyzeCategory {
                 (AnalyzeSubTab::CompositeDesign, "🥞 AISC Composite"),
                 (AnalyzeSubTab::PrestressedDesign, "🪢 PT Concrete (ACI 318)"),
                 (AnalyzeSubTab::ShearWallDesign, "🏢 RC Shear Walls & Coupling"),
+                (AnalyzeSubTab::FloorVibrationFatigue, "〰️ Floor Vib & Fatigue (SIM-08)"),
             ],
             Self::ExtremeHazardsAndResilience => &[
                 (AnalyzeSubTab::FemaP58LossAssessment, "🏛️ FEMA P-58 Loss & REDi"),
@@ -108,6 +112,9 @@ pub enum AnalyzeSubTab {
     FemaP58LossAssessment,
     BlastResistantDesign,
     StructuralFireEngineering,
+    MovingLoadInfluence,
+    SlopeRetainingStability,
+    FloorVibrationFatigue,
 }
 
 impl AnalyzeSubTab {
@@ -117,11 +124,13 @@ impl AnalyzeSubTab {
             | Self::MemberCriticality
             | Self::DisplacementForces
             | Self::Frame3dInteraction
-            | Self::CascadingCollapse => AnalyzeCategory::CoreFeaAndAri,
+            | Self::CascadingCollapse
+            | Self::MovingLoadInfluence => AnalyzeCategory::CoreFeaAndAri,
 
             Self::ModalDynamics
             | Self::NonlinearPushover
             | Self::GeotechSsi
+            | Self::SlopeRetainingStability
             | Self::BaseIsolationDesign
             | Self::TimeHistoryAnalysis => AnalyzeCategory::SeismicAndDynamics,
 
@@ -130,7 +139,8 @@ impl AnalyzeSubTab {
             | Self::WindEngineering
             | Self::CompositeDesign
             | Self::PrestressedDesign
-            | Self::ShearWallDesign => AnalyzeCategory::CodeMemberDesign,
+            | Self::ShearWallDesign
+            | Self::FloorVibrationFatigue => AnalyzeCategory::CodeMemberDesign,
 
             Self::FemaP58LossAssessment
             | Self::BlastResistantDesign

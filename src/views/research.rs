@@ -152,6 +152,10 @@ impl ResearchConceptView {
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
                     ResearchSubTab::SurveyingSite => self.render_surveying_site(ui, theme, features),
+                    ResearchSubTab::GeotechBorehole => self.render_geotech_borehole(ui, theme, features),
+                    ResearchSubTab::HydrologyFloodplain => {
+                        self.render_hydrology_floodplain(ui, theme, features)
+                    }
                     ResearchSubTab::ConceptFeasibility => {
                         self.render_concept_feasibility(ui, theme, active_pillar)
                     }
@@ -169,6 +173,14 @@ impl ResearchConceptView {
             (
                 ResearchSubTab::SurveyingSite,
                 "⛰️ GIS, DEM TIN Mesh & Geodetic Survey",
+            ),
+            (
+                ResearchSubTab::GeotechBorehole,
+                "🕳️ Geotech Borehole & SPT (1D-05)",
+            ),
+            (
+                ResearchSubTab::HydrologyFloodplain,
+                "🌊 Hydrology IDF & Floodplain (1D-06)",
             ),
             (
                 ResearchSubTab::ConceptFeasibility,
