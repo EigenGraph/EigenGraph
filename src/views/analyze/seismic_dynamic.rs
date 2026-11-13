@@ -111,12 +111,10 @@ impl AnalyzeView {
                 ui_kit::responsive_two_panes(ui, 720.0, |ui, pane_idx| match pane_idx {
                     0 => {
                         // LEFT: V_base vs Drift Capacity Curve
-                                    ui.label(RichText::new("1. Base Shear vs Roof Drift (Pushover Curve)").size(11.0).strong().color(theme.text_secondary));
-                                    let desired_left = Vec2::new(ui.available_width(), 160.0);
-                                    let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
-                                    let painter_l = ui.painter_at(rect_l);
-                    }
-                    _ => {
+                        ui.label(RichText::new("1. Base Shear vs Roof Drift (Pushover Curve)").size(11.0).strong().color(theme.text_secondary));
+                        let desired_left = Vec2::new(ui.available_width(), 160.0);
+                        let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
+                        let painter_l = ui.painter_at(rect_l);
                         painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
 
                                     let pad_l = 42.0;
@@ -161,9 +159,10 @@ impl AnalyzeView {
                                     // Labels
                                     painter_l.text(Pos2::new(x0_l, rect_l.top() + 6.0), egui::Align2::LEFT_TOP, "V_base (kN)", egui::FontId::proportional(9.5), theme.text_muted);
                                     painter_l.text(Pos2::new(rect_l.right() - pad_r, y0_l + 6.0), egui::Align2::RIGHT_TOP, "Roof Drift (mm)", egui::FontId::proportional(9.5), theme.text_muted);
-
-                                    // RIGHT: ADRS Sa vs Sd Capacity Spectrum
-                                    ui.label(RichText::new("2. Acceleration-Displacement Response Spectrum (ADRS)").size(11.0).strong().color(theme.text_secondary));
+                    }
+                    _ => {
+                        // RIGHT: ADRS Sa vs Sd Capacity Spectrum
+                        ui.label(RichText::new("2. Acceleration-Displacement Response Spectrum (ADRS)").size(11.0).strong().color(theme.text_secondary));
                                     let desired_right = Vec2::new(ui.available_width(), 160.0);
                                     let (rect_r, _) = ui.allocate_exact_size(desired_right, Sense::hover());
                                     let painter_r = ui.painter_at(rect_r);
@@ -687,12 +686,10 @@ impl AnalyzeView {
                 ui_kit::responsive_two_panes(ui, 720.0, |ui, pane_idx| match pane_idx {
                     0 => {
                         // LEFT: Pile Group 2D Plan Layout with Biaxial Load Distribution
-                                    ui.label(RichText::new(format!("1. Pile Group Layout ({}x{} = {} Piles, Cap {:.1}x{:.1}m, Eg = {:.1}%)", piles.piles_count_x, piles.piles_count_y, piles.total_piles, piles.cap_width_m, piles.cap_length_m, piles.converse_labarre_efficiency * 100.0)).size(11.0).strong().color(theme.text_secondary));
-                                    let desired_left = Vec2::new(ui.available_width(), 200.0);
-                                    let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
-                                    let painter_l = ui.painter_at(rect_l);
-                    }
-                    _ => {
+                        ui.label(RichText::new(format!("1. Pile Group Layout ({}x{} = {} Piles, Cap {:.1}x{:.1}m, Eg = {:.1}%)", piles.piles_count_x, piles.piles_count_y, piles.total_piles, piles.cap_width_m, piles.cap_length_m, piles.converse_labarre_efficiency * 100.0)).size(11.0).strong().color(theme.text_secondary));
+                        let desired_left = Vec2::new(ui.available_width(), 200.0);
+                        let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
+                        let painter_l = ui.painter_at(rect_l);
                         painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
 
                                     let center_l = rect_l.center();
@@ -749,9 +746,10 @@ impl AnalyzeView {
                                         egui::FontId::proportional(9.5),
                                         theme.accent_blue,
                                     );
-
-                                    // RIGHT: Punching Shear Critical Perimeter (SNI 2847:2019 / ACI 318-19)
-                                    ui.label(RichText::new(format!("2. Critical Punching Perimeter (bo = {:.0} mm at d/2 = {:.0} mm)", punch.critical_perimeter_bo_mm, punch.slab_effective_depth_d_mm * 0.5)).size(11.0).strong().color(theme.text_secondary));
+                    }
+                    _ => {
+                        // RIGHT: Punching Shear Critical Perimeter (SNI 2847:2019 / ACI 318-19)
+                        ui.label(RichText::new(format!("2. Critical Punching Perimeter (bo = {:.0} mm at d/2 = {:.0} mm)", punch.critical_perimeter_bo_mm, punch.slab_effective_depth_d_mm * 0.5)).size(11.0).strong().color(theme.text_secondary));
                                     let desired_right = Vec2::new(ui.available_width(), 200.0);
                                     let (rect_r, _) = ui.allocate_exact_size(desired_right, Sense::hover());
                                     let painter_r = ui.painter_at(rect_r);

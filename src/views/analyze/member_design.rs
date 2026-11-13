@@ -743,12 +743,10 @@ impl AnalyzeView {
                 ui_kit::responsive_two_panes(ui, 720.0, |ui, pane_idx| match pane_idx {
                     0 => {
                         // LEFT: 2D Elevation Detailing
-                                    ui.label(RichText::new("1. Elevation Detailing Blueprint (CAD Vector Projection)").size(11.0).strong().color(theme.text_secondary));
-                                    let desired_left = Vec2::new(ui.available_width(), 220.0);
-                                    let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
-                                    let painter_l = ui.painter_at(rect_l);
-                    }
-                    _ => {
+                        ui.label(RichText::new("1. Elevation Detailing Blueprint (CAD Vector Projection)").size(11.0).strong().color(theme.text_secondary));
+                        let desired_left = Vec2::new(ui.available_width(), 220.0);
+                        let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
+                        let painter_l = ui.painter_at(rect_l);
                         painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
 
                                     let center_l = rect_l.center();
@@ -840,9 +838,10 @@ impl AnalyzeView {
                                             painter_l.circle_stroke(Pos2::new(bx, by), r_b, Stroke::new(1.0, Color32::WHITE));
                                         }
                                     }
-
-                                    // RIGHT: Limit State DCR Breakdown Bar Chart
-                                    ui.label(RichText::new("2. AISC 360-16 Limit State DCR Utilization Bars").size(11.0).strong().color(theme.text_secondary));
+                    }
+                    _ => {
+                        // RIGHT: Limit State DCR Breakdown Bar Chart
+                        ui.label(RichText::new("2. AISC 360-16 Limit State DCR Utilization Bars").size(11.0).strong().color(theme.text_secondary));
                                     let desired_right = Vec2::new(ui.available_width(), 220.0);
                                     let (rect_r, _) = ui.allocate_exact_size(desired_right, Sense::hover());
                                     let painter_r = ui.painter_at(rect_r);
@@ -1148,12 +1147,10 @@ impl AnalyzeView {
                 ui_kit::responsive_two_panes(ui, 720.0, |ui, pane_idx| match pane_idx {
                     0 => {
                         // LEFT: Elevation Velocity Pressure Profile
-                                    ui.label(RichText::new("1. Elevation Velocity Pressure & Windward Net Vector Profile qz(z)").size(11.0).strong().color(theme.text_secondary));
-                                    let desired_left = Vec2::new(ui.available_width(), 220.0);
-                                    let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
-                                    let painter_l = ui.painter_at(rect_l);
-                    }
-                    _ => {
+                        ui.label(RichText::new("1. Elevation Velocity Pressure & Windward Net Vector Profile qz(z)").size(11.0).strong().color(theme.text_secondary));
+                        let desired_left = Vec2::new(ui.available_width(), 220.0);
+                        let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
+                        let painter_l = ui.painter_at(rect_l);
                         painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
 
                                     // Building silhouette
@@ -1201,9 +1198,10 @@ impl AnalyzeView {
 
                                     // Height and Roof label
                                     painter_l.text(Pos2::new(b_left + b_width_px * 0.5, b_top - 8.0), egui::Align2::CENTER_BOTTOM, format!("Roof H = {:.0}m (qh = {:.0} Pa)", rep.building_height_h_m, rep.qh_mean_roof_velocity_pressure_pa), egui::FontId::proportional(9.5), Color32::from_rgb(226, 232, 240));
-
-                                    // RIGHT: Dynamic Comfort Acceleration & Shear Envelope Comparison
-                                    ui.label(RichText::new("2. Human Comfort Dynamic Acceleration & Wind vs Seismic Envelope").size(11.0).strong().color(theme.text_secondary));
+                    }
+                    _ => {
+                        // RIGHT: Dynamic Comfort Acceleration & Shear Envelope Comparison
+                        ui.label(RichText::new("2. Human Comfort Dynamic Acceleration & Wind vs Seismic Envelope").size(11.0).strong().color(theme.text_secondary));
                                     let desired_right = Vec2::new(ui.available_width(), 220.0);
                                     let (rect_r, _) = ui.allocate_exact_size(desired_right, Sense::hover());
                                     let painter_r = ui.painter_at(rect_r);
@@ -1488,12 +1486,10 @@ impl AnalyzeView {
                 ui_kit::responsive_two_panes(ui, 720.0, |ui, pane_idx| match pane_idx {
                     0 => {
                         // LEFT: 2D Section Blueprint
-                                    ui.label(RichText::new("1. Cross-Section Detailing (Concrete Slab, Steel Deck Ribs & Studs)").size(11.0).strong().color(theme.text_secondary));
-                                    let desired_left = Vec2::new(ui.available_width(), 220.0);
-                                    let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
-                                    let painter_l = ui.painter_at(rect_l);
-                    }
-                    _ => {
+                        ui.label(RichText::new("1. Cross-Section Detailing (Concrete Slab, Steel Deck Ribs & Studs)").size(11.0).strong().color(theme.text_secondary));
+                        let desired_left = Vec2::new(ui.available_width(), 220.0);
+                        let (rect_l, _) = ui.allocate_exact_size(desired_left, Sense::hover());
+                        let painter_l = ui.painter_at(rect_l);
                         painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
 
                                     let center_x = rect_l.center().x;
@@ -1577,9 +1573,10 @@ impl AnalyzeView {
                                         Stroke::new(1.5, Color32::from_rgb(239, 68, 68)),
                                     );
                                     painter_l.text(Pos2::new(rect_l.right() - 20.0, pna_y - 2.0), egui::Align2::RIGHT_BOTTOM, format!("PNA: {:.1}mm ({})", rep.pna_depth_from_slab_top_mm, match rep.pna_location { PnaLocation::InConcreteSlab => "Slab", PnaLocation::InSteelFlange => "Flange", PnaLocation::InSteelWeb => "Web" }), egui::FontId::proportional(9.0), Color32::from_rgb(239, 68, 68));
-
-                                    // RIGHT: Plastic Stress Distribution & Deflections
-                                    ui.label(RichText::new("2. Plastic Stress Distribution & Serviceability Deflection").size(11.0).strong().color(theme.text_secondary));
+                    }
+                    _ => {
+                        // RIGHT: Plastic Stress Distribution & Deflections
+                        ui.label(RichText::new("2. Plastic Stress Distribution & Serviceability Deflection").size(11.0).strong().color(theme.text_secondary));
                                     let desired_right = Vec2::new(ui.available_width(), 220.0);
                                     let (rect_r, _) = ui.allocate_exact_size(desired_right, Sense::hover());
                                     let painter_r = ui.painter_at(rect_r);

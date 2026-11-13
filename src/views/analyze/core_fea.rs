@@ -141,10 +141,10 @@ impl AnalyzeView {
     // SUB-TAB 2: Member Sensitivity Matrix (ARI Perturbation)
     // -------------------------------------------------------------
     pub(super) fn render_member_criticality(&self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
+        let crit_count = members.iter().filter(|m| m.is_critical || m.ari < 0.70).count();
         ui_kit::responsive_grid_n(ui, 4, 190.0, |ui, col_idx| match col_idx {
             0 => {
-                let crit_count = members.iter().filter(|m| m.is_critical || m.ari < 0.70).count();
-                    self.metric_card(ui, theme, "TOTAL MEMBERS", &format!("{}", members.len()), "3D Truss & Frame Bars", theme.accent_blue);
+                self.metric_card(ui, theme, "TOTAL MEMBERS", &format!("{}", members.len()), "3D Truss & Frame Bars", theme.accent_blue);
             }
             1 => {
                 self.metric_card(ui, theme, "CRITICAL MEMBERS (ARI < 0.7)", &format!("{}", crit_count), "Requires Alternative Load Path", if crit_count > 0 { theme.accent_red } else { theme.accent_green });
