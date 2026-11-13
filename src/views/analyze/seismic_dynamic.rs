@@ -108,6 +108,10 @@ impl AnalyzeView {
                 ui.add_space(10.0);
 
                 // DUAL VECTOR VISUALIZER (Left: V_base vs Drift, Right: ADRS Sa vs Sd)
+                let pad_l = 42.0;
+                let pad_r = 16.0;
+                let pad_t = 16.0;
+                let pad_b = 22.0;
                 ui_kit::responsive_two_panes(ui, 720.0, |ui, pane_idx| match pane_idx {
                     0 => {
                         // LEFT: V_base vs Drift Capacity Curve
@@ -117,10 +121,6 @@ impl AnalyzeView {
                         let painter_l = ui.painter_at(rect_l);
                         painter_l.rect_filled(rect_l, CornerRadius::same(6), Color32::from_rgb(12, 16, 23));
 
-                                    let pad_l = 42.0;
-                                    let pad_r = 16.0;
-                                    let pad_t = 16.0;
-                                    let pad_b = 22.0;
                                     let plot_wl = (rect_l.width() - pad_l - pad_r).max(40.0);
                                     let plot_hl = (rect_l.height() - pad_t - pad_b).max(30.0);
                                     let x0_l = rect_l.left() + pad_l;
