@@ -21,6 +21,7 @@ use crate::features::{FeatureId, FeatureRegistry};
 use crate::icons::{self, AppIcon};
 use crate::theme::MacTheme;
 use crate::ui_kit;
+use crate::views::universal_canvas::{UniversalCanvasState, WorkspaceCanvasSettings};
 
 pub mod canvas_2d;
 pub mod detailing_2d;
@@ -97,6 +98,13 @@ impl SheetScale {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParametricFloatingTab {
+    Properties,
+    Project,
+    CanvasSync,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BimAuthoringTool {
     CadStandard,
     WallChain,
@@ -149,6 +157,13 @@ pub struct ParametricView {
     pub dragging_node_id: Option<usize>,
     pub last_canvas_rect: Option<Rect>,
     pub sketch_overlay_synced: bool,
+    // Phase 34: Universal-style canvas & floating HUD overlays inside canvas
+    pub floating_properties_open: bool,
+    pub floating_project_open: bool,
+    pub floating_right_tab: ParametricFloatingTab,
+    pub show_cli_float: bool,
+    pub sketch_draw_mode: bool,
+    pub last_floating_rects: Vec<Rect>,
 }
 
 impl Default for ParametricView {
@@ -276,13 +291,20 @@ impl Default for ParametricView {
             dragging_node_id: None,
             last_canvas_rect: None,
             sketch_overlay_synced: true,
+            floating_properties_open: true,
+            floating_project_open: true,
+            floating_right_tab: ParametricFloatingTab::Properties,
+            show_cli_float: true,
+            sketch_draw_mode: false,
+            last_floating_rects: Vec::new(),
         }
     }
 }
 
 
 impl ParametricView {
-    /// Returns true while the pointer hovers the Parametric viewport and scrolling is active (unfrozen).
+    /// Returns true while the pointer hovers the Parametric viewport (outside floating HUD panels)
+    /// and canvas scroll-zoom is active (unfrozen).
     pub fn is_pointer_in_live_canvas(&self, ctx: &egui::Context, is_frozen: bool) -> bool {
         if is_frozen {
             return false;
@@ -290,7 +312,12 @@ impl ParametricView {
         let Some(rect) = self.last_canvas_rect else {
             return false;
         };
-        ctx.input(|i| i.pointer.hover_pos().is_some_and(|p| rect.contains(p)))
+        let Some(pointer) = ctx.input(|i| i.pointer.hover_pos()) else {
+            return false;
+        };
+        let in_canvas = rect.contains(pointer);
+        let in_floating = self.last_floating_rects.iter().any(|r| r.contains(pointer));
+        in_canvas && !in_floating
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -301,70 +328,54 @@ impl ParametricView {
         db_components: &mut Vec<DatabaseComponent>,
         active_pillar: &mut NavigationPillar,
         features: &mut FeatureRegistry,
-        universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
+        universal_canvas: &mut UniversalCanvasState,
         members: &[crate::models::StructuralMember],
-        workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
+        workspace_settings: WorkspaceCanvasSettings,
         sidebar_toggle_inset_px: f32,
     ) {
         ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
         self.last_canvas_rect = None;
+        self.last_floating_rects.clear();
 
-        let avail_w = ui.available_width();
-        ui.vertical(|ui| {
-            // 1. TOP DRAFTING & BIMCRAFT AUTHORING RIBBON
-            self.render_drafting_ribbon(
-                ui,
-                theme,
-                db_components,
-                active_pillar,
-                universal_canvas,
-                members,
-                workspace_settings,
-                sidebar_toggle_inset_px,
-            );
+        // Sync Save-notification banner back & forth with unified Universal Canvas toast bar
+        if universal_canvas.status_message.is_some() && self.save_notification.is_none() {
+            self.save_notification = universal_canvas.status_message.take();
+        }
 
-            // 2. MAIN WORKSPACE (Single Hero Canvas + Synchronized Parameters Panel)
-            let deck_h = (MacTheme::viewport_size(ui.ctx()).y - 125.0).clamp(480.0, 740.0);
-            if avail_w >= 780.0 {
-                let panel_w = (avail_w * 0.27).clamp(240.0, 295.0);
-                ui.horizontal(|ui| {
-                    ui.allocate_ui(egui::Vec2::new(panel_w, deck_h), |ui| {
-                        self.render_variables_panel(
-                            ui,
-                            theme,
-                            active_pillar,
-                            features,
-                            Some(panel_w),
-                        );
-                    });
-                    self.render_drawing_canvas(
-                        ui,
-                        theme,
-                        db_components,
-                        active_pillar,
-                        features,
-                        Some(universal_canvas),
-                        Some(deck_h),
-                    );
-                });
-            } else {
-                let stacked_h = (MacTheme::viewport_size(ui.ctx()).y * 0.52).clamp(320.0, 440.0);
-                ui.vertical(|ui| {
-                    self.render_drawing_canvas(
-                        ui,
-                        theme,
-                        db_components,
-                        active_pillar,
-                        features,
-                        Some(universal_canvas),
-                        Some(stacked_h),
-                    );
-                    ui.add_space(10.0);
-                    self.render_variables_panel(ui, theme, active_pillar, features, None);
-                    ui.add_space(24.0);
-                });
-            }
-        });
+        Frame::new()
+            .fill(theme.bg_sidebar)
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .inner_margin(Margin::same(0))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+
+                // 1. Universal-style Top Canvas HUD Toolbar + Drafting Strip
+                self.render_drafting_ribbon(
+                    ui,
+                    theme,
+                    db_components,
+                    active_pillar,
+                    universal_canvas,
+                    members,
+                    workspace_settings.clone(),
+                    sidebar_toggle_inset_px,
+                );
+
+                // Dismissible Status Toast (shared across Universal, Parametric & Geometry)
+                UniversalCanvasState::render_toast_bar(ui, theme, &mut self.save_notification);
+
+                // 2. Full-Width Drawing Viewport with Floating Properties / Project / CLI Inside
+                self.render_drawing_canvas(
+                    ui,
+                    theme,
+                    db_components,
+                    active_pillar,
+                    features,
+                    universal_canvas,
+                    members,
+                    workspace_settings,
+                );
+            });
 
         if self.show_db_drawer {
             self.render_db_drawer(ui.ctx(), theme, db_components, active_pillar);

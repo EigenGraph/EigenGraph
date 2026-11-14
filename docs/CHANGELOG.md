@@ -7,6 +7,24 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.4] - 2026-11-14 — Phase 34: Universal Canvas Parity & Floating In-Canvas HUD Panels for Parametric and Geometry
+
+### Added & Changed
+- **Shared Universal Canvas UI & Ink Sketch Primitives (`src/views/universal_canvas.rs`)**:
+  - Extracted and exposed shared viewport helpers on `UniversalCanvasState`: `canvas_bg`, `preferred_canvas_height`, `floating_panel_frame`, `render_toast_bar`, `render_freeze_button`, `paint_frozen_badge`, `render_sketch_tools_bar`, `render_color_swatches`, `handle_world_sketch_interaction`, `paint_live_preview_world`, `paint_entities_world`, and `render_canvas_sync_controls`.
+  - Refactored Universal Canvas toolbar, viewport interactions, and floating inspector to call these shared helpers with zero duplicated UI/drawing logic.
+- **Parametric 2D Studio Aligned to Universal Canvas (`src/views/parametric/`)**:
+  - Replaced external docked sidebars and fixed bottom CAD Command Line box with full-width Universal Canvas chrome, shared toast notifications, unified canvas height calculation, edge-to-edge drawing viewport, and a Universal-style bottom telemetry status strip.
+  - Added translucent floating HUD panels inside the drawing canvas for **Project & Storey Levels**, **Properties / Driving Parameters / Canvas Sync**, and **CAD Command Line (`CLI`)**, with `last_floating_rects` pointer/zoom/pan exclusion and responsive stacking below the footer on viewports `< 720px`.
+  - Retained all Parametric domain capabilities (BIMCraft wall/beam/column/door/window/rebar tools, Object Snaps `SE..SG`, ORTHO, Live Section Cut, Sheet A101 composer, Dynamo Visual Node Graph, Rebar BBS, Elevations/MEP, Component Database, and `Save 1-File` / `Import` / `PDF/SVG/IFC4`). Added an interactive **Sketch** mode toggle inside the canvas for synced world-coordinate vector annotations.
+- **Geometry 3D BIM Aligned to Universal Canvas (`src/views/build/`)**:
+  - Replaced the fixed external sidebar split and always-open stacked toolbars with Universal-Canvas-style HUD chrome (Row 1 quick controls + collapsible 12-discipline `BIM Tools` ribbon + optional ground-plane `Sketch` strip), full-bleed 3D canvas (`preferred_canvas_height`), and a compact bottom viewport control/telemetry footer.
+  - Floated **Project & Model Tree**, **Properties / Clash Matrix / Model Audit / BCF Issues / Geometry Wizards / Modify / Layers / Canvas Sync**, and the **Data Deck** (`QTO`, `4D`, `Clashes`, `BIM Console`, `LiDAR Point Cloud`) inside the 3D viewport (`last_floating_rects` orbit/pan/zoom/click guard, XYZ triad & HUD label clearance, and clean mobile stacking `< 720px`).
+  - Added 3D ground-plane inverse projection (`screen_to_ground_mm`) and `y = 0.02m` synced vector ink overlay across all 17 structural archetypes, `CSG B-Rep`/`Solid`/`Wireframe`/`NFD`/`SFD`/`BMD`, ViewCube presets, Freeze Canvas guard, and `Save 1-File` / `Import`.
+- **Version Bump**: Incremented crate version sequentially from `0.3.3` to `0.3.4` in `Cargo.toml`, `README.md`, and `docs/CHANGELOG.md`.
+
+---
+
 ## [v0.3.3] - 2026-11-14 — Phase 33: Single-Canvas Parametric/Geometry Views & Vector Icon Overhaul
 
 ### Added & Changed

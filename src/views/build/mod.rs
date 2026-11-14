@@ -8,12 +8,15 @@ pub mod ribbon;
 pub mod sidebar;
 pub mod viewport_3d;
 
-use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText, ScrollArea, Sense, Stroke, StrokeKind, Ui, Vec2};
+use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText, ScrollArea, Sense, Stroke, Ui, Vec2};
 use crate::icons::{self, AppIcon};
-use crate::models::{DatabaseComponent, SidebarTab, StructuralMember};
+use crate::models::{
+    DatabaseComponent, NavigationPillar, ParametricVariable, SidebarTab, StructuralMember,
+};
 use crate::features::{FeatureId, FeatureRegistry};
 use crate::theme::MacTheme;
 use crate::ui_kit;
+use crate::views::universal_canvas::{UniversalCanvasState, WorkspaceCanvasSettings};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelArchetype {
@@ -241,6 +244,14 @@ pub struct BuildView {
     pub draft_member_n1: usize,
     pub draft_member_n2: usize,
     pub last_viewport_rect: Option<Rect>,
+    pub floating_properties_open: bool,
+    pub floating_project_open: bool,
+    pub floating_deck_open: bool,
+    pub show_discipline_ribbon: bool,
+    pub sketch_mode_active: bool,
+    pub sketch_overlay_synced: bool,
+    pub properties_canvas_sync_tab: bool,
+    pub last_floating_rects: Vec<Rect>,
 }
 
 impl Default for BuildView {
@@ -337,13 +348,22 @@ impl Default for BuildView {
             draft_member_n1: 0,
             draft_member_n2: 1,
             last_viewport_rect: None,
+            floating_properties_open: true,
+            floating_project_open: true,
+            floating_deck_open: false,
+            show_discipline_ribbon: false,
+            sketch_mode_active: false,
+            sketch_overlay_synced: true,
+            properties_canvas_sync_tab: false,
+            last_floating_rects: Vec::new(),
         }
     }
 }
 
 
 impl BuildView {
-    /// Returns true while the pointer hovers the 3D BIM viewport and scrolling is active (unfrozen).
+    /// Returns true while the pointer hovers the 3D BIM viewport (outside floating HUD panels)
+    /// and scrolling is active (unfrozen).
     pub fn is_pointer_in_live_canvas(&self, ctx: &egui::Context, is_frozen: bool) -> bool {
         if is_frozen {
             return false;
@@ -351,7 +371,12 @@ impl BuildView {
         let Some(rect) = self.last_viewport_rect else {
             return false;
         };
-        ctx.input(|i| i.pointer.hover_pos().is_some_and(|p| rect.contains(p)))
+        let Some(pointer) = ctx.input(|i| i.pointer.hover_pos()) else {
+            return false;
+        };
+        let in_canvas = rect.contains(pointer);
+        let in_floating = self.last_floating_rects.iter().any(|r| r.contains(pointer));
+        in_canvas && !in_floating
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -370,51 +395,23 @@ impl BuildView {
         ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
         self.last_viewport_rect = None;
 
-        let avail_w = ui.available_width();
-        let deck_h = (MacTheme::viewport_size(ui.ctx()).y - 125.0).clamp(480.0, 740.0);
-        if avail_w >= 780.0 {
-            let panel_w = (avail_w * 0.30).clamp(245.0, 315.0);
-            ui.horizontal(|ui| {
-                ui.allocate_ui(egui::Vec2::new(panel_w, deck_h), |ui| {
-                    self.render_unified_sidebar(
-                        ui,
-                        theme,
-                        members,
-                        db_components,
-                        features,
-                        Some(panel_w),
-                    );
-                });
+        Frame::new()
+            .fill(theme.bg_sidebar)
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .inner_margin(Margin::same(0))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
                 self.render_canvas(
                     ui,
                     theme,
                     members,
+                    db_components,
                     features,
                     universal_canvas,
                     parametric_variables,
                     workspace_settings,
                     sidebar_toggle_inset_px,
-                    Some(deck_h),
                 );
             });
-        } else {
-            let stacked_canvas_h = (MacTheme::viewport_size(ui.ctx()).y * 0.52).clamp(320.0, 440.0);
-            ui.vertical(|ui| {
-                self.render_canvas(
-                    ui,
-                    theme,
-                    members,
-                    features,
-                    universal_canvas,
-                    parametric_variables,
-                    workspace_settings,
-                    sidebar_toggle_inset_px,
-                    Some(stacked_canvas_h),
-                );
-                ui.add_space(10.0);
-                self.render_unified_sidebar(ui, theme, members, db_components, features, None);
-                ui.add_space(24.0);
-            });
-        }
     }
 }

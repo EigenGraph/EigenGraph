@@ -278,6 +278,8 @@ impl BuildView {
                                             .on_hover_text(tip).clicked() {
                                             self.active_tool_status = format!("Coordination: {}", label);
                                             self.active_sidebar_tab = SidebarTab::ClashMatrix;
+                                            self.floating_properties_open = true;
+                                            self.properties_canvas_sync_tab = false;
                                         }
                                     }
                                 }

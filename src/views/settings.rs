@@ -1154,7 +1154,7 @@ impl SettingsView {
                 ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
                 ui.label(
                     RichText::new(format!(
-                        "v{} — Phase 33 Vector-Icon & Single-Canvas Workspace",
+                        "v{} — Phase 34 Universal-Style Canvas & Floating HUD Workspace",
                         env!("CARGO_PKG_VERSION")
                     ))
                     .size(13.0)

@@ -3,24 +3,73 @@
 use super::*;
 
 impl BuildView {
-    pub(super) fn render_unified_sidebar(
+    /// Floating HUD overlay card for Project Browser & Relational Spatial Tree inside 3D viewport.
+    pub(super) fn render_floating_project_card(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        members: &[StructuralMember],
+        db_components: &[DatabaseComponent],
+        is_overlay: bool,
+    ) {
+        UniversalCanvasState::floating_panel_frame(theme, is_overlay).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                icons::icon_label(
+                    ui,
+                    AppIcon::Layers,
+                    13.0,
+                    theme.accent_blue,
+                    "Project & Model Tree",
+                    11.5,
+                    theme.text_primary,
+                    true,
+                );
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("×").size(14.0).color(theme.text_muted),
+                            )
+                            .fill(Color32::TRANSPARENT)
+                            .stroke(Stroke::NONE),
+                        )
+                        .on_hover_text("Close Project Browser overlay")
+                        .clicked()
+                    {
+                        self.floating_project_open = false;
+                    }
+                });
+            });
+            ui.separator();
+            ui.push_id("build_floating_project_body", |ui| {
+                self.render_browser_tab(ui, theme, members, db_components);
+            });
+        });
+    }
+
+    /// Floating HUD overlay card for 3D Properties, Clashes, Audit, BCF, Wizards, Modify, Layers & Canvas Sync.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn render_floating_properties_card(
         &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         members: &[StructuralMember],
         db_components: &[DatabaseComponent],
         features: &mut FeatureRegistry,
-        panel_width: Option<f32>,
+        universal_canvas: &mut UniversalCanvasState,
+        parametric_variables: &[ParametricVariable],
+        workspace_settings: WorkspaceCanvasSettings,
+        avail_w: f32,
+        is_overlay: bool,
     ) {
-        theme.sidebar_frame().show(ui, |ui| {
-            if let Some(w) = panel_width {
-                ui.set_width(w);
-            } else {
-                ui.set_width(ui.available_width());
-            }
-            ui.vertical(|ui| {
-                // Activity Bar Tabs
+        UniversalCanvasState::floating_panel_frame(theme, is_overlay).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+
+            // Compact Activity Bar + Canvas Sync Switcher + Close Button
+            ui.horizontal(|ui| {
                 ui.horizontal_wrapped(|ui| {
+                    let show_project_tab = avail_w < 980.0 || !self.floating_project_open;
                     let tabs = [
                         SidebarTab::Properties,
                         SidebarTab::ProjectBrowser,
@@ -32,10 +81,22 @@ impl BuildView {
                         SidebarTab::Layers,
                     ];
                     for tab in tabs {
+                        if tab == SidebarTab::ProjectBrowser && !show_project_tab {
+                            continue;
+                        }
                         let (_, name) = tab.icon_and_name();
-                        let is_active = self.active_sidebar_tab == tab;
-                        let bg = if is_active { theme.accent_blue } else { Color32::TRANSPARENT };
-                        let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
+                        let is_active =
+                            !self.properties_canvas_sync_tab && self.active_sidebar_tab == tab;
+                        let bg = if is_active {
+                            theme.accent_blue
+                        } else {
+                            Color32::TRANSPARENT
+                        };
+                        let fg = if is_active {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        };
 
                         if icons::icon_only_button(
                             ui,
@@ -43,35 +104,167 @@ impl BuildView {
                             fg,
                             bg,
                             Stroke::NONE,
-                            CornerRadius::same(6),
-                            Vec2::splat(26.0),
+                            CornerRadius::same(5),
+                            Vec2::splat(24.0),
                             name,
                         )
                         .clicked()
                         {
+                            self.properties_canvas_sync_tab = false;
                             self.active_sidebar_tab = tab;
                         }
                     }
+
+                    let sync_bg = if self.properties_canvas_sync_tab {
+                        theme.accent_blue
+                    } else {
+                        Color32::TRANSPARENT
+                    };
+                    let sync_fg = if self.properties_canvas_sync_tab {
+                        Color32::WHITE
+                    } else {
+                        theme.text_secondary
+                    };
+                    if icons::icon_only_button(
+                        ui,
+                        AppIcon::Palette,
+                        sync_fg,
+                        sync_bg,
+                        Stroke::NONE,
+                        CornerRadius::same(5),
+                        Vec2::splat(24.0),
+                        "Universal Canvas Sync & Sketch Settings",
+                    )
+                    .clicked()
+                    {
+                        self.properties_canvas_sync_tab = true;
+                    }
                 });
 
-                ui.add_space(8.0);
-                ui.separator();
-                ui.add_space(8.0);
-
-                // Tab Content Drawer
-                match self.active_sidebar_tab {
-                    SidebarTab::Properties => self.render_properties_tab(ui, theme, members),
-                    SidebarTab::ProjectBrowser => self.render_browser_tab(ui, theme, members, db_components),
-                    SidebarTab::ClashMatrix => self.render_clash_tab(ui, theme, features),
-                    SidebarTab::ModelAudit => self.render_audit_tab(ui, theme),
-                    SidebarTab::BcfIssues => self.render_bcf_tab(ui, theme),
-                    SidebarTab::Geometry => self.render_geometry_tab(ui, theme),
-                    SidebarTab::Modify => self.render_modify_tab(ui, theme),
-                    SidebarTab::Layers => self.render_layers_tab(ui, theme, features),
-                    _ => {}
-                }
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("×").size(14.0).color(theme.text_muted),
+                            )
+                            .fill(Color32::TRANSPARENT)
+                            .stroke(Stroke::NONE),
+                        )
+                        .on_hover_text("Close Properties Inspector overlay")
+                        .clicked()
+                    {
+                        self.floating_properties_open = false;
+                    }
+                });
             });
+
+            ui.separator();
+
+            if self.properties_canvas_sync_tab {
+                ui.push_id("build_canvas_sync_scroll", |ui| {
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        universal_canvas.render_canvas_sync_controls(
+                            ui,
+                            theme,
+                            NavigationPillar::GeometryAssembly,
+                            &self.bim_bus.project,
+                            members,
+                            parametric_variables,
+                            workspace_settings,
+                            false,
+                        );
+                    });
+                });
+            } else {
+                match self.active_sidebar_tab {
+                    // Tabs that already manage their own inner ScrollArea:
+                    SidebarTab::ProjectBrowser
+                    | SidebarTab::ClashMatrix
+                    | SidebarTab::ModelAudit
+                    | SidebarTab::BcfIssues
+                    | SidebarTab::Geometry => {
+                        ui.push_id("build_floating_direct_tab", |ui| {
+                            match self.active_sidebar_tab {
+                                SidebarTab::ProjectBrowser => {
+                                    self.render_browser_tab(ui, theme, members, db_components);
+                                }
+                                SidebarTab::ClashMatrix => {
+                                    self.render_clash_tab(ui, theme, features);
+                                }
+                                SidebarTab::ModelAudit => {
+                                    self.render_audit_tab(ui, theme);
+                                }
+                                SidebarTab::BcfIssues => {
+                                    self.render_bcf_tab(ui, theme);
+                                }
+                                SidebarTab::Geometry => {
+                                    self.render_geometry_tab(ui, theme);
+                                }
+                                _ => {}
+                            }
+                        });
+                    }
+                    // Tabs without an outer ScrollArea:
+                    _ => {
+                        ui.push_id("build_floating_scroll_tab", |ui| {
+                            egui::ScrollArea::vertical().show(ui, |ui| {
+                                match self.active_sidebar_tab {
+                                    SidebarTab::Properties => {
+                                        self.render_properties_tab(ui, theme, members);
+                                    }
+                                    SidebarTab::Modify => {
+                                        self.render_modify_tab(ui, theme);
+                                    }
+                                    SidebarTab::Layers => {
+                                        self.render_layers_tab(ui, theme, features);
+                                    }
+                                    _ => {}
+                                }
+                            });
+                        });
+                    }
+                }
+            }
         });
+    }
+
+    /// Responsive stacked cards below the 3D canvas footer on narrower screens (`< 720 px`).
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn render_stacked_drawers_mobile(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        members: &[StructuralMember],
+        db_components: &[DatabaseComponent],
+        features: &mut FeatureRegistry,
+        universal_canvas: &mut UniversalCanvasState,
+        parametric_variables: &[ParametricVariable],
+        workspace_settings: WorkspaceCanvasSettings,
+        avail_w: f32,
+    ) {
+        if self.floating_deck_open {
+            ui.add_space(6.0);
+            self.render_floating_deck_card(ui, theme, members, features, false);
+        }
+        if self.floating_project_open {
+            ui.add_space(6.0);
+            self.render_floating_project_card(ui, theme, members, db_components, false);
+        }
+        if self.floating_properties_open {
+            ui.add_space(6.0);
+            self.render_floating_properties_card(
+                ui,
+                theme,
+                members,
+                db_components,
+                features,
+                universal_canvas,
+                parametric_variables,
+                workspace_settings,
+                avail_w,
+                false,
+            );
+        }
     }
 
     fn render_properties_tab(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
@@ -404,7 +597,9 @@ impl BuildView {
         );
         ui.add_space(6.0);
 
-        egui::ScrollArea::vertical().show(ui, |ui| {
+        egui::ScrollArea::vertical()
+            .id_salt("build_geometry_scroll")
+            .show(ui, |ui| {
             // 1. Parametric Spatial Generator Wizard
             theme.card_frame().show(ui, |ui| {
                 crate::icons::icon_label(
@@ -712,7 +907,7 @@ impl BuildView {
         });
     }
 
-    fn render_browser_tab(
+    pub(super) fn render_browser_tab(
         &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
@@ -722,7 +917,9 @@ impl BuildView {
         ui.label(RichText::new("PROJECT BROWSER").size(12.0).strong().color(theme.text_secondary));
         ui.add_space(6.0);
 
-        egui::ScrollArea::vertical().show(ui, |ui| {
+        egui::ScrollArea::vertical()
+            .id_salt("build_browser_scroll")
+            .show(ui, |ui| {
             // 1. Views Hierarchy (Floor plans, 3D views, Elevations, Sections, Schedules, Sheets)
             ui.collapsing("Views (All Architectural & Structural)", |ui| {
                 ui.collapsing("Floor Plans", |ui| {
@@ -779,14 +976,17 @@ impl BuildView {
 
                 ui.collapsing("Schedules & Quantities", |ui| {
                     if ui.button("Structural Framing QTO").clicked() {
+                        self.floating_deck_open = true;
                         self.bottom_deck_expanded = true;
                         self.active_bottom_deck_tab = BottomDeckTab::ScheduleQto;
                     }
                     if ui.button("Rebar Bending Schedule (BBS)").clicked() {
+                        self.floating_deck_open = true;
                         self.bottom_deck_expanded = true;
                         self.active_bottom_deck_tab = BottomDeckTab::ScheduleQto;
                     }
                     if ui.button("Bill of Quantities (BoQ / RAB)").clicked() {
+                        self.floating_deck_open = true;
                         self.bottom_deck_expanded = true;
                         self.active_bottom_deck_tab = BottomDeckTab::ScheduleQto;
                     }
@@ -905,6 +1105,8 @@ impl BuildView {
                     if ui.selectable_label(is_sel, text).clicked() {
                         self.selected_member_id = Some(m.id);
                         self.active_sidebar_tab = SidebarTab::Properties;
+                        self.floating_properties_open = true;
+                        self.properties_canvas_sync_tab = false;
                     }
                 }
             });

@@ -25,354 +25,622 @@ impl BuildView {
         ui: &mut Ui,
         theme: &MacTheme,
         members: &[StructuralMember],
+        db_components: &[DatabaseComponent],
         features: &mut FeatureRegistry,
-        universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
-        parametric_variables: &[crate::models::ParametricVariable],
-        workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
+        universal_canvas: &mut UniversalCanvasState,
+        parametric_variables: &[ParametricVariable],
+        workspace_settings: WorkspaceCanvasSettings,
         sidebar_toggle_inset_px: f32,
-        stacked_height: Option<f32>,
     ) {
-        ui.vertical(|ui| {
-            // Master Multi-Discipline BIM Ribbon Toolbar (Phase 26)
-            self.render_bim_master_ribbon(ui, theme, sidebar_toggle_inset_px);
-            ui.add_space(4.0);
+        let avail_w = ui.available_width().max(260.0);
+        let is_wide = avail_w >= 980.0;
+        let has_floating_room = avail_w >= 720.0;
 
-            // Contextual Top Modeling Ribbon
-            Frame::new()
-                .fill(theme.bg_sidebar)
-                .inner_margin(Margin::symmetric(14, 8))
-                .stroke(Stroke::new(1.0, theme.border_subtle))
-                .show(ui, |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        // Render Style & Internal Force Diagrams Toggle
-                        let modes = [
-                            (Render3DMode::CsgSolidBrep, AppIcon::Cube3D, "CSG B-Rep", "True 3D CSG Boolean Mesh (Openings, WF Flanges & Rebar)"),
-                            (Render3DMode::SolidShaded, AppIcon::SolidBox, "Solid", "Shaded solid structural frame"),
-                            (Render3DMode::Wireframe, AppIcon::Wireframe, "Wireframe", "Vector wireframe members"),
-                            (Render3DMode::AxialForceNFD, AppIcon::ChartBar, "NFD", "Normal / Axial Force Diagram (Red=Tension, Blue=Compression)"),
-                            (Render3DMode::ShearForceSFD, AppIcon::Bolt, "SFD", "Shear Force Diagram (SFD)"),
-                            (Render3DMode::BendingMomentBMD, AppIcon::ChartLine, "BMD", "Bending Moment Diagram (BMD)"),
-                        ];
-                        for (rm, icon, lbl, tip) in modes {
-                            let sel = self.render_mode == rm;
-                            if icons::icon_button(
-                                ui,
-                                icon,
-                                lbl,
-                                10.5,
-                                if sel { Color32::WHITE } else { theme.text_secondary },
-                                if sel { theme.accent_blue } else { theme.bg_card },
-                                Stroke::NONE,
-                                CornerRadius::same(5),
-                                Vec2::new(0.0, 24.0),
-                            )
-                            .on_hover_text(tip)
-                            .clicked()
-                            {
-                                self.render_mode = rm;
-                            }
+        // 1. Universal-style Top Canvas HUD Toolbar
+        Frame::new()
+            .fill(theme.bg_card)
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .inner_margin(Margin::symmetric(12, 8))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal_wrapped(|ui| {
+                    if sidebar_toggle_inset_px > 0.0 {
+                        ui.add_space(sidebar_toggle_inset_px);
+                    }
+
+                    icons::pill_badge(ui, AppIcon::Cube3D, "Geometry • 3D", theme.accent_blue);
+                    ui.separator();
+
+                    // Render Style & Internal Force Diagrams
+                    let modes = [
+                        (Render3DMode::CsgSolidBrep, AppIcon::Cube3D, "CSG B-Rep", "True 3D CSG Boolean Mesh (Openings, WF Flanges & Rebar)"),
+                        (Render3DMode::SolidShaded, AppIcon::SolidBox, "Solid", "Shaded solid structural frame"),
+                        (Render3DMode::Wireframe, AppIcon::Wireframe, "Wireframe", "Vector wireframe members"),
+                        (Render3DMode::AxialForceNFD, AppIcon::ChartBar, "NFD", "Normal / Axial Force Diagram (Red=Tension, Blue=Compression)"),
+                        (Render3DMode::ShearForceSFD, AppIcon::Bolt, "SFD", "Shear Force Diagram (SFD)"),
+                        (Render3DMode::BendingMomentBMD, AppIcon::ChartLine, "BMD", "Bending Moment Diagram (BMD)"),
+                    ];
+                    for (rm, icon, lbl, tip) in modes {
+                        let sel = self.render_mode == rm;
+                        if icons::icon_button(
+                            ui,
+                            icon,
+                            lbl,
+                            10.5,
+                            if sel { Color32::WHITE } else { theme.text_secondary },
+                            if sel { theme.accent_blue } else { theme.bg_card },
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 26.0),
+                        )
+                        .on_hover_text(tip)
+                        .clicked()
+                        {
+                            self.render_mode = rm;
                         }
+                    }
 
-                        ui.add_space(6.0);
-                        ui.separator();
-                        ui.add_space(6.0);
+                    ui.separator();
 
-                        // Compact Model Preset Selector Dropdown (Prevents Horizontal Overflow)
-                        ui.label(RichText::new("Model:").size(11.0).color(theme.text_muted));
-                        let models = [
-                            ModelArchetype::BimCraftBuilding3D,
-                            ModelArchetype::OpenBimIfcModel3D,
-                            ModelArchetype::FireCompartmentFrame3D,
-                            ModelArchetype::BlastResistantBunker3D,
-                            ModelArchetype::FemaP58HospitalArchetype,
-                            ModelArchetype::BaseIsolatedHospital3D,
-                            ModelArchetype::TimeHistoryTower3D,
-                            ModelArchetype::CoupledShearWallCore3D,
-                            ModelArchetype::PrestressedGirderBridge3D,
-                            ModelArchetype::DoubleLayerSpaceTruss3D,
-                            ModelArchetype::GeodesicDome3D,
-                            ModelArchetype::HyparRuledShell3D,
-                            ModelArchetype::MultiStoryTower3D,
-                            ModelArchetype::DiagridTower3D,
-                            ModelArchetype::TrussBridge3D,
-                            ModelArchetype::SpaceDome3D,
-                            ModelArchetype::WarrenTruss2D,
-                        ];
-                        egui::ComboBox::from_id_salt("model_archetype_combo")
-                            .selected_text(RichText::new(self.active_model.label()).size(11.5).strong().color(theme.text_primary))
-                            .width(ui.available_width().clamp(140.0, 230.0))
-                            .show_ui(ui, |ui| {
-                                for m in models {
-                                    let is_m_sel = self.active_model == m;
-                                    if ui.selectable_label(is_m_sel, m.label()).clicked() {
-                                        self.active_model = m;
-                                        self.selected_member_id = None;
-                                        self.simulated_eliminated_ids.clear();
-                                        if m == ModelArchetype::BimCraftBuilding3D {
-                                            self.render_mode = Render3DMode::CsgSolidBrep;
-                                        }
+                    // Model Archetype Selector
+                    let models = [
+                        ModelArchetype::BimCraftBuilding3D,
+                        ModelArchetype::OpenBimIfcModel3D,
+                        ModelArchetype::FireCompartmentFrame3D,
+                        ModelArchetype::BlastResistantBunker3D,
+                        ModelArchetype::FemaP58HospitalArchetype,
+                        ModelArchetype::BaseIsolatedHospital3D,
+                        ModelArchetype::TimeHistoryTower3D,
+                        ModelArchetype::CoupledShearWallCore3D,
+                        ModelArchetype::PrestressedGirderBridge3D,
+                        ModelArchetype::DoubleLayerSpaceTruss3D,
+                        ModelArchetype::GeodesicDome3D,
+                        ModelArchetype::HyparRuledShell3D,
+                        ModelArchetype::MultiStoryTower3D,
+                        ModelArchetype::DiagridTower3D,
+                        ModelArchetype::TrussBridge3D,
+                        ModelArchetype::SpaceDome3D,
+                        ModelArchetype::WarrenTruss2D,
+                    ];
+                    egui::ComboBox::from_id_salt("model_archetype_combo")
+                        .selected_text(
+                            RichText::new(self.active_model.label())
+                                .size(11.0)
+                                .strong()
+                                .color(theme.text_primary),
+                        )
+                        .width(avail_w.clamp(135.0, 215.0))
+                        .show_ui(ui, |ui| {
+                            for m in models {
+                                let is_m_sel = self.active_model == m;
+                                if ui.selectable_label(is_m_sel, m.label()).clicked() {
+                                    self.active_model = m;
+                                    self.selected_member_id = None;
+                                    self.simulated_eliminated_ids.clear();
+                                    if m == ModelArchetype::BimCraftBuilding3D {
+                                        self.render_mode = Render3DMode::CsgSolidBrep;
                                     }
                                 }
-                            });
+                            }
+                        });
 
-                        ui.add_space(6.0);
-                        ui.separator();
-                        ui.add_space(6.0);
+                    ui.separator();
 
-                        // ViewCube Camera Presets
-                        icons::draw_icon(ui, AppIcon::Camera, 13.0, theme.text_secondary);
-                        if ui.add(egui::Button::new(RichText::new("Iso").size(11.0).color(theme.text_secondary))
-                            .fill(theme.bg_card).corner_radius(CornerRadius::same(4))).clicked() {
-                            self.cam_yaw = 0.65;
-                            self.cam_pitch = 0.35;
-                        }
-                        if ui.add(egui::Button::new(RichText::new("Front").size(11.0).color(theme.text_secondary))
-                            .fill(theme.bg_card).corner_radius(CornerRadius::same(4))).clicked() {
-                            self.cam_yaw = 0.0;
-                            self.cam_pitch = 0.0;
-                        }
-                        if ui.add(egui::Button::new(RichText::new("Top").size(11.0).color(theme.text_secondary))
-                            .fill(theme.bg_card).corner_radius(CornerRadius::same(4))).clicked() {
-                            self.cam_yaw = 0.0;
-                            self.cam_pitch = 1.50;
-                        }
-                        if ui.add(egui::Button::new(RichText::new("Side").size(11.0).color(theme.text_secondary))
-                            .fill(theme.bg_card).corner_radius(CornerRadius::same(4))).clicked() {
-                            self.cam_yaw = 1.57;
-                            self.cam_pitch = 0.0;
-                        }
-                        if icons::icon_button(
-                            ui,
-                            AppIcon::ZoomFit,
-                            "Fit",
-                            10.5,
-                            theme.accent_blue,
-                            theme.bg_card,
-                            Stroke::NONE,
-                            CornerRadius::same(4),
-                            Vec2::new(0.0, 24.0),
-                        )
-                        .clicked()
+                    // ViewCube Camera Presets
+                    for (lbl, yaw, pitch) in [
+                        ("Iso", 0.65_f32, 0.35_f32),
+                        ("Front", 0.0, 0.0),
+                        ("Top", 0.0, 1.50),
+                        ("Side", 1.57, 0.0),
+                    ] {
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    RichText::new(lbl).size(10.5).color(theme.text_secondary),
+                                )
+                                .fill(theme.bg_card)
+                                .corner_radius(CornerRadius::same(6))
+                                .min_size(Vec2::new(0.0, 26.0)),
+                            )
+                            .clicked()
                         {
-                            self.cam_zoom = 1.15;
-                            self.cam_pan = Vec2::ZERO;
+                            self.cam_yaw = yaw;
+                            self.cam_pitch = pitch;
                         }
-
-                        // Perspective toggle
-                        if ui.selectable_label(self.perspective, "Persp").clicked() {
-                            self.perspective = !self.perspective;
-                        }
-
-                        ui.separator();
-
-                        // Freeze Canvas Toggle (shared with page scroll guard)
-                        let freeze_bg = if universal_canvas.is_frozen {
-                            theme.accent_blue
-                        } else {
-                            theme.bg_card
-                        };
-                        let freeze_fg = if universal_canvas.is_frozen {
-                            Color32::WHITE
-                        } else {
-                            theme.accent_orange
-                        };
-                        let freeze_stroke = Stroke::new(
-                            1.0,
-                            if universal_canvas.is_frozen {
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ZoomFit,
+                        "Fit",
+                        10.5,
+                        theme.accent_blue,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .clicked()
+                    {
+                        self.cam_zoom = 1.15;
+                        self.cam_pan = Vec2::ZERO;
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new("Persp").size(10.5).color(
+                                if self.perspective {
+                                    Color32::WHITE
+                                } else {
+                                    theme.text_secondary
+                                },
+                            ))
+                            .fill(if self.perspective {
                                 theme.accent_blue
                             } else {
-                                theme.accent_orange.gamma_multiply(0.6)
-                            },
-                        );
-                        if icons::icon_button(
-                            ui,
-                            if universal_canvas.is_frozen {
-                                AppIcon::Snowflake
-                            } else {
-                                AppIcon::Unlock
-                            },
-                            if universal_canvas.is_frozen {
-                                "Frozen (Scroll Page)"
-                            } else {
-                                "Freeze Canvas"
-                            },
-                            10.5,
-                            freeze_fg,
-                            freeze_bg,
-                            freeze_stroke,
-                            CornerRadius::same(5),
-                            Vec2::new(0.0, 24.0),
+                                theme.bg_card
+                            })
+                            .corner_radius(CornerRadius::same(6))
+                            .min_size(Vec2::new(0.0, 26.0)),
                         )
-                        .on_hover_text("Freeze 3D viewport zoom so vertical scrolling moves the page smoothly")
                         .clicked()
-                        {
-                            universal_canvas.is_frozen = !universal_canvas.is_frozen;
-                            ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
-                        }
+                    {
+                        self.perspective = !self.perspective;
+                    }
 
-                        if icons::icon_button(
-                            ui,
-                            AppIcon::SaveDisk,
-                            "Save 1-File",
-                            10.5,
-                            Color32::WHITE,
-                            theme.accent_green,
-                            Stroke::NONE,
-                            CornerRadius::same(5),
-                            Vec2::new(0.0, 24.0),
-                        )
-                        .on_hover_text("Save unified workspace (.eigen.json)")
-                        .clicked()
+                    ui.separator();
+
+                    // Shared Freeze Canvas Toggle
+                    UniversalCanvasState::render_freeze_button(
+                        ui,
+                        theme,
+                        &mut universal_canvas.is_frozen,
+                        26.0,
+                    );
+
+                    // Floating Overlay Panel Toggles inside 3D Viewport
+                    let proj_active = if is_wide {
+                        self.floating_project_open
+                    } else {
+                        self.floating_properties_open
+                            && !self.properties_canvas_sync_tab
+                            && self.active_sidebar_tab == SidebarTab::ProjectBrowser
+                    };
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Folder,
+                        "Project",
+                        10.5,
+                        if proj_active { Color32::WHITE } else { theme.text_secondary },
+                        if proj_active { theme.accent_green } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Toggle floating Project & Model Tree overlay inside 3D viewport")
+                    .clicked()
+                    {
+                        if is_wide {
+                            self.floating_project_open = !self.floating_project_open;
+                        } else {
+                            self.floating_properties_open = !proj_active;
+                            self.properties_canvas_sync_tab = false;
+                            self.active_sidebar_tab = SidebarTab::ProjectBrowser;
+                        }
+                    }
+
+                    let prop_active = self.floating_properties_open
+                        && (is_wide
+                            || self.properties_canvas_sync_tab
+                            || self.active_sidebar_tab != SidebarTab::ProjectBrowser);
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SlidersPanel,
+                        "Properties",
+                        10.5,
+                        if prop_active { Color32::WHITE } else { theme.text_secondary },
+                        if prop_active { theme.accent_green } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Toggle floating 3D Properties, Clash, Audit, Geometry & Layers overlay")
+                    .clicked()
+                    {
+                        if !is_wide
+                            && self.floating_properties_open
+                            && !self.properties_canvas_sync_tab
+                            && self.active_sidebar_tab == SidebarTab::ProjectBrowser
                         {
-                            universal_canvas.export_unified_file(
-                                &self.bim_bus.project,
-                                members,
-                                parametric_variables,
-                                workspace_settings,
-                            );
-                            if let Some(ref msg) = universal_canvas.status_message {
-                                self.modify_status_msg = Some(msg.clone());
+                            self.active_sidebar_tab = SidebarTab::Properties;
+                        } else {
+                            self.floating_properties_open = !self.floating_properties_open;
+                            if !is_wide
+                                && !self.properties_canvas_sync_tab
+                                && self.active_sidebar_tab == SidebarTab::ProjectBrowser
+                            {
+                                self.active_sidebar_tab = SidebarTab::Properties;
                             }
                         }
+                    }
 
-                        if icons::icon_button(
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ChartBar,
+                        "Data Deck",
+                        10.5,
+                        if self.floating_deck_open { Color32::WHITE } else { theme.text_secondary },
+                        if self.floating_deck_open { theme.accent_blue } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Toggle floating Schedules QTO, 4D Simulation, Clash & BIM Console overlay")
+                    .clicked()
+                    {
+                        self.floating_deck_open = !self.floating_deck_open;
+                        self.bottom_deck_expanded = self.floating_deck_open;
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Wrench,
+                        "BIM Tools",
+                        10.5,
+                        if self.show_discipline_ribbon { Color32::WHITE } else { theme.text_secondary },
+                        if self.show_discipline_ribbon { theme.accent_blue } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Show or hide the 12-discipline BIM authoring ribbon")
+                    .clicked()
+                    {
+                        self.show_discipline_ribbon = !self.show_discipline_ribbon;
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Pencil,
+                        "Sketch",
+                        10.5,
+                        if self.sketch_mode_active { Color32::WHITE } else { theme.text_secondary },
+                        if self.sketch_mode_active { theme.accent_orange } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Draw synced Universal Ink Sketch annotations directly on the 3D ground plane")
+                    .clicked()
+                    {
+                        self.sketch_mode_active = !self.sketch_mode_active;
+                    }
+
+                    ui.separator();
+
+                    // Unified 1-File Sync & Import
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SaveDisk,
+                        "Save 1-File",
+                        10.5,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Save entire project workspace into 1 verified .eigen.json file")
+                    .clicked()
+                    {
+                        universal_canvas.export_unified_file(
+                            &self.bim_bus.project,
+                            members,
+                            parametric_variables,
+                            workspace_settings.clone(),
+                        );
+                        if let Some(ref msg) = universal_canvas.status_message {
+                            self.modify_status_msg = Some(msg.clone());
+                        }
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::UploadImport,
+                        "Import",
+                        10.5,
+                        theme.text_secondary,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Import unified .eigen.json workspace archive")
+                    .clicked()
+                    {
+                        universal_canvas.import_json_open = true;
+                    }
+
+                    // Active Disruption / Palette Badges & Selection Clear
+                    if !self.simulated_eliminated_ids.is_empty() {
+                        icons::pill_badge(
                             ui,
-                            AppIcon::UploadImport,
-                            "Import",
-                            10.5,
+                            AppIcon::AlertTriangle,
+                            format!(
+                                "N-{} DISRUPTION: {:?}",
+                                self.simulated_eliminated_ids.len(),
+                                self.simulated_eliminated_ids
+                            ),
+                            theme.accent_red,
+                        );
+                    } else {
+                        icons::pill_badge(
+                            ui,
+                            AppIcon::Palette,
+                            self.color_mode.clone(),
+                            theme.accent_blue,
+                        );
+                    }
+                    if self.selected_member_id.is_some()
+                        && icons::icon_button(
+                            ui,
+                            AppIcon::Close,
+                            "Clear Sel",
+                            10.0,
                             theme.text_secondary,
                             theme.bg_card,
                             Stroke::NONE,
                             CornerRadius::same(5),
-                            Vec2::new(0.0, 24.0),
+                            Vec2::new(0.0, 26.0),
                         )
-                        .on_hover_text("Import unified .eigen.json workspace archive")
                         .clicked()
-                        {
-                            universal_canvas.import_json_open = true;
-                        }
+                    {
+                        self.selected_member_id = None;
+                    }
+                });
+            });
 
-                        // Right Status Badges
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if !self.simulated_eliminated_ids.is_empty() {
-                                icons::pill_badge(
-                                    ui,
-                                    AppIcon::AlertTriangle,
-                                    format!(
-                                        "N-{} DISRUPTION: MEMBERS {:?}",
-                                        self.simulated_eliminated_ids.len(),
-                                        self.simulated_eliminated_ids
-                                    ),
-                                    theme.accent_red,
-                                );
-                            } else {
-                                icons::pill_badge(
-                                    ui,
-                                    AppIcon::Palette,
-                                    self.color_mode.clone(),
-                                    theme.accent_blue,
-                                );
-                            }
-
-                            if self.selected_member_id.is_some()
-                                && icons::icon_button(
-                                    ui,
-                                    AppIcon::Close,
-                                    "Clear",
-                                    10.5,
-                                    theme.text_secondary,
-                                    theme.bg_card,
-                                    Stroke::NONE,
-                                    CornerRadius::same(4),
-                                    Vec2::new(0.0, 22.0),
-                                )
-                                .clicked()
-                            {
-                                self.selected_member_id = None;
-                            }
-                        });
+        // 2. Conditional Universal Ink Sketch Bar (when Ground Sketch Mode is active)
+        if self.sketch_mode_active {
+            Frame::new()
+                .fill(theme.bg_sidebar)
+                .stroke(Stroke::new(1.0, theme.border_subtle))
+                .inner_margin(Margin::symmetric(12, 5))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal_wrapped(|ui| {
+                        universal_canvas.render_sketch_tools_bar(ui, theme, 24.0, false);
+                        ui.separator();
+                        universal_canvas.render_color_swatches(ui, theme);
+                        ui.separator();
+                        icons::pill_badge(
+                            ui,
+                            AppIcon::LinkChain,
+                            "3D Ground Sync Active (y=0.02m)",
+                            theme.accent_green,
+                        );
                     });
                 });
+        }
 
-            // 3D Canvas Viewport Container (Fills Available Screen Space)
-            let avail_size = ui.available_size();
-            let canvas_width = avail_size.x.max(240.0);
-            let canvas_height = match stacked_height {
-                Some(h) => h,
-                None => (avail_size.y - 10.0).max(360.0),
+        // 3. Conditional 12-Discipline BIM Authoring Ribbon
+        if self.show_discipline_ribbon {
+            self.render_bim_master_ribbon(ui, theme, 0.0);
+        }
+
+        // 4. Shared Status Toast Banner
+        UniversalCanvasState::render_toast_bar(ui, theme, &mut self.modify_status_msg);
+
+        // 5. Full-Width 3D Drawing Viewport matching Universal Canvas height
+        let canvas_height = universal_canvas.preferred_canvas_height(ui.ctx());
+        let (response, painter) =
+            ui.allocate_painter(Vec2::new(avail_w, canvas_height), Sense::click_and_drag());
+        let rect = response.rect;
+        self.last_viewport_rect = Some(rect);
+        self.last_floating_rects.clear();
+
+        painter.rect_filled(rect, CornerRadius::ZERO, UniversalCanvasState::canvas_bg(theme));
+
+        // Compute non-overlapping floating HUD rects inside the 3D viewport
+        let floating_props_rect = if self.floating_properties_open && has_floating_room {
+            let w = (avail_w * 0.27).clamp(250.0, 305.0);
+            let h = (rect.height() - 26.0).max(200.0);
+            let r = Rect::from_min_size(
+                Pos2::new(rect.right() - w - 12.0, rect.top() + 12.0),
+                Vec2::new(w, h),
+            );
+            self.last_floating_rects.push(r);
+            Some(r)
+        } else {
+            None
+        };
+
+        let floating_project_rect = if self.floating_project_open && is_wide {
+            let w = 240.0_f32.min((avail_w * 0.24).max(200.0));
+            let bottom_clearance = if self.show_axes { 86.0 } else { 44.0 };
+            let h = (rect.height() - 36.0 - bottom_clearance).max(160.0);
+            let r = Rect::from_min_size(
+                Pos2::new(rect.left() + 12.0, rect.top() + 36.0),
+                Vec2::new(w, h),
+            );
+            self.last_floating_rects.push(r);
+            Some(r)
+        } else {
+            None
+        };
+
+        let floating_deck_rect = if self.floating_deck_open && has_floating_room {
+            let deck_left = floating_project_rect
+                .map(|pr| pr.right() + 10.0)
+                .unwrap_or_else(|| {
+                    if self.show_axes {
+                        rect.left() + 86.0
+                    } else {
+                        rect.left() + 12.0
+                    }
+                });
+            let deck_right = floating_props_rect
+                .map(|pr| pr.left() - 10.0)
+                .unwrap_or(rect.right() - 12.0);
+            let deck_w = (deck_right - deck_left).min(640.0);
+            if deck_w >= 260.0 {
+                let deck_h = (rect.height() * 0.44).clamp(185.0, 260.0);
+                let r = Rect::from_min_size(
+                    Pos2::new(deck_left, rect.bottom() - deck_h - 14.0),
+                    Vec2::new(deck_w, deck_h),
+                );
+                self.last_floating_rects.push(r);
+                Some(r)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let pointer_in_floating = ui
+            .ctx()
+            .input(|i| i.pointer.hover_pos().or(i.pointer.interact_pos()))
+            .is_some_and(|p| self.last_floating_rects.iter().any(|r| r.contains(p)));
+
+        // Mouse Orbit, Pan, and Zoom Controls (respecting floating overlays & Freeze Canvas)
+        let allow_sketch_drag = self.sketch_mode_active
+            && universal_canvas.active_tool
+                != crate::views::universal_canvas::UniversalCanvasTool::SelectPan;
+        if !pointer_in_floating {
+            if response.dragged_by(egui::PointerButton::Secondary)
+                || response.dragged_by(egui::PointerButton::Middle)
+                || (response.dragged() && ui.input(|i| i.modifiers.shift))
+            {
+                self.cam_pan += response.drag_delta();
+            } else if !allow_sketch_drag && response.dragged_by(egui::PointerButton::Primary) {
+                self.cam_yaw = (self.cam_yaw + response.drag_delta().x * 0.008)
+                    .rem_euclid(2.0 * std::f32::consts::PI);
+                self.cam_pitch =
+                    (self.cam_pitch - response.drag_delta().y * 0.008).clamp(-1.52, 1.52);
+            }
+
+            if response.hovered()
+                && !universal_canvas.is_frozen
+                && !crate::ui_kit::is_canvas_frozen(ui.ctx())
+            {
+                let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
+                if scroll_y.abs() > 0.0 {
+                    self.cam_zoom = (self.cam_zoom * (1.0 + scroll_y * 0.0025)).clamp(0.15, 8.0);
+                }
+            }
+        }
+
+        // Geometry Definitions & Model Centers
+        let (center_3d, base_scale_unit, raw_members) = self.build_model_geometry(members);
+
+        // 3D Projector Function with Camera Transformations and Z-depth
+        let is_persp = self.perspective;
+        let cam_yaw = self.cam_yaw;
+        let cam_pitch = self.cam_pitch;
+        let cam_zoom = self.cam_zoom;
+        let cam_pan = self.cam_pan;
+        let center_screen = rect.center();
+
+        let project_3d = move |x: f32, y: f32, z: f32| -> (Pos2, f32) {
+            let dx = x - center_3d.0;
+            let dy = y - center_3d.1;
+            let dz = z - center_3d.2;
+
+            // Yaw rotation around Y axis
+            let cos_y = cam_yaw.cos();
+            let sin_y = cam_yaw.sin();
+            let x1 = dx * cos_y + dz * sin_y;
+            let z1 = -dx * sin_y + dz * cos_y;
+
+            // Pitch rotation around X axis
+            let cos_p = cam_pitch.cos();
+            let sin_p = cam_pitch.sin();
+            let y2 = dy * cos_p - z1 * sin_p;
+            let z2 = dy * sin_p + z1 * cos_p;
+
+            // Camera distance & perspective factor
+            let d_cam = 55.0;
+            let persp_factor = if is_persp {
+                (d_cam / (d_cam + z2)).clamp(0.3, 3.0)
+            } else {
+                1.0
             };
 
-            Frame::new()
-                .fill(Color32::from_rgb(14, 16, 22))
-                .stroke(Stroke::new(1.0, theme.border_subtle))
-                .inner_margin(Margin::same(0))
-                .show(ui, |ui| {
-                    let (response, painter) = ui.allocate_painter(Vec2::new(canvas_width, canvas_height), Sense::click_and_drag());
-                    let rect = response.rect;
-                    self.last_viewport_rect = Some(rect);
+            let scale = base_scale_unit * cam_zoom * persp_factor;
+            let sx = center_screen.x + cam_pan.x + x1 * scale;
+            let sy = center_screen.y + cam_pan.y - y2 * scale;
 
-                    // Mouse Orbit, Pan, and Zoom Controls
-                    if response.dragged_by(egui::PointerButton::Secondary) || (response.dragged() && ui.input(|i| i.modifiers.shift)) {
-                        self.cam_pan += response.drag_delta();
-                    } else if response.dragged_by(egui::PointerButton::Primary) {
-                        self.cam_yaw = (self.cam_yaw + response.drag_delta().x * 0.008).rem_euclid(2.0 * std::f32::consts::PI);
-                        self.cam_pitch = (self.cam_pitch - response.drag_delta().y * 0.008).clamp(-1.52, 1.52);
-                    }
+            (Pos2::new(sx, sy), z2)
+        };
 
-                    if response.hovered() && !crate::ui_kit::is_canvas_frozen(ui.ctx()) {
-                        let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
-                        if scroll_y.abs() > 0.0 {
-                            self.cam_zoom = (self.cam_zoom * (1.0 + scroll_y * 0.0025)).clamp(0.15, 8.0);
-                        }
-                    }
+        let offset_x = center_3d.0 - 6.0;
+        let offset_z = center_3d.2 - 4.5;
 
-                    // 1. Background Grid & Deep Viewport Shader
-                    painter.rect_filled(rect, CornerRadius::same(0), Color32::from_rgb(15, 17, 24));
-
-                    // Geometry Definitions & Model Centers
-                    let (center_3d, base_scale_unit, raw_members) = self.build_model_geometry(members);
-
-                    // 3D Projector Function with Camera Transformations and Z-depth
-                    let is_persp = self.perspective;
-                    let cam_yaw = self.cam_yaw;
-                    let cam_pitch = self.cam_pitch;
-                    let cam_zoom = self.cam_zoom;
-                    let cam_pan = self.cam_pan;
-                    let center_screen = rect.center();
-
-                    let project_3d = move |x: f32, y: f32, z: f32| -> (Pos2, f32) {
-                        let dx = x - center_3d.0;
-                        let dy = y - center_3d.1;
-                        let dz = z - center_3d.2;
-
-                        // Yaw rotation around Y axis
-                        let cos_y = cam_yaw.cos();
-                        let sin_y = cam_yaw.sin();
-                        let x1 = dx * cos_y + dz * sin_y;
-                        let z1 = -dx * sin_y + dz * cos_y;
-
-                        // Pitch rotation around X axis
-                        let cos_p = cam_pitch.cos();
-                        let sin_p = cam_pitch.sin();
-                        let y2 = dy * cos_p - z1 * sin_p;
-                        let z2 = dy * sin_p + z1 * cos_p;
-
-                        // Camera distance & perspective factor
-                        let d_cam = 55.0;
-                        let persp_factor = if is_persp {
-                            (d_cam / (d_cam + z2)).clamp(0.3, 3.0)
-                        } else {
-                            1.0
-                        };
-
-                        let scale = base_scale_unit * cam_zoom * persp_factor;
-                        let sx = center_screen.x + cam_pan.x + x1 * scale;
-                        let sy = center_screen.y + cam_pan.y - y2 * scale;
-
-                        (Pos2::new(sx, sy), z2)
+        // Ground-plane (y=0.02) Universal Ink Sketch authoring when Sketch Mode is active
+        if allow_sketch_drag
+            && !pointer_in_floating
+            && !universal_canvas.is_frozen
+            && !crate::ui_kit::is_canvas_frozen(ui.ctx())
+        {
+            let cos_y = cam_yaw.cos();
+            let sin_y = cam_yaw.sin();
+            let cos_p = cam_pitch.cos();
+            let sin_p = cam_pitch.sin();
+            let dy = 0.02_f32 - center_3d.1;
+            let screen_to_ground_mm = |screen: Pos2| -> [f64; 2] {
+                let mut z2_est = 0.0_f32;
+                let mut x1 = 0.0_f32;
+                let mut z1 = 0.0_f32;
+                for _ in 0..4 {
+                    let pf = if is_persp {
+                        (55.0 / (55.0 + z2_est)).clamp(0.3, 3.0)
+                    } else {
+                        1.0
                     };
+                    let sc = (base_scale_unit * cam_zoom * pf).max(0.01);
+                    x1 = (screen.x - center_screen.x - cam_pan.x) / sc;
+                    let y2 = (center_screen.y + cam_pan.y - screen.y) / sc;
+                    z1 = if sin_p.abs() > 0.02 {
+                        (dy * cos_p - y2) / sin_p
+                    } else {
+                        0.0
+                    };
+                    z2_est = dy * sin_p + z1 * cos_p;
+                }
+                let dx = x1 * cos_y - z1 * sin_y;
+                let dz = x1 * sin_y + z1 * cos_y;
+                [
+                    ((center_3d.0 + dx - offset_x) * 1000.0) as f64,
+                    ((center_3d.2 + dz - offset_z) * 1000.0) as f64,
+                ]
+            };
+            let hit_radius_mm = (18.0 / (base_scale_unit * cam_zoom).max(0.05)) as f64 * 1000.0;
+            universal_canvas.handle_world_sketch_interaction(
+                &response,
+                NavigationPillar::GeometryAssembly,
+                hit_radius_mm,
+                &screen_to_ground_mm,
+            );
+        }
 
-                    // 2. 3D Ground Grid Plane
+        if self.sketch_overlay_synced || self.sketch_mode_active {
+            let ground_to_screen = |mm: [f64; 2]| -> Pos2 {
+                project_3d(
+                    mm[0] as f32 / 1000.0 + offset_x,
+                    0.02,
+                    mm[1] as f32 / 1000.0 + offset_z,
+                )
+                .0
+            };
+            universal_canvas.paint_entities_world(
+                &painter,
+                rect,
+                theme,
+                NavigationPillar::GeometryAssembly,
+                &ground_to_screen,
+            );
+        }
+
+        // 2. 3D Ground Grid Plane
                     if self.show_grid {
                         let grid_size = 6;
                         let grid_step = 4.0;
@@ -524,26 +792,34 @@ impl BuildView {
                     // Sort back-to-front by depth (most negative z2 first)
                     render_list.sort_by(|a, b| b.depth.partial_cmp(&a.depth).unwrap_or(std::cmp::Ordering::Equal));
 
-                    // Hover & Click Detection
+                    // Hover & Click Detection (disabled over floating HUD overlays or active Ink Sketch tool)
                     let mut hovered_member: Option<usize> = None;
-                    if let Some(mouse_pos) = response.hover_pos() {
-                        // Check front-to-back for hit detection
-                        for item in render_list.iter().rev() {
-                            let dist = distance_to_segment(mouse_pos, item.p1_screen, item.p2_screen);
-                            let hit_threshold = (item.base_width * cam_zoom * 0.8).clamp(6.0, 18.0);
-                            if dist <= hit_threshold {
-                                hovered_member = Some(item.id);
-                                break;
+                    let allow_member_pick = !pointer_in_floating
+                        && (!self.sketch_mode_active
+                            || universal_canvas.active_tool
+                                == crate::views::universal_canvas::UniversalCanvasTool::SelectPan);
+                    if allow_member_pick {
+                        if let Some(mouse_pos) = response.hover_pos() {
+                            // Check front-to-back for hit detection
+                            for item in render_list.iter().rev() {
+                                let dist = distance_to_segment(mouse_pos, item.p1_screen, item.p2_screen);
+                                let hit_threshold = (item.base_width * cam_zoom * 0.8).clamp(6.0, 18.0);
+                                if dist <= hit_threshold {
+                                    hovered_member = Some(item.id);
+                                    break;
+                                }
                             }
                         }
-                    }
 
-                    if response.clicked() {
-                        if let Some(id) = hovered_member {
-                            self.selected_member_id = Some(id);
-                            self.active_sidebar_tab = SidebarTab::Properties;
-                        } else {
-                            self.selected_member_id = None;
+                        if response.clicked() {
+                            if let Some(id) = hovered_member {
+                                self.selected_member_id = Some(id);
+                                self.active_sidebar_tab = SidebarTab::Properties;
+                                self.floating_properties_open = true;
+                                self.properties_canvas_sync_tab = false;
+                            } else {
+                                self.selected_member_id = None;
+                            }
                         }
                     }
 
@@ -1049,136 +1325,357 @@ impl BuildView {
                         Render3DMode::ShearForceSFD => "SFD DIAGRAM (SHEAR)",
                         Render3DMode::BendingMomentBMD => "BMD DIAGRAM (MOMENT)",
                     };
+        painter.text(
+            Pos2::new(rect.left() + 14.0, rect.top() + 14.0),
+            Align2::LEFT_TOP,
+            format!("3D VIEWPORT: {} • {}", self.active_model.label(), mode_str),
+            egui::FontId::monospace(10.5),
+            theme.text_muted,
+        );
+
+        painter.text(
+            Pos2::new(rect.right() - 14.0, rect.bottom() - 14.0),
+            Align2::RIGHT_BOTTOM,
+            format!(
+                "Yaw: {:.0}° | Pitch: {:.0}° | Zoom: {:.2}x | Elements: {}",
+                self.cam_yaw.to_degrees(),
+                self.cam_pitch.to_degrees(),
+                self.cam_zoom,
+                raw_members.len()
+            ),
+            egui::FontId::monospace(9.5),
+            theme.text_muted,
+        );
+
+        // Live Ink Sketch preview rubber-band on 3D ground plane
+        if self.sketch_mode_active {
+            let offset_x = center_3d.0 - 6.0;
+            let offset_z = center_3d.2 - 4.5;
+            let ground_to_screen = |mm: [f64; 2]| -> Pos2 {
+                project_3d(
+                    mm[0] as f32 / 1000.0 + offset_x,
+                    0.02,
+                    mm[1] as f32 / 1000.0 + offset_z,
+                )
+                .0
+            };
+            universal_canvas.paint_live_preview_world(&painter, rect, theme, &ground_to_screen);
+        }
+
+        if universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx()) {
+            let bottom_offset = if self.show_axes { 88.0 } else { 14.0 };
+            UniversalCanvasState::paint_frozen_badge(&painter, rect, theme, bottom_offset);
+        }
+
+        // 7. Floating Hover Glass Tooltip
+        if let Some(hid) = hovered_member {
+            if let Some(item) = render_list.iter().find(|i| i.id == hid) {
+                if let Some(mpos) = response.hover_pos() {
+                    let tip_pos = mpos + Vec2::new(14.0, -18.0);
+                    let tip_rect = egui::Rect::from_min_size(tip_pos, Vec2::new(195.0, 90.0));
+
+                    painter.rect_filled(
+                        tip_rect,
+                        CornerRadius::same(6),
+                        Color32::from_rgba_premultiplied(20, 24, 34, 235),
+                    );
+                    painter.rect_stroke(
+                        tip_rect,
+                        CornerRadius::same(6),
+                        Stroke::new(1.0, theme.accent_blue),
+                        egui::StrokeKind::Outside,
+                    );
+
                     painter.text(
-                        Pos2::new(rect.left() + 14.0, rect.top() + 14.0),
+                        tip_pos + Vec2::new(8.0, 6.0),
                         Align2::LEFT_TOP,
-                        format!("3D VIEWPORT: {} • {}", self.active_model.label(), mode_str),
-                        egui::FontId::monospace(10.5),
-                        Color32::from_rgb(140, 165, 205),
+                        format!("{} [{}]", item.name, item.section),
+                        egui::FontId::proportional(11.0),
+                        Color32::WHITE,
                     );
-
                     painter.text(
-                        Pos2::new(rect.right() - 14.0, rect.bottom() - 14.0),
-                        Align2::RIGHT_BOTTOM,
-                        format!("Yaw: {:.0}° | Pitch: {:.0}° | Zoom: {:.2}x | Elements: {}", self.cam_yaw.to_degrees(), self.cam_pitch.to_degrees(), self.cam_zoom, raw_members.len()),
-                        egui::FontId::monospace(9.5),
-                        Color32::from_rgb(110, 130, 160),
+                        tip_pos + Vec2::new(8.0, 22.0),
+                        Align2::LEFT_TOP,
+                        format!("Axial Pu: {:.1} kN", item.force_kn),
+                        egui::FontId::monospace(10.0),
+                        theme.accent_blue,
                     );
+                    painter.text(
+                        tip_pos + Vec2::new(8.0, 38.0),
+                        Align2::LEFT_TOP,
+                        format!("Capacity ϕPn: {:.1} kN", item.capacity_kn),
+                        egui::FontId::monospace(10.0),
+                        theme.text_secondary,
+                    );
+                    painter.text(
+                        tip_pos + Vec2::new(8.0, 54.0),
+                        Align2::LEFT_TOP,
+                        format!("Utilization DCR: {:.1}%", item.utilization * 100.0),
+                        egui::FontId::monospace(10.0),
+                        theme.accent_orange,
+                    );
+                    painter.text(
+                        tip_pos + Vec2::new(8.0, 70.0),
+                        Align2::LEFT_TOP,
+                        format!("ARI Redundancy: {:.3}", item.ari),
+                        egui::FontId::monospace(10.0),
+                        theme.accent_green,
+                    );
+                }
+            }
+        }
 
-                    if crate::ui_kit::is_canvas_frozen(ui.ctx()) {
-                        let badge_pos = Pos2::new(rect.left() + 14.0, rect.bottom() - 14.0);
-                        let text_rect = Rect::from_min_size(
-                            Pos2::new(badge_pos.x, badge_pos.y - 24.0),
-                            Vec2::new(280.0, 24.0),
-                        );
-                        painter.rect_filled(
-                            text_rect,
-                            CornerRadius::same(6),
-                            theme.accent_blue.gamma_multiply(0.22),
-                        );
-                        painter.rect_stroke(
-                            text_rect,
-                            CornerRadius::same(6),
-                            Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.7)),
-                            StrokeKind::Inside,
-                        );
-                        let icon_rect = Rect::from_min_size(
-                            Pos2::new(text_rect.left() + 7.0, text_rect.center().y - 6.0),
-                            Vec2::splat(12.0),
-                        );
-                        icons::paint_icon(&painter, icon_rect, AppIcon::Snowflake, theme.accent_blue);
-                        painter.text(
-                            Pos2::new(text_rect.left() + 24.0, text_rect.center().y),
-                            Align2::LEFT_CENTER,
-                            "CANVAS FROZEN • Scroll moves page vertically",
-                            egui::FontId::proportional(10.5),
-                            theme.text_primary,
-                        );
-                    }
+        // 8. Floating In-Canvas HUD Overlays (Project Browser, Properties/Inspector, Data Deck)
+        if let Some(proj_rect) = floating_project_rect {
+            ui.scope_builder(egui::UiBuilder::new().max_rect(proj_rect), |ui| {
+                self.render_floating_project_card(ui, theme, members, db_components, true);
+            });
+        }
+        if let Some(props_rect) = floating_props_rect {
+            ui.scope_builder(egui::UiBuilder::new().max_rect(props_rect), |ui| {
+                self.render_floating_properties_card(
+                    ui,
+                    theme,
+                    members,
+                    db_components,
+                    features,
+                    universal_canvas,
+                    parametric_variables,
+                    workspace_settings.clone(),
+                    avail_w,
+                    true,
+                );
+            });
+        }
+        if let Some(deck_rect) = floating_deck_rect {
+            ui.scope_builder(egui::UiBuilder::new().max_rect(deck_rect), |ui| {
+                self.render_floating_deck_card(ui, theme, members, features, true);
+            });
+        }
 
-                    // 7. Floating Hover Glass Tooltip
-                    if let Some(hid) = hovered_member {
-                        if let Some(item) = render_list.iter().find(|i| i.id == hid) {
-                            if let Some(mpos) = response.hover_pos() {
-                                let tip_pos = mpos + Vec2::new(14.0, -18.0);
-                                let tip_rect = egui::Rect::from_min_size(tip_pos, Vec2::new(195.0, 90.0));
-
-                                painter.rect_filled(tip_rect, CornerRadius::same(6), Color32::from_rgba_premultiplied(20, 24, 34, 235));
-                                painter.rect_stroke(tip_rect, CornerRadius::same(6), Stroke::new(1.0, theme.accent_blue), egui::StrokeKind::Outside);
-
-                                painter.text(tip_pos + Vec2::new(8.0, 6.0), Align2::LEFT_TOP, format!("{} [{}]", item.name, item.section), egui::FontId::proportional(11.0), Color32::WHITE);
-                                painter.text(tip_pos + Vec2::new(8.0, 22.0), Align2::LEFT_TOP, format!("Axial Pu: {:.1} kN", item.force_kn), egui::FontId::monospace(10.0), theme.accent_blue);
-                                painter.text(tip_pos + Vec2::new(8.0, 38.0), Align2::LEFT_TOP, format!("Capacity ϕPn: {:.1} kN", item.capacity_kn), egui::FontId::monospace(10.0), theme.text_secondary);
-                                painter.text(tip_pos + Vec2::new(8.0, 54.0), Align2::LEFT_TOP, format!("Utilization DCR: {:.1}%", item.utilization * 100.0), egui::FontId::monospace(10.0), theme.accent_orange);
-                                painter.text(tip_pos + Vec2::new(8.0, 70.0), Align2::LEFT_TOP, format!("ARI Redundancy: {:.3}", item.ari), egui::FontId::monospace(10.0), theme.accent_green);
+        // 9. Universal-style Bottom Viewport Control & Status Strip
+        let synced_count = universal_canvas.entities.len();
+        Frame::new()
+            .fill(theme.bg_card)
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .inner_margin(Margin::symmetric(12, 6))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Scale:").size(10.0).color(theme.text_muted));
+                    egui::ComboBox::from_id_salt("viewport_scale_combo")
+                        .selected_text(
+                            RichText::new(&self.view_scale)
+                                .size(10.0)
+                                .color(theme.text_primary),
+                        )
+                        .show_ui(ui, |ui| {
+                            for s in ["1:50", "1:100", "1:200", "1:500"] {
+                                if ui.selectable_label(self.view_scale == s, s).clicked() {
+                                    self.view_scale = s.to_string();
+                                }
                             }
-                        }
+                        });
+
+                    ui.separator();
+                    ui.label(RichText::new("Detail:").size(10.0).color(theme.text_muted));
+                    egui::ComboBox::from_id_salt("viewport_lod_combo")
+                        .selected_text(
+                            RichText::new(&self.lod_level)
+                                .size(10.0)
+                                .color(theme.accent_blue),
+                        )
+                        .show_ui(ui, |ui| {
+                            for l in [
+                                "LOD 100 (Massing)",
+                                "LOD 200 (Design)",
+                                "LOD 350 (Fine BIM Detail)",
+                                "LOD 400 (Fabrication)",
+                            ] {
+                                if ui.selectable_label(self.lod_level == l, l).clicked() {
+                                    self.lod_level = l.to_string();
+                                }
+                            }
+                        });
+
+                    ui.separator();
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Sun,
+                        "Sun",
+                        10.0,
+                        if self.show_sun_shadows {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.show_sun_shadows {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(4),
+                        Vec2::new(0.0, 22.0),
+                    )
+                    .clicked()
+                    {
+                        self.show_sun_shadows = !self.show_sun_shadows;
                     }
-                });
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::RulerSquare,
+                        "Datums",
+                        10.0,
+                        if self.show_level_datums {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.show_level_datums {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(4),
+                        Vec2::new(0.0, 22.0),
+                    )
+                    .clicked()
+                    {
+                        self.show_level_datums = !self.show_level_datums;
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Grid,
+                        "Grids",
+                        10.0,
+                        if self.show_grid_bubbles {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.show_grid_bubbles {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(4),
+                        Vec2::new(0.0, 22.0),
+                    )
+                    .clicked()
+                    {
+                        self.show_grid_bubbles = !self.show_grid_bubbles;
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::BoxPackage,
+                        "Section Box",
+                        10.0,
+                        if self.section_box_enabled {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.section_box_enabled {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(4),
+                        Vec2::new(0.0, 22.0),
+                    )
+                    .clicked()
+                    {
+                        self.section_box_enabled = !self.section_box_enabled;
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Target,
+                        "Isolate",
+                        10.0,
+                        if self.temporary_isolate_active {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.temporary_isolate_active {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(4),
+                        Vec2::new(0.0, 22.0),
+                    )
+                    .clicked()
+                    {
+                        self.temporary_isolate_active = !self.temporary_isolate_active;
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::AlertTriangle,
+                        "Clashes",
+                        10.0,
+                        if self.show_3d_clash_markers {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.show_3d_clash_markers {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(4),
+                        Vec2::new(0.0, 22.0),
+                    )
+                    .clicked()
+                    {
+                        self.show_3d_clash_markers = !self.show_3d_clash_markers;
+                    }
 
-            ui.add_space(4.0);
-            // Phase 26 / 29: Responsive Revit-Style Viewport Control Strip
+                    ui.separator();
+                    icons::icon_label(
+                        ui,
+                        AppIcon::CheckCircle,
+                        11.0,
+                        theme.accent_green,
+                        format!("{} Elements • {} Synced Drawings", members.len(), synced_count),
+                        10.0,
+                        theme.accent_green,
+                        true,
+                    );
+                });
+            });
+
+        // 10. Stacked Drawers on Mobile (< 720px) or whenever a floating deck couldn't overlay cleanly
+        if !has_floating_room {
             Frame::new()
-                .fill(theme.bg_sidebar)
-                .inner_margin(Margin::symmetric(10, 4))
-                .stroke(Stroke::new(1.0, theme.border_subtle))
+                .inner_margin(Margin::symmetric(10, 8))
                 .show(ui, |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        // Scale
-                        ui.label(RichText::new("Scale:").size(10.0).color(theme.text_muted));
-                        egui::ComboBox::from_id_salt("viewport_scale_combo")
-                            .selected_text(RichText::new(&self.view_scale).size(10.0).color(theme.text_primary))
-                            .show_ui(ui, |ui| {
-                                for s in ["1:50", "1:100", "1:200", "1:500"] {
-                                    if ui.selectable_label(self.view_scale == s, s).clicked() {
-                                        self.view_scale = s.to_string();
-                                    }
-                                }
-                            });
-
-                        ui.separator();
-                        // LOD Detail
-                        ui.label(RichText::new("Detail:").size(10.0).color(theme.text_muted));
-                        egui::ComboBox::from_id_salt("viewport_lod_combo")
-                            .selected_text(RichText::new(&self.lod_level).size(10.0).color(theme.accent_blue))
-                            .show_ui(ui, |ui| {
-                                for l in ["LOD 100 (Massing)", "LOD 200 (Design)", "LOD 350 (Fine BIM Detail)", "LOD 400 (Fabrication)"] {
-                                    if ui.selectable_label(self.lod_level == l, l).clicked() {
-                                        self.lod_level = l.to_string();
-                                    }
-                                }
-                            });
-
-                        ui.separator();
-                        // Visual toggles
-                        if icons::icon_button(ui, AppIcon::Sun, "Sun", 10.0, if self.show_sun_shadows { Color32::WHITE } else { theme.text_secondary }, if self.show_sun_shadows { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
-                            self.show_sun_shadows = !self.show_sun_shadows;
-                        }
-                        if icons::icon_button(ui, AppIcon::RulerSquare, "Datums", 10.0, if self.show_level_datums { Color32::WHITE } else { theme.text_secondary }, if self.show_level_datums { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
-                            self.show_level_datums = !self.show_level_datums;
-                        }
-                        if icons::icon_button(ui, AppIcon::Grid, "Grids", 10.0, if self.show_grid_bubbles { Color32::WHITE } else { theme.text_secondary }, if self.show_grid_bubbles { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
-                            self.show_grid_bubbles = !self.show_grid_bubbles;
-                        }
-                        if icons::icon_button(ui, AppIcon::BoxPackage, "Section Box", 10.0, if self.section_box_enabled { Color32::WHITE } else { theme.text_secondary }, if self.section_box_enabled { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
-                            self.section_box_enabled = !self.section_box_enabled;
-                        }
-                        if icons::icon_button(ui, AppIcon::Target, "Isolate", 10.0, if self.temporary_isolate_active { Color32::WHITE } else { theme.text_secondary }, if self.temporary_isolate_active { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
-                            self.temporary_isolate_active = !self.temporary_isolate_active;
-                        }
-                        if icons::icon_button(ui, AppIcon::AlertTriangle, "Clashes", 10.0, if self.show_3d_clash_markers { Color32::WHITE } else { theme.text_secondary }, if self.show_3d_clash_markers { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
-                            self.show_3d_clash_markers = !self.show_3d_clash_markers;
-                        }
-
-                        ui.separator();
-                        icons::icon_label(ui, AppIcon::CheckCircle, 11.0, theme.accent_green, format!("{} Elements", members.len()), 10.0, theme.accent_green, true);
-                    });
+                    self.render_stacked_drawers_mobile(
+                        ui,
+                        theme,
+                        members,
+                        db_components,
+                        features,
+                        universal_canvas,
+                        parametric_variables,
+                        workspace_settings,
+                        avail_w,
+                    );
                 });
-
-            ui.add_space(4.0);
-            // Phase 26: Expandable Bottom BIM Data Deck
-            self.render_bottom_deck(ui, theme, members, features);
-        });
+        } else if self.floating_deck_open && floating_deck_rect.is_none() {
+            Frame::new()
+                .inner_margin(Margin::symmetric(10, 8))
+                .show(ui, |ui| {
+                    self.render_floating_deck_card(ui, theme, members, features, false);
+                });
+        }
     }
 
     /// Builds 3D coordinates and elements based on active architectural archetype.

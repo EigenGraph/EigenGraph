@@ -3,62 +3,80 @@
 use super::*;
 
 impl BuildView {
-    pub(super) fn render_bottom_deck(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember], features: &mut FeatureRegistry) {
-        let (toggle_ico, toggle_label) = if self.bottom_deck_expanded {
-            (crate::icons::AppIcon::ChevronDown, "Collapse")
-        } else {
-            (crate::icons::AppIcon::ChevronUp, "Expand")
-        };
-
-        Frame::new()
-            .fill(theme.bg_sidebar)
-            .inner_margin(Margin::symmetric(10, 4))
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
+    /// Floating or stacked BIM Data Deck (QTO Schedules, 4D Simulation, Clashes, BIM CLI & LiDAR).
+    pub(super) fn render_floating_deck_card(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        _members: &[StructuralMember],
+        features: &mut FeatureRegistry,
+        is_overlay: bool,
+    ) {
+        UniversalCanvasState::floating_panel_frame(theme, is_overlay).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     let tabs = [
                         BottomDeckTab::ScheduleQto,
                         BottomDeckTab::TimeSimulation4D,
                         BottomDeckTab::ClashManager,
                         BottomDeckTab::BimConsole,
+                        BottomDeckTab::PointCloudDeviation,
                     ];
                     for tab in tabs {
-                        let is_sel = self.active_bottom_deck_tab == tab && self.bottom_deck_expanded;
-                        let bg = if is_sel { theme.accent_blue } else { theme.bg_card };
-                        let fg = if is_sel { Color32::WHITE } else { theme.text_secondary };
+                        let is_sel = self.active_bottom_deck_tab == tab;
+                        let bg = if is_sel {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        };
+                        let fg = if is_sel {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        };
 
-                        if ui.add(egui::Button::new(RichText::new(tab.label()).size(10.0).color(fg))
-                            .fill(bg).corner_radius(CornerRadius::same(5))).clicked() {
+                        if icons::icon_button(
+                            ui,
+                            tab.app_icon(),
+                            tab.label(),
+                            10.0,
+                            fg,
+                            bg,
+                            Stroke::NONE,
+                            CornerRadius::same(5),
+                            Vec2::new(0.0, 22.0),
+                        )
+                        .clicked()
+                        {
                             self.active_bottom_deck_tab = tab;
                             self.bottom_deck_expanded = true;
                         }
                     }
-
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if crate::icons::icon_button(
-                            ui,
-                            toggle_ico,
-                            toggle_label,
-                            10.0,
-                            theme.text_secondary,
-                            theme.bg_card,
-                            Stroke::NONE,
-                            CornerRadius::same(5),
-                            Vec2::ZERO,
-                        )
-                        .clicked()
-                        {
-                            self.bottom_deck_expanded = !self.bottom_deck_expanded;
-                        }
-                    });
                 });
 
-                if self.bottom_deck_expanded {
-                    ui.add_space(4.0);
-                    ui.separator();
-                    ui.add_space(4.0);
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("×").size(14.0).color(theme.text_muted),
+                            )
+                            .fill(Color32::TRANSPARENT)
+                            .stroke(Stroke::NONE),
+                        )
+                        .on_hover_text("Close Data Deck overlay")
+                        .clicked()
+                    {
+                        self.floating_deck_open = false;
+                        self.bottom_deck_expanded = false;
+                    }
+                });
+            });
 
-                    match self.active_bottom_deck_tab {
+            ui.separator();
+
+            ui.push_id("build_floating_deck_body", |ui| {
+                match self.active_bottom_deck_tab {
                         BottomDeckTab::ScheduleQto => {
                             // Filter row
                             ui.horizontal(|ui| {
@@ -344,9 +362,7 @@ impl BuildView {
                                 });
                         }
                     }
-                }
             });
+        });
     }
-
-
 }

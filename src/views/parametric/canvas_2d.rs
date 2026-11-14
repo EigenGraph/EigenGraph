@@ -8,193 +8,274 @@ impl ParametricView {
         &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
-        _db_components: &[DatabaseComponent],
-        _active_pillar: &mut NavigationPillar,
+        db_components: &mut Vec<DatabaseComponent>,
+        active_pillar: &mut NavigationPillar,
         features: &mut FeatureRegistry,
-        universal_canvas: Option<&crate::views::universal_canvas::UniversalCanvasState>,
-        stacked_height: Option<f32>,
+        universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
+        members: &[crate::models::StructuralMember],
+        workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
     ) {
-        ui.vertical(|ui| {
-            if let Some(ref note) = self.save_notification {
-                Frame::new()
-                    .fill(theme.accent_green.gamma_multiply(0.15))
-                    .stroke(Stroke::new(1.0, theme.accent_green))
-                    .corner_radius(CornerRadius::same(8))
-                    .inner_margin(Margin::symmetric(14, 6))
-                    .show(ui, |ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            icons::icon_label(
-                                ui,
-                                AppIcon::CheckCircle,
-                                13.0,
-                                theme.accent_green,
-                                note,
-                                11.5,
-                                theme.accent_green,
-                                false,
-                            );
-                        });
-                    });
-                ui.add_space(4.0);
-            }
+        ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
 
-            let available_height = match stacked_height {
-                Some(h) => h,
-                None => (ui.available_height() - 135.0).max(320.0),
-            };
-            let available_width = ui.available_width().max(240.0);
+        let avail_w = ui.available_width().max(260.0);
+        let canvas_h = universal_canvas.preferred_canvas_height(ui.ctx());
+        let is_wide = avail_w >= 960.0;
+        let has_floating_room = avail_w >= 720.0;
+        let is_painter_mode = matches!(
+            self.view_mode,
+            DraftingViewMode::FloorPlanViewRange
+                | DraftingViewMode::LiveSectionCutPoche
+                | DraftingViewMode::SheetLayoutA101
+        );
+        self.last_floating_rects.clear();
 
-            if self.view_mode == DraftingViewMode::VisualNodeGraphDynamo {
-                self.render_dynamo_algorithmic_studio(ui, theme, available_width, available_height);
-            } else if matches!(
-                self.view_mode,
-                DraftingViewMode::RebarBbsDetailing | DraftingViewMode::ElevationsAndMepRiser
-            ) {
-                egui::ScrollArea::vertical()
-                    .id_salt("parametric_detailing_slots_scroll")
-                    .max_height(available_height)
-                    .show(ui, |ui| match self.view_mode {
-                        DraftingViewMode::RebarBbsDetailing => {
-                            self.render_rebar_bbs_detailing(ui, theme, features);
-                        }
-                        DraftingViewMode::ElevationsAndMepRiser => {
-                            self.render_elevations_mep_riser(ui, theme, features);
-                        }
-                        _ => {}
-                    });
-            } else {
-                Frame::new()
-                    .fill(Color32::from_rgb(14, 17, 23))
-                    .stroke(Stroke::new(1.0, theme.border_subtle))
-                    .corner_radius(CornerRadius::same(8))
-                    .inner_margin(Margin::same(0))
-                    .show(ui, |ui| {
-                        let (response, painter) = ui.allocate_painter(
-                            Vec2::new(available_width, available_height),
-                            Sense::click_and_drag(),
-                        );
-                        let rect = response.rect;
-                        self.last_canvas_rect = Some(rect);
-
-                        // Pan & Zoom with Secondary Drag / Scroll Wheel
-                        if response.dragged_by(egui::PointerButton::Secondary)
-                            || (response.dragged() && ui.input(|i| i.modifiers.shift))
-                        {
-                            self.canvas_pan += response.drag_delta();
-                        }
-                        if response.hovered() && !crate::ui_kit::is_canvas_frozen(ui.ctx()) {
-                            let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
-                            if scroll_y.abs() > 0.0 {
-                                self.canvas_zoom =
-                                    (self.canvas_zoom * (1.0 + scroll_y * 0.002)).clamp(0.35, 4.5);
-                            }
-                        }
-
-                        match self.view_mode {
-                            DraftingViewMode::FloorPlanViewRange => {
-                                self.draw_interactive_floor_plan(
-                                    &response,
-                                    &painter,
-                                    rect,
-                                    theme,
-                                    universal_canvas,
-                                );
-                            }
-                            DraftingViewMode::LiveSectionCutPoche => {
-                                self.draw_live_section_cut(&painter, rect, theme);
-                            }
-                            DraftingViewMode::SheetLayoutA101 => {
-                                self.draw_sheet_layout_a101(&painter, rect, theme);
-                            }
-                            DraftingViewMode::VisualNodeGraphDynamo
-                            | DraftingViewMode::RebarBbsDetailing
-                            | DraftingViewMode::ElevationsAndMepRiser => {}
-                        }
-
-                        if crate::ui_kit::is_canvas_frozen(ui.ctx()) {
-                            let badge_pos = Pos2::new(rect.left() + 14.0, rect.bottom() - 14.0);
-                            let text_rect = Rect::from_min_size(
-                                Pos2::new(badge_pos.x, badge_pos.y - 24.0),
-                                Vec2::new(280.0, 24.0),
-                            );
-                            painter.rect_filled(
-                                text_rect,
-                                CornerRadius::same(6),
-                                theme.accent_blue.gamma_multiply(0.22),
-                            );
-                            painter.rect_stroke(
-                                text_rect,
-                                CornerRadius::same(6),
-                                Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.7)),
-                                StrokeKind::Inside,
-                            );
-                            let icon_rect = Rect::from_min_size(
-                                Pos2::new(text_rect.left() + 7.0, text_rect.center().y - 6.0),
-                                Vec2::splat(12.0),
-                            );
-                            icons::paint_icon(&painter, icon_rect, AppIcon::Snowflake, theme.accent_blue);
-                            painter.text(
-                                Pos2::new(text_rect.left() + 24.0, text_rect.center().y),
-                                Align2::LEFT_CENTER,
-                                "CANVAS FROZEN • Scroll moves page vertically",
-                                egui::FontId::proportional(10.5),
-                                theme.text_primary,
-                            );
-                        }
-                    });
-            }
-
-            ui.add_space(6.0);
-
-            // Command Line Interface (Bottom Box)
-            Frame::new()
-                .fill(Color32::from_rgb(22, 24, 28))
-                .stroke(Stroke::new(1.0, theme.border_subtle))
-                .corner_radius(CornerRadius::same(6))
-                .inner_margin(Margin::symmetric(10, 6))
-                .show(ui, |ui| {
-                    ui.vertical(|ui| {
-                        let history_len = self.command_history.len();
-                        let start_idx = history_len.saturating_sub(2);
-                        for line in &self.command_history[start_idx..] {
-                            ui.label(
-                                RichText::new(line)
-                                    .size(10.5)
-                                    .monospace()
-                                    .color(theme.text_muted),
-                            );
-                        }
-
-                        ui.horizontal(|ui| {
-                            ui.label(
-                                RichText::new("Command:")
-                                    .size(12.0)
-                                    .strong()
-                                    .monospace()
-                                    .color(theme.accent_blue),
-                            );
-                            let cmd_res = ui.add(
-                                egui::TextEdit::singleline(&mut self.command_line_input)
-                                    .hint_text(
-                                        "Type 'WA' (Wall), 'BM' (Beam), 'CL' (Column), 'DR' (Door), 'WN' (Window), 'RF' (Reinforce), 'UNDO', 'PDF' or JSON...",
-                                    )
-                                    .desired_width((ui.available_width() - 80.0).max(100.0)),
-                            );
-
-                            let enter_pressed = (cmd_res.lost_focus()
-                                && ui.input(|i| i.key_pressed(egui::Key::Enter)))
-                                || ui.button("Enter").clicked();
-
-                            if enter_pressed && !self.command_line_input.trim().is_empty() {
-                                let raw = self.command_line_input.trim().to_string();
-                                self.command_history.push(format!("Command: {raw}"));
-                                self.execute_cad_command(&raw);
-                                self.command_line_input.clear();
-                            }
-                        });
-                    });
+        if self.view_mode == DraftingViewMode::VisualNodeGraphDynamo {
+            self.render_dynamo_algorithmic_studio(ui, theme, avail_w, canvas_h);
+        } else if matches!(
+            self.view_mode,
+            DraftingViewMode::RebarBbsDetailing | DraftingViewMode::ElevationsAndMepRiser
+        ) {
+            egui::ScrollArea::vertical()
+                .id_salt("parametric_detailing_slots_scroll")
+                .max_height(canvas_h)
+                .show(ui, |ui| match self.view_mode {
+                    DraftingViewMode::RebarBbsDetailing => {
+                        self.render_rebar_bbs_detailing(ui, theme, features);
+                    }
+                    DraftingViewMode::ElevationsAndMepRiser => {
+                        self.render_elevations_mep_riser(ui, theme, features);
+                    }
+                    _ => {}
                 });
-        });
+        } else {
+            let (response, painter) =
+                ui.allocate_painter(Vec2::new(avail_w, canvas_h), Sense::click_and_drag());
+            let rect = response.rect;
+            self.last_canvas_rect = Some(rect);
+            painter.rect_filled(
+                rect,
+                CornerRadius::ZERO,
+                UniversalCanvasState::canvas_bg(theme),
+            );
+
+            // Compute non-overlapping floating panel bounds inside canvas (desktop & tablet >= 720px)
+            let floating_props_rect = if self.floating_properties_open && has_floating_room {
+                let w = (avail_w * 0.27).clamp(248.0, 296.0);
+                let h = (rect.height() - 26.0).max(200.0);
+                let r = Rect::from_min_size(
+                    Pos2::new(rect.right() - w - 12.0, rect.top() + 12.0),
+                    Vec2::new(w, h),
+                );
+                self.last_floating_rects.push(r);
+                Some(r)
+            } else {
+                None
+            };
+
+            let floating_project_rect =
+                if self.floating_project_open && is_wide {
+                    let w = 238.0_f32.min((avail_w * 0.24).max(200.0));
+                    let bottom_clearance = if universal_canvas.is_frozen { 46.0 } else { 14.0 };
+                    let h = (rect.height() - 36.0 - bottom_clearance).max(160.0);
+                    let r = Rect::from_min_size(
+                        Pos2::new(rect.left() + 12.0, rect.top() + 36.0),
+                        Vec2::new(w, h),
+                    );
+                    self.last_floating_rects.push(r);
+                    Some(r)
+                } else {
+                    None
+                };
+
+            let floating_cli_rect = if self.show_cli_float && has_floating_room {
+                let cli_left = floating_project_rect
+                    .map(|pr| pr.right() + 12.0)
+                    .unwrap_or(rect.left() + 12.0);
+                let cli_right_limit = floating_props_rect
+                    .map(|pr| pr.left() - 12.0)
+                    .unwrap_or(rect.right() - 12.0);
+                let cli_w = (cli_right_limit - cli_left).min(480.0);
+                if cli_w >= 210.0 {
+                    let cli_h = 104.0_f32.min((rect.height() * 0.28).max(88.0));
+                    let r = Rect::from_min_size(
+                        Pos2::new(cli_left, rect.bottom() - cli_h - 12.0),
+                        Vec2::new(cli_w, cli_h),
+                    );
+                    self.last_floating_rects.push(r);
+                    Some(r)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let pointer_in_floating = ui
+                .ctx()
+                .input(|i| i.pointer.hover_pos().or(i.pointer.interact_pos()))
+                .is_some_and(|p| self.last_floating_rects.iter().any(|r| r.contains(p)));
+
+            // Pan & Zoom with Secondary Drag / Scroll Wheel (ignoring floating HUD overlays & freeze lock)
+            if !pointer_in_floating
+                && (response.dragged_by(egui::PointerButton::Secondary)
+                    || (response.dragged() && ui.input(|i| i.modifiers.shift)))
+            {
+                self.canvas_pan += response.drag_delta();
+            }
+            if !pointer_in_floating
+                && response.hovered()
+                && !universal_canvas.is_frozen
+                && !crate::ui_kit::is_canvas_frozen(ui.ctx())
+            {
+                let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
+                if scroll_y.abs() > 0.0 {
+                    self.canvas_zoom =
+                        (self.canvas_zoom * (1.0 + scroll_y * 0.002)).clamp(0.35, 4.5);
+                }
+            }
+
+            match self.view_mode {
+                DraftingViewMode::FloorPlanViewRange => {
+                    self.draw_interactive_floor_plan(
+                        &response,
+                        &painter,
+                        rect,
+                        theme,
+                        universal_canvas,
+                        pointer_in_floating,
+                    );
+                }
+                DraftingViewMode::LiveSectionCutPoche => {
+                    self.draw_live_section_cut(&painter, rect, theme);
+                }
+                DraftingViewMode::SheetLayoutA101 => {
+                    self.draw_sheet_layout_a101(&painter, rect, theme);
+                }
+                DraftingViewMode::VisualNodeGraphDynamo
+                | DraftingViewMode::RebarBbsDetailing
+                | DraftingViewMode::ElevationsAndMepRiser => {}
+            }
+
+            if universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx()) {
+                let bottom_offset = if floating_cli_rect.is_some() && floating_project_rect.is_none()
+                {
+                    124.0
+                } else {
+                    14.0
+                };
+                UniversalCanvasState::paint_frozen_badge(&painter, rect, theme, bottom_offset);
+            }
+
+            // Render Floating In-Canvas HUD Overlays
+            if let Some(proj_rect) = floating_project_rect {
+                ui.scope_builder(egui::UiBuilder::new().max_rect(proj_rect), |ui| {
+                    self.render_floating_project_card(ui, theme, db_components, true);
+                });
+            }
+            if let Some(props_rect) = floating_props_rect {
+                ui.scope_builder(egui::UiBuilder::new().max_rect(props_rect), |ui| {
+                    self.render_floating_properties_card(
+                        ui,
+                        theme,
+                        db_components,
+                        active_pillar,
+                        features,
+                        universal_canvas,
+                        members,
+                        workspace_settings.clone(),
+                        avail_w,
+                        true,
+                    );
+                });
+            }
+            if let Some(cli_rect) = floating_cli_rect {
+                ui.scope_builder(egui::UiBuilder::new().max_rect(cli_rect), |ui| {
+                    self.render_floating_cli_card(ui, theme, true);
+                });
+            }
+        }
+
+        // Universal-style Bottom Status Telemetry Strip
+        let lvl_name = self
+            .bim_bus
+            .project
+            .levels
+            .get(self.active_level_idx)
+            .map(|l| l.name.as_str())
+            .unwrap_or("Level 1");
+        let synced_count = universal_canvas.entities.len();
+        Frame::new()
+            .fill(theme.bg_card)
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .inner_margin(Margin::symmetric(12, 6))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "Cursor: ({:.0}, {:.0}, {:.0}) mm • Zoom {:.0}% • {}",
+                            self.cursor_pos_mm.0,
+                            self.cursor_pos_mm.1,
+                            self.cursor_pos_mm.2,
+                            self.canvas_zoom * 100.0,
+                            lvl_name,
+                        ))
+                        .size(10.5)
+                        .monospace()
+                        .color(theme.text_muted),
+                    );
+                    ui.separator();
+                    ui.label(
+                        RichText::new(format!(
+                            "{} Walls / {} Cols / {} Beams / {} Rooms • ARI {:.3}",
+                            self.bim_bus.project.walls.len(),
+                            self.bim_bus.project.columns.len(),
+                            self.bim_bus.project.runs.len(),
+                            self.bim_bus.project.rooms.len(),
+                            self.live_ari_score,
+                        ))
+                        .size(10.5)
+                        .color(theme.accent_blue),
+                    );
+                    ui.separator();
+                    ui.label(
+                        RichText::new(format!(
+                            "Mode: {} • {} Synced Drawings",
+                            if self.sketch_draw_mode {
+                                "Universal Ink Sketch"
+                            } else if self.ortho_mode {
+                                "ORTHO 90°"
+                            } else if self.snap_to_grid {
+                                "OSNAP On"
+                            } else {
+                                "Freehand BIM"
+                            },
+                            synced_count,
+                        ))
+                        .size(10.5)
+                        .color(theme.accent_green),
+                    );
+                });
+            });
+
+        // Stacked Drawers on Narrow Screens (< 720px) or Non-Painter Tabs (Dynamo / Rebar / Elevations)
+        if !has_floating_room || !is_painter_mode {
+            Frame::new()
+                .inner_margin(Margin::symmetric(10, 8))
+                .show(ui, |ui| {
+                    self.render_stacked_drawers_mobile(
+                        ui,
+                        theme,
+                        db_components,
+                        active_pillar,
+                        features,
+                        universal_canvas,
+                        members,
+                        workspace_settings,
+                        avail_w,
+                    );
+                });
+        }
     }
 
     pub(super) fn draw_interactive_floor_plan(
@@ -203,7 +284,8 @@ impl ParametricView {
         painter: &egui::Painter,
         rect: Rect,
         theme: &MacTheme,
-        universal_canvas: Option<&crate::views::universal_canvas::UniversalCanvasState>,
+        universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
+        pointer_in_floating: bool,
     ) {
         let scale = 0.042 * self.canvas_zoom; // mm -> screen px
         let origin = Pos2::new(
@@ -222,24 +304,33 @@ impl ParametricView {
         };
 
         // 1. Subtle Millimetre Grid
+        let grid_stroke = if theme.is_dark() {
+            Color32::from_rgba_premultiplied(50, 65, 90, 35)
+        } else {
+            Color32::from_rgba_premultiplied(15, 23, 42, 20)
+        };
         for gx in (-2..=15).map(|i| i as f64 * 1000.0) {
             let p0 = to_screen(P2(gx, -1500.0));
             let p1 = to_screen(P2(gx, 10500.0));
-            painter.line_segment(
-                [p0, p1],
-                Stroke::new(0.5, Color32::from_rgba_premultiplied(50, 65, 90, 35)),
-            );
+            painter.line_segment([p0, p1], Stroke::new(0.5, grid_stroke));
         }
         for gy in (-1..=11).map(|i| i as f64 * 1000.0) {
             let p0 = to_screen(P2(-1500.0, gy));
             let p1 = to_screen(P2(13500.0, gy));
-            painter.line_segment(
-                [p0, p1],
-                Stroke::new(0.5, Color32::from_rgba_premultiplied(50, 65, 90, 35)),
-            );
+            painter.line_segment([p0, p1], Stroke::new(0.5, grid_stroke));
         }
 
         // 2. Structural Grids & Bubbles (1, 2, 3 / A, B, C)
+        let bubble_fill = if theme.is_dark() {
+            Color32::from_rgb(20, 32, 50)
+        } else {
+            Color32::from_rgb(239, 246, 255)
+        };
+        let bubble_text = if theme.is_dark() {
+            Color32::from_rgb(125, 211, 252)
+        } else {
+            theme.accent_blue
+        };
         for g in &self.bim_bus.project.grids {
             let s0 = to_screen(g.start);
             let s1 = to_screen(g.end);
@@ -247,18 +338,24 @@ impl ParametricView {
                 [s0, s1],
                 Stroke::new(1.0, Color32::from_rgba_premultiplied(56, 189, 248, 120)),
             );
-            painter.circle_filled(s1, 11.0, Color32::from_rgb(20, 32, 50));
+            painter.circle_filled(s1, 11.0, bubble_fill);
             painter.circle_stroke(s1, 11.0, Stroke::new(1.3, Color32::from_rgb(56, 189, 248)));
             painter.text(
                 s1,
                 Align2::CENTER_CENTER,
                 &g.label,
                 egui::FontId::monospace(10.5),
-                Color32::from_rgb(125, 211, 252),
+                bubble_text,
             );
         }
 
         // 3. Enclosed Rooms (Halftone Fill + Room Tag)
+        let room_text_col = if theme.is_dark() {
+            Color32::from_rgb(110, 231, 183)
+        } else {
+            Color32::from_rgb(5, 122, 85)
+        };
+        let hole_fill = UniversalCanvasState::canvas_bg(theme);
         for rm in &self.bim_bus.project.rooms {
             let pts: Vec<Pos2> = rm.outer_ring.iter().map(|&p| to_screen(p)).collect();
             if pts.len() >= 3 {
@@ -273,7 +370,7 @@ impl ParametricView {
                 if hpts.len() >= 3 {
                     painter.add(egui::Shape::convex_polygon(
                         hpts.clone(),
-                        Color32::from_rgb(14, 17, 23),
+                        hole_fill,
                         Stroke::new(1.0, Color32::from_rgb(244, 63, 94)),
                     ));
                     // Shaft cross 'X' symbol
@@ -295,7 +392,7 @@ impl ParametricView {
                 Align2::CENTER_CENTER,
                 format!("{} — {}", rm.number, rm.name),
                 egui::FontId::proportional(11.0),
-                Color32::from_rgb(110, 231, 183),
+                room_text_col,
             );
             painter.text(
                 c_pos + Vec2::new(0.0, 7.0),
@@ -478,8 +575,42 @@ impl ParametricView {
             Color32::from_rgb(244, 63, 94),
         );
 
-        // 10. Interactive Cursor Object Snap (`SE, SM, SI, SC, SP, SN`) + Graduated Angular Ruler
-        if let Some(mpos) = response.hover_pos() {
+        // 10. Interactive Sketch Authoring OR BIMCraft Object Snap (`SE, SM, SI, SC, SP, SN`)
+        if self.sketch_draw_mode {
+            if !pointer_in_floating
+                && !universal_canvas.is_frozen
+                && !crate::ui_kit::is_canvas_frozen(&response.ctx)
+            {
+                if let Some(mpos) = response.hover_pos() {
+                    let w = to_world(mpos);
+                    let lvl_z = self
+                        .bim_bus
+                        .project
+                        .levels
+                        .get(self.active_level_idx)
+                        .map(|l| l.elevation_mm as f32)
+                        .unwrap_or(0.0);
+                    self.cursor_pos_mm = (w.0 as f32, w.1 as f32, lvl_z);
+                }
+                if response.dragged_by(egui::PointerButton::Primary)
+                    && universal_canvas.active_tool
+                        == crate::views::universal_canvas::UniversalCanvasTool::SelectPan
+                {
+                    self.canvas_pan += response.drag_delta();
+                } else {
+                    let to_world_mm = |s: Pos2| -> [f64; 2] {
+                        let w = to_world(s);
+                        [w.0, w.1]
+                    };
+                    universal_canvas.handle_world_sketch_interaction(
+                        response,
+                        NavigationPillar::ParametricDED,
+                        350.0 / (self.canvas_zoom as f64).max(0.25),
+                        &to_world_mm,
+                    );
+                }
+            }
+        } else if let Some(mpos) = response.hover_pos().filter(|_| !pointer_in_floating) {
             let raw_world = to_world(mpos);
             let angle_step = if self.ortho_mode { 90.0 } else { 15.0 };
             let snap_hit = self.bim_bus.project.find_snap(
@@ -662,33 +793,43 @@ impl ParametricView {
             self.last_snap_hit = Some(snap_hit);
         }
 
-        if self.sketch_overlay_synced {
-            if let Some(uc) = universal_canvas {
-                let to_screen_mm = |mm: [f64; 2]| to_screen(P2(mm[0], mm[1]));
-                uc.paint_entities_world(
-                    painter,
-                    rect,
-                    theme,
-                    NavigationPillar::ParametricDED,
-                    &to_screen_mm,
-                );
-            }
+        let to_screen_mm = |mm: [f64; 2]| to_screen(P2(mm[0], mm[1]));
+        if self.sketch_overlay_synced || self.sketch_draw_mode {
+            universal_canvas.paint_entities_world(
+                painter,
+                rect,
+                theme,
+                NavigationPillar::ParametricDED,
+                &to_screen_mm,
+            );
+        }
+        if self.sketch_draw_mode {
+            universal_canvas.paint_live_preview_world(painter, rect, theme, &to_screen_mm);
         }
 
         // Top-Left HUD Overlay
         painter.text(
             Pos2::new(rect.left() + 14.0, rect.top() + 12.0),
             Align2::LEFT_TOP,
-            format!(
-                "FLOOR PLAN VIEW RANGE (Cut +1200mm) • Tool: {:?} • Right-Click to finish / Drag to Pan",
-                self.bim_tool
-            ),
+            if self.sketch_draw_mode {
+                "FLOOR PLAN + UNIVERSAL INK SKETCH • Draw synced annotations or toggle Sketch off for BIM Authoring".to_string()
+            } else {
+                format!(
+                    "FLOOR PLAN VIEW RANGE (Cut +1200mm) • Tool: {:?} • Right-Click to finish / Drag to Pan",
+                    self.bim_tool
+                )
+            },
             egui::FontId::monospace(10.5),
-            Color32::from_rgb(148, 163, 184),
+            theme.text_muted,
         );
     }
 
-    pub(super) fn draw_live_section_cut(&self, painter: &egui::Painter, rect: Rect, _theme: &MacTheme) {
+    pub(super) fn draw_live_section_cut(
+        &self,
+        painter: &egui::Painter,
+        rect: Rect,
+        theme: &MacTheme,
+    ) {
         let (sec_a, sec_b) = self.bim_bus.project.section_line;
         let sec = self.bim_bus.project.generate_section_cut(sec_a, sec_b);
         let scale = 0.045 * self.canvas_zoom;
@@ -701,6 +842,11 @@ impl ParametricView {
         };
 
         // 1. Level Datum Lines & Elevation Labels
+        let level_text_col = if theme.is_dark() {
+            Color32::from_rgb(125, 211, 252)
+        } else {
+            theme.accent_blue
+        };
         for (lname, elev) in &sec.level_lines {
             let p0 = map_pt(0.0, *elev);
             let p1 = map_pt(sec.section_length_mm, *elev);
@@ -723,7 +869,7 @@ impl ParametricView {
                 Align2::LEFT_CENTER,
                 format!("{} ({:+.0} mm)", lname, elev),
                 egui::FontId::monospace(10.0),
-                Color32::from_rgb(125, 211, 252),
+                level_text_col,
             );
         }
 
@@ -741,7 +887,7 @@ impl ParametricView {
                 Align2::CENTER_CENTER,
                 glabel,
                 egui::FontId::monospace(10.0),
-                Color32::WHITE,
+                theme.text_primary,
             );
         }
 
