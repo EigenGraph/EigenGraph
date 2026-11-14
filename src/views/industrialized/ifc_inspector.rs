@@ -22,43 +22,77 @@ impl IndustrializedView {
 
         // 1. Transaction & Mode Control Bar
         ui.horizontal_wrapped(|ui| {
-            let edit_txt = if self.is_editing { "👁️ View Mode" } else { "✏️ Edit Entity" };
+            let (edit_icon, edit_txt) = if self.is_editing {
+                (crate::icons::AppIcon::SlidersPanel, "View Mode")
+            } else {
+                (crate::icons::AppIcon::Pencil, "Edit Entity")
+            };
             let edit_bg = if self.is_editing { theme.accent_blue } else { theme.bg_canvas };
             let edit_fg = if self.is_editing { Color32::WHITE } else { theme.text_primary };
 
-            if ui.add(egui::Button::new(RichText::new(edit_txt).size(11.0).strong().color(edit_fg))
-                .fill(edit_bg)
-                .corner_radius(CornerRadius::same(6))).clicked() {
+            if crate::icons::icon_button(
+                ui,
+                edit_icon,
+                edit_txt,
+                11.0,
+                edit_fg,
+                edit_bg,
+                Stroke::NONE,
+                CornerRadius::same(6),
+                Vec2::ZERO,
+            ).clicked() {
                 action = Some(InspectorAction::ToggleEdit);
             }
 
             let can_undo = self.edit_session.can_undo();
             let undo_lbl = if let Some(desc) = self.edit_session.undo_description() {
-                format!("↶ Undo ({})", desc)
+                format!("Undo ({})", desc)
             } else {
-                "↶ Undo".to_string()
+                "Undo".to_string()
             };
-            if ui.add_enabled(can_undo, egui::Button::new(RichText::new(undo_lbl).size(10.5).color(if can_undo { theme.text_primary } else { theme.text_muted }))
-                .fill(theme.bg_canvas)
-                .corner_radius(CornerRadius::same(6))).clicked() {
-                action = Some(InspectorAction::Undo);
-            }
+            ui.add_enabled_ui(can_undo, |ui| {
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Undo,
+                    undo_lbl,
+                    10.5,
+                    if can_undo { theme.text_primary } else { theme.text_muted },
+                    theme.bg_canvas,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                ).clicked() {
+                    action = Some(InspectorAction::Undo);
+                }
+            });
 
             let can_redo = self.edit_session.can_redo();
             let redo_lbl = if let Some(desc) = self.edit_session.redo_description() {
-                format!("↷ Redo ({})", desc)
+                format!("Redo ({})", desc)
             } else {
-                "↷ Redo".to_string()
+                "Redo".to_string()
             };
-            if ui.add_enabled(can_redo, egui::Button::new(RichText::new(redo_lbl).size(10.5).color(if can_redo { theme.text_primary } else { theme.text_muted }))
-                .fill(theme.bg_canvas)
-                .corner_radius(CornerRadius::same(6))).clicked() {
-                action = Some(InspectorAction::Redo);
-            }
+            ui.add_enabled_ui(can_redo, |ui| {
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Redo,
+                    redo_lbl,
+                    10.5,
+                    if can_redo { theme.text_primary } else { theme.text_muted },
+                    theme.bg_canvas,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                ).clicked() {
+                    action = Some(InspectorAction::Redo);
+                }
+            });
 
             if self.edit_session.is_dirty {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("● MODIFIED").size(10.0).strong().color(theme.accent_orange));
+                    ui.horizontal(|ui| {
+                        crate::icons::icon_label(ui, crate::icons::AppIcon::Info, 11.0, theme.accent_orange, "MODIFIED", 10.0, theme.accent_orange, true);
+                    });
                 });
             }
         });
@@ -114,7 +148,7 @@ impl IndustrializedView {
                 ui.add_space(8.0);
 
                 // Property Sets (Psets)
-                ui.label(RichText::new(format!("📑 PROPERTY SETS ({} Sets Assigned)", el.property_sets.len())).size(11.5).strong().color(theme.accent_blue));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Document, 12.0, theme.accent_blue, format!("PROPERTY SETS ({} Sets Assigned)", el.property_sets.len()), 11.5, theme.accent_blue, true);
                 ui.add_space(4.0);
 
                 if el.property_sets.is_empty() {
@@ -144,7 +178,7 @@ impl IndustrializedView {
                 ui.add_space(6.0);
 
                 // Element Quantities (Qto)
-                ui.label(RichText::new("📊 QUANTITIES TAKEOFF (Qto)").size(11.5).strong().color(theme.accent_green));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::ChartBar, 12.0, theme.accent_green, "QUANTITIES TAKEOFF (Qto)", 11.5, theme.accent_green, true);
                 ui.add_space(4.0);
                 if el.quantities.is_empty() {
                     let (dx, dy, dz) = el.bbox.dimensions();
@@ -160,7 +194,7 @@ impl IndustrializedView {
                 }
             } else {
                 // INTERACTIVE EDITING MODE
-                ui.label(RichText::new("✏️ EDIT ELEMENT ATTRIBUTES").size(11.5).strong().color(theme.accent_blue));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Pencil, 12.0, theme.accent_blue, "EDIT ELEMENT ATTRIBUTES", 11.5, theme.accent_blue, true);
                 ui.add_space(6.0);
 
                 // 1. Identity attributes
@@ -177,9 +211,7 @@ impl IndustrializedView {
                     ui.add(egui::TextEdit::singleline(&mut self.edit_obj_type).desired_width(220.0));
                 });
 
-                if ui.add(egui::Button::new(RichText::new("💾 Apply Attribute Changes").size(10.5).strong().color(Color32::WHITE))
-                    .fill(theme.accent_blue)
-                    .corner_radius(CornerRadius::same(5))).clicked() {
+                if crate::icons::icon_button(ui, crate::icons::AppIcon::SaveDisk, "Apply Attribute Changes", 10.5, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO).clicked() {
                     action = Some(InspectorAction::UpdateAttributes {
                         id: el.step_id,
                         name: self.edit_name.clone(),
@@ -193,7 +225,7 @@ impl IndustrializedView {
                 ui.add_space(6.0);
 
                 // 2. Material Reassignment
-                ui.label(RichText::new("🧪 MATERIAL REASSIGNMENT").size(11.5).strong().color(theme.accent_orange));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Layers, 12.0, theme.accent_orange, "MATERIAL REASSIGNMENT", 11.5, theme.accent_orange, true);
                 ui.horizontal_wrapped(|ui| {
                     ui.add(egui::TextEdit::singleline(&mut self.edit_material).hint_text("e.g. Steel S460ML / C30/37").desired_width(200.0));
                     if ui.add(egui::Button::new(RichText::new("Assign Material").size(10.5).strong().color(Color32::WHITE))
@@ -211,7 +243,7 @@ impl IndustrializedView {
                 ui.add_space(6.0);
 
                 // 3. Storey Reassignment
-                ui.label(RichText::new("🏢 SPATIAL STOREY REASSIGNMENT").size(11.5).strong().color(theme.accent_green));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Building, 12.0, theme.accent_green, "SPATIAL STOREY REASSIGNMENT", 11.5, theme.accent_green, true);
                 ui.horizontal_wrapped(|ui| {
                     for (sid, sname) in &storeys {
                         let is_cur = *sname == el.storey_name;
@@ -233,7 +265,7 @@ impl IndustrializedView {
                 ui.add_space(6.0);
 
                 // 4. Property Sets Mutation
-                ui.label(RichText::new("📑 PROPERTY SETS MUTATION").size(11.5).strong().color(theme.accent_blue));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Document, 12.0, theme.accent_blue, "PROPERTY SETS MUTATION", 11.5, theme.accent_blue, true);
                 for pset in &el.property_sets {
                     Frame::new()
                         .fill(theme.bg_canvas)
@@ -243,9 +275,7 @@ impl IndustrializedView {
                             ui.horizontal_wrapped(|ui| {
                                 ui.label(RichText::new(&pset.name).size(11.0).strong().color(theme.text_primary));
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    if ui.add(egui::Button::new(RichText::new("🗑️ Delete Pset").size(9.5).color(Color32::from_rgb(239, 68, 68)))
-                                        .fill(theme.bg_card)
-                                        .corner_radius(CornerRadius::same(4))).clicked() {
+                                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Trash, "Delete Pset", 9.5, Color32::from_rgb(239, 68, 68), theme.bg_card, Stroke::NONE, CornerRadius::same(4), Vec2::ZERO).clicked() {
                                         action = Some(InspectorAction::DeletePset {
                                             id: el.step_id,
                                             pset: pset.name.clone(),
@@ -259,9 +289,7 @@ impl IndustrializedView {
                                 ui.horizontal_wrapped(|ui| {
                                     ui.label(RichText::new(format!("• {}:", p_name)).size(10.5).color(theme.text_secondary));
                                     ui.label(RichText::new(p_val).size(10.5).strong().color(theme.accent_blue));
-                                    if ui.add(egui::Button::new(RichText::new("✕").size(9.0).color(theme.text_muted))
-                                        .fill(theme.bg_canvas)
-                                        .corner_radius(CornerRadius::same(3))).clicked() {
+                                    if crate::icons::icon_only_button(ui, crate::icons::AppIcon::Close, theme.text_muted, theme.bg_canvas, Stroke::NONE, CornerRadius::same(3), Vec2::splat(18.0), "Remove property").clicked() {
                                         action = Some(InspectorAction::RemoveProperty {
                                             id: el.step_id,
                                             pset: pset.name.clone(),
@@ -280,9 +308,7 @@ impl IndustrializedView {
                     ui.add(egui::TextEdit::singleline(&mut self.new_prop_name).hint_text("Property Name").desired_width(110.0));
                     ui.add(egui::TextEdit::singleline(&mut self.new_prop_val).hint_text("Value").desired_width(110.0));
                     let target_pset = el.property_sets.first().map(|p| p.name.clone()).unwrap_or_else(|| "Pset_CustomAudit".to_string());
-                    if ui.add(egui::Button::new(RichText::new("➕ Set Property").size(10.0).strong().color(Color32::WHITE))
-                        .fill(theme.accent_blue)
-                        .corner_radius(CornerRadius::same(4))).clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Plus, "Set Property", 10.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(4), Vec2::ZERO).clicked() {
                         if !self.new_prop_name.trim().is_empty() {
                             action = Some(InspectorAction::SetProperty {
                                 id: el.step_id,
@@ -300,9 +326,7 @@ impl IndustrializedView {
                 ui.add_space(6.0);
                 ui.horizontal_wrapped(|ui| {
                     ui.add(egui::TextEdit::singleline(&mut self.new_pset_name).hint_text("New Pset Name").desired_width(160.0));
-                    if ui.add(egui::Button::new(RichText::new("➕ Create Pset").size(10.0).strong().color(Color32::WHITE))
-                        .fill(theme.accent_green)
-                        .corner_radius(CornerRadius::same(4))).clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Plus, "Create Pset", 10.0, Color32::WHITE, theme.accent_green, Stroke::NONE, CornerRadius::same(4), Vec2::ZERO).clicked() {
                         if !self.new_pset_name.trim().is_empty() {
                             action = Some(InspectorAction::AddPset {
                                 id: el.step_id,
@@ -315,9 +339,7 @@ impl IndustrializedView {
 
                 // Export mutated STEP
                 ui.add_space(10.0);
-                if ui.add(egui::Button::new(RichText::new("💾 Export & Serialize Mutated STEP Physical File").size(11.0).strong().color(Color32::WHITE))
-                    .fill(Color32::from_rgb(139, 92, 246))
-                    .corner_radius(CornerRadius::same(5))).clicked() {
+                if crate::icons::icon_button(ui, crate::icons::AppIcon::SaveDisk, "Export & Serialize Mutated STEP Physical File", 11.0, Color32::WHITE, Color32::from_rgb(139, 92, 246), Stroke::NONE, CornerRadius::same(5), Vec2::ZERO).clicked() {
                     action = Some(InspectorAction::ExportMutatedStep);
                 }
             }
@@ -580,39 +602,69 @@ impl IndustrializedView {
         ui.horizontal_wrapped(|ui| {
             let can_undo = self.edit_session.can_undo();
             let undo_lbl = if let Some(desc) = self.edit_session.undo_description() {
-                format!("↩ Undo ({})", desc)
+                format!("Undo ({})", desc)
             } else {
-                "↩ Undo".to_string()
+                "Undo".to_string()
             };
-            if ui.add_enabled(can_undo, egui::Button::new(RichText::new(undo_lbl).size(10.5).color(if can_undo { theme.text_primary } else { theme.text_muted }))
-                .fill(theme.bg_canvas)
-                .corner_radius(CornerRadius::same(6))).clicked() {
-                action = Some(GeomAction::Undo);
-            }
+            ui.add_enabled_ui(can_undo, |ui| {
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Undo,
+                    undo_lbl,
+                    10.5,
+                    if can_undo { theme.text_primary } else { theme.text_muted },
+                    theme.bg_canvas,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                ).clicked() {
+                    action = Some(GeomAction::Undo);
+                }
+            });
 
             let can_redo = self.edit_session.can_redo();
             let redo_lbl = if let Some(desc) = self.edit_session.redo_description() {
-                format!("↷ Redo ({})", desc)
+                format!("Redo ({})", desc)
             } else {
-                "↷ Redo".to_string()
+                "Redo".to_string()
             };
-            if ui.add_enabled(can_redo, egui::Button::new(RichText::new(redo_lbl).size(10.5).color(if can_redo { theme.text_primary } else { theme.text_muted }))
-                .fill(theme.bg_canvas)
-                .corner_radius(CornerRadius::same(6))).clicked() {
-                action = Some(GeomAction::Redo);
-            }
+            ui.add_enabled_ui(can_redo, |ui| {
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Redo,
+                    redo_lbl,
+                    10.5,
+                    if can_redo { theme.text_primary } else { theme.text_muted },
+                    theme.bg_canvas,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                ).clicked() {
+                    action = Some(GeomAction::Redo);
+                }
+            });
 
             let synth_btn_bg = if self.show_synth_modal { theme.accent_green } else { theme.bg_canvas };
             let synth_btn_fg = if self.show_synth_modal { Color32::WHITE } else { theme.text_primary };
-            if ui.add(egui::Button::new(RichText::new("➕ Synthesize Element").size(10.5).strong().color(synth_btn_fg))
-                .fill(synth_btn_bg)
-                .corner_radius(CornerRadius::same(6))).clicked() {
+            if crate::icons::icon_button(
+                ui,
+                crate::icons::AppIcon::Plus,
+                "Synthesize Element",
+                10.5,
+                synth_btn_fg,
+                synth_btn_bg,
+                Stroke::NONE,
+                CornerRadius::same(6),
+                Vec2::ZERO,
+            ).clicked() {
                 action = Some(GeomAction::ToggleSynthModal);
             }
 
             if self.edit_session.is_dirty {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("● MODIFIED").size(10.0).strong().color(theme.accent_orange));
+                    ui.horizontal(|ui| {
+                        crate::icons::icon_label(ui, crate::icons::AppIcon::Info, 11.0, theme.accent_orange, "MODIFIED", 10.0, theme.accent_orange, true);
+                    });
                 });
             }
         });
@@ -635,7 +687,7 @@ impl IndustrializedView {
                 .inner_margin(Margin::same(12))
                 .stroke(Stroke::new(1.0, theme.accent_green))
                 .show(ui, |ui| {
-                    ui.label(RichText::new("✨ SYNTHESIZE STRUCTURAL ELEMENT (ISO 10303-21 / ISO 16739)").size(11.5).strong().color(theme.accent_green));
+                    crate::icons::icon_label(ui, crate::icons::AppIcon::Sparkles, 12.0, theme.accent_green, "SYNTHESIZE STRUCTURAL ELEMENT (ISO 10303-21 / ISO 16739)", 11.5, theme.accent_green, true);
                     ui.add_space(6.0);
 
                     ui.horizontal_wrapped(|ui| {
@@ -696,9 +748,7 @@ impl IndustrializedView {
                     });
 
                     ui.add_space(4.0);
-                    if ui.add(egui::Button::new(RichText::new("🚀 Synthesize Structural Entity into STEP Graph").size(11.0).strong().color(Color32::WHITE))
-                        .fill(theme.accent_green)
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Play, "Synthesize Structural Entity into STEP Graph", 11.0, Color32::WHITE, theme.accent_green, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                         let target_sid = if self.selected_target_storey != 0 {
                             self.selected_target_storey
                         } else {
@@ -739,7 +789,7 @@ impl IndustrializedView {
             let (dx, dy, dz) = el.bbox.dimensions();
             let (cx, cy, cz) = el.centroid;
 
-            ui.label(RichText::new(format!("📐 3D BOUNDING BOX — {} (#{}: {})", el.name, el.step_id, el.class_name)).size(12.0).strong().color(theme.accent_blue));
+            crate::icons::icon_label(ui, crate::icons::AppIcon::RulerSquare, 12.0, theme.accent_blue, format!("3D BOUNDING BOX — {} (#{}: {})", el.name, el.step_id, el.class_name), 12.0, theme.accent_blue, true);
             ui.add_space(8.0);
 
             let bbox_cards = [
@@ -775,7 +825,7 @@ impl IndustrializedView {
             ui.add_space(8.0);
 
             // 4. Interactive Geometric Topology & Extrusion Mutations
-            ui.label(RichText::new("🛠️ GEOMETRIC TOPOLOGY & SWEPT SOLID MUTATION").size(11.5).strong().color(theme.accent_orange));
+            crate::icons::icon_label(ui, crate::icons::AppIcon::Wrench, 12.0, theme.accent_orange, "GEOMETRIC TOPOLOGY & SWEPT SOLID MUTATION", 11.5, theme.accent_orange, true);
             ui.add_space(6.0);
 
             // Section A: Extrusion Depth
@@ -785,7 +835,7 @@ impl IndustrializedView {
                 .inner_margin(Margin::same(10))
                 .stroke(Stroke::new(1.0, theme.border_subtle))
                 .show(ui, |ui| {
-                    ui.label(RichText::new("📏 Swept Solid Extrusion Depth (IfcExtrudedAreaSolid.Depth)").size(11.0).strong().color(theme.text_primary));
+                    crate::icons::icon_label(ui, crate::icons::AppIcon::DimensionRuler, 11.5, theme.accent_blue, "Swept Solid Extrusion Depth (IfcExtrudedAreaSolid.Depth)", 11.0, theme.text_primary, true);
                     ui.add_space(4.0);
                     ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new("New Depth (m):").size(10.5).color(theme.text_secondary));
@@ -815,7 +865,7 @@ impl IndustrializedView {
                 .inner_margin(Margin::same(10))
                 .stroke(Stroke::new(1.0, theme.border_subtle))
                 .show(ui, |ui| {
-                    ui.label(RichText::new("🧭 3D Spatial Translation (IfcCartesianPoint [dX, dY, dZ])").size(11.0).strong().color(theme.text_primary));
+                    crate::icons::icon_label(ui, crate::icons::AppIcon::Compass, 11.5, theme.accent_blue, "3D Spatial Translation (IfcCartesianPoint [dX, dY, dZ])", 11.0, theme.text_primary, true);
                     ui.add_space(4.0);
                     ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new("dX:").size(10.5).color(theme.text_secondary));
@@ -845,7 +895,7 @@ impl IndustrializedView {
                 .inner_margin(Margin::same(10))
                 .stroke(Stroke::new(1.0, theme.border_subtle))
                 .show(ui, |ui| {
-                    ui.label(RichText::new("📐 Parametric Profile Dimensions (IfcRectangleProfileDef [XDim, YDim])").size(11.0).strong().color(theme.text_primary));
+                    crate::icons::icon_label(ui, crate::icons::AppIcon::RulerSquare, 11.5, theme.accent_blue, "Parametric Profile Dimensions (IfcRectangleProfileDef [XDim, YDim])", 11.0, theme.text_primary, true);
                     ui.add_space(4.0);
                     ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new("Width X (m):").size(10.5).color(theme.text_secondary));
@@ -872,9 +922,7 @@ impl IndustrializedView {
 
             // Section D: Safe Element Deletion
             ui.horizontal_wrapped(|ui| {
-                if ui.add(egui::Button::new(RichText::new(format!("🗑️ Delete Structural Element #{}", el.step_id)).size(11.0).strong().color(Color32::WHITE))
-                    .fill(Color32::from_rgb(239, 68, 68))
-                    .corner_radius(CornerRadius::same(5))).clicked() {
+                if crate::icons::icon_button(ui, crate::icons::AppIcon::Trash, format!("Delete Structural Element #{}", el.step_id), 11.0, Color32::WHITE, Color32::from_rgb(239, 68, 68), Stroke::NONE, CornerRadius::same(5), Vec2::ZERO).clicked() {
                     action = Some(GeomAction::DeleteElement { element_id: el.step_id });
                 }
             });
@@ -992,19 +1040,17 @@ impl IndustrializedView {
         // 1. Sub-Tab Selector for Clash, Diff, and IDS
         ui.horizontal_wrapped(|ui| {
             let tabs = [
-                (0, "⚔️ Spatial Clash Matrix"),
-                (1, "🔄 BIM Differential (Model Diff)"),
-                (2, "🛡️ buildingSMART IDS & BCF"),
+                (0, crate::icons::AppIcon::AlertTriangle, "Spatial Clash Matrix"),
+                (1, crate::icons::AppIcon::Layers, "BIM Differential (Model Diff)"),
+                (2, crate::icons::AppIcon::Shield, "buildingSMART IDS & BCF"),
             ];
 
-            for (idx, label) in tabs {
+            for (idx, icon, label) in tabs {
                 let is_active = self.diff_subtab == idx;
                 let bg = if is_active { theme.accent_blue } else { theme.bg_canvas };
                 let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
 
-                if ui.add(egui::Button::new(RichText::new(label).size(10.5).strong().color(fg))
-                    .fill(bg)
-                    .corner_radius(CornerRadius::same(6))).clicked() {
+                if crate::icons::icon_button(ui, icon, label, 10.5, fg, bg, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                     self.diff_subtab = idx;
                 }
             }
@@ -1018,7 +1064,7 @@ impl IndustrializedView {
         match self.diff_subtab {
             0 => {
                 // SPATIAL CLASH MATRIX
-                ui.label(RichText::new("⚔️ 3D SPATIAL CLASH DETECTION & CLEARANCE GUARD").size(12.0).strong().color(theme.accent_blue));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::AlertTriangle, 12.0, theme.accent_blue, "3D SPATIAL CLASH DETECTION & CLEARANCE GUARD", 12.0, theme.accent_blue, true);
                 ui.add_space(4.0);
                 ui.label(RichText::new("Automated Axis-Aligned Bounding Box (AABB) volumetric intersection and proximity clearance evaluation.").size(10.5).color(theme.text_secondary));
                 ui.add_space(8.0);
@@ -1036,9 +1082,7 @@ impl IndustrializedView {
                             ui.label(RichText::new("Clearance Buffer (mm):").size(10.5).color(theme.text_secondary));
                             ui.add(egui::DragValue::new(&mut self.clearance_buffer_mm).speed(5.0).range(10.0..=500.0));
 
-                            if ui.add(egui::Button::new(RichText::new("⚡ Run Clash Detection").size(11.0).strong().color(Color32::WHITE))
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(5))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Bolt, "Run Clash Detection", 11.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO).clicked() {
                                 run_clash = true;
                             }
                         });
@@ -1071,7 +1115,7 @@ impl IndustrializedView {
                             .inner_margin(Margin::same(10))
                             .stroke(Stroke::new(1.0, Color32::from_rgb(16, 185, 129)))
                             .show(ui, |ui| {
-                                ui.label(RichText::new("✅ ZERO CLASHES: All structural framing elements satisfy spatial clearances and geometric separation.").size(11.0).strong().color(theme.accent_green));
+                                crate::icons::icon_label(ui, crate::icons::AppIcon::CheckCircle, 12.0, theme.accent_green, "ZERO CLASHES: All structural framing elements satisfy spatial clearances and geometric separation.", 11.0, theme.accent_green, true);
                             });
                     } else {
                         ui.label(RichText::new(format!("DETECTED SPATIAL INCIDENTS ({} items)", cr.clashes.len())).size(11.0).strong().color(theme.text_secondary));
@@ -1096,7 +1140,7 @@ impl IndustrializedView {
                                             ui.label(RichText::new(badge_lbl).size(9.0).strong().color(Color32::WHITE));
                                         });
 
-                                        ui.label(RichText::new(format!("#{} ({}) ⚔️ #{} ({})", clash.id_a, clash.name_a, clash.id_b, clash.name_b)).size(10.5).strong().color(theme.text_primary));
+                                        ui.label(RichText::new(format!("#{} ({}) vs #{} ({})", clash.id_a, clash.name_a, clash.id_b, clash.name_b)).size(10.5).strong().color(theme.text_primary));
 
                                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                             if ui.add(egui::Button::new(RichText::new(format!("Select #{}", clash.id_a)).size(9.5).color(theme.accent_blue))
@@ -1113,19 +1157,17 @@ impl IndustrializedView {
                         }
                     }
                 } else {
-                    ui.label(RichText::new("Click '⚡ Run Clash Detection' above to evaluate 3D spatial intersections.").size(10.5).color(theme.text_muted));
+                    ui.label(RichText::new("Click 'Run Clash Detection' above to evaluate 3D spatial intersections.").size(10.5).color(theme.text_muted));
                 }
             }
             1 => {
                 // MODEL DIFFERENTIAL (BIM DIFF)
-                ui.label(RichText::new("🔄 BIM MODEL DIFFERENTIAL & REVISION TRACKING").size(12.0).strong().color(theme.accent_blue));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Layers, 12.0, theme.accent_blue, "BIM MODEL DIFFERENTIAL & REVISION TRACKING", 12.0, theme.accent_blue, true);
                 ui.add_space(4.0);
                 ui.label(RichText::new("Deterministic comparison between initial baseline model and active mutated session model.").size(10.5).color(theme.text_secondary));
                 ui.add_space(8.0);
 
-                if ui.add(egui::Button::new(RichText::new("🔄 Compute Model Differential").size(11.0).strong().color(Color32::WHITE))
-                    .fill(theme.accent_blue)
-                    .corner_radius(CornerRadius::same(6))).clicked() {
+                if crate::icons::icon_button(ui, crate::icons::AppIcon::Layers, "Compute Model Differential", 11.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                     run_diff = true;
                 }
 
@@ -1152,7 +1194,7 @@ impl IndustrializedView {
                         .inner_margin(Margin::same(8))
                         .stroke(Stroke::new(1.0, theme.border_subtle))
                         .show(ui, |ui| {
-                            ui.label(RichText::new("🔐 CRYPTOGRAPHIC REVISION HASH SEAL (FIPS 180-4 SHA-256):").size(9.5).strong().color(theme.text_muted));
+                            crate::icons::icon_label(ui, crate::icons::AppIcon::Lock, 10.5, theme.text_muted, "CRYPTOGRAPHIC REVISION HASH SEAL (FIPS 180-4 SHA-256):", 9.5, theme.text_muted, true);
                             ui.label(RichText::new(&diff.revision_hash).size(10.0).monospace().color(theme.accent_blue));
                         });
 
@@ -1204,32 +1246,26 @@ impl IndustrializedView {
                         ui.add_space(4.0);
                     }
                 } else {
-                    ui.label(RichText::new("Click '🔄 Compute Model Differential' above to compare active changes.").size(10.5).color(theme.text_muted));
+                    ui.label(RichText::new("Click 'Compute Model Differential' above to compare active changes.").size(10.5).color(theme.text_muted));
                 }
             }
             2 => {
                 // BUILDINGSMART IDS & BCF
-                ui.label(RichText::new("🛡️ BUILDINGSMART IDS CONFORMANCE & BCF ISSUE EXPORTER").size(12.0).strong().color(theme.accent_blue));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Shield, 12.0, theme.accent_blue, "BUILDINGSMART IDS CONFORMANCE & BCF ISSUE EXPORTER", 12.0, theme.accent_blue, true);
                 ui.add_space(4.0);
                 ui.label(RichText::new("Information Delivery Specification (IDS) validation rules and BIM Collaboration Format (BCF 2.1) export.").size(10.5).color(theme.text_secondary));
                 ui.add_space(8.0);
 
                 ui.horizontal_wrapped(|ui| {
-                    if ui.add(egui::Button::new(RichText::new("🛡️ Validate IDS Specification Rules").size(11.0).strong().color(Color32::WHITE))
-                        .fill(theme.accent_blue)
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Shield, "Validate IDS Specification Rules", 11.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                         run_ids = true;
                     }
 
-                    if ui.add(egui::Button::new(RichText::new("📬 Export BCF Topics XML").size(11.0).strong().color(Color32::WHITE))
-                        .fill(Color32::from_rgb(14, 165, 233))
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Document, "Export BCF Topics XML", 11.0, Color32::WHITE, Color32::from_rgb(14, 165, 233), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                         export_bcf = true;
                     }
 
-                    if ui.add(egui::Button::new(RichText::new("📋 Export ifcJSON-4").size(11.0).strong().color(Color32::WHITE))
-                        .fill(Color32::from_rgb(234, 88, 12))
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Document, "Export ifcJSON-4", 11.0, Color32::WHITE, Color32::from_rgb(234, 88, 12), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                         export_json = true;
                     }
                 });
@@ -1289,7 +1325,7 @@ impl IndustrializedView {
                         ui.add_space(4.0);
                     }
                 } else {
-                    ui.label(RichText::new("Click '🛡️ Validate IDS Specification Rules' above to audit model requirements.").size(10.5).color(theme.text_muted));
+                    ui.label(RichText::new("Click 'Validate IDS Specification Rules' above to audit model requirements.").size(10.5).color(theme.text_muted));
                 }
             }
             _ => {}

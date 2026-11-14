@@ -4,7 +4,11 @@ use super::*;
 
 impl BuildView {
     pub(super) fn render_bottom_deck(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember], features: &mut FeatureRegistry) {
-        let toggle_icon = if self.bottom_deck_expanded { "▼ Collapse" } else { "▲ Expand" };
+        let (toggle_ico, toggle_label) = if self.bottom_deck_expanded {
+            (crate::icons::AppIcon::ChevronDown, "Collapse")
+        } else {
+            (crate::icons::AppIcon::ChevronUp, "Expand")
+        };
 
         Frame::new()
             .fill(theme.bg_sidebar)
@@ -31,8 +35,19 @@ impl BuildView {
                     }
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.add(egui::Button::new(RichText::new(toggle_icon).size(10.0).color(theme.text_secondary))
-                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+                        if crate::icons::icon_button(
+                            ui,
+                            toggle_ico,
+                            toggle_label,
+                            10.0,
+                            theme.text_secondary,
+                            theme.bg_card,
+                            Stroke::NONE,
+                            CornerRadius::same(5),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
+                        {
                             self.bottom_deck_expanded = !self.bottom_deck_expanded;
                         }
                     });
@@ -47,7 +62,12 @@ impl BuildView {
                         BottomDeckTab::ScheduleQto => {
                             // Filter row
                             ui.horizontal(|ui| {
-                                ui.label(RichText::new("🔍").size(11.0));
+                                crate::icons::draw_icon(
+                                    ui,
+                                    crate::icons::AppIcon::Search,
+                                    13.0,
+                                    theme.text_muted,
+                                );
                                 ui.add(egui::TextEdit::singleline(&mut self.schedule_search_query)
                                     .hint_text("Filter schedule...")
                                     .desired_width(120.0));
@@ -63,8 +83,7 @@ impl BuildView {
                                         }
                                     });
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    if ui.add(egui::Button::new(RichText::new("📥 Export CSV").size(10.0).color(theme.accent_blue))
-                                        .fill(theme.bg_card).corner_radius(CornerRadius::same(4))).clicked() {
+                                    if icons::icon_button(ui, AppIcon::UploadImport, "Export CSV", 10.0, theme.accent_blue, theme.bg_card, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 20.0)).clicked() {
                                         self.modify_status_msg = Some("Exported Schedule to CSV: EigenGraph_BoQ_Schedule.csv".to_string());
                                     }
                                 });
@@ -145,26 +164,22 @@ impl BuildView {
                                 });
                         }
                         BottomDeckTab::TimeSimulation4D => {
-                            ui.horizontal(|ui| {
-                                let play_lbl = if self.simulation_4d_playing { "⏸ Pause" } else { "▶ Play" };
-                                if ui.add(egui::Button::new(RichText::new(play_lbl).size(10.5).strong().color(Color32::WHITE))
-                                    .fill(theme.accent_blue).corner_radius(CornerRadius::same(5))).clicked() {
+                            ui.horizontal_wrapped(|ui| {
+                                let play_icon = if self.simulation_4d_playing { AppIcon::Pause } else { AppIcon::Play };
+                                let play_lbl = if self.simulation_4d_playing { "Pause" } else { "Play" };
+                                if icons::icon_button(ui, play_icon, play_lbl, 10.5, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0)).clicked() {
                                     self.simulation_4d_playing = !self.simulation_4d_playing;
                                 }
-                                if ui.add(egui::Button::new(RichText::new("⏮ Day 1").size(10.5).color(theme.text_secondary))
-                                    .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+                                if icons::icon_button(ui, AppIcon::SkipBack, "Day 1", 10.5, theme.text_secondary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0)).clicked() {
                                     self.simulation_4d_day = 1;
                                 }
-                                if ui.add(egui::Button::new(RichText::new("◀ Prev").size(10.5).color(theme.text_secondary))
-                                    .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+                                if icons::icon_button(ui, AppIcon::ChevronLeft, "Prev", 10.5, theme.text_secondary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0)).clicked() {
                                     self.simulation_4d_day = self.simulation_4d_day.saturating_sub(5).max(1);
                                 }
-                                if ui.add(egui::Button::new(RichText::new("Next ▶").size(10.5).color(theme.text_secondary))
-                                    .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+                                if icons::icon_button(ui, AppIcon::ArrowRight, "Next", 10.5, theme.text_secondary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0)).clicked() {
                                     self.simulation_4d_day = (self.simulation_4d_day + 5).min(180);
                                 }
-                                if ui.add(egui::Button::new(RichText::new("⏭ Day 180").size(10.5).color(theme.text_secondary))
-                                    .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+                                if icons::icon_button(ui, AppIcon::SkipNext, "Day 180", 10.5, theme.text_secondary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0)).clicked() {
                                     self.simulation_4d_day = 180;
                                 }
 
@@ -202,7 +217,7 @@ impl BuildView {
                             ui.horizontal_wrapped(|ui| {
                                 let _ = ui.selectable_label(true, "Spatial Bvh3D AABB Index");
                                 let _ = ui.selectable_label(false, "Auto-Generate BCF from Clashes");
-                                let _ = ui.button("🔍 Scan Active BimProject CSG Solids");
+                                let _ = icons::icon_button(ui, AppIcon::Search, "Scan Active BimProject CSG Solids", 10.5, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0));
                             });
                         });
                         ui.add_space(6.0);
@@ -244,12 +259,10 @@ impl BuildView {
                                                         ui.label(RichText::new(format!("{} ∩ {}", item.element_a, item.element_b)).size(10.0).color(theme.text_primary));
                                                         ui.label(RichText::new(format!("{} • Vol {:.3} m³", item.metric_summary(), item.clash_volume_m3())).size(9.5).color(theme.text_secondary));
                                                         ui.horizontal(|ui| {
-                                                            if ui.add(egui::Button::new(RichText::new("👁️ Isolate 3D").size(9.0).color(theme.accent_blue))
-                                                                .fill(theme.bg_canvas).corner_radius(CornerRadius::same(4))).clicked() {
+                                                            if icons::icon_button(ui, AppIcon::Target, "Isolate 3D", 9.0, theme.accent_blue, theme.bg_canvas, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 20.0)).clicked() {
                                                                 deck_focus = Some((item.id, item.tag.clone(), item.point_3d));
                                                             }
-                                                            if ui.add(egui::Button::new(RichText::new(format!("🔄 {}", item.status.next().label())).size(9.0).color(theme.accent_green))
-                                                                .fill(theme.bg_canvas).corner_radius(CornerRadius::same(4))).clicked() {
+                                                            if icons::icon_button(ui, AppIcon::Redo, item.status.next().label(), 9.0, theme.accent_green, theme.bg_canvas, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 20.0)).clicked() {
                                                                 deck_toggle_idx = Some(idx);
                                                             }
                                                         });
@@ -298,7 +311,7 @@ impl BuildView {
                                     if !self.bim_console_input.trim().is_empty() {
                                         let cmd = self.bim_console_input.trim().to_string();
                                         self.bim_console_logs.push(format!("> {}", cmd));
-                                        self.bim_console_logs.push(format!("✓ Executed command '{}' with status: SUCCESS", cmd));
+                                        self.bim_console_logs.push(format!("Executed command '{}' with status: SUCCESS", cmd));
                                         self.modify_status_msg = Some(format!("Executed: {}", cmd));
                                         self.bim_console_input.clear();
                                     }
@@ -325,7 +338,7 @@ impl BuildView {
                                         ui.horizontal_wrapped(|ui| {
                                             let _ = ui.selectable_label(true, "Heat Band: ±10mm ACI 117");
                                             let _ = ui.selectable_label(false, "Overlay Laser Scan Voxels");
-                                            let _ = ui.button("📡 Import .E57 / .LAS Point Cloud");
+                                            let _ = icons::icon_button(ui, AppIcon::UploadImport, "Import .E57 / .LAS Point Cloud", 10.5, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0));
                                         });
                                     });
                                 });

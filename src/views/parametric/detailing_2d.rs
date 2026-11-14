@@ -26,7 +26,17 @@ impl ParametricView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "SNI 2847 / ACI 318 Special Moment Frame");
                 let _ = ui.selectable_label(false, "135-deg Seismic Hooks");
-                let _ = ui.button("🔩 Auto-Draft Rebar Elevations & BBS Table");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::Rebar,
+                    "Auto-Draft Rebar Elevations & BBS Table",
+                    10.5,
+                    theme.text_primary,
+                    theme.bg_card,
+                    Stroke::NONE,
+                    CornerRadius::same(5),
+                    Vec2::new(0.0, 24.0),
+                );
             });
             ui.add_space(10.0);
 
@@ -112,7 +122,17 @@ impl ParametricView {
                 let _ = ui.selectable_label(false, "East Facade Elevation");
                 let _ = ui.selectable_label(false, "HVAC + Chilled Water Riser");
                 let _ = ui.selectable_label(false, "Fire Standpipe + Sprinkler");
-                let _ = ui.button("📐 Project All Facades & Riser Stacks to Sheets");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::RulerSquare,
+                    "Project All Facades & Riser Stacks to Sheets",
+                    10.5,
+                    theme.text_primary,
+                    theme.bg_card,
+                    Stroke::NONE,
+                    CornerRadius::same(5),
+                    Vec2::new(0.0, 24.0),
+                );
             });
             ui.add_space(10.0);
 

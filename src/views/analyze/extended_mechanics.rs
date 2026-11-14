@@ -27,7 +27,17 @@ impl AnalyzeView {
                 let _ = ui.selectable_label(true, "HL-93 Truck + Lane");
                 let _ = ui.selectable_label(false, "SNI 1725 BGT + BTR");
                 let _ = ui.selectable_label(false, "Envelope All Spans");
-                let _ = ui.button("🚂 Sweep Vehicle Axles & Trace Influence Line");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::ChartLine,
+                    "Sweep Vehicle Axles & Trace Influence Line",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
             ui.add_space(10.0);
 
@@ -93,7 +103,17 @@ impl AnalyzeView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Method: Bishop Simplified Slices");
                 let _ = ui.selectable_label(false, "Cantilever Retaining Wall + Key");
-                let _ = ui.button("⛰️ Search Critical Slip Surface Arc");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::Search,
+                    "Search Critical Slip Surface Arc",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
             ui.add_space(10.0);
 
@@ -170,7 +190,17 @@ impl AnalyzeView {
                 let _ = ui.selectable_label(true, "AISC DG-11 Office (0.5% g)");
                 let _ = ui.selectable_label(false, "Sensitive Lab / MRI (0.1% g)");
                 let _ = ui.selectable_label(false, "Crane Girder Fatigue Class C");
-                let _ = ui.button("〰️ Compute Modal Footfall Response & S-N Curves");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::Pulse,
+                    "Compute Modal Footfall Response & S-N Curves",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
             ui.add_space(10.0);
 

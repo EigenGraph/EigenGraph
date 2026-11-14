@@ -29,11 +29,11 @@ pub enum TileSource {
 impl TileSource {
     pub fn display_name(&self) -> &'static str {
         match self {
-            Self::OpenStreetMap => "🗺️ OpenStreetMap Standard",
-            Self::OpenTopoMap => "⛰️ OpenTopoMap Elevation",
-            Self::EsriWorldImagery => "🛰️ Esri World Imagery (Satellite)",
-            Self::CartoDbDarkMatter => "🌌 CartoDB Dark Matter",
-            Self::SyntheticVectorTerrain => "📐 Synthetic Vector Terrain (Offline)",
+            Self::OpenStreetMap => "OpenStreetMap Standard",
+            Self::OpenTopoMap => "OpenTopoMap Elevation",
+            Self::EsriWorldImagery => "Esri World Imagery (Satellite)",
+            Self::CartoDbDarkMatter => "CartoDB Dark Matter",
+            Self::SyntheticVectorTerrain => "Synthetic Vector Terrain (Offline)",
         }
     }
 
@@ -534,13 +534,18 @@ impl SlippyMapState {
                     painter.circle_filled(pos, 14.0, theme.accent_blue.gamma_multiply(0.2));
                 }
 
-                // Pin circle and icon
-                painter.circle_filled(pos, 8.0, theme.accent_blue);
-                painter.circle_stroke(pos, 8.0, Stroke::new(2.0, Color32::WHITE));
+                // Pin circle and painted vector glyph
+                painter.circle_filled(pos, 9.0, theme.accent_blue);
+                painter.circle_stroke(pos, 9.0, Stroke::new(1.8, Color32::WHITE));
+                crate::icons::AppIcon::MapPin.paint(
+                    painter,
+                    Rect::from_center_size(pos, Vec2::splat(11.0)),
+                    Color32::WHITE,
+                );
 
                 // Pin label card
                 let label_pos = Pos2::new(pos.x + 12.0, pos.y - 8.0);
-                let label_text = format!("📍 #{}: {} ({:.1}m)", pin.id, pin.label, pin.elevation_m);
+                let label_text = format!("#{}: {} ({:.1}m)", pin.id, pin.label, pin.elevation_m);
                 let text_color = if is_active { theme.accent_blue } else { theme.text_primary };
 
                 painter.rect_filled(

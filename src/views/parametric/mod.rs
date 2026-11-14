@@ -18,6 +18,7 @@ use crate::models::{
     CadTool, DatabaseComponent, NavigationPillar, ParametricGeneratorPreset, ParametricVariable,
 };
 use crate::features::{FeatureId, FeatureRegistry};
+use crate::icons::{self, AppIcon};
 use crate::theme::MacTheme;
 use crate::ui_kit;
 
@@ -146,6 +147,8 @@ pub struct ParametricView {
     pub preview_yaw: f32,
     pub preview_pitch: f32,
     pub dragging_node_id: Option<usize>,
+    pub last_canvas_rect: Option<Rect>,
+    pub sketch_overlay_synced: bool,
 }
 
 impl Default for ParametricView {
@@ -271,12 +274,26 @@ impl Default for ParametricView {
             preview_yaw: 0.65,
             preview_pitch: 0.35,
             dragging_node_id: None,
+            last_canvas_rect: None,
+            sketch_overlay_synced: true,
         }
     }
 }
 
 
 impl ParametricView {
+    /// Returns true while the pointer hovers the Parametric viewport and scrolling is active (unfrozen).
+    pub fn is_pointer_in_live_canvas(&self, ctx: &egui::Context, is_frozen: bool) -> bool {
+        if is_frozen {
+            return false;
+        }
+        let Some(rect) = self.last_canvas_rect else {
+            return false;
+        };
+        ctx.input(|i| i.pointer.hover_pos().is_some_and(|p| rect.contains(p)))
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn show(
         &mut self,
         ui: &mut Ui,
@@ -284,16 +301,32 @@ impl ParametricView {
         db_components: &mut Vec<DatabaseComponent>,
         active_pillar: &mut NavigationPillar,
         features: &mut FeatureRegistry,
+        universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
+        members: &[crate::models::StructuralMember],
+        workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
+        sidebar_toggle_inset_px: f32,
     ) {
+        ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
+        self.last_canvas_rect = None;
+
         let avail_w = ui.available_width();
         ui.vertical(|ui| {
             // 1. TOP DRAFTING & BIMCRAFT AUTHORING RIBBON
-            self.render_drafting_ribbon(ui, theme, db_components, active_pillar);
+            self.render_drafting_ribbon(
+                ui,
+                theme,
+                db_components,
+                active_pillar,
+                universal_canvas,
+                members,
+                workspace_settings,
+                sidebar_toggle_inset_px,
+            );
 
-            // 2. MAIN WORKSPACE (Side-by-side on Desktop, Stacked on Mobile/Narrow Tablet)
-            let deck_h = (MacTheme::viewport_size(ui.ctx()).y * 0.68).clamp(440.0, 680.0);
+            // 2. MAIN WORKSPACE (Single Hero Canvas + Synchronized Parameters Panel)
+            let deck_h = (MacTheme::viewport_size(ui.ctx()).y - 125.0).clamp(480.0, 740.0);
             if avail_w >= 780.0 {
-                let panel_w = (avail_w * 0.28).clamp(240.0, 300.0);
+                let panel_w = (avail_w * 0.27).clamp(240.0, 295.0);
                 ui.horizontal(|ui| {
                     ui.allocate_ui(egui::Vec2::new(panel_w, deck_h), |ui| {
                         self.render_variables_panel(
@@ -310,11 +343,12 @@ impl ParametricView {
                         db_components,
                         active_pillar,
                         features,
+                        Some(universal_canvas),
                         Some(deck_h),
                     );
                 });
             } else {
-                let stacked_h = (MacTheme::viewport_size(ui.ctx()).y * 0.45).clamp(260.0, 380.0);
+                let stacked_h = (MacTheme::viewport_size(ui.ctx()).y * 0.52).clamp(320.0, 440.0);
                 ui.vertical(|ui| {
                     self.render_drawing_canvas(
                         ui,
@@ -322,6 +356,7 @@ impl ParametricView {
                         db_components,
                         active_pillar,
                         features,
+                        Some(universal_canvas),
                         Some(stacked_h),
                     );
                     ui.add_space(10.0);
@@ -482,7 +517,7 @@ impl ParametricView {
         let mut load_idx: Option<usize> = None;
         let mut assemble_in_build = false;
 
-        egui::Window::new("📦 Parametric Component Database & IFC Sections")
+        egui::Window::new("Parametric Component Database & IFC Sections")
             .open(&mut open)
             .collapsible(false)
             .resizable(true)
@@ -499,7 +534,7 @@ impl ParametricView {
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("🏛️").size(28.0));
+                        icons::draw_icon(ui, AppIcon::Building, 26.0, theme.accent_blue);
                         ui.add_space(8.0);
                         ui.vertical(|ui| {
                             ui.label(
@@ -586,33 +621,34 @@ impl ParametricView {
 
                                 ui.add_space(8.0);
                                 ui.horizontal_wrapped(|ui| {
-                                    if ui
-                                        .add(
-                                            egui::Button::new(
-                                                RichText::new("📥 Load into Canvas")
-                                                    .size(11.0)
-                                                    .strong()
-                                                    .color(Color32::WHITE),
-                                            )
-                                            .fill(theme.accent_blue)
-                                            .corner_radius(CornerRadius::same(6)),
-                                        )
-                                        .clicked()
+                                    if icons::icon_button(
+                                        ui,
+                                        AppIcon::UploadImport,
+                                        "Load into Canvas",
+                                        11.0,
+                                        Color32::WHITE,
+                                        theme.accent_blue,
+                                        Stroke::NONE,
+                                        CornerRadius::same(6),
+                                        Vec2::new(0.0, 26.0),
+                                    )
+                                    .clicked()
                                     {
                                         load_idx = Some(idx);
                                     }
 
-                                    if ui
-                                        .add(
-                                            egui::Button::new(
-                                                RichText::new("🏗️ Assemble in BUILD (3D)")
-                                                    .size(11.0)
-                                                    .color(theme.text_secondary),
-                                            )
-                                            .fill(theme.bg_canvas)
-                                            .corner_radius(CornerRadius::same(6)),
-                                        )
-                                        .clicked()
+                                    if icons::icon_button(
+                                        ui,
+                                        AppIcon::Cube3D,
+                                        "Assemble in Geometry (3D)",
+                                        11.0,
+                                        theme.text_secondary,
+                                        theme.bg_canvas,
+                                        Stroke::new(1.0, theme.border_subtle),
+                                        CornerRadius::same(6),
+                                        Vec2::new(0.0, 26.0),
+                                    )
+                                    .clicked()
                                     {
                                         assemble_in_build = true;
                                     }

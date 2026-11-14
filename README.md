@@ -23,7 +23,7 @@
 
 ## 🏛️ Overview
 
-**EigenGraph** (`EigenGraph/EigenGraph`) is a client-side **WebAssembly + WebGL2** 10D BIM and structural mechanics workstation compiled cleanly from Rust (`v0.3.2`, Phase 32 Canvas-First Unified Workspace) and deployed automatically to **Cloudflare Workers**.
+**EigenGraph** (`EigenGraph/EigenGraph`) is a client-side **WebAssembly + WebGL2** 10D BIM and structural mechanics workstation compiled cleanly from Rust (`v0.3.3`, Phase 33 Single-Canvas Parametric/Geometry & Vector Icon Overhaul) and deployed automatically to **Cloudflare Workers**.
 
 ### 15 Engineering Modules
 1. **📁 My Library** — Project records, parametric component catalog, interactive HTML5 3D viewer & Markdown dossier browser downloads.

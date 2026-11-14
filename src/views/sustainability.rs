@@ -6,6 +6,7 @@ use egui::{
     ScrollArea, Sense, Stroke, Ui, Vec2,
 };
 use crate::features::{FeatureId, FeatureRegistry};
+use crate::icons::{self, AppIcon};
 use crate::models::{GreenBuildingCredit, LcaStageEmission, StructuralMember};
 use crate::theme::MacTheme;
 use crate::ui_kit;
@@ -196,7 +197,7 @@ impl SustainabilityView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Source: Active BimProject Steel + Slab Volumes");
                 let _ = ui.selectable_label(false, "EPD Factor Database (A1-A3)");
-                let _ = ui.button("♻️ Recompute Live Model CO₂e Footprint");
+                let _ = icons::icon_button(ui, AppIcon::Recycle, "Recompute Live Model CO₂e Footprint", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
             });
         });
 
@@ -210,27 +211,20 @@ impl SustainabilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("🏭 Steel Production Route:")
-                            .size(12.0)
-                            .strong()
-                            .color(theme.text_primary),
-                    );
-                    ui.selectable_value(
-                        &mut self.steel_production_route,
-                        SteelProductionRoute::ElectricArcFurnace,
-                        "♻️ EAF Electric Arc (1.15 t CO₂e/t)",
-                    );
-                    ui.selectable_value(
-                        &mut self.steel_production_route,
-                        SteelProductionRoute::BlastFurnaceBof,
-                        "⚙️ Conventional BF-BOF (2.35 t CO₂e/t)",
-                    );
-                    ui.selectable_value(
-                        &mut self.steel_production_route,
-                        SteelProductionRoute::HydrogenDri,
-                        "🌱 Green Hydrogen DRI (0.45 t CO₂e/t)",
-                    );
+                    icons::icon_label(ui, AppIcon::Building, 13.5, theme.accent_blue, "Steel Production Route:", 12.0, theme.text_primary, true);
+                    for (route, icon, lbl) in [
+                        (SteelProductionRoute::ElectricArcFurnace, AppIcon::Recycle, "EAF Electric Arc (1.15 t CO₂e/t)"),
+                        (SteelProductionRoute::BlastFurnaceBof, AppIcon::Wrench, "Conventional BF-BOF (2.35 t CO₂e/t)"),
+                        (SteelProductionRoute::HydrogenDri, AppIcon::Leaf, "Green Hydrogen DRI (0.45 t CO₂e/t)"),
+                    ] {
+                        let is_sel = self.steel_production_route == route;
+                        let bg = if is_sel { theme.accent_blue.gamma_multiply(0.18) } else { theme.bg_canvas };
+                        let fg = if is_sel { theme.accent_blue } else { theme.text_secondary };
+                        let stroke = if is_sel { Stroke::new(1.0, theme.accent_blue) } else { Stroke::new(1.0, theme.border_subtle) };
+                        if icons::icon_button(ui, icon, lbl, 11.5, fg, bg, stroke, CornerRadius::same(6), Vec2::ZERO).clicked() {
+                            self.steel_production_route = route;
+                        }
+                    }
                 });
             });
 
@@ -244,12 +238,7 @@ impl SustainabilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("🌍 WHOLE BUILDING LIFE CYCLE ASSESSMENT (EN 15978 / ISO 14040)")
-                            .size(13.0)
-                            .strong()
-                            .color(theme.text_primary),
-                    );
+                    icons::icon_label(ui, AppIcon::Globe, 14.5, theme.accent_green, "WHOLE BUILDING LIFE CYCLE ASSESSMENT (EN 15978 / ISO 14040)", 13.0, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(
                             RichText::new("RIBA 2030 Climate Challenge Benchmark: Tier A (< 300 kg CO₂e/m²)")
@@ -331,14 +320,7 @@ impl SustainabilityView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new(
-                        "📈 Pareto Frontier: Structural Redundancy (ARI) vs. Embodied Carbon (CO₂e)",
-                    )
-                    .size(13.5)
-                    .strong()
-                    .color(theme.text_primary),
-                );
+                icons::icon_label(ui, AppIcon::ChartLine, 14.5, theme.accent_blue, "Pareto Frontier: Structural Redundancy (ARI) vs. Embodied Carbon (CO₂e)", 13.5, theme.text_primary, true);
                 ui.add_space(6.0);
                 ui.label(
                     RichText::new("Finding the optimum trade-off where progressive collapse resilience increases significantly without disproportionate carbon expenditure.")
@@ -348,13 +330,13 @@ impl SustainabilityView {
                 ui.add_space(14.0);
 
                 let scenarios = [
-                    ("Vulnerable Design (Non-Redundant)", "0.58", "38.2 Tons", "43.9 t CO₂e", "🔴 Catastrophic Collapse Risk (Reconstruction = +120 t CO₂e)", false),
-                    ("Code-Baseline Standard Design", "0.72", "44.0 Tons", "50.6 t CO₂e", "🟡 Meets Minimum Code, Lacks Secondary Redundancy", false),
-                    ("EigenGraph Optimal Design (Recommended)", "0.94", "48.5 Tons", "55.8 t CO₂e", "🟢 SWEET SPOT: ARI +30.5%, Carbon Only +5.2 t CO₂e (+10.2%)", true),
-                    ("Over-Conservative Design", "0.98", "62.0 Tons", "71.3 t CO₂e", "⚪ Inefficient: +27.8% Carbon Surcharge for Negligible ARI Gain", false),
+                    ("Vulnerable Design (Non-Redundant)", "0.58", "38.2 Tons", "43.9 t CO₂e", AppIcon::AlertTriangle, theme.accent_red, "Catastrophic Collapse Risk (Reconstruction = +120 t CO₂e)", false),
+                    ("Code-Baseline Standard Design", "0.72", "44.0 Tons", "50.6 t CO₂e", AppIcon::Info, theme.accent_orange, "Meets Minimum Code, Lacks Secondary Redundancy", false),
+                    ("EigenGraph Optimal Design (Recommended)", "0.94", "48.5 Tons", "55.8 t CO₂e", AppIcon::CheckCircle, theme.accent_green, "SWEET SPOT: ARI +30.5%, Carbon Only +5.2 t CO₂e (+10.2%)", true),
+                    ("Over-Conservative Design", "0.98", "62.0 Tons", "71.3 t CO₂e", AppIcon::Minus, theme.text_muted, "Inefficient: +27.8% Carbon Surcharge for Negligible ARI Gain", false),
                 ];
 
-                for (name, ari, steel, co2, desc, is_opt) in scenarios {
+                for (name, ari, steel, co2, desc_icon, desc_col, desc, is_opt) in scenarios {
                     let fill = if is_opt {
                         theme.accent_blue.gamma_multiply(0.12)
                     } else {
@@ -377,11 +359,11 @@ impl SustainabilityView {
                                     ui.horizontal_wrapped(|ui| {
                                         ui.label(RichText::new(name).size(12.5).strong().color(if is_opt { theme.accent_blue } else { theme.text_primary }));
                                         if is_opt {
-                                            ui.label(RichText::new("⭐ BEST ECO-EFFICIENCY").size(10.0).strong().color(theme.accent_green));
+                                            icons::pill_badge(ui, AppIcon::Star, "BEST ECO-EFFICIENCY", theme.accent_green);
                                         }
                                     });
                                     ui.add_space(2.0);
-                                    ui.label(RichText::new(desc).size(11.0).color(theme.text_secondary));
+                                    icons::icon_label(ui, desc_icon, 12.0, desc_col, desc, 11.0, theme.text_secondary, false);
                                 });
 
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -413,12 +395,7 @@ impl SustainabilityView {
         // Standard Filter Pills
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(
-                    RichText::new("🏅 RATING SYSTEM:")
-                        .size(11.5)
-                        .strong()
-                        .color(theme.accent_blue),
-                );
+                icons::icon_label(ui, AppIcon::Star, 13.0, theme.accent_blue, "RATING SYSTEM:", 11.5, theme.accent_blue, true);
 
                 let is_all = self.selected_credit_standard.is_none();
                 let all_bg = if is_all { theme.accent_blue } else { theme.bg_canvas };
@@ -462,12 +439,7 @@ impl SustainabilityView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("📋 Green Certification Verification Checklist")
-                        .size(13.0)
-                        .strong()
-                        .color(theme.text_primary),
-                );
+                icons::icon_label(ui, AppIcon::Clipboard, 14.5, theme.accent_blue, "Green Certification Verification Checklist", 13.0, theme.text_primary, true);
                 ui.add_space(10.0);
 
                 for credit in &self.green_credits {
@@ -536,12 +508,7 @@ impl SustainabilityView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("⚡ Thermal Efficiency & Life Cycle Durability Assessment")
-                        .size(13.5)
-                        .strong()
-                        .color(theme.text_primary),
-                );
+                icons::icon_label(ui, AppIcon::Bolt, 14.5, theme.accent_orange, "Thermal Efficiency & Life Cycle Durability Assessment", 13.5, theme.text_primary, true);
                 ui.add_space(10.0);
 
                 let energy_cards = [
@@ -578,7 +545,7 @@ impl SustainabilityView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Climate Zone: Tropical Marine (-6.2° S)");
                 let _ = ui.selectable_label(false, "Include 600mm Horizontal Sunshades");
-                let _ = ui.button("☀️ Compute N/E/S/W Facade OTTV & Glare Audit");
+                let _ = icons::icon_button(ui, AppIcon::Sun, "Compute N/E/S/W Facade OTTV & Glare Audit", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
             });
             ui.add_space(12.0);
 
@@ -685,7 +652,7 @@ impl SustainabilityView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Include Bolted Deconstruction Pathways");
                 let _ = ui.selectable_label(false, "EU Madaster / ISO 20887 Schema");
-                let _ = ui.button("♻️ Export Circular Material Passport (.JSON / QR)");
+                let _ = icons::icon_button(ui, AppIcon::Recycle, "Export Circular Material Passport (.JSON / QR)", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
             });
             ui.add_space(10.0);
 

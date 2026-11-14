@@ -7,6 +7,7 @@ use egui::{
     Stroke, Ui, Vec2,
 };
 use crate::features::{FeatureId, FeatureRegistry};
+use crate::icons::{self, AppIcon};
 use crate::models::StructuralMember;
 use crate::theme::MacTheme;
 use crate::ui_kit;
@@ -139,11 +140,15 @@ impl SafetyView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("🏗️ 8D Tower Crane Swing Radius & Hook Capacity Envelope")
-                                .size(17.0)
-                                .strong()
-                                .color(theme.text_primary),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Building,
+                            17.0,
+                            theme.accent_blue,
+                            "8D Tower Crane Swing Radius & Hook Capacity Envelope",
+                            17.0,
+                            theme.text_primary,
+                            true,
                         );
                         ui.label(
                             RichText::new("Real-time working radius sweep, pick load versus radius capacity curves, and collision avoidance over public zones.")
@@ -158,10 +163,10 @@ impl SafetyView {
                         } else {
                             theme.accent_green
                         };
-                        let status_text = if is_overloaded {
-                            format!("⚠️ CRANE OVERLOAD (DCR {:.2})", dcr)
+                        let (status_icon, status_text) = if is_overloaded {
+                            (AppIcon::AlertTriangle, format!("CRANE OVERLOAD (DCR {:.2})", dcr))
                         } else {
-                            format!("✓ LIFT CAPACITY SAFE (DCR {:.2})", dcr)
+                            (AppIcon::CheckCircle, format!("LIFT CAPACITY SAFE (DCR {:.2})", dcr))
                         };
 
                         Frame::new()
@@ -170,12 +175,9 @@ impl SafetyView {
                             .corner_radius(CornerRadius::same(6))
                             .inner_margin(Margin::symmetric(12, 6))
                             .show(ui, |ui| {
-                                ui.label(
-                                    RichText::new(status_text)
-                                        .size(11.0)
-                                        .strong()
-                                        .color(status_color),
-                                );
+                                ui.horizontal(|ui| {
+                                    icons::icon_label(ui, status_icon, 13.0, status_color, status_text, 11.0, status_color, true);
+                                });
                             });
                     });
                 });
@@ -193,7 +195,7 @@ impl SafetyView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Guard: Active BimProject Envelopes");
                     let _ = ui.selectable_label(false, "Site Property Boundary Buffer (3.0 m)");
-                    let _ = ui.button("🛡️ Sweep 360° 3D Boom vs Building Envelope");
+                    let _ = icons::icon_button(ui, AppIcon::Shield, "Sweep 360° 3D Boom vs Building Envelope", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
             },
         );
@@ -210,11 +212,15 @@ impl SafetyView {
                     .inner_margin(Margin::same(16))
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(
-                            RichText::new("⚙️ Crane Configuration & Pick Telemetry")
-                                .size(14.0)
-                                .strong()
-                                .color(theme.text_primary),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::SlidersPanel,
+                            14.5,
+                            theme.accent_blue,
+                            "Crane Configuration & Pick Telemetry",
+                            14.0,
+                            theme.text_primary,
+                            true,
                         );
                         ui.add_space(10.0);
 
@@ -294,11 +300,15 @@ impl SafetyView {
                     .inner_margin(Margin::same(16))
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(
-                            RichText::new("🎯 Site Sweep Radar & Exclusion Boundary")
-                                .size(14.0)
-                                .strong()
-                                .color(theme.text_primary),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Target,
+                            14.5,
+                            theme.accent_blue,
+                            "Site Sweep Radar & Exclusion Boundary",
+                            14.0,
+                            theme.text_primary,
+                            true,
                         );
                         ui.add_space(6.0);
 
@@ -372,11 +382,15 @@ impl SafetyView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(18))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("🛡️ Slab Edge Fall Protection & Leading Edge Risk Controls")
-                        .size(17.0)
-                        .strong()
-                        .color(theme.text_primary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::Shield,
+                    17.0,
+                    theme.accent_blue,
+                    "Slab Edge Fall Protection & Leading Edge Risk Controls",
+                    17.0,
+                    theme.text_primary,
+                    true,
                 );
                 ui.label(
                     RichText::new("OSHA 1926.502 / Permenaker No. 9/2016 compliance checks for perimeter slab edges, floor openings, and horizontal lifeline tie-offs.")
@@ -430,11 +444,15 @@ impl SafetyView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(18))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("🚑 Emergency Site Logistics & Evacuation Pathways")
-                        .size(17.0)
-                        .strong()
-                        .color(theme.text_primary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::AlertTriangle,
+                    17.0,
+                    theme.accent_red,
+                    "Emergency Site Logistics & Evacuation Pathways",
+                    17.0,
+                    theme.text_primary,
+                    true,
                 );
                 ui.label(
                     RichText::new("Rapid egress corridors, designated safe muster points, fire brigade staging, and on-site first responder facilities.")
@@ -447,13 +465,13 @@ impl SafetyView {
                 ui.add_space(16.0);
 
                 let facilities = [
-                    ("🚨 Emergency Assembly Zone", "East Boundary Plot (Clear radius 25m, capacity 200 workers)", "OPERATIONAL", theme.accent_green),
-                    ("🚒 Fire Hydrant & Staging", "North Gate Access Road (Water flow 1,500 L/min certified)", "CONNECTED", theme.accent_blue),
-                    ("🏥 First Aid Medical Clinic", "Ground Floor North Bay (2 Certified paramedics on site)", "STAFFED", theme.accent_green),
-                    ("🧯 Fire Extinguisher Points", "Every 20m along scaffold corridors (Type ABC Dry Chemical)", "INSPECTED", theme.accent_green),
+                    (AppIcon::AlertTriangle, "Emergency Assembly Zone", "East Boundary Plot (Clear radius 25m, capacity 200 workers)", "OPERATIONAL", theme.accent_green),
+                    (AppIcon::Flame, "Fire Hydrant & Staging", "North Gate Access Road (Water flow 1,500 L/min certified)", "CONNECTED", theme.accent_blue),
+                    (AppIcon::Shield, "First Aid Medical Clinic", "Ground Floor North Bay (2 Certified paramedics on site)", "STAFFED", theme.accent_green),
+                    (AppIcon::Bolt, "Fire Extinguisher Points", "Every 20m along scaffold corridors (Type ABC Dry Chemical)", "INSPECTED", theme.accent_green),
                 ];
 
-                for (name, desc, stat, col) in facilities {
+                for (icon, name, desc, stat, col) in facilities {
                     Frame::new()
                         .fill(theme.bg_canvas)
                         .corner_radius(CornerRadius::same(8))
@@ -462,7 +480,7 @@ impl SafetyView {
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
                                 ui.vertical(|ui| {
-                                    ui.label(RichText::new(name).size(13.0).strong().color(theme.text_primary));
+                                    icons::icon_label(ui, icon, 14.0, col, name, 13.0, theme.text_primary, true);
                                     ui.label(RichText::new(desc).size(11.0).color(theme.text_muted));
                                 });
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -488,11 +506,15 @@ impl SafetyView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(18))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("📋 8D Safety & Health Audit Compliance Matrix")
-                        .size(17.0)
-                        .strong()
-                        .color(theme.text_primary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::Clipboard,
+                    17.0,
+                    theme.accent_blue,
+                    "8D Safety & Health Audit Compliance Matrix",
+                    17.0,
+                    theme.text_primary,
+                    true,
                 );
                 ui.label(
                     RichText::new("Hazard Identification, Risk Assessment, and Determining Controls (HIRADC) summary.")
@@ -568,7 +590,17 @@ impl SafetyView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "ACI 347 Slab Maturity Redistribution");
                     let _ = ui.selectable_label(false, "300mm Post-Tensioned Transfer Slab");
-                    let _ = ui.button("🪜 Verify Shoring Strip Sequence & Buckling FS");
+                    let _ = icons::icon_button(
+                        ui,
+                        AppIcon::CheckCircle,
+                        "Verify Shoring Strip Sequence & Buckling FS",
+                        12.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    );
                 });
                 ui.add_space(10.0);
 
@@ -676,7 +708,17 @@ impl SafetyView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Enforce Gas Test for Confined Spaces");
                     let _ = ui.selectable_label(false, "Auto-Suspend Lift PTW @ Wind >= 55 km/h");
-                    let _ = ui.button("🪪 Issue Digital Permit-to-Work & Log Drill Time");
+                    let _ = icons::icon_button(
+                        ui,
+                        AppIcon::Shield,
+                        "Issue Digital Permit-to-Work & Log Drill Time",
+                        12.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    );
                 });
                 ui.add_space(10.0);
 
@@ -690,13 +732,15 @@ impl SafetyView {
                                 ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                             }
                             ui.end_row();
-                            for (id, cls, loc, sup, val, st, col) in [
-                                ("PTW-HW-09", "🔥 Hot-Work Welding", "Level 08 Truss Splice", "R. Pratama (HSE L3)", "Until 17:00", "RENEW SOON", theme.accent_orange),
-                                ("PTW-WH-14", "🧗 Work-at-Height", "Perimeter Facade West", "S. Wijaya (Rigging)", "Until 18:00", "ACTIVE", theme.accent_green),
-                                ("PTW-CS-03", "🕳️ Confined Space", "Sump Pit B2 (O₂ 20.9%)", "H. Kusuma (Gas Tech)", "Until 16:30", "ACTIVE", theme.accent_green),
+                            for (id, icon, cls, loc, sup, val, st, col) in [
+                                ("PTW-HW-09", AppIcon::Flame, "Hot-Work Welding", "Level 08 Truss Splice", "R. Pratama (HSE L3)", "Until 17:00", "RENEW SOON", theme.accent_orange),
+                                ("PTW-WH-14", AppIcon::HardHat, "Work-at-Height", "Perimeter Facade West", "S. Wijaya (Rigging)", "Until 18:00", "ACTIVE", theme.accent_green),
+                                ("PTW-CS-03", AppIcon::AlertTriangle, "Confined Space", "Sump Pit B2 (O₂ 20.9%)", "H. Kusuma (Gas Tech)", "Until 16:30", "ACTIVE", theme.accent_green),
                             ] {
                                 ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
-                                ui.label(RichText::new(cls).size(10.5).strong().color(theme.text_primary));
+                                ui.horizontal(|ui| {
+                                    icons::icon_label(ui, icon, 12.0, col, cls, 10.5, theme.text_primary, true);
+                                });
                                 ui.label(RichText::new(loc).size(10.5).color(theme.text_secondary));
                                 ui.label(RichText::new(sup).size(10.5).color(theme.text_secondary));
                                 ui.label(RichText::new(val).size(10.5).color(theme.text_muted));

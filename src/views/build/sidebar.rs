@@ -32,14 +32,23 @@ impl BuildView {
                         SidebarTab::Layers,
                     ];
                     for tab in tabs {
-                        let (icon, name) = tab.icon_and_name();
+                        let (_, name) = tab.icon_and_name();
                         let is_active = self.active_sidebar_tab == tab;
                         let bg = if is_active { theme.accent_blue } else { Color32::TRANSPARENT };
                         let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
 
-                        if ui.add(egui::Button::new(RichText::new(icon).size(15.0).color(fg))
-                            .fill(bg)
-                            .corner_radius(CornerRadius::same(6))).on_hover_text(name).clicked() {
+                        if icons::icon_only_button(
+                            ui,
+                            tab.app_icon(),
+                            fg,
+                            bg,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::splat(26.0),
+                            name,
+                        )
+                        .clicked()
+                        {
                             self.active_sidebar_tab = tab;
                         }
                     }
@@ -81,11 +90,30 @@ impl BuildView {
             let dcr = m_opt.map(|m| m.dcr_interaction).unwrap_or(0.45);
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new("🔍 ELEMENT INSPECTOR").size(11.0).strong().color(theme.accent_blue));
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Search,
+                    13.0,
+                    theme.accent_blue,
+                    "ELEMENT INSPECTOR",
+                    11.0,
+                    theme.accent_blue,
+                    true,
+                );
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new(RichText::new("✕ Close / Return to KPI").size(10.0).color(theme.text_secondary))
-                        .fill(theme.bg_card)
-                        .corner_radius(CornerRadius::same(4))).clicked() {
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Close,
+                        "Close / Return to KPI",
+                        10.0,
+                        theme.text_secondary,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(4),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
                         self.selected_member_id = None;
                     }
                 });
@@ -119,13 +147,27 @@ impl BuildView {
 
                 ui.add_space(8.0);
                 let is_elim = self.simulated_eliminated_ids.contains(&mid);
-                let btn_text = if is_elim { "🔄 Restore This Member" } else { "💥 Test Member Disruption (N-1)" };
+                let btn_icon = if is_elim {
+                    crate::icons::AppIcon::Redo
+                } else {
+                    crate::icons::AppIcon::Bolt
+                };
+                let btn_text = if is_elim { "Restore This Member" } else { "Test Member Disruption (N-1)" };
                 let btn_bg = if is_elim { theme.accent_green } else { theme.accent_red };
 
-                if ui.add(egui::Button::new(RichText::new(btn_text).size(11.0).strong().color(Color32::WHITE))
-                    .fill(btn_bg)
-                    .corner_radius(CornerRadius::same(6))
-                    .min_size(Vec2::new(ui.available_width(), 26.0))).clicked() {
+                if crate::icons::icon_button(
+                    ui,
+                    btn_icon,
+                    btn_text,
+                    11.0,
+                    Color32::WHITE,
+                    btn_bg,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::new(ui.available_width(), 26.0),
+                )
+                .clicked()
+                {
                     if is_elim {
                         self.simulated_eliminated_ids.retain(|&x| x != mid);
                     } else {
@@ -152,7 +194,7 @@ impl BuildView {
                     ("Selected Model", self.active_model.label().to_string()),
                     ("Redundancy Index (Global ARI)", "0.892 (Robust)".to_string()),
                     ("AI Surrogate Prediction (Memory)", format!("{:.3} ({} Cycles)", surrogate_ari, mem.total_ari_evaluations)),
-                    ("LOD 100 ➔ 300 Convergence", format!("+{:.1}% ARI ({:.1}x κ)", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)),
+                    ("LOD 100 -> 300 Convergence", format!("+{:.1}% ARI ({:.1}x κ)", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)),
                     ("Auto-Checkpoints (InternalVault)", format!("{}x Autosaved", mem.total_autosaves_count)),
                     ("Eliminated Members (Disrupted)", format!("N-{}", self.simulated_eliminated_ids.len())),
                 ];
@@ -171,10 +213,19 @@ impl BuildView {
                 ui.separator();
                 ui.add_space(6.0);
 
-                if ui.add(egui::Button::new(RichText::new("💥 Random N-1 Disruption Test (Auto-Checkpoint)").size(11.0).color(theme.text_primary))
-                    .fill(theme.bg_canvas)
-                    .corner_radius(CornerRadius::same(6))
-                    .min_size(Vec2::new(ui.available_width(), 26.0))).clicked() {
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Bolt,
+                    "Random N-1 Disruption Test (Auto-Checkpoint)",
+                    11.0,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::new(ui.available_width(), 26.0),
+                )
+                .clicked()
+                {
                     self.simulated_eliminated_ids = vec![4];
                     let _ = crate::core::InternalVault::record_live_checkpoint(
                         "Random N-1 Disruption Test on Primary Girder #4",
@@ -189,7 +240,16 @@ impl BuildView {
 
         // Model Selector in Sidebar
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("🏛️ SELECT 3D STRUCTURAL MODEL").size(11.0).strong().color(theme.text_secondary));
+            crate::icons::icon_label(
+                ui,
+                crate::icons::AppIcon::Cube3D,
+                13.0,
+                theme.text_secondary,
+                "SELECT 3D STRUCTURAL MODEL",
+                11.0,
+                theme.text_secondary,
+                true,
+            );
             ui.add_space(6.0);
 
             let models = [
@@ -317,35 +377,76 @@ impl BuildView {
             .corner_radius(CornerRadius::same(6))
             .inner_margin(Margin::same(10))
             .show(ui, |ui| {
-                ui.label(RichText::new("💡 3D Orbit Controls:\n• Left Click + Drag: Rotate / Orbit 360°\n• Right Click + Drag: Pan / Translate View\n• Mouse Wheel Scroll: Zoom In / Out").size(10.0).color(theme.text_muted));
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Info,
+                    12.0,
+                    theme.accent_blue,
+                    "3D Orbit Controls:",
+                    10.0,
+                    theme.text_secondary,
+                    true,
+                );
+                ui.label(RichText::new("• Left Click + Drag: Rotate / Orbit 360°\n• Right Click + Drag: Pan / Translate View\n• Mouse Wheel Scroll: Zoom In / Out").size(10.0).color(theme.text_muted));
             });
     }
 
     fn render_geometry_tab(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        ui.label(RichText::new("📐 3D SPATIAL GEOMETRY & WIZARD STUDIO").size(12.0).strong().color(theme.text_secondary));
+        crate::icons::icon_label(
+            ui,
+            crate::icons::AppIcon::Compass,
+            14.0,
+            theme.text_secondary,
+            "3D SPATIAL GEOMETRY & WIZARD STUDIO",
+            12.0,
+            theme.text_secondary,
+            true,
+        );
         ui.add_space(6.0);
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             // 1. Parametric Spatial Generator Wizard
             theme.card_frame().show(ui, |ui| {
-                ui.label(RichText::new("✨ PARAMETRIC GENERATOR WIZARD").size(11.5).strong().color(theme.accent_blue));
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Sparkles,
+                    13.5,
+                    theme.accent_blue,
+                    "PARAMETRIC GENERATOR WIZARD",
+                    11.5,
+                    theme.accent_blue,
+                    true,
+                );
                 ui.add_space(4.0);
 
                 ui.label(RichText::new("Select Spatial Archetype:").size(10.0).color(theme.text_muted));
                 let wizards = [
-                    (ModelArchetype::PrestressedGirderBridge3D, "🌉 Prestressed PT Bridge Girder"),
-                    (ModelArchetype::DoubleLayerSpaceTruss3D, "🕸️ Space Truss (MERO Octet)"),
-                    (ModelArchetype::GeodesicDome3D, "🌐 Geodesic Lattice Dome"),
-                    (ModelArchetype::HyparRuledShell3D, "🎪 Hypar Inverted Umbrella"),
-                    (ModelArchetype::MultiStoryTower3D, "🏢 Multi-Story Core Tower"),
+                    (ModelArchetype::PrestressedGirderBridge3D, crate::icons::AppIcon::Beam, "Prestressed PT Bridge Girder"),
+                    (ModelArchetype::DoubleLayerSpaceTruss3D, crate::icons::AppIcon::Wireframe, "Space Truss (MERO Octet)"),
+                    (ModelArchetype::GeodesicDome3D, crate::icons::AppIcon::Globe, "Geodesic Lattice Dome"),
+                    (ModelArchetype::HyparRuledShell3D, crate::icons::AppIcon::RulerSquare, "Hypar Inverted Umbrella"),
+                    (ModelArchetype::MultiStoryTower3D, crate::icons::AppIcon::Building, "Multi-Story Core Tower"),
                 ];
 
-                for (arch, label) in wizards {
+                for (arch, ico, label) in wizards {
                     let is_sel = self.active_model == arch;
-                    if ui.selectable_label(is_sel, label).clicked() {
+                    if crate::icons::icon_button(
+                        ui,
+                        ico,
+                        label,
+                        10.5,
+                        if is_sel { Color32::WHITE } else { theme.text_secondary },
+                        if is_sel { theme.accent_blue } else { theme.bg_card },
+                        Stroke::new(1.0, if is_sel { theme.accent_blue } else { theme.border_subtle }),
+                        CornerRadius::same(5),
+                        Vec2::new(ui.available_width(), 22.0),
+                    )
+                    .clicked()
+                    {
                         self.active_model = arch;
                         self.selected_member_id = None;
                     }
+                    ui.add_space(2.0);
                 }
 
                 ui.add_space(6.0);
@@ -413,10 +514,19 @@ impl BuildView {
                 }
 
                 ui.add_space(6.0);
-                if ui.add(egui::Button::new(RichText::new("⚡ Generate & Load in 3D Viewport").size(10.5).strong().color(Color32::WHITE))
-                    .fill(theme.accent_blue)
-                    .corner_radius(CornerRadius::same(5))
-                    .min_size(Vec2::new(ui.available_width(), 24.0))).clicked() {
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Bolt,
+                    "Generate & Load in 3D Viewport",
+                    10.5,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(5),
+                    Vec2::new(ui.available_width(), 24.0),
+                )
+                .clicked()
+                {
                     self.modify_status_msg = Some(format!("Generated spatial model: {}", self.active_model.label()));
                 }
             });
@@ -425,7 +535,16 @@ impl BuildView {
 
             // 2. Green's Theorem Arbitrary Cross-Section Studio
             theme.card_frame().show(ui, |ui| {
-                ui.label(RichText::new("📐 GREEN'S THEOREM SECTION INTEGRATOR").size(11.5).strong().color(theme.accent_green));
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::RulerSquare,
+                    13.5,
+                    theme.accent_green,
+                    "GREEN'S THEOREM SECTION INTEGRATOR",
+                    11.5,
+                    theme.accent_green,
+                    true,
+                );
                 ui.add_space(4.0);
                 ui.label(RichText::new("Exact Line Integral of Arbitrary 2D Closed Polygons:").size(10.0).color(theme.text_muted));
 
@@ -517,11 +636,31 @@ impl BuildView {
 
             // 3. Topology Cleanup & 3D Mesh Exporters
             theme.card_frame().show(ui, |ui| {
-                ui.label(RichText::new("🛠️ TOPOLOGY TOOLS & 3D EXPORT").size(11.5).strong().color(theme.text_secondary));
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Wrench,
+                    13.5,
+                    theme.text_secondary,
+                    "TOPOLOGY TOOLS & 3D EXPORT",
+                    11.5,
+                    theme.text_secondary,
+                    true,
+                );
                 ui.add_space(4.0);
 
-                if ui.add(egui::Button::new(RichText::new("🧹 Consolidate Nodes (tol: 0.05m)").size(10.5).color(theme.text_primary))
-                    .fill(theme.bg_card).corner_radius(CornerRadius::same(5)).min_size(Vec2::new(ui.available_width(), 24.0))).clicked() {
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Eraser,
+                    "Consolidate Nodes (tol: 0.05m)",
+                    10.5,
+                    theme.text_primary,
+                    theme.bg_card,
+                    Stroke::NONE,
+                    CornerRadius::same(5),
+                    Vec2::new(ui.available_width(), 24.0),
+                )
+                .clicked()
+                {
                     let mut fem = self.bim_bus.project.to_structural_model();
                     let merged = crate::core::MeshTopologyEngine::consolidate_nodes(&mut fem, 0.05);
                     self.modify_status_msg = Some(format!("Consolidated nodes: {} duplicate vertices merged", merged));
@@ -529,17 +668,39 @@ impl BuildView {
 
                 ui.add_space(6.0);
 
-                ui.horizontal(|ui| {
-                    if ui.add(egui::Button::new(RichText::new("🧊 Wavefront (.obj)").size(10.5).color(theme.accent_blue))
-                        .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+                ui.horizontal_wrapped(|ui| {
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Cube3D,
+                        "Wavefront (.obj)",
+                        10.5,
+                        theme.accent_blue,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(5),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
                         let fem = self.bim_bus.project.to_structural_model();
                         let obj = crate::core::MeshTopologyEngine::export_to_obj(&fem);
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Spatial_Model.obj", &obj) {
                             self.modify_status_msg = Some(format!("Saved 3D OBJ to: {}", path));
                         }
                     }
-                    if ui.add(egui::Button::new(RichText::new("📏 AutoCAD 3D (.dxf)").size(10.5).color(theme.accent_green))
-                        .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::UploadImport,
+                        "AutoCAD 3D (.dxf)",
+                        10.5,
+                        theme.accent_green,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(5),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
                         let fem = self.bim_bus.project.to_structural_model();
                         let dxf = crate::core::MeshTopologyEngine::export_to_dxf_3d(&fem);
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Spatial_Model.dxf", &dxf) {
@@ -563,8 +724,8 @@ impl BuildView {
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             // 1. Views Hierarchy (Floor plans, 3D views, Elevations, Sections, Schedules, Sheets)
-            ui.collapsing("📁 Views (All Architectural & Structural)", |ui| {
-                ui.collapsing("📐 Floor Plans", |ui| {
+            ui.collapsing("Views (All Architectural & Structural)", |ui| {
+                ui.collapsing("Floor Plans", |ui| {
                     let plans = [
                         ("Level 0 (GF 0.00m)", 4.0),
                         ("Level 1 (+4.00m)", 8.0),
@@ -583,7 +744,7 @@ impl BuildView {
                     }
                 });
 
-                ui.collapsing("🎥 3D Views", |ui| {
+                ui.collapsing("3D Views", |ui| {
                     if ui.selectable_label(self.render_mode == Render3DMode::CsgSolidBrep, "Default {3D} CSG Perspective").clicked() {
                         self.render_mode = Render3DMode::CsgSolidBrep;
                         self.cam_yaw = 0.65;
@@ -597,7 +758,7 @@ impl BuildView {
                     }
                 });
 
-                ui.collapsing("🧭 Elevations", |ui| {
+                ui.collapsing("Elevations", |ui| {
                     if ui.button("North Elevation (0°)").clicked() {
                         self.cam_yaw = 0.0;
                         self.cam_pitch = 0.0;
@@ -616,7 +777,7 @@ impl BuildView {
                     }
                 });
 
-                ui.collapsing("📑 Schedules & Quantities", |ui| {
+                ui.collapsing("Schedules & Quantities", |ui| {
                     if ui.button("Structural Framing QTO").clicked() {
                         self.bottom_deck_expanded = true;
                         self.active_bottom_deck_tab = BottomDeckTab::ScheduleQto;
@@ -631,7 +792,7 @@ impl BuildView {
                     }
                 });
 
-                ui.collapsing("📄 Drawing Sheets", |ui| {
+                ui.collapsing("Drawing Sheets", |ui| {
                     ui.label(RichText::new("• A101 Architectural GA Plan").size(10.0).color(theme.text_secondary));
                     ui.label(RichText::new("• S101 Structural Framing GA").size(10.0).color(theme.text_secondary));
                     ui.label(RichText::new("• S201 Foundation & Rebar Details").size(10.0).color(theme.text_secondary));
@@ -642,12 +803,30 @@ impl BuildView {
             ui.add_space(4.0);
 
             // 2. Spatial Breakdown Structure (SBS / buildingSMART IFC4 Tree)
-            ui.collapsing("🌐 Spatial Breakdown Structure (IFC Tree)", |ui| {
+            ui.collapsing("Spatial Breakdown Structure (IFC Tree)", |ui| {
                 ui.label(RichText::new("IfcProject: EigenGraph Master BIM").size(10.5).strong().color(theme.accent_blue));
                 ui.indent("site_indent", |ui| {
-                    ui.label(RichText::new("📍 IfcSite: Georeferenced UTM 48S").size(10.0).color(theme.text_secondary));
+                    crate::icons::icon_label(
+                        ui,
+                        crate::icons::AppIcon::MapPin,
+                        12.0,
+                        theme.accent_blue,
+                        "IfcSite: Georeferenced UTM 48S",
+                        10.0,
+                        theme.text_secondary,
+                        false,
+                    );
                     ui.indent("bldg_indent", |ui| {
-                        ui.label(RichText::new("🏢 IfcBuilding: Commercial Tower A").size(10.0).strong().color(theme.text_primary));
+                        crate::icons::icon_label(
+                            ui,
+                            crate::icons::AppIcon::Building,
+                            12.0,
+                            theme.text_primary,
+                            "IfcBuilding: Commercial Tower A",
+                            10.0,
+                            theme.text_primary,
+                            true,
+                        );
                         ui.indent("storey_indent", |ui| {
                             let storeys = [
                                 ("Level 0 (GF 0.00m)", 34, 0),
@@ -657,11 +836,36 @@ impl BuildView {
                             ];
                             for (st, cnt, idx) in storeys {
                                 ui.horizontal(|ui| {
-                                    let eye = if self.active_workset_visibility[idx] { "👁️" } else { "🚫" };
-                                    if ui.small_button(eye).clicked() {
-                                        self.active_workset_visibility[idx] = !self.active_workset_visibility[idx];
+                                    let vis = self.active_workset_visibility[idx];
+                                    let ico = if vis {
+                                        crate::icons::AppIcon::Target
+                                    } else {
+                                        crate::icons::AppIcon::Close
+                                    };
+                                    if crate::icons::icon_only_button(
+                                        ui,
+                                        ico,
+                                        if vis { theme.accent_blue } else { theme.text_muted },
+                                        theme.bg_card,
+                                        Stroke::NONE,
+                                        CornerRadius::same(4),
+                                        Vec2::splat(20.0),
+                                        if vis { "Hide storey workset" } else { "Show storey workset" },
+                                    )
+                                    .clicked()
+                                    {
+                                        self.active_workset_visibility[idx] = !vis;
                                     }
-                                    ui.label(RichText::new(format!("🏬 {} [{} elements]", st, cnt)).size(9.5).color(theme.text_secondary));
+                                    crate::icons::icon_label(
+                                        ui,
+                                        crate::icons::AppIcon::Layers,
+                                        11.0,
+                                        theme.text_secondary,
+                                        format!("{} [{} elements]", st, cnt),
+                                        9.5,
+                                        theme.text_secondary,
+                                        false,
+                                    );
                                 });
                             }
                         });
@@ -671,7 +875,7 @@ impl BuildView {
 
             ui.add_space(4.0);
 
-            ui.collapsing("🏗️ BIMCraft Relational Hierarchy (LOD 350)", |ui| {
+            ui.collapsing("BIMCraft Relational Hierarchy (LOD 350)", |ui| {
                 ui.label(RichText::new(format!("• Levels: {} | Grids: {}", self.bim_bus.project.levels.len(), self.bim_bus.project.grids.len())).size(10.5).color(theme.accent_blue));
                 ui.label(RichText::new(format!("• CSG Walls: {} | 3D Runs: {}", self.bim_bus.project.walls.len(), self.bim_bus.project.runs.len())).size(10.5).color(theme.text_primary));
                 ui.label(RichText::new(format!("• Columns: {} | Slabs: {} | Rooms: {}", self.bim_bus.project.columns.len(), self.bim_bus.project.slabs.len(), self.bim_bus.project.rooms.len())).size(10.5).color(theme.text_secondary));
@@ -680,7 +884,7 @@ impl BuildView {
 
             ui.add_space(4.0);
 
-            ui.collapsing("📦 Imported Parametric Components (Database)", |ui| {
+            ui.collapsing("Imported Parametric Components (Database)", |ui| {
                 for comp in db_components {
                     theme.card_frame().show(ui, |ui| {
                         ui.horizontal(|ui| {
@@ -694,7 +898,7 @@ impl BuildView {
 
             ui.add_space(4.0);
 
-            ui.collapsing("📐 Structural Frame Elements (Active)", |ui| {
+            ui.collapsing("Structural Frame Elements (Active)", |ui| {
                 for m in members {
                     let is_sel = self.selected_member_id == Some(m.id);
                     let text = format!("{}: {} (ARI: {:.2})", m.name, m.section, m.ari);
@@ -705,13 +909,13 @@ impl BuildView {
                 }
             });
 
-            ui.collapsing("📍 Boundary Restraints (Supports)", |ui| {
+            ui.collapsing("Boundary Restraints (Supports)", |ui| {
                 ui.label(RichText::new("• Node 0: Pinned (ux=0, uy=0, uz=0)").size(11.0).color(theme.text_secondary));
                 ui.label(RichText::new("• Node 6: Roller (uy=0, uz=0)").size(11.0).color(theme.text_secondary));
                 ui.label(RichText::new("• Base Perimeter: Fixed Anchor Bolts").size(11.0).color(theme.text_secondary));
             });
 
-            ui.collapsing("⚡ Load Combinations (ASCE 7-22)", |ui| {
+            ui.collapsing("Load Combinations (ASCE 7-22)", |ui| {
                 ui.label(RichText::new("• Combo 1: 1.2D + 1.6L").size(11.0).color(theme.accent_orange));
                 ui.label(RichText::new("• Combo 2: 1.2D + 1.0E + 0.5L (Seismic)").size(11.0).color(theme.text_secondary));
                 ui.label(RichText::new("• Alternate Path: (0.9 or 1.2)D + 0.5L").size(11.0).color(theme.text_secondary));
@@ -723,8 +927,19 @@ impl BuildView {
         ui.label(RichText::new("CAD / BIM MODIFY & REINFORCE TOOLS").size(12.0).strong().color(theme.text_secondary));
         ui.add_space(6.0);
 
-        if ui.add(egui::Button::new(RichText::new("↔️ Move / Translate Wall (+500mm X)").size(11.0).color(theme.text_primary))
-            .fill(theme.bg_card).corner_radius(CornerRadius::same(6)).min_size(Vec2::new(ui.available_width(), 26.0))).clicked() {
+        if crate::icons::icon_button(
+            ui,
+            crate::icons::AppIcon::CursorPan,
+            "Move / Translate Wall (+500mm X)",
+            11.0,
+            theme.text_primary,
+            theme.bg_card,
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(ui.available_width(), 26.0),
+        )
+        .clicked()
+        {
             if let Some(w) = self.bim_bus.project.walls.last() {
                 let wid = w.id;
                 let res = self.bim_bus.execute(crate::core::BimCommand::MoveElement {
@@ -736,8 +951,19 @@ impl BuildView {
         }
         ui.add_space(4.0);
 
-        if ui.add(egui::Button::new(RichText::new("🔄 Rotate 3D Column (15° Increment)").size(11.0).color(theme.text_primary))
-            .fill(theme.bg_card).corner_radius(CornerRadius::same(6)).min_size(Vec2::new(ui.available_width(), 26.0))).clicked() {
+        if crate::icons::icon_button(
+            ui,
+            crate::icons::AppIcon::Redo,
+            "Rotate 3D Column (15° Increment)",
+            11.0,
+            theme.text_primary,
+            theme.bg_card,
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(ui.available_width(), 26.0),
+        )
+        .clicked()
+        {
             if let Some(c) = self.bim_bus.project.columns.first() {
                 let cid = c.id;
                 let res = self.bim_bus.execute(crate::core::BimCommand::RotateElement {
@@ -749,8 +975,19 @@ impl BuildView {
         }
         ui.add_space(4.0);
 
-        if ui.add(egui::Button::new(RichText::new("✂️ Subdivide / Split Interior Wall (SL)").size(11.0).color(theme.text_primary))
-            .fill(theme.bg_card).corner_radius(CornerRadius::same(6)).min_size(Vec2::new(ui.available_width(), 26.0))).clicked() {
+        if crate::icons::icon_button(
+            ui,
+            crate::icons::AppIcon::Wrench,
+            "Subdivide / Split Interior Wall (SL)",
+            11.0,
+            theme.text_primary,
+            theme.bg_card,
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(ui.available_width(), 26.0),
+        )
+        .clicked()
+        {
             if let Some(w) = self.bim_bus.project.walls.last() {
                 let wid = w.id;
                 let mid = (w.start + w.end) * 0.5;
@@ -763,8 +1000,19 @@ impl BuildView {
         }
         ui.add_space(4.0);
 
-        if ui.add(egui::Button::new(RichText::new("🪞 Mirror Elements Across Grid 2 (MM)").size(11.0).color(theme.text_primary))
-            .fill(theme.bg_card).corner_radius(CornerRadius::same(6)).min_size(Vec2::new(ui.available_width(), 26.0))).clicked() {
+        if crate::icons::icon_button(
+            ui,
+            crate::icons::AppIcon::Compass,
+            "Mirror Elements Across Grid 2 (MM)",
+            11.0,
+            theme.text_primary,
+            theme.bg_card,
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(ui.available_width(), 26.0),
+        )
+        .clicked()
+        {
             let res = self.bim_bus.execute(crate::core::BimCommand::MirrorElements {
                 axis_a: crate::core::P2(6000.0, 0.0),
                 axis_b: crate::core::P2(6000.0, 9000.0),
@@ -773,8 +1021,19 @@ impl BuildView {
         }
         ui.add_space(4.0);
 
-        if ui.add(egui::Button::new(RichText::new("🔲 Offset / Array WF Purline (+1500mm)").size(11.0).color(theme.text_primary))
-            .fill(theme.bg_card).corner_radius(CornerRadius::same(6)).min_size(Vec2::new(ui.available_width(), 26.0))).clicked() {
+        if crate::icons::icon_button(
+            ui,
+            crate::icons::AppIcon::Layers,
+            "Offset / Array WF Purline (+1500mm)",
+            11.0,
+            theme.text_primary,
+            theme.bg_card,
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(ui.available_width(), 26.0),
+        )
+        .clicked()
+        {
             let res = self.bim_bus.execute(crate::core::BimCommand::AddBeamRun {
                 level_id: 2,
                 category: crate::core::RunCategory::StructuralBeam,
@@ -789,8 +1048,19 @@ impl BuildView {
         }
         ui.add_space(4.0);
 
-        if ui.add(egui::Button::new(RichText::new("🔩 Reinforce Concrete (RF) [SNI 2847]").size(11.0).strong().color(Color32::WHITE))
-            .fill(theme.accent_blue).corner_radius(CornerRadius::same(6)).min_size(Vec2::new(ui.available_width(), 28.0))).clicked() {
+        if crate::icons::icon_button(
+            ui,
+            crate::icons::AppIcon::Rebar,
+            "Reinforce Concrete (RF) [SNI 2847]",
+            11.0,
+            Color32::WHITE,
+            theme.accent_blue,
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(ui.available_width(), 28.0),
+        )
+        .clicked()
+        {
             let res = self.bim_bus.execute(crate::core::BimCommand::ReinforceAllConcrete {
                 preset: crate::core::RebarPreset::default(),
             });
@@ -799,12 +1069,34 @@ impl BuildView {
 
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            if ui.add(egui::Button::new(RichText::new(format!("↩ Undo ({})", self.bim_bus.undo_stack.len())).size(10.5).color(theme.text_primary))
-                .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+            if crate::icons::icon_button(
+                ui,
+                crate::icons::AppIcon::Undo,
+                format!("Undo ({})", self.bim_bus.undo_stack.len()),
+                10.5,
+                theme.text_primary,
+                theme.bg_card,
+                Stroke::NONE,
+                CornerRadius::same(5),
+                Vec2::ZERO,
+            )
+            .clicked()
+            {
                 self.modify_status_msg = self.bim_bus.undo();
             }
-            if ui.add(egui::Button::new(RichText::new(format!("↪ Redo ({})", self.bim_bus.redo_stack.len())).size(10.5).color(theme.text_primary))
-                .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).clicked() {
+            if crate::icons::icon_button(
+                ui,
+                crate::icons::AppIcon::Redo,
+                format!("Redo ({})", self.bim_bus.redo_stack.len()),
+                10.5,
+                theme.text_primary,
+                theme.bg_card,
+                Stroke::NONE,
+                CornerRadius::same(5),
+                Vec2::ZERO,
+            )
+            .clicked()
+            {
                 self.modify_status_msg = self.bim_bus.redo();
             }
         });
@@ -812,7 +1104,16 @@ impl BuildView {
         if let Some(msg) = &self.modify_status_msg {
             ui.add_space(6.0);
             theme.card_frame().show(ui, |ui| {
-                ui.label(RichText::new(format!("✅ {}", msg)).size(10.0).color(theme.accent_green));
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::CheckCircle,
+                    12.0,
+                    theme.accent_green,
+                    msg,
+                    10.0,
+                    theme.accent_green,
+                    false,
+                );
             });
         }
     }
@@ -823,17 +1124,30 @@ impl BuildView {
 
         ui.label(RichText::new("3D Color Heatmap by:").size(11.0).strong().color(theme.text_primary));
         let modes = [
-            ("ARI", "🎨 Heatmap Adjusted Redundancy (ARI)"),
-            ("Tension_Compression", "🔵🔴 Axial Force (Blue=Compression, Red=Tension)"),
-            ("Criticality", "🚨 Top Fracture Critical Members"),
-            ("DCR_Stress", "🔥 Yield Capacity Ratio Heatmap (DCR)"),
-            ("Material", "🧱 Material & Section Profiles"),
+            ("ARI", crate::icons::AppIcon::Palette, "Heatmap Adjusted Redundancy (ARI)"),
+            ("Tension_Compression", crate::icons::AppIcon::Pulse, "Axial Force (Blue=Compression, Red=Tension)"),
+            ("Criticality", crate::icons::AppIcon::AlertTriangle, "Top Fracture Critical Members"),
+            ("DCR_Stress", crate::icons::AppIcon::Flame, "Yield Capacity Ratio Heatmap (DCR)"),
+            ("Material", crate::icons::AppIcon::Layers, "Material & Section Profiles"),
         ];
-        for (m, label) in modes {
+        for (m, ico, label) in modes {
             let is_sel = self.color_mode == m;
-            if ui.selectable_label(is_sel, label).clicked() {
+            if crate::icons::icon_button(
+                ui,
+                ico,
+                label,
+                10.5,
+                if is_sel { Color32::WHITE } else { theme.text_secondary },
+                if is_sel { theme.accent_blue } else { theme.bg_card },
+                Stroke::new(1.0, if is_sel { theme.accent_blue } else { theme.border_subtle }),
+                CornerRadius::same(5),
+                Vec2::new(ui.available_width(), 22.0),
+            )
+            .clicked()
+            {
                 self.color_mode = m.to_string();
             }
+            ui.add_space(2.0);
         }
 
         ui.add_space(8.0);
@@ -846,8 +1160,8 @@ impl BuildView {
         ui.checkbox(&mut self.show_grid, "3D Ground Grid Plane");
         ui.checkbox(&mut self.show_axes, "Global Coordinate Axes (XYZ Triad)");
         ui.checkbox(&mut self.show_node_labels, "Node IDs & Boundary Restraints");
-        ui.checkbox(&mut self.show_rebar_cage, "🔩 3D Rebar Cage Overlay (Longitudinal + Stirrups)");
-        ui.checkbox(&mut self.section_box_enabled, "🔪 3D Section Box Z-Plane Cut");
+        ui.checkbox(&mut self.show_rebar_cage, "3D Rebar Cage Overlay (Longitudinal + Stirrups)");
+        ui.checkbox(&mut self.section_box_enabled, "3D Section Box Z-Plane Cut");
         if self.section_box_enabled {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Cut Z:").size(10.5).color(theme.text_secondary));
@@ -860,30 +1174,49 @@ impl BuildView {
                 ui.label(RichText::new("Scale:").size(11.0).color(theme.text_secondary));
                 ui.add(egui::Slider::new(&mut self.deformation_scale, 1.0..=200.0).text("x"));
             });
-            ui.checkbox(&mut self.animate_vibration, "🌀 Mode 1 Vibration Animation");
+            ui.checkbox(&mut self.animate_vibration, "Mode 1 Vibration Animation");
         }
 
         ui.add_space(10.0);
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::FederatedLayersAxisSlicer, |ui| {
             ui.label(RichText::new("Federated Discipline Isolation").size(10.5).strong().color(theme.accent_blue));
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "🏛️ ARC (Walls/Glazing)");
-                let _ = ui.selectable_label(true, "🏗️ STR (Frame/Core)");
-                let _ = ui.selectable_label(true, "⚡ MEP (Risers/Ducts)");
-                let _ = ui.selectable_label(false, "🕳️ GEO (Soil/Piles)");
+                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Building, "ARC (Walls/Glazing)", 10.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO);
+                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Cube3D, "STR (Frame/Core)", 10.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO);
+                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Bolt, "MEP (Risers/Ducts)", 10.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO);
+                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Layers, "GEO (Soil/Piles)", 10.0, theme.text_secondary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(5), Vec2::ZERO);
             });
             ui.add_space(6.0);
             let mut x_slice = 24.0_f32;
             let mut y_slice = 18.0_f32;
             ui.add(egui::Slider::new(&mut x_slice, 0.0..=30.0).text("Clip X (m)"));
             ui.add(egui::Slider::new(&mut y_slice, 0.0..=24.0).text("Clip Y (m)"));
-            let _ = ui.button("🔪 Apply Multi-Axis Section Box Crop");
+            let _ = crate::icons::icon_button(
+                ui,
+                crate::icons::AppIcon::SectionCut,
+                "Apply Multi-Axis Section Box Crop",
+                10.5,
+                theme.text_primary,
+                theme.bg_card,
+                Stroke::new(1.0, theme.border_subtle),
+                CornerRadius::same(5),
+                Vec2::ZERO,
+            );
         });
     }
 
 
     fn render_audit_tab(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        ui.label(RichText::new("🛡️ SOLIBRI-STYLE MODEL QUALITY & CODE AUDIT").size(11.5).strong().color(theme.text_secondary));
+        crate::icons::icon_label(
+            ui,
+            crate::icons::AppIcon::Shield,
+            13.5,
+            theme.text_secondary,
+            "SOLIBRI-STYLE MODEL QUALITY & CODE AUDIT",
+            11.5,
+            theme.text_secondary,
+            true,
+        );
         ui.add_space(4.0);
 
         // Large Health Scorecard
@@ -906,29 +1239,40 @@ impl BuildView {
         // Automated Rule Checks
         egui::ScrollArea::vertical().id_salt("model_audit_scroll").show(ui, |ui| {
             let rules = [
-                ("✅ Room Enclosure Integrity", "100% closed boundary polygons (zero leaks)", theme.accent_green),
-                ("✅ Column Load Path Continuity", "All columns coaxial across stories to foundation", theme.accent_green),
-                ("✅ Minimum Headroom Clearance", "Clear height >= 2.40m along primary egress paths", theme.accent_green),
-                ("✅ 2-Hour Fire Wall Continuity", "Fire rated partition envelope continuous without unrated openings", theme.accent_green),
-                ("⚠️ Uncapped MEP Open Connectors", "2 open duct terminals require end-cap accessories", theme.accent_orange),
-                ("✅ Structural Compression Slenderness", "Effective slenderness λ < 120 (AISC 360-16 compliant)", theme.accent_green),
-                ("✅ IFC Property Set Completeness", "100% structural elements have valid Pset attributes", theme.accent_green),
-                ("✅ Duplicate Geometry Check", "Zero coincident overlapping duplicate elements found", theme.accent_green),
+                (crate::icons::AppIcon::CheckCircle, "Room Enclosure Integrity", "100% closed boundary polygons (zero leaks)", theme.accent_green),
+                (crate::icons::AppIcon::CheckCircle, "Column Load Path Continuity", "All columns coaxial across stories to foundation", theme.accent_green),
+                (crate::icons::AppIcon::CheckCircle, "Minimum Headroom Clearance", "Clear height >= 2.40m along primary egress paths", theme.accent_green),
+                (crate::icons::AppIcon::CheckCircle, "2-Hour Fire Wall Continuity", "Fire rated partition envelope continuous without unrated openings", theme.accent_green),
+                (crate::icons::AppIcon::AlertTriangle, "Uncapped MEP Open Connectors", "2 open duct terminals require end-cap accessories", theme.accent_orange),
+                (crate::icons::AppIcon::CheckCircle, "Structural Compression Slenderness", "Effective slenderness λ < 120 (AISC 360-16 compliant)", theme.accent_green),
+                (crate::icons::AppIcon::CheckCircle, "IFC Property Set Completeness", "100% structural elements have valid Pset attributes", theme.accent_green),
+                (crate::icons::AppIcon::CheckCircle, "Duplicate Geometry Check", "Zero coincident overlapping duplicate elements found", theme.accent_green),
             ];
 
-            for (title, desc, col) in rules {
+            for (ico, title, desc, col) in rules {
                 theme.card_frame().show(ui, |ui| {
-                    ui.label(RichText::new(title).size(11.0).strong().color(col));
+                    crate::icons::icon_label(ui, ico, 13.0, col, title, 11.0, col, true);
                     ui.label(RichText::new(desc).size(10.0).color(theme.text_secondary));
                 });
                 ui.add_space(3.0);
             }
 
             ui.add_space(6.0);
-            if ui.add(egui::Button::new(RichText::new("🛡️ Re-Run All Validation Rules (Solibri Engine)").size(11.0).color(theme.text_primary))
-                .fill(theme.bg_card).corner_radius(CornerRadius::same(6)).min_size(Vec2::new(ui.available_width(), 26.0))).clicked() {
+            if crate::icons::icon_button(
+                ui,
+                crate::icons::AppIcon::Shield,
+                "Re-Run All Validation Rules (Solibri Engine)",
+                11.0,
+                theme.text_primary,
+                theme.bg_card,
+                Stroke::NONE,
+                CornerRadius::same(6),
+                Vec2::new(ui.available_width(), 26.0),
+            )
+            .clicked()
+            {
                 self.modify_status_msg = Some("Model Quality Audit complete: 8/8 rule categories evaluated (98.4% Pass)".to_string());
-                self.bim_console_logs.push("🛡️ [Solibri Engine] Automated model quality audit: 184 checks passed, 2 minor warnings, 0 fatal errors.".to_string());
+                self.bim_console_logs.push("[Solibri Engine] Automated model quality audit: 184 checks passed, 2 minor warnings, 0 fatal errors.".to_string());
             }
         });
     }

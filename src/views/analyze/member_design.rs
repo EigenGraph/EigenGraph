@@ -74,7 +74,7 @@ impl AnalyzeView {
                         theme,
                         "BIAXIAL AUDIT (DCR)",
                         &format!("{:.3} (Biax)", biaxial_rep.biaxial_dcr),
-                        if is_safe { "🟢 SAFE (Biaxial Adequate)" } else { "🔴 OVERSTRESSED (Exceeds Envelope)" },
+                        if is_safe { "SAFE (Biaxial Adequate)" } else { "OVERSTRESSED (Exceeds Envelope)" },
                         if is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) },
                     );
             }
@@ -85,7 +85,7 @@ impl AnalyzeView {
         // 3. Section Preset Buttons & Parameter Controls
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("🏛️ Standard Section Presets (SNI 2847 / ACI 318):").size(12.5).strong().color(theme.text_primary));
+                icons::icon_label(ui, AppIcon::Building, 14.0, theme.accent_blue, "Standard Section Presets (SNI 2847 / ACI 318):", 12.5, theme.text_primary, true);
                 ui.add_space(8.0);
 
                 if ui.button(RichText::new("Building Column 400x400 (8 D22, fc' 30)").size(11.0)).clicked() {
@@ -133,7 +133,7 @@ impl AnalyzeView {
             // Parameter Sliders
             ui_kit::responsive_grid_n(ui, 3, 240.0, |ui, col_idx| match col_idx {
                 0 => {
-                    ui.label(RichText::new("📐 Dimensions & Concrete Cover:").size(11.5).strong().color(theme.text_secondary));
+                    icons::icon_label(ui, AppIcon::RulerSquare, 13.0, theme.text_secondary, "Dimensions & Concrete Cover:", 11.5, theme.text_secondary, true);
                                 ui.horizontal(|ui| {
                                     ui.label(RichText::new("Width b:").size(11.0));
                                     ui.add(egui::Slider::new(&mut self.concrete_col_width_mm, 200.0..=1200.0).suffix(" mm").step_by(50.0));
@@ -148,7 +148,7 @@ impl AnalyzeView {
                                 });
                 }
                 1 => {
-                    ui.label(RichText::new("🔩 Material Grades (SNI / ACI):").size(11.5).strong().color(theme.text_secondary));
+                    icons::icon_label(ui, AppIcon::Wrench, 13.0, theme.text_secondary, "Material Grades (SNI / ACI):", 11.5, theme.text_secondary, true);
                                 ui.horizontal(|ui| {
                                     ui.label(RichText::new("Concrete Grade f'c:").size(11.0));
                                     egui::ComboBox::from_id_salt("fc_select")
@@ -182,7 +182,7 @@ impl AnalyzeView {
                                 });
                 }
                 _ => {
-                    ui.label(RichText::new("⚡ Factored Design Demand:").size(11.5).strong().color(theme.text_secondary));
+                    icons::icon_label(ui, AppIcon::Bolt, 13.0, theme.text_secondary, "Factored Design Demand:", 11.5, theme.text_secondary, true);
                                 ui.horizontal(|ui| {
                                     ui.label(RichText::new("Axial Load Pu:").size(11.0));
                                     ui.add(egui::Slider::new(&mut self.concrete_demand_pu_kn, -500.0..=5000.0).suffix(" kN").step_by(50.0));
@@ -196,8 +196,10 @@ impl AnalyzeView {
                                     ui.add(egui::Slider::new(&mut self.concrete_demand_muy_knm, 0.0..=800.0).suffix(" kNm").step_by(10.0));
                                 });
                                 ui.horizontal(|ui| {
-                                    let status_label = if is_safe { "🟢 SAFE" } else { "🔴 UNSAFE" };
+                                    let status_label = if is_safe { "SAFE" } else { "UNSAFE" };
+                                    let status_icon = if is_safe { AppIcon::CheckCircle } else { AppIcon::AlertTriangle };
                                     let status_col = if is_safe { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
+                                    icons::draw_icon(ui, status_icon, 13.0, status_col);
                                     ui.label(RichText::new(format!("Biax DCR: {:.3} (α={:.2}) • {}", biaxial_rep.biaxial_dcr, biaxial_rep.alpha_exponent, status_label)).size(11.0).strong().color(status_col));
                                 });
                 }
@@ -209,7 +211,7 @@ impl AnalyzeView {
         // 4. Interactive Dual Canvas: P-M Diagram (Left) + Rebar Section View (Right)
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📊 P-M Interaction Diagram & Column Section Visualizer").size(13.5).strong().color(theme.text_primary));
+                icons::icon_label(ui, AppIcon::ChartBar, 15.0, theme.accent_blue, "P-M Interaction Diagram & Column Section Visualizer", 13.5, theme.text_primary, true);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new(format!("Standard: SNI 2847:2019 / ACI 318-19 • β₁ = {:.3}", pm_report.beta1)).size(11.0).color(theme.accent_blue));
                 });
@@ -431,7 +433,7 @@ impl AnalyzeView {
 
         // 5. Technical Cardinal Values Verification Table per SNI 2847:2019
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("📋 Column Capacity Cardinal Points Verification Table (SNI 2847 / ACI 318):").size(12.5).strong().color(theme.text_primary));
+            icons::icon_label(ui, AppIcon::Clipboard, 14.0, theme.accent_blue, "Column Capacity Cardinal Points Verification Table (SNI 2847 / ACI 318):", 12.5, theme.text_primary, true);
             ui.add_space(8.0);
 
             let cardinals: [(&str, String, String, String, String); 5] = [
@@ -478,7 +480,7 @@ impl AnalyzeView {
         // 6. 3D Biaxial P-Mx-My Interaction Surface & PCA Load Contour (SNI 2847:2019 / Bresler)
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📐 3D Biaxial P-Mx-My Interaction Surface & PCA Load Contour Envelope (SNI 2847:2019 / ACI 318-19):").size(12.5).strong().color(theme.text_primary));
+                icons::icon_label(ui, AppIcon::RulerSquare, 14.0, theme.accent_blue, "3D Biaxial P-Mx-My Interaction Surface & PCA Load Contour Envelope (SNI 2847:2019 / ACI 318-19):", 12.5, theme.text_primary, true);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let bresler_lbl = format!("Bresler Reciprocal φPn: {:.1} kN • α = {:.3}", biaxial_rep.bresler_phi_pn_kn, biaxial_rep.alpha_exponent);
                     ui.label(RichText::new(bresler_lbl).size(11.0).color(theme.accent_blue));
@@ -730,11 +732,14 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📐 Connection 2D Detailing Blueprint & AISC 360-16 Limit State Breakdown").size(13.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::RulerSquare, 15.0, theme.accent_blue, "Connection 2D Detailing Blueprint & AISC 360-16 Limit State Breakdown", 13.5, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let verdict_tag = if rep.is_compliant { "✅ Connection Approved (All DCR ≤ 1.00)" } else { "⚠️ Reinforcement / Plate Upgrade Required" };
+                        let verdict_tag = if rep.is_compliant { "Connection Approved (All DCR ≤ 1.00)" } else { "Reinforcement / Plate Upgrade Required" };
+                        let verdict_icon = if rep.is_compliant { AppIcon::CheckCircle } else { AppIcon::AlertTriangle };
                         let verdict_col = if rep.is_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                        ui.label(RichText::new(verdict_tag).size(11.5).strong().color(verdict_col));
+                        ui.horizontal(|ui| {
+                            icons::icon_label(ui, verdict_icon, 13.0, verdict_col, verdict_tag, 11.5, verdict_col, true);
+                        });
                     });
                 });
 
@@ -896,7 +901,7 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📋 AISC 360-16 / SNI 1729:2020 Connection Limit States Verification Table:").size(12.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::Clipboard, 14.0, theme.accent_blue, "AISC 360-16 / SNI 1729:2020 Connection Limit States Verification Table:", 12.5, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new("Standard: ANSI/AISC 360-16 Specification for Structural Steel Buildings").size(11.0).color(theme.text_muted));
                     });
@@ -946,7 +951,7 @@ impl AnalyzeView {
                         ui.add_space(40.0);
                         ui.label(RichText::new(format!("{:.3}", ls.demand_capacity_ratio)).size(11.0).strong().color(dcr_col));
                         ui.add_space(45.0);
-                        ui.label(RichText::new(if ls.is_safe { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(dcr_col));
+                        icons::icon_label(ui, if ls.is_safe { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, dcr_col, if ls.is_safe { "PASS" } else { "FAIL" }, 11.0, dcr_col, true);
                     });
                     ui.separator();
                 }
@@ -961,11 +966,14 @@ impl AnalyzeView {
                 .stroke(Stroke::new(1.0, Color32::from_rgb(59, 130, 246)))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("🔬 Column Panel Zone Shear & Stiffener Audit (AISC 360-16 Section J10):").size(12.5).strong().color(Color32::WHITE));
+                        icons::icon_label(ui, AppIcon::Search, 14.0, theme.accent_blue, "Column Panel Zone Shear & Stiffener Audit (AISC 360-16 Section J10):", 12.5, Color32::WHITE, true);
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            let badge = if pz.doubler_plate_required { "⚠️ DOUBLER PLATE REQUIRED" } else { "🟢 WEB THICKNESS ADEQUATE" };
+                            let badge = if pz.doubler_plate_required { "DOUBLER PLATE REQUIRED" } else { "WEB THICKNESS ADEQUATE" };
+                            let b_icon = if pz.doubler_plate_required { AppIcon::AlertTriangle } else { AppIcon::CheckCircle };
                             let b_color = if pz.doubler_plate_required { Color32::from_rgb(245, 158, 11) } else { theme.accent_green };
-                            ui.label(RichText::new(badge).size(11.0).strong().color(b_color));
+                            ui.horizontal(|ui| {
+                                icons::icon_label(ui, b_icon, 13.0, b_color, badge, 11.0, b_color, true);
+                            });
                         });
                     });
                     ui.add_space(6.0);
@@ -1126,19 +1134,26 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🌪️ ASCE 7-22 Directional MWFRS Pressure Elevation & Dynamic Comfort Analysis").size(13.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::Wind, 15.0, theme.accent_blue, "ASCE 7-22 Directional MWFRS Pressure Elevation & Dynamic Comfort Analysis", 13.5, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let gov_text = if rep.wind_governs_lateral_system {
-                            "⚠️ WIND GOVERNS LATERAL SYSTEM (Vw > Vs)"
+                            "WIND GOVERNS LATERAL SYSTEM (Vw > Vs)"
                         } else {
-                            "🟢 SEISMIC GOVERNS LATERAL SYSTEM (Vs > Vw)"
+                            "SEISMIC GOVERNS LATERAL SYSTEM (Vs > Vw)"
+                        };
+                        let gov_icon = if rep.wind_governs_lateral_system {
+                            AppIcon::AlertTriangle
+                        } else {
+                            AppIcon::CheckCircle
                         };
                         let gov_col = if rep.wind_governs_lateral_system {
                             Color32::from_rgb(245, 158, 11)
                         } else {
                             theme.accent_green
                         };
-                        ui.label(RichText::new(gov_text).size(11.5).strong().color(gov_col));
+                        ui.horizontal(|ui| {
+                            icons::icon_label(ui, gov_icon, 13.0, gov_col, gov_text, 11.5, gov_col, true);
+                        });
                     });
                 });
 
@@ -1269,7 +1284,7 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📊 Story-by-Story ASCE 7-22 Directional MWFRS Wind Force Schedule").size(12.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::ChartBar, 14.0, theme.accent_blue, "Story-by-Story ASCE 7-22 Directional MWFRS Wind Force Schedule", 12.5, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new(format!("Total Overturning Moment: {:.0} kN·m", rep.total_overturning_moment_wind_knm)).size(11.0).strong().color(theme.accent_orange));
                     });
@@ -1473,11 +1488,14 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🥞 AISC 360-16 / SNI 1729:2020 Composite Section Blueprint & Stress State").size(13.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::Layers, 15.0, theme.accent_blue, "AISC 360-16 / SNI 1729:2020 Composite Section Blueprint & Stress State", 13.5, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let tag = if rep.is_overall_compliant { "🟢 COMPOSITE BEAM APPROVED" } else { "⚠️ SECTION UPGRADE REQUIRED" };
+                        let tag = if rep.is_overall_compliant { "COMPOSITE BEAM APPROVED" } else { "SECTION UPGRADE REQUIRED" };
+                        let tag_icon = if rep.is_overall_compliant { AppIcon::CheckCircle } else { AppIcon::AlertTriangle };
                         let tag_col = if rep.is_overall_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                        ui.label(RichText::new(tag).size(11.5).strong().color(tag_col));
+                        ui.horizontal(|ui| {
+                            icons::icon_label(ui, tag_icon, 13.0, tag_col, tag, 11.5, tag_col, true);
+                        });
                     });
                 });
 
@@ -1627,7 +1645,7 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📊 AISC 360-16 / SNI 1729:2020 Limit States Verification Table").size(12.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::ChartBar, 14.0, theme.accent_blue, "AISC 360-16 / SNI 1729:2020 Limit States Verification Table", 12.5, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new(format!("Effective Inertia Ieff: {:.0} cm⁴", rep.lower_bound_effective_inertia_ieff_cm4)).size(11.0).strong().color(theme.accent_blue));
                     });
@@ -1677,7 +1695,7 @@ impl AnalyzeView {
                         ui.add_space(40.0);
                         ui.label(RichText::new(format!("{:.3}", ls.demand_capacity_ratio)).size(11.0).strong().color(dcr_col));
                         ui.add_space(40.0);
-                        ui.label(RichText::new(if ls.is_safe { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(dcr_col));
+                        icons::icon_label(ui, if ls.is_safe { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, dcr_col, if ls.is_safe { "PASS" } else { "FAIL" }, 11.0, dcr_col, true);
                     });
                     ui.separator();
                 }
@@ -1709,7 +1727,7 @@ impl AnalyzeView {
         ui_kit::responsive_grid_n(ui, 4, 190.0, |ui, col_idx| match col_idx {
             0 => {
                 let status_col = if rep.is_code_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                    let status_text = if rep.is_code_compliant { "🟢 PASS (Code Compliant)" } else { "🔴 FAIL (DCR Exceeded)" };
+                    let status_text = if rep.is_code_compliant { "PASS (Code Compliant)" } else { "FAIL (DCR Exceeded)" };
                     self.metric_card(
                         ui,
                         theme,
@@ -1770,8 +1788,7 @@ impl AnalyzeView {
                 // LEFT COLUMN: PARAMETER CONTROLS
                     ui.group(|ui| {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("⚙️").size(15.0));
-                            ui.label(RichText::new("Prestressed Girder & Tendon Studio").size(13.5).strong().color(theme.text_primary));
+                            icons::icon_label(ui, AppIcon::SlidersPanel, 15.0, theme.accent_blue, "Prestressed Girder & Tendon Studio", 13.5, theme.text_primary, true);
                         });
                         ui.separator();
                         ui.add_space(4.0);
@@ -1843,9 +1860,17 @@ impl AnalyzeView {
                         ui.add(egui::Slider::new(&mut self.pt_live_load_kn_m, 5.0..=30.0).text("Service Live Load w_LL (kN/m)").step_by(1.0));
 
                         ui.add_space(8.0);
-                        if ui.add(egui::Button::new(RichText::new("📄 Export Prestressed Dossier (.md)").size(11.5).strong().color(Color32::WHITE))
-                            .fill(theme.accent_blue)
-                            .corner_radius(CornerRadius::same(6))).clicked() {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Document,
+                            "Export Prestressed Dossier (.md)",
+                            11.5,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        ).clicked() {
                             let dossier = rep.generate_markdown_dossier();
                             if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Prestressed_Concrete_Dossier.md", &dossier) {
                                 self.export_status = Some(format!("Prestressed Concrete Dossier saved to: {}", path));
@@ -1857,8 +1882,7 @@ impl AnalyzeView {
                 // RIGHT COLUMN: 2D VECTOR TENDON PROFILE & LOSSES
                     ui.group(|ui| {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("📐").size(15.0));
-                            ui.label(RichText::new("Tendon Elevation & Neutral Axis Profile").size(13.5).strong().color(theme.text_primary));
+                            icons::icon_label(ui, AppIcon::RulerSquare, 15.0, theme.accent_blue, "Tendon Elevation & Neutral Axis Profile", 13.5, theme.text_primary, true);
                         });
                         ui.separator();
 
@@ -1949,8 +1973,7 @@ impl AnalyzeView {
         // 3. Concrete Fiber Stresses & Limit States Audit Table
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📋").size(15.0));
-                ui.label(RichText::new("Concrete Fiber Stresses & Code Compliance Audit (ACI 318-19 / SNI 2847:2019)").size(13.0).strong().color(theme.text_primary));
+                icons::icon_label(ui, AppIcon::Clipboard, 15.0, theme.accent_blue, "Concrete Fiber Stresses & Code Compliance Audit (ACI 318-19 / SNI 2847:2019)", 13.0, theme.text_primary, true);
             });
             ui.separator();
             ui.add_space(4.0);
@@ -1989,7 +2012,7 @@ impl AnalyzeView {
                 ui.add_space(30.0);
                 ui.label(RichText::new(format!("{:.3}", t_dcr)).size(11.0).strong().color(t_col));
                 ui.add_space(35.0);
-                ui.label(RichText::new(if t_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(t_col));
+                icons::icon_label(ui, if t_dcr <= 1.0 { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, t_col, if t_dcr <= 1.0 { "PASS" } else { "FAIL" }, 11.0, t_col, true);
             });
             ui.separator();
 
@@ -2009,7 +2032,7 @@ impl AnalyzeView {
                 ui.add_space(30.0);
                 ui.label(RichText::new(format!("{:.3}", s_dcr)).size(11.0).strong().color(s_col));
                 ui.add_space(35.0);
-                ui.label(RichText::new(if s_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(s_col));
+                icons::icon_label(ui, if s_dcr <= 1.0 { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, s_col, if s_dcr <= 1.0 { "PASS" } else { "FAIL" }, 11.0, s_col, true);
             });
             ui.separator();
 
@@ -2028,7 +2051,7 @@ impl AnalyzeView {
                 ui.add_space(40.0);
                 ui.label(RichText::new(format!("{:.3}", rep.flexure_dcr)).size(11.0).strong().color(flex_col));
                 ui.add_space(35.0);
-                ui.label(RichText::new(if rep.flexure_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(flex_col));
+                icons::icon_label(ui, if rep.flexure_dcr <= 1.0 { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, flex_col, if rep.flexure_dcr <= 1.0 { "PASS" } else { "FAIL" }, 11.0, flex_col, true);
             });
             ui.separator();
 
@@ -2048,7 +2071,7 @@ impl AnalyzeView {
                 ui.add_space(40.0);
                 ui.label(RichText::new(format!("{:.3}", mcr_dcr)).size(11.0).strong().color(mcr_col));
                 ui.add_space(35.0);
-                ui.label(RichText::new(if mcr_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(mcr_col));
+                icons::icon_label(ui, if mcr_dcr <= 1.0 { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, mcr_col, if mcr_dcr <= 1.0 { "PASS" } else { "FAIL" }, 11.0, mcr_col, true);
             });
             ui.separator();
 
@@ -2067,7 +2090,7 @@ impl AnalyzeView {
                 ui.add_space(20.0);
                 ui.label(RichText::new(format!("{:.3}", rep.shear_dcr)).size(11.0).strong().color(shear_col));
                 ui.add_space(35.0);
-                ui.label(RichText::new(if rep.shear_dcr <= 1.0 { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(shear_col));
+                icons::icon_label(ui, if rep.shear_dcr <= 1.0 { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, shear_col, if rep.shear_dcr <= 1.0 { "PASS" } else { "FAIL" }, 11.0, shear_col, true);
             });
         });
     }
@@ -2098,7 +2121,7 @@ impl AnalyzeView {
         ui_kit::responsive_grid_n(ui, 4, 190.0, |ui, col_idx| match col_idx {
             0 => {
                 let status_col = if rep.is_fully_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                    let status_text = if rep.is_fully_compliant { "🟢 PASS (Code Compliant)" } else { "🔴 FAIL (DCR Exceeded)" };
+                    let status_text = if rep.is_fully_compliant { "PASS (Code Compliant)" } else { "FAIL (DCR Exceeded)" };
                     self.metric_card(
                         ui,
                         theme,
@@ -2114,7 +2137,7 @@ impl AnalyzeView {
                     } else {
                         theme.accent_green
                     };
-                    let sbe_status = if rep.boundary_element.is_sbe_required { "⚠️ MANDATORY SBE" } else { "✅ NO SBE NEEDED" };
+                    let sbe_status = if rep.boundary_element.is_sbe_required { "MANDATORY SBE" } else { "NO SBE NEEDED" };
                     self.metric_card(
                         ui,
                         theme,
@@ -2155,7 +2178,7 @@ impl AnalyzeView {
             0 => {
                 // LEFT COLUMN: Parameter Controls Studio
                     theme.card_frame().show(ui, |ui| {
-                        ui.label(RichText::new("🏢 WALL PIER & COUPLING PARAMETERS").size(12.5).strong().color(theme.accent_blue));
+                        icons::icon_label(ui, AppIcon::Building, 14.0, theme.accent_blue, "WALL PIER & COUPLING PARAMETERS", 12.5, theme.accent_blue, true);
                         ui.add_space(6.0);
 
                         // Section A: Wall Geometry
@@ -2229,7 +2252,7 @@ impl AnalyzeView {
             _ => {
                 // RIGHT COLUMN: 2D Vector CAD Canvas Detailer
                     theme.card_frame().show(ui, |ui| {
-                        ui.label(RichText::new("📐 2D VECTOR REBAR & BOUNDARY BLUEPRINT").size(12.5).strong().color(theme.accent_blue));
+                        icons::icon_label(ui, AppIcon::RulerSquare, 14.0, theme.accent_blue, "2D VECTOR REBAR & BOUNDARY BLUEPRINT", 12.5, theme.accent_blue, true);
                         ui.add_space(4.0);
 
                         let canvas_size = Vec2::new(ui.available_width(), 320.0);
@@ -2381,7 +2404,7 @@ impl AnalyzeView {
 
         // 3. Full Regulatory Code Compliance Audit Table
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("📋 ACI 318-19 CHAPTER 18 / SNI 2847:2019 PASAL 18 REGULATORY AUDIT").size(12.0).strong().color(theme.accent_blue));
+            icons::icon_label(ui, AppIcon::Clipboard, 14.0, theme.accent_blue, "ACI 318-19 CHAPTER 18 / SNI 2847:2019 PASAL 18 REGULATORY AUDIT", 12.0, theme.accent_blue, true);
             ui.add_space(4.0);
 
             // Table Header
@@ -2417,7 +2440,7 @@ impl AnalyzeView {
                 ui.add_space(15.0);
                 ui.label(RichText::new(format!("{:.3}", rep.in_plane_shear.shear_dcr)).size(11.0).strong().color(shear_col));
                 ui.add_space(30.0);
-                ui.label(RichText::new(if rep.in_plane_shear.is_shear_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(shear_col));
+                icons::icon_label(ui, if rep.in_plane_shear.is_shear_adequate { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, shear_col, if rep.in_plane_shear.is_shear_adequate { "PASS" } else { "FAIL" }, 11.0, shear_col, true);
             });
             ui.separator();
 
@@ -2436,7 +2459,7 @@ impl AnalyzeView {
                 ui.add_space(20.0);
                 ui.label(RichText::new(format!("{:.3}", rep.boundary_element.neutral_axis_c_mm / rep.boundary_element.c_limit_mm)).size(11.0).strong().color(sbe_stat_col));
                 ui.add_space(30.0);
-                ui.label(RichText::new(if rep.boundary_element.is_geometry_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(sbe_stat_col));
+                icons::icon_label(ui, if rep.boundary_element.is_geometry_adequate { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, sbe_stat_col, if rep.boundary_element.is_geometry_adequate { "PASS" } else { "FAIL" }, 11.0, sbe_stat_col, true);
             });
             ui.separator();
 
@@ -2455,7 +2478,7 @@ impl AnalyzeView {
                 ui.add_space(15.0);
                 ui.label(RichText::new(format!("{:.3}", rep.boundary_element.dcr_confinement)).size(11.0).strong().color(conf_col));
                 ui.add_space(30.0);
-                ui.label(RichText::new(if rep.boundary_element.is_confinement_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(conf_col));
+                icons::icon_label(ui, if rep.boundary_element.is_confinement_adequate { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, conf_col, if rep.boundary_element.is_confinement_adequate { "PASS" } else { "FAIL" }, 11.0, conf_col, true);
             });
             ui.separator();
 
@@ -2474,7 +2497,7 @@ impl AnalyzeView {
                 ui.add_space(20.0);
                 ui.label(RichText::new(format!("{:.3}", rep.flexure_dcr)).size(11.0).strong().color(flex_col));
                 ui.add_space(30.0);
-                ui.label(RichText::new(if rep.is_flexure_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(flex_col));
+                icons::icon_label(ui, if rep.is_flexure_adequate { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, flex_col, if rep.is_flexure_adequate { "PASS" } else { "FAIL" }, 11.0, flex_col, true);
             });
             ui.separator();
 
@@ -2493,7 +2516,7 @@ impl AnalyzeView {
                 ui.add_space(30.0);
                 ui.label(RichText::new(format!("{:.3}", rep.coupling_beam.coupling_dcr)).size(11.0).strong().color(cb_stat_col));
                 ui.add_space(30.0);
-                ui.label(RichText::new(if rep.coupling_beam.is_coupling_adequate { "🟢 PASS" } else { "🔴 FAIL" }).size(11.0).strong().color(cb_stat_col));
+                icons::icon_label(ui, if rep.coupling_beam.is_coupling_adequate { AppIcon::CheckCircle } else { AppIcon::AlertTriangle }, 13.0, cb_stat_col, if rep.coupling_beam.is_coupling_adequate { "PASS" } else { "FAIL" }, 11.0, cb_stat_col, true);
             });
         });
     }

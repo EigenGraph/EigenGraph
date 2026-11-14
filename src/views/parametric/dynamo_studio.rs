@@ -20,25 +20,36 @@ impl ParametricView {
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(
-                            RichText::new("🧬 ALGORITHMIC PRESET:")
-                                .size(11.0)
-                                .strong()
-                                .color(theme.accent_blue),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::NodesGraph,
+                            13.0,
+                            theme.accent_blue,
+                            "ALGORITHMIC PRESET:",
+                            11.0,
+                            theme.accent_blue,
+                            true,
                         );
                         for preset in ParametricGeneratorPreset::all() {
                             let is_sel = self.active_preset == *preset;
                             let bg = if is_sel { theme.accent_blue } else { theme.bg_card };
                             let fg = if is_sel { Color32::WHITE } else { theme.text_secondary };
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new(preset.label()).size(10.5).strong().color(fg),
-                                    )
-                                    .fill(bg)
-                                    .corner_radius(CornerRadius::same(6)),
-                                )
-                                .clicked()
+                            if icons::icon_button(
+                                ui,
+                                match preset {
+                                    ParametricGeneratorPreset::DiagridTower => AppIcon::Building,
+                                    ParametricGeneratorPreset::GeodesicDome => AppIcon::Globe,
+                                    ParametricGeneratorPreset::VoronoiCanopy => AppIcon::NodesGraph,
+                                },
+                                preset.label(),
+                                10.5,
+                                fg,
+                                bg,
+                                Stroke::NONE,
+                                CornerRadius::same(6),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .clicked()
                             {
                                 self.active_preset = *preset;
                                 self.preset_params = preset.default_params();
@@ -57,18 +68,18 @@ impl ParametricView {
                             }
                         }
 
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("⚡ Bake to BIM Scene")
-                                        .size(10.5)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(theme.accent_green)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Bolt,
+                            "Bake to BIM Scene",
+                            10.5,
+                            Color32::WHITE,
+                            theme.accent_green,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .clicked()
                         {
                             self.bake_parametric_to_bim();
                         }
@@ -156,6 +167,7 @@ impl ParametricView {
                             }
                         }
                         let rect = response.rect;
+                        self.last_canvas_rect = Some(rect);
                         self.draw_visual_node_graph(&response, &painter, rect, theme);
                     });
 
@@ -182,6 +194,7 @@ impl ParametricView {
                         }
                     }
                     let rect = response.rect;
+                    self.last_canvas_rect = Some(rect);
                     self.draw_visual_node_graph(&response, &painter, rect, theme);
                 });
 
@@ -354,11 +367,15 @@ impl ParametricView {
                         .inner_margin(Margin::symmetric(10, 6))
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
-                                ui.label(
-                                    RichText::new("🧬 LIVE 3D PARAMETRIC MESH")
-                                        .size(10.5)
-                                        .strong()
-                                        .color(theme.accent_blue),
+                                icons::icon_label(
+                                    ui,
+                                    AppIcon::Cube3D,
+                                    13.0,
+                                    theme.accent_blue,
+                                    "LIVE 3D PARAMETRIC MESH",
+                                    10.5,
+                                    theme.accent_blue,
+                                    true,
                                 );
                                 ui.label(
                                     RichText::new(format!(
@@ -630,7 +647,7 @@ impl ParametricView {
         let (_, edges, ton) = self.generate_parametric_wireframe();
         self.refresh_live_ari();
         let msg = format!(
-            "⚡ Baked {} ({} mesh struts / {:.1} t): added {} Columns & {} Beams to BIM Project (UNDO ready).",
+            "Baked {} ({} mesh struts / {:.1} t): added {} Columns & {} Beams to BIM Project (UNDO ready).",
             self.active_preset.label(),
             edges.len(),
             ton,
@@ -922,7 +939,7 @@ impl ParametricView {
             hud_rect.min + Vec2::new(10.0, 8.0),
             Align2::LEFT_TOP,
             format!(
-                "⚡ DYNAMO STUDIO • {} NODES (DRAG NODES OR PAN)",
+                "DYNAMO STUDIO • {} NODES (DRAG NODES OR PAN)",
                 self.node_graph.nodes.len()
             ),
             egui::FontId::proportional(9.5),
@@ -940,7 +957,7 @@ impl ParametricView {
         painter.text(
             run_btn_rect.center(),
             Align2::CENTER_CENTER,
-            "▶ Run & Bake",
+            "Run & Bake",
             egui::FontId::proportional(9.0),
             Color32::WHITE,
         );
@@ -949,7 +966,7 @@ impl ParametricView {
         painter.text(
             add_btn_rect.center(),
             Align2::CENTER_CENTER,
-            "➕ Add Node",
+            "+ Add Node",
             egui::FontId::proportional(9.0),
             Color32::WHITE,
         );
@@ -973,7 +990,7 @@ impl ParametricView {
                     });
                     self.selected_node_id = Some(next_id);
                     self.graph_bake_status =
-                        Some(format!("➕ Added Math Node #{} to visual programming graph.", next_id));
+                        Some(format!("Added Math Node #{} to visual programming graph.", next_id));
                 } else {
                     let hit = self.node_graph.nodes.iter().rev().find_map(|node| {
                         let n_pos = rect.min

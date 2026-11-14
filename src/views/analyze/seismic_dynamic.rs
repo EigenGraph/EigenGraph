@@ -97,11 +97,14 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📉 Capacity Spectrum Method (ATC-40 / ASCE 41-17) & Performance Point").size(13.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::ChartLine, 14.0, theme.accent_blue, "Capacity Spectrum Method (ATC-40 / ASCE 41-17) & Performance Point", 13.5, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let status_tag = if csm.is_code_compliant { "✅ Life Safety (LS) Compliant" } else { "⚠️ Collapse Exceeded Limit" };
-                        let status_col = if csm.is_code_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                        ui.label(RichText::new(status_tag).size(11.5).strong().color(status_col));
+                        let (status_icon, status_tag, status_col) = if csm.is_code_compliant {
+                            (AppIcon::CheckCircle, "Life Safety (LS) Compliant", theme.accent_green)
+                        } else {
+                            (AppIcon::AlertTriangle, "Collapse Exceeded Limit", Color32::from_rgb(239, 68, 68))
+                        };
+                        icons::pill_badge(ui, status_icon, status_tag, status_col);
                     });
                 });
 
@@ -240,15 +243,18 @@ impl AnalyzeView {
                         ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new("Inelastic Plastic Hinge Matrix at Performance Point:").size(11.0).strong().color(Color32::WHITE));
                             ui.add_space(10.0);
-                            ui.label(RichText::new(format!("🟢 Elastic: {} Elements", csm.hinges_elastic)).size(10.5).color(theme.accent_green));
-                            ui.label(RichText::new("•").size(10.5).color(theme.text_muted));
-                            ui.label(RichText::new(format!("🔵 IO: {} Elements", csm.hinges_io)).size(10.5).color(theme.accent_blue));
-                            ui.label(RichText::new("•").size(10.5).color(theme.text_muted));
-                            ui.label(RichText::new(format!("🟠 LS: {} Elements", csm.hinges_ls)).size(10.5).color(theme.accent_orange));
-                            ui.label(RichText::new("•").size(10.5).color(theme.text_muted));
-                            ui.label(RichText::new(format!("🔴 CP: {} Elements", csm.hinges_cp)).size(10.5).color(Color32::from_rgb(255, 69, 58)));
-                            ui.label(RichText::new("•").size(10.5).color(theme.text_muted));
-                            ui.label(RichText::new(format!("🟣 Mech: {} Elements", csm.hinges_mechanism)).size(10.5).color(Color32::from_rgb(191, 90, 242)));
+                            for (lbl, col) in [
+                                (format!("Elastic: {} Elements", csm.hinges_elastic), theme.accent_green),
+                                (format!("IO: {} Elements", csm.hinges_io), theme.accent_blue),
+                                (format!("LS: {} Elements", csm.hinges_ls), theme.accent_orange),
+                                (format!("CP: {} Elements", csm.hinges_cp), Color32::from_rgb(255, 69, 58)),
+                                (format!("Mech: {} Elements", csm.hinges_mechanism), Color32::from_rgb(191, 90, 242)),
+                            ] {
+                                let (r, _) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
+                                ui.painter().circle_filled(r.center(), 4.0, col);
+                                ui.label(RichText::new(lbl).size(10.5).color(col));
+                                ui.add_space(4.0);
+                            }
                         });
                         ui.add_space(4.0);
                         ui.label(RichText::new(&csm.performance_point.compliance_audit).size(11.0).strong().color(Color32::from_rgb(226, 232, 240)));
@@ -300,11 +306,16 @@ impl AnalyzeView {
                     .stroke(Stroke::new(1.0, Color32::from_rgb(37, 99, 235)))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("🔬 Sherman-Morrison / Woodbury Non-Linear Redistribution & AI Advisor (Eqs. 4.13d–4.13g):").size(12.5).strong().color(Color32::WHITE));
+                            icons::icon_label(ui, AppIcon::NodesGraph, 13.0, Color32::WHITE, "Sherman-Morrison / Woodbury Non-Linear Redistribution & AI Advisor (Eqs. 4.13d–4.13g):", 12.5, Color32::WHITE, true);
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                let badge_txt = if woodbury_rep.is_mechanism { "🚨 KINEMATIC MECHANISM" } else if woodbury_rep.non_linear_ci >= 0.35 { "⚠️ CRITICAL POST-YIELD" } else { "🟢 REDUNDANT PATH CLEAR" };
-                                let badge_c = if woodbury_rep.is_mechanism { Color32::from_rgb(239, 68, 68) } else if woodbury_rep.non_linear_ci >= 0.35 { Color32::from_rgb(245, 158, 11) } else { theme.accent_green };
-                                ui.label(RichText::new(badge_txt).size(11.0).strong().color(badge_c));
+                                let (badge_icon, badge_txt, badge_c) = if woodbury_rep.is_mechanism {
+                                    (AppIcon::AlertTriangle, "KINEMATIC MECHANISM", Color32::from_rgb(239, 68, 68))
+                                } else if woodbury_rep.non_linear_ci >= 0.35 {
+                                    (AppIcon::AlertTriangle, "CRITICAL POST-YIELD", Color32::from_rgb(245, 158, 11))
+                                } else {
+                                    (AppIcon::CheckCircle, "REDUNDANT PATH CLEAR", theme.accent_green)
+                                };
+                                icons::pill_badge(ui, badge_icon, badge_txt, badge_c);
                             });
                         });
                         ui.add_space(6.0);
@@ -339,7 +350,7 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🌊 Dynamic Modal Analysis & Seismic Spectrum SNI 1726:2019 / ASCE 7-16").size(14.0).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::Pulse, 15.0, theme.accent_blue, "Dynamic Modal Analysis & Seismic Spectrum SNI 1726:2019 / ASCE 7-16", 14.0, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new("Eigenvalue Solution: K*phi = omega^2*M*phi").size(11.0).color(theme.accent_blue));
                     });
@@ -378,9 +389,17 @@ impl AnalyzeView {
                     ui.add(egui::DragValue::new(&mut self.r_val).speed(0.5).range(1.0..=10.0));
 
                     ui.add_space(12.0);
-                    if ui.add(egui::Button::new(RichText::new("⚡ Compute Modes & Seismic").size(11.5).strong().color(Color32::WHITE))
-                        .fill(theme.accent_blue)
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Bolt,
+                        "Compute Modes & Seismic",
+                        11.5,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    ).clicked() {
                         let mut engine = crate::core::ParametricEngine::new();
                         if let Ok(model) = engine.generate_warren_truss() {
                             let spec = crate::core::modal::Sni1726Spectrum::new(self.site_class, self.ss_val as f64, self.s1_val as f64, self.r_val as f64, 1.0);
@@ -458,7 +477,7 @@ impl AnalyzeView {
                     ui.add_space(16.0);
 
                     // Mode Shapes Table
-                    ui.label(RichText::new("📋 Natural Vibration Modes Characteristics Table:").size(12.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::Clipboard, 13.5, theme.accent_blue, "Natural Vibration Modes Characteristics Table:", 12.5, theme.text_primary, true);
                     ui.add_space(6.0);
 
                     ui.horizontal(|ui| {
@@ -507,11 +526,14 @@ impl AnalyzeView {
                         .stroke(Stroke::new(1.0, Color32::from_rgb(14, 165, 233)))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
-                                ui.label(RichText::new("📊 Dynamic Modal Combinations & 85% Static Scaling (SNI 1726:2019 Pasal 7.9.3 & ASCE 7-16):").size(12.5).strong().color(Color32::WHITE));
+                                icons::icon_label(ui, AppIcon::ChartBar, 13.0, Color32::WHITE, "Dynamic Modal Combinations & 85% Static Scaling (SNI 1726:2019 Pasal 7.9.3 & ASCE 7-16):", 12.5, Color32::WHITE, true);
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    let scale_badge = if modal_comb.scale_factor_85pct > 1.0 { "⚠️ SCALED TO 85% V_STATIC" } else { "🟢 DYNAMIC Vt ≥ 0.85 Vs" };
-                                    let badge_color = if modal_comb.scale_factor_85pct > 1.0 { Color32::from_rgb(245, 158, 11) } else { theme.accent_green };
-                                    ui.label(RichText::new(scale_badge).size(11.0).strong().color(badge_color));
+                                    let (scale_icon, scale_badge, badge_color) = if modal_comb.scale_factor_85pct > 1.0 {
+                                        (AppIcon::AlertTriangle, "SCALED TO 85% V_STATIC", Color32::from_rgb(245, 158, 11))
+                                    } else {
+                                        (AppIcon::CheckCircle, "DYNAMIC Vt ≥ 0.85 Vs", theme.accent_green)
+                                    };
+                                    icons::pill_badge(ui, scale_icon, scale_badge, badge_color);
                                 });
                             });
                             ui.add_space(6.0);
@@ -673,11 +695,14 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📐 Foundation & SSI Vector Visualizer (Deep Foundation Grid + Two-Way Punching Perimeter)").size(13.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::RulerSquare, 14.0, theme.accent_blue, "Foundation & SSI Vector Visualizer (Deep Foundation Grid + Two-Way Punching Perimeter)", 13.5, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let status_tag = if audit.is_fully_compliant { "✅ Geotech & Punching Compliant" } else { "⚠️ Reinforcement / Piles Required" };
-                        let status_col = if audit.is_fully_compliant { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                        ui.label(RichText::new(status_tag).size(11.5).strong().color(status_col));
+                        let (status_icon, status_tag, status_col) = if audit.is_fully_compliant {
+                            (AppIcon::CheckCircle, "Geotech & Punching Compliant", theme.accent_green)
+                        } else {
+                            (AppIcon::AlertTriangle, "Reinforcement / Piles Required", Color32::from_rgb(239, 68, 68))
+                        };
+                        icons::pill_badge(ui, status_icon, status_tag, status_col);
                     });
                 });
 
@@ -812,7 +837,7 @@ impl AnalyzeView {
                                     painter_r.text(
                                         Pos2::new(rect_r.left() + 8.0, rect_r.bottom() - 8.0),
                                         egui::Align2::LEFT_BOTTOM,
-                                        if punch.is_punching_safe { "🟢 PASS: Two-way punching shear compliant without stud rails" } else { "⚠️ FAIL: Add shear studs or increase slab thickness" },
+                                        if punch.is_punching_safe { "PASS: Two-way punching shear compliant without stud rails" } else { "FAIL: Add shear studs or increase slab thickness" },
                                         egui::FontId::proportional(9.0),
                                         bo_color,
                                     );
@@ -830,7 +855,7 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, Color32::from_rgb(14, 165, 233)))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🔬 Equivalent 6-DOF Winkler Subgrade Reaction Matrix (Vesic / Bowles Formulation):").size(12.5).strong().color(Color32::WHITE));
+                    icons::icon_label(ui, AppIcon::NodesGraph, 13.0, Color32::WHITE, "Equivalent 6-DOF Winkler Subgrade Reaction Matrix (Vesic / Bowles Formulation):", 12.5, Color32::WHITE, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new(format!("ks = {:.0} kN/m³ • E = {:.1} MPa • ν = {:.2} • φ = {:.1}°", soil_layer.subgrade_reaction_ks_kn_m3, soil_layer.elastic_modulus_es_mpa, soil_layer.poisson_ratio_nu, soil_layer.friction_angle_deg)).size(11.0).color(theme.accent_blue));
                     });
@@ -860,7 +885,7 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📋 Individual Pile Biaxial Load Distribution & Lateral Deflection Schedule:").size(12.5).strong().color(theme.text_primary));
+                    icons::icon_label(ui, AppIcon::Clipboard, 13.0, theme.accent_blue, "Individual Pile Biaxial Load Distribution & Lateral Deflection Schedule:", 12.5, theme.text_primary, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new(format!("Allowable Compression: {:.0} kN • Tension: {:.0} kN", piles.pile_details.first().map(|p| p.allowable_compression_all_kn).unwrap_or(0.0), piles.pile_details.first().map(|p| p.allowable_tension_uplift_kn).unwrap_or(0.0))).size(11.0).color(theme.text_muted));
                     });
@@ -910,7 +935,8 @@ impl AnalyzeView {
                         ui.add_space(40.0);
                         ui.label(RichText::new(format!("{:.2} mm", p.lateral_deflection_mm)).size(11.0).color(theme.text_secondary));
                         ui.add_space(40.0);
-                        ui.label(RichText::new(if p.is_safe { "🟢 SAFE" } else { "🔴 OVERSTRESSED" }).size(11.0).strong().color(dcr_col));
+                        let (p_icon, p_txt) = if p.is_safe { (AppIcon::CheckCircle, "SAFE") } else { (AppIcon::AlertTriangle, "OVERSTRESSED") };
+                        icons::icon_label(ui, p_icon, 11.5, dcr_col, p_txt, 11.0, dcr_col, true);
                     });
                     ui.separator();
                 }
@@ -926,7 +952,7 @@ impl AnalyzeView {
             .stroke(Stroke::new(1.0, Color32::from_rgb(16, 185, 129)))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🌊 Veletsos & Meek Dynamic Soil-Structure Interaction (SSI) Modal Shift (ASCE 7-22 Ch. 19):").size(12.0).strong().color(Color32::WHITE));
+                    icons::icon_label(ui, AppIcon::Pulse, 13.0, Color32::WHITE, "Veletsos & Meek Dynamic Soil-Structure Interaction (SSI) Modal Shift (ASCE 7-22 Ch. 19):", 12.0, Color32::WHITE, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new(&ssi.ssi_classification).size(11.0).strong().color(theme.accent_green));
                     });
@@ -997,7 +1023,7 @@ impl AnalyzeView {
 
         // Header Title
         ui.horizontal(|ui| {
-            ui.label(RichText::new("🛡️ Seismic Base Isolation & Supplementary Energy Dissipation Studio").size(15.0).strong().color(theme.text_primary));
+            icons::icon_label(ui, AppIcon::Shield, 16.0, theme.accent_blue, "Seismic Base Isolation & Supplementary Energy Dissipation Studio", 15.0, theme.text_primary, true);
             ui.add_space(8.0);
             ui.label(RichText::new("ASCE 7-22 Ch 17 & 18 / SNI 1726:2019 Pasal 12 & 13").size(11.0).color(theme.accent_blue));
         });
@@ -1046,7 +1072,7 @@ impl AnalyzeView {
         // Parameter Studio Card
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("⚙️ Isolation & Damping Parameter Studio").size(12.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::SettingsGear, 13.5, theme.accent_blue, "Isolation & Damping Parameter Studio", 12.5, theme.accent_blue, true);
                 ui.add_space(20.0);
                 ui.selectable_value(&mut self.iso_type, crate::core::IsolatorType::LeadRubberBearing, "Lead-Rubber Bearing (LRB)");
                 ui.selectable_value(&mut self.iso_type, crate::core::IsolatorType::FrictionPendulum, "Friction Pendulum (FPS)");
@@ -1176,7 +1202,7 @@ impl AnalyzeView {
         // Vector CAD Blueprint & Hysteresis Canvas
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📐 2D Vector CAD Blueprint & Dynamic Hysteresis Loop Canvas").size(12.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::RulerSquare, 13.5, theme.accent_blue, "2D Vector CAD Blueprint & Dynamic Hysteresis Loop Canvas", 12.5, theme.accent_blue, true);
                 ui.add_space(20.0);
                 ui.label(RichText::new(format!("Energy Dissipated per Cycle: {:.1} kJ", rep.energy_dissipated_per_cycle_kj)).size(11.0).color(theme.accent_green));
             });
@@ -1405,11 +1431,14 @@ impl AnalyzeView {
         // ASCE 7-22 / SNI 1726 Regulatory Compliance Audit Table
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📋 ASCE 7-22 & SNI 1726:2019 Regulatory Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::Clipboard, 13.5, theme.accent_blue, "ASCE 7-22 & SNI 1726:2019 Regulatory Compliance Audit", 12.5, theme.accent_blue, true);
                 ui.add_space(20.0);
-                let overall_status = if rep.is_design_acceptable { "🟢 ALL CODE CHECKS SATISFIED" } else { "🔴 DESIGN REVISIONS REQUIRED" };
-                let status_col = if rep.is_design_acceptable { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+                let (st_icon, overall_status, status_col) = if rep.is_design_acceptable {
+                    (AppIcon::CheckCircle, "ALL CODE CHECKS SATISFIED", theme.accent_green)
+                } else {
+                    (AppIcon::AlertTriangle, "DESIGN REVISIONS REQUIRED", Color32::from_rgb(239, 68, 68))
+                };
+                icons::pill_badge(ui, st_icon, overall_status, status_col);
             });
 
             ui.add_space(6.0);
@@ -1443,7 +1472,8 @@ impl AnalyzeView {
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.3}", item.demand_capacity_ratio)).size(10.5).strong().color(row_col));
                     ui.add_space(20.0);
-                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                    let (r_icon, r_txt) = if item.is_passed { (AppIcon::CheckCircle, "PASS") } else { (AppIcon::AlertTriangle, "FAIL") };
+                    icons::icon_label(ui, r_icon, 11.0, row_col, r_txt, 10.5, row_col, true);
                 });
                 ui.separator();
             }
@@ -1473,15 +1503,22 @@ impl AnalyzeView {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("🌊 Nonlinear Dynamic Direct Time-History Analysis (NL-THA) & Ground Motion Scaling").size(13.0).strong().color(theme.accent_blue));
+                    icons::icon_label(ui, AppIcon::Pulse, 14.0, theme.accent_blue, "Nonlinear Dynamic Direct Time-History Analysis (NL-THA) & Ground Motion Scaling", 13.0, theme.accent_blue, true);
                     ui.label(RichText::new("ASCE 7-22 Chapter 16 · SNI 1726:2019 Pasal 11 · NIST GCR 17-917-46 / ATC-114 · PEER/TBI (2017)").size(10.5).color(theme.text_secondary));
                 });
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new(RichText::new("📥 Export NL-THA Dossier (.md)").size(11.0).color(Color32::WHITE))
-                        .fill(theme.bg_canvas)
-                        .stroke(Stroke::new(1.0, theme.accent_blue))
-                        .corner_radius(CornerRadius::same(7))).clicked() {
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SaveDisk,
+                        "Export NL-THA Dossier (.md)",
+                        11.0,
+                        Color32::WHITE,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.accent_blue),
+                        CornerRadius::same(7),
+                        Vec2::ZERO,
+                    ).clicked() {
                         let dossier = crate::core::TimeHistoryEngine::generate_markdown_dossier(&input, &rep);
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_NL_THA_Time_History_Dossier.md", &dossier) {
                             self.export_status = Some(format!("NL-THA Calculation Dossier saved to: {}", path));
@@ -1622,7 +1659,7 @@ ui.label(RichText::new("ENERGY CONSERVATION").size(10.0).strong().color(theme.te
         // 2D Vector CAD Canvas: Response Time Traces + Story Height Drift Profile
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📐 2D Vector CAD Dynamic Response Waves & Multi-Story Drift Envelope").size(12.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::RulerSquare, 13.5, theme.accent_blue, "2D Vector CAD Dynamic Response Waves & Multi-Story Drift Envelope", 12.5, theme.accent_blue, true);
                 ui.add_space(20.0);
                 ui.label(RichText::new(format!("Scaled PGA: {:.3} g | Peak Roof Disp: {:.1} mm", rep.scaled_pga_g, rep.peak_roof_disp_mm)).size(11.0).color(theme.accent_green));
             });
@@ -1783,11 +1820,14 @@ ui.label(RichText::new("ENERGY CONSERVATION").size(10.0).strong().color(theme.te
         // ASCE 7-22 / SNI 1726 Regulatory Compliance Audit Table
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📋 ASCE 7-22 & SNI 1726:2019 NL-THA Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::Clipboard, 13.5, theme.accent_blue, "ASCE 7-22 & SNI 1726:2019 NL-THA Compliance Audit", 12.5, theme.accent_blue, true);
                 ui.add_space(20.0);
-                let overall_status = if rep.is_design_acceptable { "🟢 ALL REGULATORY CHECKS SATISFIED" } else { "🔴 DESIGN REVISIONS REQUIRED" };
-                let status_col = if rep.is_design_acceptable { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+                let (st_icon, overall_status, status_col) = if rep.is_design_acceptable {
+                    (AppIcon::CheckCircle, "ALL REGULATORY CHECKS SATISFIED", theme.accent_green)
+                } else {
+                    (AppIcon::AlertTriangle, "DESIGN REVISIONS REQUIRED", Color32::from_rgb(239, 68, 68))
+                };
+                icons::pill_badge(ui, st_icon, overall_status, status_col);
             });
 
             ui.add_space(6.0);
@@ -1821,7 +1861,8 @@ ui.label(RichText::new("ENERGY CONSERVATION").size(10.0).strong().color(theme.te
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.3}", item.demand_capacity_ratio)).size(10.5).strong().color(row_col));
                     ui.add_space(20.0);
-                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                    let (r_icon, r_txt) = if item.is_passed { (AppIcon::CheckCircle, "PASS") } else { (AppIcon::AlertTriangle, "FAIL") };
+                    icons::icon_label(ui, r_icon, 11.0, row_col, r_txt, 10.5, row_col, true);
                 });
                 ui.separator();
             }

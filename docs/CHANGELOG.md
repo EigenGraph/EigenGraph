@@ -7,6 +7,19 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.3] - 2026-11-14 — Phase 33: Single-Canvas Parametric/Geometry Views & Vector Icon Overhaul
+
+### Added & Changed
+- **Single Unified Canvas in Parametric & Geometry (`src/views/parametric/`, `src/views/build/`)**:
+  - Consolidated `ParametricDED` and `GeometryAssembly` to render a single synchronized workspace canvas each, eliminating duplicate canvas panes while retaining `Freeze Canvas` / `Frozen (Scroll Page)`, `Save 1-File` / `Import` (`.eigen.json`), and shared BIM synchronization.
+  - Respects `sidebar_toggle_inset_px` clearance so floating sidebar controls never collide with module action ribbons.
+- **Painted Vector Icon Overhaul (`src/icons.rs`, `src/ui_kit.rs`, `src/app.rs`, `src/views/`)**:
+  - Replaced raw Unicode emojis, colored circles, pictographs, and bitmap glyph workarounds across sidebar items, subtab bars, tool ribbons, cards, badges, inspectors, and canvas overlays with geometric `egui::Painter` icons (`crate::icons::{self, AppIcon}`).
+  - Expanded `prefix_map` and `strip_pictographs` in `src/icons.rs` to map all MEP/infrastructure/schedule/cost/sustainability ribbon tools cleanly while preserving engineering and mathematical typography (`Δ`, `σ`, `ε`, `μ`, `λ`, `θ`, `φ`, `·`, `±`, `°`, `≥`, `≤`, subscripts/superscripts).
+- **Version Bump**: Incremented crate version from `0.3.2` to `0.3.3` in `Cargo.toml` and `README.md`.
+
+---
+
 ## [v0.3.2] - 2026-11-14 — Phase 32: Canvas-First Unified Workspace & Settings Consolidation
 
 ### Added & Changed

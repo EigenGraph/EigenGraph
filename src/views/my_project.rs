@@ -1,5 +1,6 @@
 use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, ScrollArea, Stroke, Ui, Vec2};
 use crate::features::{FeatureId, FeatureRegistry};
+use crate::icons::{self, AppIcon};
 use crate::models::{BimFamilyItem, NavigationPillar, ProjectItem};
 use crate::theme::MacTheme;
 use crate::ui_kit;
@@ -93,7 +94,16 @@ impl MyProjectView {
                             ui.add_space(10.0);
                             theme.card_frame().show(ui, |ui| {
                                 ui.horizontal_wrapped(|ui| {
-                                    ui.label(RichText::new("✅ INTERNAL VAULT AUTOSAVE:").size(11.5).strong().color(theme.accent_green));
+                                    icons::icon_label(
+                                        ui,
+                                        AppIcon::CheckCircle,
+                                        12.5,
+                                        theme.accent_green,
+                                        "INTERNAL VAULT AUTOSAVE:",
+                                        11.5,
+                                        theme.accent_green,
+                                        true,
+                                    );
                                     ui.label(RichText::new(msg).size(11.5).color(theme.text_primary));
                                 });
                             });
@@ -147,31 +157,51 @@ impl MyProjectView {
 
         ui.add_space(10.0);
         ui.label(RichText::new(format!(
-            "📊 Elements: {}   •   Nodes: {}   •   Max Disp: {:.2} mm   •   Min ARI: {:.2}",
+            "Elements: {}   •   Nodes: {}   •   Max Disp: {:.2} mm   •   Min ARI: {:.2}",
             p.elements_count, p.nodes_count, p.max_deflection_mm, p.min_ari
         )).size(12.0).color(theme.text_muted));
 
         ui.add_space(14.0);
         ui.horizontal_wrapped(|ui| {
-            if ui.add(egui::Button::new(RichText::new("🚀 Open in 3D Workspace").size(12.5).strong().color(Color32::WHITE))
-                .fill(theme.accent_blue)
-                .corner_radius(CornerRadius::same(8))
-                .min_size(egui::Vec2::new(165.0, 32.0))).clicked() {
+            if icons::icon_button(
+                ui,
+                AppIcon::Cube3D,
+                "Open in 3D Workspace",
+                12.5,
+                Color32::WHITE,
+                theme.accent_blue,
+                Stroke::NONE,
+                CornerRadius::same(8),
+                egui::Vec2::new(165.0, 32.0),
+            ).clicked() {
                 *active_pillar = NavigationPillar::GeometryAssembly;
             }
 
-            if ui.add(egui::Button::new(RichText::new("📜 EigenGraph Audit Certificate").size(12.5).strong().color(Color32::WHITE))
-                .fill(theme.accent_green)
-                .corner_radius(CornerRadius::same(8))
-                .min_size(egui::Vec2::new(180.0, 32.0))).clicked() {
+            if icons::icon_button(
+                ui,
+                AppIcon::Document,
+                "EigenGraph Audit Certificate",
+                12.5,
+                Color32::WHITE,
+                theme.accent_green,
+                Stroke::NONE,
+                CornerRadius::same(8),
+                egui::Vec2::new(180.0, 32.0),
+            ).clicked() {
                 self.show_dossier_modal = true;
             }
 
-            if ui.add(egui::Button::new(RichText::new("🔐 Autosave to InternalVault (.eigen)").size(12.0).strong().color(theme.text_primary))
-                .fill(theme.bg_card)
-                .stroke(Stroke::new(1.0, theme.border_subtle))
-                .corner_radius(CornerRadius::same(8))
-                .min_size(egui::Vec2::new(180.0, 32.0))).clicked() {
+            if icons::icon_button(
+                ui,
+                AppIcon::Lock,
+                "Autosave to InternalVault (.eigen)",
+                12.0,
+                theme.text_primary,
+                theme.bg_card,
+                Stroke::new(1.0, theme.border_subtle),
+                CornerRadius::same(8),
+                egui::Vec2::new(180.0, 32.0),
+            ).clicked() {
                 let mut engine = crate::core::ParametricEngine::new();
                 if let Ok(mut model) = engine.generate_warren_truss() {
                     model.name = "NVW_DCR-LOD300_Eng-CON".to_string();
@@ -227,7 +257,7 @@ impl MyProjectView {
                 painter.text(
                     egui::pos2(rect.center().x, rect.bottom() - 8.0),
                     egui::Align2::CENTER_CENTER,
-                    "🏢 NVW_DCR-LOD (LOD 100 • 200 • 300)",
+                    "NVW_DCR-LOD (LOD 100 • 200 • 300)",
                     egui::FontId::proportional(10.0),
                     theme.text_secondary,
                 );
@@ -268,8 +298,28 @@ impl MyProjectView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Storage Engine: Browser IndexedDB");
                 let _ = ui.selectable_label(false, "Schema: eigengraph_vault_v3");
-                let _ = ui.button("💾 Save IndexedDB Snapshot");
-                let _ = ui.button("📥 Restore Offline Workspace");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::SaveDisk,
+                    "Save IndexedDB Snapshot",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_card,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::UploadImport,
+                    "Restore Offline Workspace",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_card,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
         });
         ui.add_space(12.0);
@@ -280,11 +330,28 @@ impl MyProjectView {
 
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("⚛️ EIGENGRAPH ENGINEERING VAULT & KNOWLEDGE MEMORY").size(13.0).strong().color(theme.accent_blue));
+                icons::icon_label(
+                    ui,
+                    AppIcon::Database,
+                    14.0,
+                    theme.accent_blue,
+                    "EIGENGRAPH ENGINEERING VAULT & KNOWLEDGE MEMORY",
+                    13.0,
+                    theme.accent_blue,
+                    true,
+                );
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new(RichText::new("🔄 Sync & Train ARI Memory").size(11.5).strong().color(Color32::WHITE))
-                        .fill(theme.accent_green)
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Undo,
+                        "Sync & Train ARI Memory",
+                        11.5,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    ).clicked() {
                         let mut engine = crate::core::ParametricEngine::new();
                         if let Ok(mut model) = engine.generate_warren_truss() {
                             model.name = "Active_Warren_Project".to_string();
@@ -300,15 +367,18 @@ impl MyProjectView {
             });
 
             ui.add_space(6.0);
-            ui.label(
-                RichText::new(format!(
-                    "📂 Active Vault Location: {}",
-                    vault_root.display()
-                ))
-                .size(11.5)
-                .monospace()
-                .color(theme.text_secondary),
-            );
+            ui.horizontal_wrapped(|ui| {
+                icons::draw_icon(ui, AppIcon::Folder, 13.0, theme.accent_blue);
+                ui.label(
+                    RichText::new(format!(
+                        "Active Vault Location: {}",
+                        vault_root.display()
+                    ))
+                    .size(11.5)
+                    .monospace()
+                    .color(theme.text_secondary),
+                );
+            });
 
             ui.add_space(8.0);
             let best_sec = mem
@@ -359,7 +429,16 @@ impl MyProjectView {
             ui.add_space(8.0);
             let dir_input_w = (ui.available_width() - 80.0).clamp(160.0, 320.0);
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("🎯 Switch Target Vault Directory:").size(11.0).color(theme.text_muted));
+                icons::icon_label(
+                    ui,
+                    AppIcon::Target,
+                    12.5,
+                    theme.accent_blue,
+                    "Switch Target Vault Directory:",
+                    11.0,
+                    theme.text_muted,
+                    false,
+                );
                 let resp = ui.add(egui::TextEdit::singleline(&mut self.custom_vault_override)
                     .hint_text("Enter custom folder path...")
                     .desired_width(dir_input_w));
@@ -380,7 +459,16 @@ impl MyProjectView {
             // Multi-LOD Redundancy Convergence Engine Table (LOD 100 -> LOD 200 -> LOD 300)
             let conv = crate::core::InternalVault::evaluate_nvw_multi_lod_convergence();
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("📈 MULTI-LOD REDUNDANCY CONVERGENCE AUDIT (LOD 100 ➔ LOD 200 ➔ LOD 300)").size(11.5).strong().color(theme.accent_green));
+                icons::icon_label(
+                    ui,
+                    AppIcon::ChartLine,
+                    13.0,
+                    theme.accent_green,
+                    "MULTI-LOD REDUNDANCY CONVERGENCE AUDIT (LOD 100 -> LOD 200 -> LOD 300)",
+                    11.5,
+                    theme.accent_green,
+                    true,
+                );
                 ui.label(RichText::new(format!("• ΔARI: +{:.1}% • κ(K) Reduction: {:.1}x", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)).size(11.0).strong().color(theme.accent_blue));
             });
             ui.add_space(4.0);
@@ -515,14 +603,21 @@ impl MyProjectView {
 
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new(format!(
-                    "📊 {} El  •  {} Nd  •  ARI: {:.2}",
+                    "{} El  •  {} Nd  •  ARI: {:.2}",
                     p.elements_count, p.nodes_count, p.min_ari
                 )).size(11.5).color(theme.text_muted));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new(RichText::new("Open Model ➔").size(11.5).strong().color(Color32::WHITE))
-                        .fill(theme.accent_blue)
-                        .corner_radius(CornerRadius::same(6))
-                        .min_size(egui::Vec2::new(100.0, 26.0))).clicked() {
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ArrowRight,
+                        "Open Model",
+                        11.5,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        egui::Vec2::new(100.0, 26.0),
+                    ).clicked() {
                         *active_pillar = NavigationPillar::GeometryAssembly;
                     }
                 });
@@ -538,7 +633,7 @@ impl MyProjectView {
 
     fn render_dossier_modal(&mut self, ui: &mut Ui, theme: &MacTheme) {
         let ctx = ui.ctx().clone();
-        egui::Window::new("📜 OFFICIAL STRUCTURAL REDUNDANCY AUDIT CERTIFICATE (EIGENGRAPH)")
+        egui::Window::new("OFFICIAL STRUCTURAL REDUNDANCY AUDIT CERTIFICATE (EIGENGRAPH)")
             .collapsible(false)
             .resizable(true)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::new(0.0, 0.0))
@@ -602,9 +697,27 @@ impl MyProjectView {
                                 .inner_margin(Margin::same(10))
                                 .show(ui, |ui| {
                                     ui.horizontal_wrapped(|ui| {
-                                        ui.label(RichText::new("🔐 CRYPTOGRAPHIC AUDIT SEAL (SHA-256):").size(11.0).strong().color(theme.accent_blue));
+                                        icons::icon_label(
+                                            ui,
+                                            AppIcon::Lock,
+                                            12.0,
+                                            theme.accent_blue,
+                                            "CRYPTOGRAPHIC AUDIT SEAL (SHA-256):",
+                                            11.0,
+                                            theme.accent_blue,
+                                            true,
+                                        );
                                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                            ui.label(RichText::new("✅ Tamper-Proof Authentic").size(10.5).color(theme.accent_green));
+                                            icons::icon_label(
+                                                ui,
+                                                AppIcon::CheckCircle,
+                                                12.0,
+                                                theme.accent_green,
+                                                "Tamper-Proof Authentic",
+                                                10.5,
+                                                theme.accent_green,
+                                                false,
+                                            );
                                         });
                                     });
                                     ui.label(RichText::new(format!("Hash: {}", mock_hash)).size(10.0).color(theme.text_secondary));
@@ -618,14 +731,31 @@ impl MyProjectView {
                             ui.label(RichText::new("Certification Status: OFFICIALLY VALIDATED (EIGENGRAPH 2026)").size(11.5).strong().color(theme.accent_green));
                             if let Some(ref msg) = self.export_success_msg {
                                 ui.add_space(4.0);
-                                ui.label(RichText::new(format!("✅ {}", msg)).size(11.0).color(theme.accent_green));
+                                icons::icon_label(
+                                    ui,
+                                    AppIcon::CheckCircle,
+                                    12.0,
+                                    theme.accent_green,
+                                    msg,
+                                    11.0,
+                                    theme.accent_green,
+                                    false,
+                                );
                             }
 
                             ui.add_space(8.0);
                             ui.horizontal_wrapped(|ui| {
-                                if ui.add(egui::Button::new(RichText::new("🌐 Download Interactive 3D Viewer (.html)").size(12.0).strong().color(Color32::WHITE))
-                                    .fill(Color32::from_rgb(147, 51, 234))
-                                    .corner_radius(CornerRadius::same(6))).clicked() {
+                                if icons::icon_button(
+                                    ui,
+                                    AppIcon::Globe,
+                                    "Download Interactive 3D Viewer (.html)",
+                                    12.0,
+                                    Color32::WHITE,
+                                    Color32::from_rgb(147, 51, 234),
+                                    Stroke::NONE,
+                                    CornerRadius::same(6),
+                                    Vec2::ZERO,
+                                ).clicked() {
                                     let mut engine = crate::core::ParametricEngine::new();
                                     if let Ok(model) = engine.generate_warren_truss() {
                                         let assessment = crate::core::AriEngine::evaluate_redundancy(&model).ok();
@@ -649,9 +779,17 @@ impl MyProjectView {
                                     }
                                 }
 
-                                if ui.add(egui::Button::new(RichText::new("📄 Download Comprehensive Dossier (.md)").size(12.0).strong().color(Color32::WHITE))
-                                    .fill(theme.accent_green)
-                                    .corner_radius(CornerRadius::same(6))).clicked() {
+                                if icons::icon_button(
+                                    ui,
+                                    AppIcon::Document,
+                                    "Download Comprehensive Dossier (.md)",
+                                    12.0,
+                                    Color32::WHITE,
+                                    theme.accent_green,
+                                    Stroke::NONE,
+                                    CornerRadius::same(6),
+                                    Vec2::ZERO,
+                                ).clicked() {
                                     let mut engine = crate::core::ParametricEngine::new();
                                     if let Ok(model) = engine.generate_warren_truss() {
                                         if let Ok(assessment) = crate::core::AriEngine::evaluate_redundancy(&model) {
@@ -683,15 +821,31 @@ impl MyProjectView {
                                     }
                                 }
 
-                                if ui.add(egui::Button::new(RichText::new("💾 Save PDF Dossier").size(12.0).strong().color(Color32::WHITE))
-                                    .fill(theme.accent_blue)
-                                    .corner_radius(CornerRadius::same(6))).clicked() {
+                                if icons::icon_button(
+                                    ui,
+                                    AppIcon::SaveDisk,
+                                    "Save PDF Dossier",
+                                    12.0,
+                                    Color32::WHITE,
+                                    theme.accent_blue,
+                                    Stroke::NONE,
+                                    CornerRadius::same(6),
+                                    Vec2::ZERO,
+                                ).clicked() {
                                     self.export_success_msg = Some("Document ready to print to PDF format via system viewer".to_string());
                                 }
 
-                                if ui.add(egui::Button::new(RichText::new("✕ Close").size(12.0).color(theme.text_secondary))
-                                    .fill(theme.bg_card)
-                                    .corner_radius(CornerRadius::same(6))).clicked() {
+                                if icons::icon_button(
+                                    ui,
+                                    AppIcon::Close,
+                                    "Close",
+                                    12.0,
+                                    theme.text_secondary,
+                                    theme.bg_card,
+                                    Stroke::new(1.0, theme.border_subtle),
+                                    CornerRadius::same(6),
+                                    Vec2::ZERO,
+                                ).clicked() {
                                     self.show_dossier_modal = false;
                                 }
                             });
@@ -710,7 +864,7 @@ impl MyProjectView {
             .inner_margin(Margin::symmetric(14, 10))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("🔍 Search:").size(11.0).color(theme.text_secondary));
+                    icons::icon_label(ui, AppIcon::Search, 12.0, theme.text_secondary, "Search:", 11.0, theme.text_secondary, false);
                     let search_w = (ui.available_width() - 90.0).clamp(120.0, 180.0);
                     ui.add(egui::TextEdit::singleline(&mut self.family_search_query).desired_width(search_w).hint_text("Filter families..."));
 
@@ -738,9 +892,17 @@ impl MyProjectView {
                     }
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.add(egui::Button::new(RichText::new("➕ Create Family").size(11.0).strong().color(Color32::WHITE))
-                            .fill(theme.accent_blue)
-                            .corner_radius(CornerRadius::same(6))).clicked() {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Plus,
+                            "Create Family",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        ).clicked() {
                             let next_idx = self.families.len() + 1;
                             self.families.push(crate::models::BimFamilyItem {
                                 id: format!("fam_custom_{}", next_idx),
@@ -814,9 +976,32 @@ impl MyProjectView {
                     ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new(&fam.name).size(13.0).strong().color(theme.text_primary));
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if ui.add(egui::Button::new(RichText::new(if is_sel { "✓ Selected" } else { "Inspect" }).size(11.0).color(if is_sel { Color32::WHITE } else { theme.text_primary }))
-                                .fill(if is_sel { theme.accent_blue } else { theme.bg_sidebar })
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            let sel_btn = if is_sel {
+                                icons::icon_button(
+                                    ui,
+                                    AppIcon::CheckCircle,
+                                    "Selected",
+                                    11.0,
+                                    Color32::WHITE,
+                                    theme.accent_blue,
+                                    Stroke::NONE,
+                                    CornerRadius::same(6),
+                                    Vec2::ZERO,
+                                )
+                            } else {
+                                icons::icon_button(
+                                    ui,
+                                    AppIcon::Search,
+                                    "Inspect",
+                                    11.0,
+                                    theme.text_primary,
+                                    theme.bg_sidebar,
+                                    Stroke::new(1.0, theme.border_subtle),
+                                    CornerRadius::same(6),
+                                    Vec2::ZERO,
+                                )
+                            };
+                            if sel_btn.clicked() {
                                 self.selected_family_idx = *idx;
                             }
                         });
@@ -873,7 +1058,16 @@ impl MyProjectView {
                 ui.set_width(ui.available_width());
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(RichText::new("📋 PARAMETER INSPECTOR").size(10.5).strong().color(theme.accent_blue));
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Clipboard,
+                            12.0,
+                            theme.accent_blue,
+                            "PARAMETER INSPECTOR",
+                            10.5,
+                            theme.accent_blue,
+                            true,
+                        );
                         ui.label(RichText::new(&active_fam.name).size(13.0).strong().color(theme.text_primary));
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -941,29 +1135,50 @@ impl MyProjectView {
 
                 // Action Buttons
                 ui.vertical(|ui| {
-                    if ui.add(egui::Button::new(RichText::new("🏗️ Insert into Active 3D Scene").size(12.0).strong().color(Color32::WHITE))
-                        .fill(theme.accent_blue)
-                        .corner_radius(CornerRadius::same(7))
-                        .min_size(Vec2::new(ui.available_width(), 32.0))).clicked() {
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Cube3D,
+                        "Insert into Active 3D Scene",
+                        12.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(7),
+                        Vec2::new(ui.available_width(), 32.0),
+                    ).clicked() {
                         self.export_success_msg = Some(format!("Family '{}' successfully instantiated into active BIM model at Grid Intersection A-1.", active_fam.name));
                     }
                     ui.add_space(6.0);
                     let btn_w = ((ui.available_width() - 8.0) * 0.5).clamp(130.0, 220.0);
                     ui.horizontal_wrapped(|ui| {
-                        if ui.add(egui::Button::new(RichText::new("📋 Duplicate Type").size(11.0).color(theme.text_primary))
-                            .fill(theme.bg_sidebar)
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(btn_w, 28.0))).clicked() {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Clipboard,
+                            "Duplicate Type",
+                            11.0,
+                            theme.text_primary,
+                            theme.bg_sidebar,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::new(btn_w, 28.0),
+                        ).clicked() {
                             let mut dup = active_fam.clone();
                             dup.id = format!("{}_copy", dup.id);
                             dup.name = format!("{} (Type 2)", dup.name);
                             self.families.push(dup);
                             self.export_success_msg = Some(format!("Duplicated family type '{}'.", active_fam.name));
                         }
-                        if ui.add(egui::Button::new(RichText::new("📥 Export IFC Spec").size(11.0).color(theme.text_primary))
-                            .fill(theme.bg_sidebar)
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(btn_w, 28.0))).clicked() {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::UploadImport,
+                            "Export IFC Spec",
+                            11.0,
+                            theme.text_primary,
+                            theme.bg_sidebar,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::new(btn_w, 28.0),
+                        ).clicked() {
                             self.export_success_msg = Some(format!("Exported ISO 10303-21 STEP specification for '{}'.", active_fam.name));
                         }
                     });
@@ -994,7 +1209,17 @@ impl MyProjectView {
                 let _ = ui.selectable_label(true, "Active Container: SHARED");
                 let _ = ui.selectable_label(false, "WIP Team Folders");
                 let _ = ui.selectable_label(false, "Transmittal Queue (2 Pending)");
-                let _ = ui.button("📤 Issue Transmittal Package (ISO 19650)");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::UploadImport,
+                    "Issue Transmittal Package (ISO 19650)",
+                    11.5,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
             ui.add_space(10.0);
 
@@ -1045,28 +1270,32 @@ impl MyProjectView {
 
             let templates = [
                 (
-                    "🌉 36m Composite Warren Arch Viaduct",
+                    AppIcon::Beam,
+                    "36m Composite Warren Arch Viaduct",
                     "SNI 1725 / AASHTO LRFD Bridge Spec",
                     "3×12m spans • W14x90 Chords • HL-93 Moving Load Preset • Baseline ARI 0.94",
                     "Instantiate Steel Bridge Seed",
                     theme.accent_blue,
                 ),
                 (
-                    "🏢 24-Storey Dual-System RC Tower",
+                    AppIcon::Building,
+                    "24-Storey Dual-System RC Tower",
                     "SNI 2847 / ACI 318 / SNI 1726 KDS-D",
                     "C45 Coupled Core Shear Walls + SMF Perimeter • Seismic R=7.0 • Baseline ARI 0.91",
                     "Instantiate RC Tower Seed",
                     theme.accent_green,
                 ),
                 (
-                    "🏗️ PT Post-Tensioned Box-Girder Flyover",
+                    AppIcon::Cube3D,
+                    "PT Post-Tensioned Box-Girder Flyover",
                     "AASHTO Segmental / ACI 318 Ch. 20",
                     "45m Balanced Cantilever Span • 19-Strand Low-Lax Tendons • Stage-Prestress Preset",
                     "Instantiate PT Flyover Seed",
                     theme.accent_orange,
                 ),
                 (
-                    "🏭 Automated Precast Logistics Fulfillment Hub",
+                    AppIcon::BoxPackage,
+                    "Automated Precast Logistics Fulfillment Hub",
                     "PCI Design Handbook / 10D DfMA Ready",
                     "18m Clear-Bay Precast Portal • Corbel Columns + Double-Tee Roof • CNC Ready",
                     "Instantiate Precast Plant Seed",
@@ -1075,7 +1304,7 @@ impl MyProjectView {
             ];
 
             ui_kit::responsive_grid_n(ui, templates.len(), 250.0, |ui, idx| {
-                let (title, code, specs, btn_label, accent) = templates[idx];
+                let (icon, title, code, specs, btn_label, accent) = templates[idx];
                 Frame::new()
                     .fill(theme.bg_card)
                     .corner_radius(CornerRadius::same(8))
@@ -1083,15 +1312,21 @@ impl MyProjectView {
                     .inner_margin(Margin::same(12))
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new(title).size(12.5).strong().color(accent));
+                        icons::icon_label(ui, icon, 14.0, accent, title, 12.5, accent, true);
                         ui.label(RichText::new(code).size(10.0).strong().color(theme.text_muted));
                         ui.add_space(6.0);
                         ui.label(RichText::new(specs).size(11.0).color(theme.text_secondary));
                         ui.add_space(10.0);
-                        let _ = ui.add(
-                            egui::Button::new(RichText::new(btn_label).size(11.0).strong().color(Color32::WHITE))
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6)),
+                        let _ = icons::icon_button(
+                            ui,
+                            AppIcon::Plus,
+                            btn_label,
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
                         );
                     });
             });

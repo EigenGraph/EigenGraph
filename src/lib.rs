@@ -1,6 +1,7 @@
 pub mod app;
 pub mod core;
 pub mod features;
+pub mod icons;
 pub mod models;
 pub mod theme;
 pub mod ui_kit;

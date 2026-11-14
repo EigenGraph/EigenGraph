@@ -209,16 +209,31 @@ pub fn subtab_bar<T: Copy + PartialEq>(
                         Stroke::new(1.0, theme.border_subtle)
                     };
 
-                    if ui
-                        .add(
-                            egui::Button::new(RichText::new(label).size(11.5).strong().color(fg))
+                    let (maybe_icon, clean_label) = crate::icons::split_icon_and_label(label);
+                    let clicked = if let Some(icon) = maybe_icon {
+                        crate::icons::icon_button(
+                            ui,
+                            icon,
+                            clean_label,
+                            11.5,
+                            fg,
+                            bg,
+                            stroke,
+                            CornerRadius::same(7),
+                            Vec2::new(0.0, 30.0),
+                        )
+                        .clicked()
+                    } else {
+                        ui.add(
+                            egui::Button::new(RichText::new(clean_label).size(11.5).strong().color(fg))
                                 .fill(bg)
                                 .stroke(stroke)
                                 .corner_radius(CornerRadius::same(7))
                                 .min_size(Vec2::new(0.0, 30.0)),
                         )
                         .clicked()
-                    {
+                    };
+                    if clicked {
                         *active = tab;
                     }
                 }
@@ -262,21 +277,16 @@ pub fn stat_card(
 }
 
 /// Renders a compact status badge (`ACTIVE` or `LOCKED • Phase 3x`) for workspace headers and toolbars.
-pub fn feature_status_badge(ui: &mut Ui, theme: &MacTheme, status: FeatureStatus) {
-    let (label, color) = match status {
-        FeatureStatus::Active => ("🔓 ACTIVE".to_string(), theme.accent_green),
-        FeatureStatus::Locked { target_phase } => {
-            (format!("🔒 LOCKED • {target_phase}"), theme.accent_orange)
-        }
+pub fn feature_status_badge(ui: &mut Ui, _theme: &MacTheme, status: FeatureStatus) {
+    let (icon, label, color) = match status {
+        FeatureStatus::Active => (crate::icons::AppIcon::Unlock, "ACTIVE".to_string(), _theme.accent_green),
+        FeatureStatus::Locked { target_phase } => (
+            crate::icons::AppIcon::Lock,
+            format!("LOCKED • {target_phase}"),
+            _theme.accent_orange,
+        ),
     };
-    Frame::new()
-        .fill(color.gamma_multiply(0.14))
-        .stroke(Stroke::new(1.0, color.gamma_multiply(0.55)))
-        .corner_radius(CornerRadius::same(6))
-        .inner_margin(Margin::symmetric(8, 3))
-        .show(ui, |ui| {
-            ui.label(RichText::new(label).size(10.0).strong().color(color));
-        });
+    crate::icons::pill_badge(ui, icon, label, color);
 }
 
 /// Renders a complete final-layout preview card for an unlockable feature slot.
@@ -315,33 +325,33 @@ pub fn locked_feature_slot(
 
                 if is_locked {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let btn_text = if entry.prioritized {
-                            "🎯 Prioritized for Unlock"
+                        let (btn_icon, btn_text) = if entry.prioritized {
+                            (crate::icons::AppIcon::Target, "Prioritized for Unlock")
                         } else {
-                            "☆ Queue for Unlock"
+                            (crate::icons::AppIcon::Star, "Queue for Unlock")
                         };
                         let btn_fill = if entry.prioritized {
                             theme.accent_blue.gamma_multiply(0.28)
                         } else {
                             theme.bg_sidebar
                         };
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new(btn_text)
-                                        .size(10.5)
-                                        .strong()
-                                        .color(if entry.prioritized {
-                                            theme.accent_blue
-                                        } else {
-                                            theme.text_secondary
-                                        }),
-                                )
-                                .fill(btn_fill)
-                                .stroke(Stroke::new(1.0, theme.border_card))
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        let btn_fg = if entry.prioritized {
+                            theme.accent_blue
+                        } else {
+                            theme.text_secondary
+                        };
+                        if crate::icons::icon_button(
+                            ui,
+                            btn_icon,
+                            btn_text,
+                            10.5,
+                            btn_fg,
+                            btn_fill,
+                            Stroke::new(1.0, theme.border_card),
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .clicked()
                         {
                             entry.prioritized = !entry.prioritized;
                             toggled = true;

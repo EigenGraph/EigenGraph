@@ -1,6 +1,6 @@
 //! settings.rs — Workspace Settings, Design Standards & Centralized Feature Unlock Roadmap.
 
-use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, ProgressBar, RichText, ScrollArea, Stroke, Ui};
+use egui::{Align, Color32, CornerRadius, Frame, Layout, Margin, ProgressBar, RichText, ScrollArea, Stroke, Ui, Vec2};
 use crate::core::DiskExporter;
 use crate::features::{FeatureRegistry, FeatureStatus};
 use crate::models::NavigationPillar;
@@ -242,11 +242,11 @@ impl SettingsView {
                         .desired_width(220.0),
                 );
 
-                for (filter, label) in [
-                    (RegistryFilter::All, "All"),
-                    (RegistryFilter::LockedOnly, "🔒 Locked Only"),
-                    (RegistryFilter::PrioritizedOnly, "🎯 Prioritized"),
-                    (RegistryFilter::ActiveOnly, "🔓 Active Only"),
+                for (filter, maybe_ico, label) in [
+                    (RegistryFilter::All, None, "All"),
+                    (RegistryFilter::LockedOnly, Some(crate::icons::AppIcon::Lock), "Locked Only"),
+                    (RegistryFilter::PrioritizedOnly, Some(crate::icons::AppIcon::Target), "Prioritized"),
+                    (RegistryFilter::ActiveOnly, Some(crate::icons::AppIcon::Unlock), "Active Only"),
                 ] {
                     let selected = self.registry_filter == filter;
                     let fill = if selected {
@@ -259,14 +259,28 @@ impl SettingsView {
                     } else {
                         theme.text_secondary
                     };
-                    if ui
-                        .add(
+                    let clicked = if let Some(ico) = maybe_ico {
+                        crate::icons::icon_button(
+                            ui,
+                            ico,
+                            label,
+                            11.0,
+                            fg,
+                            fill,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
+                    } else {
+                        ui.add(
                             egui::Button::new(RichText::new(label).size(11.0).color(fg))
                                 .fill(fill)
                                 .corner_radius(CornerRadius::same(6)),
                         )
                         .clicked()
-                    {
+                    };
+                    if clicked {
                         self.registry_filter = filter;
                     }
                 }
@@ -355,63 +369,66 @@ impl SettingsView {
 
             ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("⭐ Prioritize Phase 32")
-                                .size(11.0)
-                                .color(theme.accent_blue),
-                        )
-                        .fill(theme.accent_blue.gamma_multiply(0.15))
-                        .corner_radius(CornerRadius::same(6)),
-                    )
-                    .clicked()
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Star,
+                    "Prioritize Phase 32",
+                    11.0,
+                    theme.accent_blue,
+                    theme.accent_blue.gamma_multiply(0.15),
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
                 {
                     registry.prioritize_phase("Phase 32");
                 }
 
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("⭐ Prioritize Phase 33")
-                                .size(11.0)
-                                .color(theme.accent_blue),
-                        )
-                        .fill(theme.accent_blue.gamma_multiply(0.15))
-                        .corner_radius(CornerRadius::same(6)),
-                    )
-                    .clicked()
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Star,
+                    "Prioritize Phase 33",
+                    11.0,
+                    theme.accent_blue,
+                    theme.accent_blue.gamma_multiply(0.15),
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
                 {
                     registry.prioritize_phase("Phase 33");
                 }
 
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("🧹 Clear Queue Flags")
-                                .size(11.0)
-                                .color(theme.text_secondary),
-                        )
-                        .fill(theme.bg_sidebar)
-                        .corner_radius(CornerRadius::same(6)),
-                    )
-                    .clicked()
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Eraser,
+                    "Clear Queue Flags",
+                    11.0,
+                    theme.text_secondary,
+                    theme.bg_sidebar,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
                 {
                     registry.clear_all_priorities();
                 }
 
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("📄 Export Unlock Backlog (.md)")
-                                .size(11.0)
-                                .strong()
-                                .color(Color32::WHITE),
-                        )
-                        .fill(theme.accent_green)
-                        .corner_radius(CornerRadius::same(6)),
-                    )
-                    .clicked()
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Document,
+                    "Export Unlock Backlog (.md)",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_green,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
                 {
                     let md = registry.export_unlock_backlog_markdown();
                     match DiskExporter::write_export_file("EigenGraph_Unlock_Backlog.md", &md) {
@@ -424,18 +441,18 @@ impl SettingsView {
                     }
                 }
 
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("📦 Export Unlock Roadmap (.json)")
-                                .size(11.0)
-                                .strong()
-                                .color(Color32::WHITE),
-                        )
-                        .fill(theme.accent_blue)
-                        .corner_radius(CornerRadius::same(6)),
-                    )
-                    .clicked()
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::BoxPackage,
+                    "Export Unlock Roadmap (.json)",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
                 {
                     let json = registry.export_unlock_roadmap_json();
                     match DiskExporter::write_export_file("EigenGraph_Unlock_Roadmap.json", &json) {
@@ -519,7 +536,19 @@ impl SettingsView {
                         {
                             self.pillar_filter = if is_selected { None } else { Some(pillar) };
                         }
-                        if ui.small_button("↗ Open").clicked() {
+                        if crate::icons::icon_button(
+                            ui,
+                            crate::icons::AppIcon::ArrowRight,
+                            "Open",
+                            10.0,
+                            theme.accent_blue,
+                            theme.bg_sidebar,
+                            Stroke::NONE,
+                            CornerRadius::same(4),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
+                        {
                             *active_pillar = pillar;
                             jump_clicked = true;
                         }
@@ -652,27 +681,28 @@ impl SettingsView {
                         );
 
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new("↗ Inspect Layout")
-                                            .size(10.5)
-                                            .color(theme.text_primary),
-                                    )
-                                    .fill(theme.bg_sidebar)
-                                    .corner_radius(CornerRadius::same(6)),
-                                )
-                                .clicked()
+                            if crate::icons::icon_button(
+                                ui,
+                                crate::icons::AppIcon::ArrowRight,
+                                "Inspect Layout",
+                                10.5,
+                                theme.text_primary,
+                                theme.bg_sidebar,
+                                Stroke::NONE,
+                                CornerRadius::same(6),
+                                Vec2::ZERO,
+                            )
+                            .clicked()
                             {
                                 *active_pillar = entry.pillar;
                                 jump_clicked = true;
                             }
 
                             if !entry.status.is_active() {
-                                let label = if entry.prioritized {
-                                    "🎯 Prioritized for Unlock"
+                                let (ico, label) = if entry.prioritized {
+                                    (crate::icons::AppIcon::Target, "Prioritized for Unlock")
                                 } else {
-                                    "☆ Queue for Unlock"
+                                    (crate::icons::AppIcon::Star, "Queue for Unlock")
                                 };
                                 let fill = if entry.prioritized {
                                     theme.accent_blue.gamma_multiply(0.25)
@@ -684,13 +714,18 @@ impl SettingsView {
                                 } else {
                                     theme.text_secondary
                                 };
-                                if ui
-                                    .add(
-                                        egui::Button::new(RichText::new(label).size(10.5).strong().color(fg))
-                                            .fill(fill)
-                                            .corner_radius(CornerRadius::same(6)),
-                                    )
-                                    .clicked()
+                                if crate::icons::icon_button(
+                                    ui,
+                                    ico,
+                                    label,
+                                    10.5,
+                                    fg,
+                                    fill,
+                                    Stroke::NONE,
+                                    CornerRadius::same(6),
+                                    Vec2::ZERO,
+                                )
+                                .clicked()
                                 {
                                     entry.prioritized = !entry.prioritized;
                                 }
@@ -725,11 +760,15 @@ impl SettingsView {
         members: &[StructuralMember],
         variables: &[ParametricVariable],
     ) {
-        ui.heading(
-            RichText::new("⚙️ Workspace Settings")
-                .size(20.0)
-                .strong()
-                .color(theme.text_primary),
+        crate::icons::icon_label(
+            ui,
+            crate::icons::AppIcon::SettingsGear,
+            20.0,
+            theme.accent_blue,
+            "Workspace Settings",
+            20.0,
+            theme.text_primary,
+            true,
         );
         ui.label(
             RichText::new(
@@ -763,28 +802,28 @@ impl SettingsView {
                     );
                     ui.add_space(4.0);
                     ui.horizontal_wrapped(|ui| {
-                        for (mode, label) in [
-                            (ThemeMode::ProDark, "🌙 Pro Dark"),
-                            (ThemeMode::EngineeringLight, "☀️ Engineering Light"),
-                        ] {
+                        for mode in [ThemeMode::ProDark, ThemeMode::EngineeringLight] {
                             let is_active = theme.mode == mode;
-                            if ui
-                                .add(
-                                    egui::Button::new(RichText::new(label).size(11.5).strong().color(
-                                        if is_active {
-                                            Color32::WHITE
-                                        } else {
-                                            theme.text_primary
-                                        },
-                                    ))
-                                    .fill(if is_active {
-                                        theme.accent_blue
-                                    } else {
-                                        theme.bg_sidebar
-                                    })
-                                    .corner_radius(egui::CornerRadius::same(7)),
-                                )
-                                .clicked()
+                            if crate::icons::icon_button(
+                                ui,
+                                mode.app_icon(),
+                                mode.label(),
+                                11.5,
+                                if is_active {
+                                    Color32::WHITE
+                                } else {
+                                    theme.text_primary
+                                },
+                                if is_active {
+                                    theme.accent_blue
+                                } else {
+                                    theme.bg_sidebar
+                                },
+                                Stroke::NONE,
+                                egui::CornerRadius::same(7),
+                                Vec2::ZERO,
+                            )
+                            .clicked()
                             {
                                 pending_theme_mode = Some(mode);
                             }
@@ -933,18 +972,18 @@ impl SettingsView {
             );
             ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("💾 Export 1-File Unified Workspace (.eigen.json)")
-                                .size(11.5)
-                                .strong()
-                                .color(Color32::WHITE),
-                        )
-                        .fill(theme.accent_blue)
-                        .corner_radius(egui::CornerRadius::same(7)),
-                    )
-                    .clicked()
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::SaveDisk,
+                    "Export 1-File Unified Workspace (.eigen.json)",
+                    11.5,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    egui::CornerRadius::same(7),
+                    Vec2::ZERO,
+                )
+                .clicked()
                 {
                     let snap = self.workspace_settings_snapshot(
                         theme,
@@ -954,18 +993,18 @@ impl SettingsView {
                     universal_canvas.export_unified_file(bim_project, members, variables, snap);
                 }
 
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("📥 Import 1-File Archive (.eigen.json)")
-                                .size(11.5)
-                                .strong()
-                                .color(theme.text_primary),
-                        )
-                        .fill(theme.bg_sidebar)
-                        .corner_radius(egui::CornerRadius::same(7)),
-                    )
-                    .clicked()
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::UploadImport,
+                    "Import 1-File Archive (.eigen.json)",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_sidebar,
+                    Stroke::NONE,
+                    egui::CornerRadius::same(7),
+                    Vec2::ZERO,
+                )
+                .clicked()
                 {
                     universal_canvas.import_json_open = true;
                 }
@@ -1114,10 +1153,13 @@ impl SettingsView {
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
                 ui.label(
-                    RichText::new(format!("v{} — Phase 32 Streamlined Canvas Workspace", env!("CARGO_PKG_VERSION")))
-                        .size(13.0)
-                        .color(theme.accent_green)
-                        .strong(),
+                    RichText::new(format!(
+                        "v{} — Phase 33 Vector-Icon & Single-Canvas Workspace",
+                        env!("CARGO_PKG_VERSION")
+                    ))
+                    .size(13.0)
+                    .color(theme.accent_green)
+                    .strong(),
                 );
             });
 

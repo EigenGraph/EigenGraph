@@ -8,6 +8,7 @@ use egui::{
 };
 use crate::core::web_bridge;
 use crate::features::{FeatureId, FeatureRegistry};
+use crate::icons::{self, AppIcon};
 use crate::models::{
     CalculationMemoResult, CopilotCarbonParams, CopilotShearWallParams, CopilotWindParams,
     CopilotWorkflowKind, DatabaseComponent, ProjectItem, StructuralMember,
@@ -45,12 +46,12 @@ impl FirmRole {
         }
     }
 
-    pub fn icon(&self) -> &'static str {
+    pub fn app_icon(&self) -> AppIcon {
         match self {
-            Self::ProjectManager => "👔",
-            Self::SeniorDrafter => "📐",
-            Self::FeaAnalyst => "⚡",
-            Self::QsSpecialist => "💰",
+            Self::ProjectManager => AppIcon::HardHat,
+            Self::SeniorDrafter => AppIcon::RulerSquare,
+            Self::FeaAnalyst => AppIcon::Bolt,
+            Self::QsSpecialist => AppIcon::Coins,
         }
     }
 
@@ -211,24 +212,22 @@ impl AiFirmView {
             .inner_margin(Margin::same(16))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("🤖 Autonomous AI Civil Engineering Copilot Studio")
-                            .size(17.0)
-                            .strong()
-                            .color(theme.text_primary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Bot,
+                        18.0,
+                        theme.accent_blue,
+                        "Autonomous AI Civil Engineering Copilot Studio",
+                        17.0,
+                        theme.text_primary,
+                        true,
                     );
-                    Frame::new()
-                        .fill(theme.accent_blue.gamma_multiply(0.15))
-                        .corner_radius(CornerRadius::same(6))
-                        .inner_margin(Margin::symmetric(8, 3))
-                        .show(ui, |ui| {
-                            ui.label(
-                                RichText::new("DETERMINISTIC CODE SOLVER + MARKDOWN MEMO")
-                                    .size(9.5)
-                                    .strong()
-                                    .color(theme.accent_blue),
-                            );
-                        });
+                    icons::pill_badge(
+                        ui,
+                        AppIcon::Cpu,
+                        "DETERMINISTIC CODE SOLVER + MARKDOWN MEMO",
+                        theme.accent_blue,
+                    );
                 });
                 ui.add_space(4.0);
                 ui.label(
@@ -241,18 +240,17 @@ impl AiFirmView {
                 ui.horizontal_wrapped(|ui| {
                     for wf in CopilotWorkflowKind::all() {
                         let active = self.active_copilot == *wf;
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new(wf.label())
-                                        .size(11.5)
-                                        .strong()
-                                        .color(if active { Color32::WHITE } else { theme.text_primary }),
-                                )
-                                .fill(if active { theme.accent_blue } else { theme.bg_canvas })
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::smart_button(
+                            ui,
+                            wf.label(),
+                            11.5,
+                            if active { Color32::WHITE } else { theme.text_primary },
+                            if active { theme.accent_blue } else { theme.bg_canvas },
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            egui::Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.active_copilot = *wf;
                         }
@@ -270,7 +268,16 @@ impl AiFirmView {
                 .inner_margin(Margin::symmetric(12, 6))
                 .show(ui, |ui| {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(RichText::new(format!("✅ {}", status)).size(11.5).color(theme.text_primary));
+                        icons::icon_label(
+                            ui,
+                            AppIcon::CheckCircle,
+                            12.5,
+                            theme.accent_green,
+                            status,
+                            11.5,
+                            theme.text_primary,
+                            false,
+                        );
                         if ui.small_button("Dismiss").clicked() {
                             dismiss_copilot_status = true;
                         }
@@ -317,9 +324,39 @@ impl AiFirmView {
                             .strong()
                             .color(theme.text_primary),
                     );
-                    let _ = ui.button("🔗 Connect API Key");
-                    let _ = ui.button("🛠️ Preview Tool Schema (12 BIM Commands)");
-                    let _ = ui.button("🚀 Dispatch Live Agent Orchestration");
+                    let _ = icons::icon_button(
+                        ui,
+                        AppIcon::LinkChain,
+                        "Connect API Key",
+                        11.0,
+                        theme.text_primary,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        egui::Vec2::ZERO,
+                    );
+                    let _ = icons::icon_button(
+                        ui,
+                        AppIcon::Wrench,
+                        "Preview Tool Schema (12 BIM Commands)",
+                        11.0,
+                        theme.text_primary,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        egui::Vec2::ZERO,
+                    );
+                    let _ = icons::icon_button(
+                        ui,
+                        AppIcon::Sparkles,
+                        "Dispatch Live Agent Orchestration",
+                        11.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        egui::Vec2::ZERO,
+                    );
                 });
             },
         );
@@ -333,14 +370,28 @@ impl AiFirmView {
             .inner_margin(Margin::same(16))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("⚙️ DESIGN PARAMETERS & DEMANDS")
-                            .size(12.0)
-                            .strong()
-                            .color(theme.accent_blue),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::SettingsGear,
+                        13.0,
+                        theme.accent_blue,
+                        "DESIGN PARAMETERS & DEMANDS",
+                        12.0,
+                        theme.accent_blue,
+                        true,
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.small_button("↺ Reset Defaults").clicked() {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Undo,
+                            "Reset Defaults",
+                            11.0,
+                            theme.text_primary,
+                            theme.bg_canvas,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            egui::Vec2::ZERO,
+                        ).clicked() {
                             match self.active_copilot {
                                 CopilotWorkflowKind::ShearWallAci318 => {
                                     self.shear_wall_params = CopilotShearWallParams::default();
@@ -476,19 +527,12 @@ impl AiFirmView {
                                 .color(theme.text_muted),
                         );
                     });
-                    Frame::new()
-                        .fill(status_col.gamma_multiply(0.16))
-                        .stroke(Stroke::new(1.0, status_col))
-                        .corner_radius(CornerRadius::same(6))
-                        .inner_margin(Margin::symmetric(10, 4))
-                        .show(ui, |ui| {
-                            let badge = if memo.is_compliant {
-                                format!("✅ COMPLIANT • DCR {:.2}", memo.dcr_ratio)
-                            } else {
-                                format!("⚠️ EXCEEDS • DCR {:.2}", memo.dcr_ratio)
-                            };
-                            ui.label(RichText::new(badge).size(10.5).strong().color(status_col));
-                        });
+                    let (badge_icon, badge) = if memo.is_compliant {
+                        (AppIcon::CheckCircle, format!("COMPLIANT • DCR {:.2}", memo.dcr_ratio))
+                    } else {
+                        (AppIcon::AlertTriangle, format!("EXCEEDS • DCR {:.2}", memo.dcr_ratio))
+                    };
+                    icons::pill_badge(ui, badge_icon, badge, status_col);
                 });
 
                 ui.add_space(6.0);
@@ -506,11 +550,15 @@ impl AiFirmView {
                     });
 
                 ui.add_space(10.0);
-                ui.label(
-                    RichText::new("📐 GOVERNING EQUATIONS & TRACEABLE CHECKS")
-                        .size(10.5)
-                        .strong()
-                        .color(theme.text_secondary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::RulerSquare,
+                    12.5,
+                    theme.text_secondary,
+                    "GOVERNING EQUATIONS & TRACEABLE CHECKS",
+                    10.5,
+                    theme.text_secondary,
+                    true,
                 );
                 ui.add_space(4.0);
                 for eq in &memo.equations {
@@ -543,11 +591,15 @@ impl AiFirmView {
                     .inner_margin(Margin::same(10))
                     .stroke(Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.45)))
                     .show(ui, |ui| {
-                        ui.label(
-                            RichText::new("💡 AUTONOMOUS COPILOT RECOMMENDATION")
-                                .size(10.0)
-                                .strong()
-                                .color(theme.accent_blue),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Sparkles,
+                            11.5,
+                            theme.accent_blue,
+                            "AUTONOMOUS COPILOT RECOMMENDATION",
+                            10.0,
+                            theme.accent_blue,
+                            true,
                         );
                         ui.add_space(2.0);
                         ui.label(RichText::new(&memo.recommendation).size(11.5).color(theme.text_primary));
@@ -555,18 +607,18 @@ impl AiFirmView {
 
                 ui.add_space(12.0);
                 ui.horizontal_wrapped(|ui| {
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("📥 Export Calc Memo (.md)")
-                                    .size(11.5)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_blue)
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::UploadImport,
+                        "Export Calc Memo (.md)",
+                        11.5,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        egui::Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         let filename = match self.active_copilot {
                             CopilotWorkflowKind::ShearWallAci318 => "EigenGraph_ShearWall_ACI318_Memo.md",
@@ -583,18 +635,18 @@ impl AiFirmView {
                         }
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("📢 Push Summary to Firm Board")
-                                    .size(11.5)
-                                    .strong()
-                                    .color(theme.text_primary),
-                            )
-                            .fill(theme.bg_canvas)
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Sparkles,
+                        "Push Summary to Firm Board",
+                        11.5,
+                        theme.text_primary,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        egui::Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         self.live_logs.push(AgentLogEntry {
                             timestamp: web_bridge::unix_timestamp_label(),
@@ -624,11 +676,15 @@ impl AiFirmView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("🏛️ Autonomous Virtual Engineering Firm Organigram")
-                                .size(17.0)
-                                .strong()
-                                .color(theme.text_primary),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Building,
+                            18.0,
+                            theme.accent_blue,
+                            "Autonomous Virtual Engineering Firm Organigram",
+                            17.0,
+                            theme.text_primary,
+                            true,
                         );
                         ui.label(
                             RichText::new("Four specialized AI engineering agents working asynchronously on multi-hazard modeling, compliance verification, and quantity takeoffs.")
@@ -637,19 +693,7 @@ impl AiFirmView {
                         );
                     });
 
-                    Frame::new()
-                        .fill(theme.accent_green.gamma_multiply(0.15))
-                        .stroke(Stroke::new(1.0, theme.accent_green.gamma_multiply(0.6)))
-                        .corner_radius(CornerRadius::same(6))
-                        .inner_margin(Margin::symmetric(10, 5))
-                        .show(ui, |ui| {
-                            ui.label(
-                                RichText::new("● 4 / 4 AGENTS SYNCED")
-                                    .size(10.5)
-                                    .strong()
-                                    .color(theme.accent_green),
-                            );
-                        });
+                    icons::pill_badge(ui, AppIcon::CheckCircle, "4 / 4 AGENTS SYNCED", theme.accent_green);
                 });
             });
 
@@ -684,7 +728,7 @@ impl AiFirmView {
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(RichText::new(role.icon()).size(26.0));
+                        icons::draw_icon(ui, role.app_icon(), 22.0, theme.accent_blue);
                         ui.vertical(|ui| {
                             ui.label(
                                 RichText::new(role.title())
@@ -719,17 +763,18 @@ impl AiFirmView {
                     });
 
                     ui.add_space(10.0);
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new(if is_selected { "Selected ✓" } else { "Inspect Agent" })
-                                    .size(11.0)
-                                    .color(if is_selected { Color32::WHITE } else { theme.text_primary }),
-                            )
-                            .fill(if is_selected { theme.accent_blue } else { theme.bg_canvas })
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        if is_selected { AppIcon::CheckCircle } else { AppIcon::Search },
+                        if is_selected { "Selected" } else { "Inspect Agent" },
+                        11.0,
+                        if is_selected { Color32::WHITE } else { theme.text_primary },
+                        if is_selected { theme.accent_blue } else { theme.bg_canvas },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        egui::Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         *selected = Some(role);
                     }
@@ -749,11 +794,15 @@ impl AiFirmView {
                 .corner_radius(CornerRadius::same(10))
                 .inner_margin(Margin::same(16))
                 .show(ui, |ui| {
-                    ui.label(
-                        RichText::new(format!("🔎 Active Agent Inspector: {}", role.title()))
-                            .size(14.0)
-                            .strong()
-                            .color(theme.accent_blue),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Search,
+                        15.0,
+                        theme.accent_blue,
+                        format!("Active Agent Inspector: {}", role.title()),
+                        14.0,
+                        theme.accent_blue,
+                        true,
                     );
                     ui.add_space(6.0);
                     ui.label(
@@ -776,11 +825,15 @@ impl AiFirmView {
             .inner_margin(Margin::same(18))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("💬 Multi-Agent Live Coordination Feed")
-                            .size(16.0)
-                            .strong()
-                            .color(theme.text_primary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::CommentNote,
+                        17.0,
+                        theme.accent_blue,
+                        "Multi-Agent Live Coordination Feed",
+                        16.0,
+                        theme.text_primary,
+                        true,
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if ui
@@ -829,7 +882,7 @@ impl AiFirmView {
                             .inner_margin(Margin::symmetric(14, 10))
                             .show(ui, |ui| {
                                 ui.horizontal_wrapped(|ui| {
-                                    ui.label(RichText::new(log.role.icon()).size(16.0));
+                                    icons::draw_icon(ui, log.role.app_icon(), 15.0, theme.accent_blue);
                                     ui.label(
                                         RichText::new(log.role.title())
                                             .size(12.0)
@@ -877,11 +930,15 @@ impl AiFirmView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(18))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("⌨️ Chief Engineer Directives Console")
-                        .size(16.0)
-                        .strong()
-                        .color(theme.text_primary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::SlidersPanel,
+                    17.0,
+                    theme.accent_blue,
+                    "Chief Engineer Directives Console",
+                    16.0,
+                    theme.text_primary,
+                    true,
                 );
                 ui.label(
                     RichText::new("Issue high-level natural language instructions to individual specialist agents or broadcast directives to the entire engineering firm.")
@@ -903,23 +960,25 @@ impl AiFirmView {
                     );
 
                     let options = [
-                        (None, "📢 All Agents (Broadcast)"),
-                        (Some(FirmRole::ProjectManager), "👔 Project Manager"),
-                        (Some(FirmRole::SeniorDrafter), "📐 Senior Drafter"),
-                        (Some(FirmRole::FeaAnalyst), "⚡ FEA Analyst"),
-                        (Some(FirmRole::QsSpecialist), "💰 QS Specialist"),
+                        (None, AppIcon::Sparkles, "All Agents (Broadcast)"),
+                        (Some(FirmRole::ProjectManager), AppIcon::HardHat, "Project Manager"),
+                        (Some(FirmRole::SeniorDrafter), AppIcon::RulerSquare, "Senior Drafter"),
+                        (Some(FirmRole::FeaAnalyst), AppIcon::Bolt, "FEA Analyst"),
+                        (Some(FirmRole::QsSpecialist), AppIcon::Coins, "QS Specialist"),
                     ];
 
-                    for (target, label) in options {
+                    for (target, icon, label) in options {
                         let is_active = self.target_recipient == target;
-                        let btn = ui.add(
-                            egui::Button::new(
-                                RichText::new(label)
-                                    .size(11.0)
-                                    .color(if is_active { Color32::WHITE } else { theme.text_secondary }),
-                            )
-                            .fill(if is_active { theme.accent_blue } else { theme.bg_canvas })
-                            .corner_radius(CornerRadius::same(6)),
+                        let btn = icons::icon_button(
+                            ui,
+                            icon,
+                            label,
+                            11.0,
+                            if is_active { Color32::WHITE } else { theme.text_secondary },
+                            if is_active { theme.accent_blue } else { theme.bg_canvas },
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            egui::Vec2::ZERO,
                         );
 
                         if btn.clicked() {
@@ -939,18 +998,18 @@ impl AiFirmView {
                             .desired_width(field_w),
                     );
 
-                    let send_clicked = ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("Execute ↵")
-                                    .size(12.0)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_blue)
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked();
+                    let send_clicked = icons::icon_button(
+                        ui,
+                        AppIcon::Play,
+                        "Execute",
+                        12.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        egui::Vec2::ZERO,
+                    )
+                    .clicked();
 
                     let enter_pressed = text_edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
@@ -1014,11 +1073,15 @@ impl AiFirmView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(18))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("📊 Autonomous Engineering Firm Telemetry")
-                        .size(16.0)
-                        .strong()
-                        .color(theme.text_primary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::ChartBar,
+                    17.0,
+                    theme.accent_blue,
+                    "Autonomous Engineering Firm Telemetry",
+                    16.0,
+                    theme.text_primary,
+                    true,
                 );
                 ui.label(
                     RichText::new("Live operational metrics and verification indicators across the multi-agent virtual engineering organization.")
@@ -1066,7 +1129,17 @@ impl AiFirmView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Code Profile: SNI 2847 + SNI 1726 + AISC 360");
                 let _ = ui.selectable_label(false, "Include Detailing Checklists");
-                let _ = ui.button("⚖️ Execute Automated Code Compliance Sweep");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::Shield,
+                    "Execute Automated Code Compliance Sweep",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    egui::Vec2::ZERO,
+                );
             });
             ui.add_space(10.0);
 
@@ -1121,7 +1194,17 @@ impl AiFirmView {
                     ui.add_space(6.0);
                     ui.label(RichText::new("Constraints: Min ARI >= 0.85 | Max Drift <= h/500 | DCR <= 0.90").size(10.5).color(theme.text_secondary));
                     ui.add_space(8.0);
-                    let _ = ui.button("🧬 Evolve 50 NSGA-II Generations (40 Pop)");
+                    let _ = icons::icon_button(
+                        ui,
+                        AppIcon::Sparkles,
+                        "Evolve 50 NSGA-II Generations (40 Pop)",
+                        11.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        egui::Vec2::ZERO,
+                    );
                 }
                 _ => {
                     ui.label(RichText::new("NON-DOMINATED PARETO FRONTIER (COST vs CARBON CO2e)").size(11.0).strong().color(theme.accent_blue));
@@ -1158,17 +1241,26 @@ impl AiFirmView {
                         let col = if knee { theme.accent_green } else { theme.accent_orange };
                         painter.circle_filled(screen_pts[idx], if knee { 6.0 } else { 4.5 }, col);
                     }
+                    icons::paint_icon(
+                        &painter,
+                        egui::Rect::from_min_size(
+                            egui::Pos2::new(screen_pts[2].x + 6.0, screen_pts[2].y - 19.0),
+                            egui::Vec2::splat(11.0),
+                        ),
+                        AppIcon::Star,
+                        theme.accent_green,
+                    );
                     painter.text(
-                        egui::Pos2::new(screen_pts[2].x + 8.0, screen_pts[2].y - 8.0),
+                        egui::Pos2::new(screen_pts[2].x + 20.0, screen_pts[2].y - 8.0),
                         egui::Align2::LEFT_BOTTOM,
-                        "★ Knee Sol #14 (ARI 0.942)",
+                        "Knee Sol #14 (ARI 0.942)",
                         egui::FontId::proportional(10.0),
                         theme.accent_green,
                     );
                     painter.text(
                         egui::Pos2::new(plot.center().x, rect.bottom() - 8.0),
                         egui::Align2::CENTER_CENTER,
-                        "5D Structural Capex (IDR Billion) ➔",
+                        "5D Structural Capex (IDR Billion) ->",
                         egui::FontId::proportional(9.5),
                         theme.text_muted,
                     );

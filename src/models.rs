@@ -89,21 +89,42 @@ impl NavigationPillar {
 
     pub fn icon(&self) -> &'static str {
         match self {
-            Self::MyLibrary => "📁",
-            Self::AiAgent => "🤖",
-            Self::ResearchConcept => "💡",
-            Self::ParametricDED => "📐",
-            Self::GeometryAssembly => "🏗️",
-            Self::AnalysisSimulation => "⚡",
-            Self::TimeScheduling => "⏱️",
-            Self::CostBudgeting => "💰",
-            Self::SustainabilityEnergy => "🌱",
-            Self::FacilityManagement => "🏢",
-            Self::SafetyHealth => "🛡️",
-            Self::LeanConstruction => "♻️",
-            Self::IndustrializedAutomation => "🤖",
-            Self::Prediction => "🔮",
-            Self::ReportPublishing => "📑",
+            Self::MyLibrary => "LIB",
+            Self::AiAgent => "AI",
+            Self::ResearchConcept => "1D",
+            Self::ParametricDED => "2D",
+            Self::GeometryAssembly => "3D",
+            Self::AnalysisSimulation => "FEA",
+            Self::TimeScheduling => "4D",
+            Self::CostBudgeting => "5D",
+            Self::SustainabilityEnergy => "6D",
+            Self::FacilityManagement => "7D",
+            Self::SafetyHealth => "8D",
+            Self::LeanConstruction => "9D",
+            Self::IndustrializedAutomation => "10D",
+            Self::Prediction => "PRED",
+            Self::ReportPublishing => "PUB",
+        }
+    }
+
+    pub fn app_icon(&self) -> crate::icons::AppIcon {
+        use crate::icons::AppIcon;
+        match self {
+            Self::MyLibrary => AppIcon::Folder,
+            Self::AiAgent => AppIcon::Bot,
+            Self::ResearchConcept => AppIcon::Compass,
+            Self::ParametricDED => AppIcon::RulerSquare,
+            Self::GeometryAssembly => AppIcon::Cube3D,
+            Self::AnalysisSimulation => AppIcon::Bolt,
+            Self::TimeScheduling => AppIcon::Clock,
+            Self::CostBudgeting => AppIcon::Coins,
+            Self::SustainabilityEnergy => AppIcon::Leaf,
+            Self::FacilityManagement => AppIcon::Building,
+            Self::SafetyHealth => AppIcon::Shield,
+            Self::LeanConstruction => AppIcon::Recycle,
+            Self::IndustrializedAutomation => AppIcon::Cpu,
+            Self::Prediction => AppIcon::Pulse,
+            Self::ReportPublishing => AppIcon::Document,
         }
     }
 
@@ -304,18 +325,36 @@ pub enum SidebarTab {
 impl SidebarTab {
     pub fn icon_and_name(&self) -> (&'static str, &'static str) {
         match self {
-            Self::Properties => ("📋", "Properties & IFC Psets"),
-            Self::ProjectBrowser => ("📁", "Project Browser & SBS"),
-            Self::ClashMatrix => ("⚔️", "Clash Detection Matrix"),
-            Self::ModelAudit => ("🛡️", "Solibri BIM Audit"),
-            Self::BcfIssues => ("💬", "BCF 3.0 Issues"),
-            Self::Geometry => ("📐", "Geometry & Wizards"),
-            Self::Modify => ("✏️", "Modify & Reinforce"),
-            Self::Layers => ("📑", "Layers & Worksets"),
-            Self::Sections => ("📏", "Sections"),
-            Self::Materials => ("🧱", "Materials"),
-            Self::Loads => ("⬇️", "Loads"),
-            Self::Settings => ("⚙️", "Settings"),
+            Self::Properties => ("PRP", "Properties & IFC Psets"),
+            Self::ProjectBrowser => ("BRW", "Project Browser & SBS"),
+            Self::ClashMatrix => ("CLS", "Clash Detection Matrix"),
+            Self::ModelAudit => ("AUD", "Solibri BIM Audit"),
+            Self::BcfIssues => ("BCF", "BCF 3.0 Issues"),
+            Self::Geometry => ("GEO", "Geometry & Wizards"),
+            Self::Modify => ("MOD", "Modify & Reinforce"),
+            Self::Layers => ("LAY", "Layers & Worksets"),
+            Self::Sections => ("SEC", "Sections"),
+            Self::Materials => ("MAT", "Materials"),
+            Self::Loads => ("LOD", "Loads"),
+            Self::Settings => ("SET", "Settings"),
+        }
+    }
+
+    pub fn app_icon(&self) -> crate::icons::AppIcon {
+        use crate::icons::AppIcon;
+        match self {
+            Self::Properties => AppIcon::Clipboard,
+            Self::ProjectBrowser => AppIcon::Folder,
+            Self::ClashMatrix => AppIcon::AlertTriangle,
+            Self::ModelAudit => AppIcon::Shield,
+            Self::BcfIssues => AppIcon::CommentNote,
+            Self::Geometry => AppIcon::Cube3D,
+            Self::Modify => AppIcon::Pencil,
+            Self::Layers => AppIcon::Layers,
+            Self::Sections => AppIcon::DimensionRuler,
+            Self::Materials => AppIcon::Wall,
+            Self::Loads => AppIcon::ArrowDown,
+            Self::Settings => AppIcon::SettingsGear,
         }
     }
 }
@@ -1350,9 +1389,9 @@ impl ClashSeverity {
 
     pub fn badge(&self) -> &'static str {
         match self {
-            Self::Hard => "🔴 Hard",
-            Self::Soft => "🟡 Soft",
-            Self::CodeTolerance => "🟠 Code",
+            Self::Hard => "[HARD]",
+            Self::Soft => "[SOFT]",
+            Self::CodeTolerance => "[CODE]",
         }
     }
 
@@ -1556,10 +1595,10 @@ pub enum BcfPriority {
 impl BcfPriority {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Critical => "🔴 Critical",
-            Self::High => "🟠 High",
-            Self::Medium => "🟡 Medium",
-            Self::Low => "🟢 Low",
+            Self::Critical => "Critical",
+            Self::High => "High",
+            Self::Medium => "Medium",
+            Self::Low => "Low",
         }
     }
 
@@ -1781,9 +1820,9 @@ impl CopilotWorkflowKind {
 
     pub fn label(&self) -> &'static str {
         match self {
-            Self::ShearWallAci318 => "🧱 ACI 318-19 / EC2 Shear Wall Reinforcement",
-            Self::WindLoadAsce7 => "💨 ASCE 7-22 Lateral Wind Pressure",
-            Self::CarbonMinimizerIso14040 => "🌱 ISO 14040 / EN 15978 Carbon Minimizer",
+            Self::ShearWallAci318 => "ACI 318-19 / EC2 Shear Wall Reinforcement",
+            Self::WindLoadAsce7 => "ASCE 7-22 Lateral Wind Pressure",
+            Self::CarbonMinimizerIso14040 => "ISO 14040 / EN 15978 Carbon Minimizer",
         }
     }
 
@@ -2225,9 +2264,9 @@ impl ParametricGeneratorPreset {
 
     pub fn label(&self) -> &'static str {
         match self {
-            Self::DiagridTower => "🏢 Twisting Diagrid Tower",
-            Self::GeodesicDome => "🌐 Geodesic Space Dome",
-            Self::VoronoiCanopy => "🕸️ Freeform Canopy Shell",
+            Self::DiagridTower => "Twisting Diagrid Tower",
+            Self::GeodesicDome => "Geodesic Space Dome",
+            Self::VoronoiCanopy => "Freeform Canopy Shell",
         }
     }
 

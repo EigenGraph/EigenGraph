@@ -14,6 +14,7 @@ use crate::core::gis::{
     TileSource, TinSurfaceMesh,
 };
 use crate::features::{FeatureId, FeatureRegistry};
+use crate::icons::{self, AppIcon};
 use crate::models::NavigationPillar;
 use crate::theme::MacTheme;
 use crate::ui_kit;
@@ -87,7 +88,7 @@ impl Default for ResearchConceptView {
             crs_selected_zone: 48,
             crs_is_south: true,
             crs_conversion_log: vec![
-                "✅ Monas Jakarta Benchmark: φ = -6.175400°, λ = 106.827200° ➔ UTM Zone 48S: E = 702,183.32 m, N = 9,317,059.38 m (γ = -0.1967°, k = 1.00000)".to_string(),
+                "Monas Jakarta Benchmark: φ = -6.175400°, λ = 106.827200° -> UTM Zone 48S: E = 702,183.32 m, N = 9,317,059.38 m (γ = -0.1967°, k = 1.00000)".to_string(),
             ],
 
             tin_preset: preset,
@@ -211,11 +212,15 @@ impl ResearchConceptView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("⛰️ PHASE 25 — DIGITAL ELEVATION MODEL (DEM) & TOPOGRAPHIC TIN MESH")
-                                .size(11.0)
-                                .strong()
-                                .color(theme.accent_blue),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Compass,
+                            13.0,
+                            theme.accent_blue,
+                            "PHASE 25 — DIGITAL ELEVATION MODEL (DEM) & TOPOGRAPHIC TIN MESH",
+                            11.0,
+                            theme.accent_blue,
+                            true,
                         );
                         ui.add_space(3.0);
                         ui.label(
@@ -267,11 +272,15 @@ impl ResearchConceptView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("🏔️ DEM Terrain Source:")
-                            .size(11.5)
-                            .strong()
-                            .color(theme.text_primary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Globe,
+                        13.0,
+                        theme.text_primary,
+                        "DEM Terrain Source:",
+                        11.5,
+                        theme.text_primary,
+                        true,
                     );
                     for &preset in DemTerrainPreset::all() {
                         let active = self.tin_preset == preset;
@@ -285,13 +294,17 @@ impl ResearchConceptView {
                         } else {
                             theme.text_secondary
                         };
-                        if ui
-                            .add(
-                                egui::Button::new(RichText::new(preset.label()).size(11.0).color(fg))
-                                    .fill(bg)
-                                    .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::smart_button(
+                            ui,
+                            preset.label(),
+                            11.0,
+                            fg,
+                            bg,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.tin_preset = preset;
                             need_rebuild = true;
@@ -299,23 +312,23 @@ impl ResearchConceptView {
                     }
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let mode_label = if self.tin_3d_isometric {
-                            "🧊 3D Isometric TIN View"
+                        let (mode_icon, mode_label) = if self.tin_3d_isometric {
+                            (AppIcon::Cube3D, "3D Isometric TIN View")
                         } else {
-                            "🗺️ 2D Plan Contour Map"
+                            (AppIcon::Layers, "2D Plan Contour Map")
                         };
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new(mode_label)
-                                        .size(11.5)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            mode_icon,
+                            mode_label,
+                            11.5,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.tin_3d_isometric = !self.tin_3d_isometric;
                         }
@@ -327,10 +340,15 @@ impl ResearchConceptView {
                 ui.add_space(8.0);
 
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("📐 Grading Datum (m MSL):")
-                            .size(11.5)
-                            .color(theme.text_secondary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::RulerSquare,
+                        12.0,
+                        theme.text_secondary,
+                        "Grading Datum (m MSL):",
+                        11.5,
+                        theme.text_secondary,
+                        false,
                     );
                     let min_z = self.tin_mesh.min_elevation;
                     let max_z = (self.tin_mesh.max_elevation).max(min_z + 1.0);
@@ -345,10 +363,15 @@ impl ResearchConceptView {
                     }
 
                     ui.add_space(8.0);
-                    ui.label(
-                        RichText::new("⛰️ Contour Step:")
-                            .size(11.5)
-                            .color(theme.text_secondary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Layers,
+                        12.0,
+                        theme.text_secondary,
+                        "Contour Step:",
+                        11.5,
+                        theme.text_secondary,
+                        false,
                     );
                     for (minor, major, lbl) in [
                         (1.0_f32, 5.0_f32, "1.0m / 5.0m"),
@@ -385,19 +408,19 @@ impl ResearchConceptView {
                     ui.add_space(10.0);
                     ui.checkbox(
                         &mut self.tin_show_wireframe,
-                        RichText::new("🕸️ TIN Mesh").size(11.0).color(theme.text_secondary),
+                        RichText::new("TIN Mesh").size(11.0).color(theme.text_secondary),
                     );
                     ui.checkbox(
                         &mut self.tin_show_contours,
-                        RichText::new("〰️ Contours").size(11.0).color(theme.text_secondary),
+                        RichText::new("Contours").size(11.0).color(theme.text_secondary),
                     );
                     ui.checkbox(
                         &mut self.tin_show_slope_hazard,
-                        RichText::new("⚠️ Slope >30°").size(11.0).color(theme.accent_red),
+                        RichText::new("Slope >30°").size(11.0).color(theme.accent_red),
                     );
                     ui.checkbox(
                         &mut self.tin_show_datum_plane,
-                        RichText::new("🟦 Pad Datum").size(11.0).color(theme.accent_blue),
+                        RichText::new("Pad Datum").size(11.0).color(theme.accent_blue),
                     );
                 });
             });
@@ -519,11 +542,15 @@ impl ResearchConceptView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("🗺️ PHASE 23 — GIS SITE INCEPTION & GEODETIC LOCATION STUDIO")
-                                .size(11.0)
-                                .strong()
-                                .color(theme.accent_blue),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::MapPin,
+                            13.0,
+                            theme.accent_blue,
+                            "PHASE 23 — GIS SITE INCEPTION & GEODETIC LOCATION STUDIO",
+                            11.0,
+                            theme.accent_blue,
+                            true,
                         );
                         ui.add_space(4.0);
                         ui.label(
@@ -549,9 +576,39 @@ impl ResearchConceptView {
         // Phase 31+ Preview Slot: Live Raster Map Tile Cache & GeoTIFF/CSV DEM Importer
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::LiveRasterMapTileFetcher, |ui| {
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.button("🌐 Stream OSM / Esri Live Raster Tiles (0 / 512 MB Cache)");
-                let _ = ui.button("🗺️ Import GeoTIFF DEM (.tif)");
-                let _ = ui.button("📄 Load Survey Point Cloud (.csv / .xyz)");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::Globe,
+                    "Stream OSM / Esri Live Raster Tiles (0 / 512 MB Cache)",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::Layers,
+                    "Import GeoTIFF DEM (.tif)",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::Document,
+                    "Load Survey Point Cloud (.csv / .xyz)",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
                 ui.label(
                     RichText::new("Pipeline ready for async WASM fetch + DEM resampling into the 72×72 TIN grid")
                         .size(11.0)
@@ -570,30 +627,37 @@ impl ResearchConceptView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("📍 Quick Jumps:")
-                            .size(12.0)
-                            .strong()
-                            .color(theme.text_primary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::MapPin,
+                        13.0,
+                        theme.text_primary,
+                        "Quick Jumps:",
+                        12.0,
+                        theme.text_primary,
+                        true,
                     );
                     let presets = [
-                        ("🏛️ Monas Jakarta", -6.175392, 106.827153, 14.5),
-                        ("🎓 ITB Bandung", -6.891500, 107.610700, 15.0),
-                        ("🏗️ IKN Nusantara (Sepaku)", -0.957700, 116.702400, 13.0),
-                        ("⚓ Tanjung Perak Surabaya", -7.198300, 112.733100, 14.0),
-                        ("🗼 Shinjuku Tokyo", 35.693800, 139.703400, 14.0),
-                        ("🌉 SF Bay Golden Gate", 37.819900, -122.478300, 13.5),
+                        ("Monas Jakarta", -6.175392, 106.827153, 14.5),
+                        ("ITB Bandung", -6.891500, 107.610700, 15.0),
+                        ("IKN Nusantara (Sepaku)", -0.957700, 116.702400, 13.0),
+                        ("Tanjung Perak Surabaya", -7.198300, 112.733100, 14.0),
+                        ("Shinjuku Tokyo", 35.693800, 139.703400, 14.0),
+                        ("SF Bay Golden Gate", 37.819900, -122.478300, 13.5),
                     ];
                     for (label, lat, lon, zoom) in presets {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new(label).size(11.0).color(theme.text_secondary),
-                                )
-                                .fill(theme.bg_canvas)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::MapPin,
+                            label,
+                            11.0,
+                            theme.text_secondary,
+                            theme.bg_canvas,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.slippy_map.set_center(lat, lon);
                             self.slippy_map.zoom_level = zoom;
@@ -607,11 +671,15 @@ impl ResearchConceptView {
                 ui.add_space(8.0);
 
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("🌐 Basemap:")
-                            .size(12.0)
-                            .strong()
-                            .color(theme.text_primary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Globe,
+                        13.0,
+                        theme.text_primary,
+                        "Basemap:",
+                        12.0,
+                        theme.text_primary,
+                        true,
                     );
                     let combo_w = ui.available_width().clamp(140.0, 230.0);
                     egui::ComboBox::from_id_salt("tile_provider_select")
@@ -648,38 +716,38 @@ impl ResearchConceptView {
                     ui.add_space(12.0);
                     ui.checkbox(
                         &mut self.slippy_map.show_grid,
-                        RichText::new("🌐 Grid").size(11.5).color(theme.text_secondary),
+                        RichText::new("Grid").size(11.5).color(theme.text_secondary),
                     );
                     ui.checkbox(
                         &mut self.slippy_map.show_scale_bar,
-                        RichText::new("📏 Scale").size(11.5).color(theme.text_secondary),
+                        RichText::new("Scale").size(11.5).color(theme.text_secondary),
                     );
                     ui.checkbox(
                         &mut self.slippy_map.show_elevation_contours,
-                        RichText::new("⛰️ Contours")
+                        RichText::new("Contours")
                             .size(11.5)
                             .color(theme.text_secondary),
                     );
                     ui.checkbox(
                         &mut self.slippy_map.crosshair_active,
-                        RichText::new("🎯 Crosshair")
+                        RichText::new("Crosshair")
                             .size(11.5)
                             .color(theme.text_secondary),
                     );
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("➕ Inset Pin")
-                                        .size(11.0)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::MapPin,
+                            "Insert Pin",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             let (lat, lon) = self.slippy_map.center_lat_lon;
                             self.slippy_map.add_pin(
@@ -689,18 +757,17 @@ impl ResearchConceptView {
                             );
                         }
 
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("➕")
-                                        .size(12.0)
-                                        .strong()
-                                        .color(theme.text_primary),
-                                )
-                                .fill(theme.bg_canvas)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_only_button(
+                            ui,
+                            AppIcon::Plus,
+                            theme.text_primary,
+                            theme.bg_canvas,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::splat(26.0),
+                            "Zoom in",
+                        )
+                        .clicked()
                         {
                             self.slippy_map.zoom_in(0.5);
                         }
@@ -710,18 +777,17 @@ impl ResearchConceptView {
                                 .monospace()
                                 .color(theme.text_primary),
                         );
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("➖")
-                                        .size(12.0)
-                                        .strong()
-                                        .color(theme.text_primary),
-                                )
-                                .fill(theme.bg_canvas)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_only_button(
+                            ui,
+                            AppIcon::Minus,
+                            theme.text_primary,
+                            theme.bg_canvas,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::splat(26.0),
+                            "Zoom out",
+                        )
+                        .clicked()
                         {
                             self.slippy_map.zoom_out(0.5);
                         }
@@ -754,11 +820,15 @@ impl ResearchConceptView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("🛰️ REAL-TIME GEODETIC TELEMETRY (EPSG:3857 / WGS84)")
-                            .size(11.5)
-                            .strong()
-                            .color(theme.accent_blue),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Target,
+                        13.0,
+                        theme.accent_blue,
+                        "REAL-TIME GEODETIC TELEMETRY (EPSG:3857 / WGS84)",
+                        11.5,
+                        theme.accent_blue,
+                        true,
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(
@@ -827,11 +897,15 @@ impl ResearchConceptView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("📐 PHASE 24 — GEODETIC CRS & UTM PROJECTION ENGINE (proj4rs Pure-Rust)")
-                                .size(11.0)
-                                .strong()
-                                .color(theme.accent_blue),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::RulerSquare,
+                            13.0,
+                            theme.accent_blue,
+                            "PHASE 24 — GEODETIC CRS & UTM PROJECTION ENGINE (proj4rs Pure-Rust)",
+                            11.0,
+                            theme.accent_blue,
+                            true,
                         );
                         ui.add_space(4.0);
                         ui.label(
@@ -863,11 +937,15 @@ impl ResearchConceptView {
                             .stroke(Stroke::new(1.0, theme.border_subtle))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
-                                ui.label(
-                                    RichText::new("🌐 WGS84 Geodetic ➔ UTM Projected (Forward)")
-                                        .size(13.0)
-                                        .strong()
-                                        .color(theme.accent_blue),
+                                icons::icon_label(
+                                    ui,
+                                    AppIcon::Globe,
+                                    14.0,
+                                    theme.accent_blue,
+                                    "WGS84 Geodetic -> UTM Projected (Forward)",
+                                    13.0,
+                                    theme.accent_blue,
+                                    true,
                                 );
                                 ui.add_space(8.0);
 
@@ -939,18 +1017,18 @@ impl ResearchConceptView {
                                 ui.add_space(10.0);
 
                                 ui.horizontal_wrapped(|ui| {
-                                    if ui
-                                        .add(
-                                            egui::Button::new(
-                                                RichText::new("🔄 Compute UTM")
-                                                    .size(11.5)
-                                                    .strong()
-                                                    .color(Color32::WHITE),
-                                            )
-                                            .fill(theme.accent_blue)
-                                            .corner_radius(CornerRadius::same(6)),
-                                        )
-                                        .clicked()
+                                    if icons::icon_button(
+                                        ui,
+                                        AppIcon::Undo,
+                                        "Compute UTM",
+                                        11.5,
+                                        Color32::WHITE,
+                                        theme.accent_blue,
+                                        Stroke::NONE,
+                                        CornerRadius::same(6),
+                                        Vec2::ZERO,
+                                    )
+                                    .clicked()
                                     {
                                         if let (Ok(lat), Ok(lon)) = (
                                             self.crs_input_lat.trim().parse::<f64>(),
@@ -968,7 +1046,7 @@ impl ResearchConceptView {
                                             self.projection_engine.meridian_convergence_deg = conv;
 
                                             let log_entry = format!(
-                                                "✅ WGS84 ({:.6}°, {:.6}°) ➔ UTM Zone {}{}: E = {:.2} m, N = {:.2} m (γ = {:.4}°, k = {:.6})",
+                                                "WGS84 ({:.6}°, {:.6}°) -> UTM Zone {}{}: E = {:.2} m, N = {:.2} m (γ = {:.4}°, k = {:.6})",
                                                 lat,
                                                 lon,
                                                 self.crs_selected_zone,
@@ -985,17 +1063,18 @@ impl ResearchConceptView {
                                         }
                                     }
 
-                                    if ui
-                                        .add(
-                                            egui::Button::new(
-                                                RichText::new("🧭 Auto-Detect")
-                                                    .size(11.0)
-                                                    .color(theme.text_secondary),
-                                            )
-                                            .fill(theme.bg_card)
-                                            .corner_radius(CornerRadius::same(6)),
-                                        )
-                                        .clicked()
+                                    if icons::icon_button(
+                                        ui,
+                                        AppIcon::Compass,
+                                        "Auto-Detect",
+                                        11.0,
+                                        theme.text_secondary,
+                                        theme.bg_card,
+                                        Stroke::NONE,
+                                        CornerRadius::same(6),
+                                        Vec2::ZERO,
+                                    )
+                                    .clicked()
                                     {
                                         if let Ok(lon) = self.crs_input_lon.trim().parse::<f64>() {
                                             self.crs_selected_zone =
@@ -1003,17 +1082,18 @@ impl ResearchConceptView {
                                         }
                                     }
 
-                                    if ui
-                                        .add(
-                                            egui::Button::new(
-                                                RichText::new("📍 Sync Pin")
-                                                    .size(11.0)
-                                                    .color(theme.text_secondary),
-                                            )
-                                            .fill(theme.bg_card)
-                                            .corner_radius(CornerRadius::same(6)),
-                                        )
-                                        .clicked()
+                                    if icons::icon_button(
+                                        ui,
+                                        AppIcon::MapPin,
+                                        "Sync Pin",
+                                        11.0,
+                                        theme.text_secondary,
+                                        theme.bg_card,
+                                        Stroke::NONE,
+                                        CornerRadius::same(6),
+                                        Vec2::ZERO,
+                                    )
+                                    .clicked()
                                     {
                                         let (plat, plon) = self
                                             .slippy_map
@@ -1047,11 +1127,15 @@ impl ResearchConceptView {
                             .stroke(Stroke::new(1.0, theme.border_subtle))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
-                                ui.label(
-                                    RichText::new("🗺️ UTM Projected ➔ WGS84 Geodetic (Reverse)")
-                                        .size(13.0)
-                                        .strong()
-                                        .color(theme.accent_green),
+                                icons::icon_label(
+                                    ui,
+                                    AppIcon::Layers,
+                                    14.0,
+                                    theme.accent_green,
+                                    "UTM Projected -> WGS84 Geodetic (Reverse)",
+                                    13.0,
+                                    theme.accent_green,
+                                    true,
                                 );
                                 ui.add_space(8.0);
 
@@ -1099,18 +1183,18 @@ impl ResearchConceptView {
                                 ui.add_space(10.0);
 
                                 ui.horizontal_wrapped(|ui| {
-                                    if ui
-                                        .add(
-                                            egui::Button::new(
-                                                RichText::new("🔄 Compute WGS84")
-                                                    .size(11.5)
-                                                    .strong()
-                                                    .color(Color32::WHITE),
-                                            )
-                                            .fill(theme.accent_green)
-                                            .corner_radius(CornerRadius::same(6)),
-                                        )
-                                        .clicked()
+                                    if icons::icon_button(
+                                        ui,
+                                        AppIcon::Undo,
+                                        "Compute WGS84",
+                                        11.5,
+                                        Color32::WHITE,
+                                        theme.accent_green,
+                                        Stroke::NONE,
+                                        CornerRadius::same(6),
+                                        Vec2::ZERO,
+                                    )
+                                    .clicked()
                                     {
                                         if let (Ok(e), Ok(n)) = (
                                             self.crs_input_easting.trim().parse::<f64>(),
@@ -1125,7 +1209,7 @@ impl ResearchConceptView {
                                             self.crs_input_lon = format!("{:.6}", lon_back);
 
                                             let log_entry = format!(
-                                                "✅ UTM (E={:.2} m, N={:.2} m, Zone {}{}) ➔ WGS84: φ = {:.6}°, λ = {:.6}° [Error < 0.05 mm]",
+                                                "UTM (E={:.2} m, N={:.2} m, Zone {}{}) -> WGS84: φ = {:.6}°, λ = {:.6}° [Error < 0.05 mm]",
                                                 e,
                                                 n,
                                                 self.crs_selected_zone,
@@ -1140,17 +1224,18 @@ impl ResearchConceptView {
                                         }
                                     }
 
-                                    if ui
-                                        .add(
-                                            egui::Button::new(
-                                                RichText::new("🎯 Center Map")
-                                                    .size(11.0)
-                                                    .color(theme.text_secondary),
-                                            )
-                                            .fill(theme.bg_card)
-                                            .corner_radius(CornerRadius::same(6)),
-                                        )
-                                        .clicked()
+                                    if icons::icon_button(
+                                        ui,
+                                        AppIcon::Target,
+                                        "Center Map",
+                                        11.0,
+                                        theme.text_secondary,
+                                        theme.bg_card,
+                                        Stroke::NONE,
+                                        CornerRadius::same(6),
+                                        Vec2::ZERO,
+                                    )
+                                    .clicked()
                                     {
                                         if let (Ok(lat), Ok(lon)) = (
                                             self.crs_input_lat.trim().parse::<f64>(),
@@ -1192,13 +1277,15 @@ impl ResearchConceptView {
                     .stroke(Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.35)))
                     .show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(
-                                RichText::new(
-                                    "🏛️ ISO 16739 / IFC4 IfcMapConversion BIM Georeferencing Ledger",
-                                )
-                                .size(12.5)
-                                .strong()
-                                .color(theme.accent_blue),
+                            icons::icon_label(
+                                ui,
+                                AppIcon::Building,
+                                14.0,
+                                theme.accent_blue,
+                                "ISO 16739 / IFC4 IfcMapConversion BIM Georeferencing Ledger",
+                                12.5,
+                                theme.accent_blue,
+                                true,
                             );
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 ui.label(
@@ -1262,11 +1349,15 @@ impl ResearchConceptView {
                     });
 
                 ui.add_space(10.0);
-                ui.label(
-                    RichText::new("📜 Geodetic Projection Verification Audit Ledger:")
-                        .size(11.5)
-                        .strong()
-                        .color(theme.text_secondary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::Clipboard,
+                    13.0,
+                    theme.text_secondary,
+                    "Geodetic Projection Verification Audit Ledger:",
+                    11.5,
+                    theme.text_secondary,
+                    true,
                 );
                 ui.add_space(4.0);
                 for entry in &self.crs_conversion_log {
@@ -1548,11 +1639,15 @@ impl ResearchConceptView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("💡 INITIAL CONCEPTUAL STAGE (1D BIM)")
-                                .size(11.0)
-                                .strong()
-                                .color(theme.accent_blue),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Sparkles,
+                            12.5,
+                            theme.accent_blue,
+                            "INITIAL CONCEPTUAL STAGE (1D BIM)",
+                            11.0,
+                            theme.accent_blue,
+                            true,
                         );
                         ui.add_space(4.0);
                         ui.label(
@@ -1573,19 +1668,18 @@ impl ResearchConceptView {
                         );
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("Start 2D Drafting ➔")
-                                        .size(12.0)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6))
-                                .min_size(Vec2::new(140.0, 32.0)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::ArrowRight,
+                            "Start 2D Drafting",
+                            12.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::new(140.0, 32.0),
+                        )
+                        .clicked()
                         {
                             *active_pillar = NavigationPillar::ParametricDED;
                         }
@@ -1638,11 +1732,15 @@ impl ResearchConceptView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("📊 Structural Initial Concept Alternative Evaluation Matrix")
-                        .size(13.5)
-                        .strong()
-                        .color(theme.text_primary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::ChartBar,
+                    15.0,
+                    theme.text_primary,
+                    "Structural Initial Concept Alternative Evaluation Matrix",
+                    13.5,
+                    theme.text_primary,
+                    true,
                 );
                 ui.add_space(10.0);
 
@@ -1652,7 +1750,7 @@ impl ResearchConceptView {
                         "Span 24.0m, Height 3.2m",
                         "ARI = 0.94",
                         "IDR 3.84 B",
-                        "⭐ Optimum: Highest ARI score, controlled cost, iconic aesthetics",
+                        "Optimum: Highest ARI score, controlled cost, iconic aesthetics",
                         true,
                     ),
                     (
@@ -1660,7 +1758,7 @@ impl ResearchConceptView {
                         "Span 24.0m, 4 Girders",
                         "ARI = 0.62",
                         "IDR 3.65 B",
-                        "⚠️ Vulnerable: Large midspan deflection, low redundancy",
+                        "Vulnerable: Large midspan deflection, low redundancy",
                         false,
                     ),
                     (
@@ -1668,7 +1766,7 @@ impl ResearchConceptView {
                         "Span 24.0m, Sub-Truss 12m",
                         "ARI = 0.74",
                         "IDR 4.05 B",
-                        "🟡 Fair: Efficient erection but higher material cost",
+                        "Fair: Efficient erection but higher material cost",
                         false,
                     ),
                 ];
@@ -1704,11 +1802,11 @@ impl ResearchConceptView {
                                             ),
                                         );
                                         if is_best {
-                                            ui.label(
-                                                RichText::new("⭐ SELECTED RECOMMENDATION")
-                                                    .size(10.0)
-                                                    .strong()
-                                                    .color(theme.accent_green),
+                                            icons::pill_badge(
+                                                ui,
+                                                AppIcon::Star,
+                                                "SELECTED RECOMMENDATION",
+                                                theme.accent_green,
                                             );
                                         }
                                     });
@@ -1747,13 +1845,15 @@ impl ResearchConceptView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new(
-                        "📜 Regulatory Compliance & National / International Design Standards Verification",
-                    )
-                    .size(13.5)
-                    .strong()
-                    .color(theme.text_primary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::Book,
+                    15.0,
+                    theme.text_primary,
+                    "Regulatory Compliance & National / International Design Standards Verification",
+                    13.5,
+                    theme.text_primary,
+                    true,
                 );
                 ui.add_space(10.0);
 
@@ -1762,31 +1862,31 @@ impl ResearchConceptView {
                         "SNI 1729:2020",
                         "Specification for Structural Steel Buildings (AISC 360-16 LRFD Adoption)",
                         "Resistance factors: ϕ_t = 0.90, ϕ_c = 0.90, ϕ_b = 0.90. Verified elastic safe.",
-                        "🟢 Compliant",
+                        "Compliant",
                     ),
                     (
                         "SNI 8460:2017",
                         "Geotechnical Design Requirements (Slope Stability & Earthwork Cut/Fill)",
                         "Phase 25 TIN Mesh automatically flags terrain facets > 30° for slope stabilization.",
-                        "🟢 Compliant",
+                        "Compliant",
                     ),
                     (
                         "SNI 2833:2016",
                         "Bridge Design for Earthquake Loads",
                         "Critical bridge importance category, importance factor I = 1.20.",
-                        "🟢 Compliant",
+                        "Compliant",
                     ),
                     (
                         "AISC 360-16 Section H1",
                         "Interaction of Flexure and Axial Force for Members under Combined Stresses",
                         "P-M-V interaction evaluation equations H1-1a and H1-1b. Maximum DCR 0.528.",
-                        "🟢 Compliant",
+                        "Compliant",
                     ),
                     (
                         "DoD UFC 4-023-03",
                         "Design of Buildings to Resist Progressive Collapse (Alternate Path Method)",
                         "N-1 and N-2 key member removal disruption test. Full rank SVD K_ff.",
-                        "🟢 Compliant",
+                        "Compliant",
                     ),
                 ];
 
@@ -1812,12 +1912,7 @@ impl ResearchConceptView {
                             );
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(
-                                RichText::new(status)
-                                    .size(11.5)
-                                    .strong()
-                                    .color(theme.accent_green),
-                            );
+                            icons::pill_badge(ui, AppIcon::CheckCircle, status, theme.accent_green);
                         });
                     });
                     ui.separator();
@@ -1833,13 +1928,15 @@ impl ResearchConceptView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new(
-                            "🔬 Official Theoretical Foundation: Adjusted Redundancy Index (EigenGraph 2026)",
-                        )
-                        .size(13.5)
-                        .strong()
-                        .color(theme.text_primary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Target,
+                        15.0,
+                        theme.text_primary,
+                        "Official Theoretical Foundation: Adjusted Redundancy Index (EigenGraph 2026)",
+                        13.5,
+                        theme.text_primary,
+                        true,
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(
@@ -1931,7 +2028,17 @@ impl ResearchConceptView {
                 let _ = ui.selectable_label(true, "Borehole BH-01");
                 let _ = ui.selectable_label(false, "BH-02 (Corner)");
                 let _ = ui.selectable_label(false, "CPT-04 Sounding");
-                let _ = ui.button("📥 Import AGS / CSV Boring Log");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::UploadImport,
+                    "Import AGS / CSV Boring Log",
+                    11.0,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
             ui.add_space(10.0);
 
@@ -2028,7 +2135,17 @@ impl ResearchConceptView {
                 let _ = ui.selectable_label(false, "10-Yr Storm");
                 let _ = ui.selectable_label(false, "25-Yr Storm");
                 let _ = ui.selectable_label(true, "100-Yr Critical Storm");
-                let _ = ui.button("🌊 Compute Rational Hydrograph & Detention Size");
+                let _ = icons::icon_button(
+                    ui,
+                    AppIcon::Pulse,
+                    "Compute Rational Hydrograph & Detention Size",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
             ui.add_space(10.0);
 
@@ -2073,7 +2190,7 @@ impl ResearchConceptView {
             painter.text(
                 Pos2::new(plot.center().x, rect.bottom() - 8.0),
                 Align2::CENTER_CENTER,
-                "IDF Rainfall Duration tc (5 min -> 180 min) ➔",
+                "IDF Rainfall Duration tc (5 min -> 180 min)",
                 FontId::proportional(9.5),
                 theme.text_muted,
             );

@@ -74,11 +74,15 @@ impl IndustrializedView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("🏭 6-STAGE DfMA SUPPLY CHAIN PIPELINE")
-                            .size(12.5)
-                            .strong()
-                            .color(theme.text_primary),
+                    crate::icons::icon_label(
+                        ui,
+                        crate::icons::AppIcon::BoxPackage,
+                        13.0,
+                        theme.accent_blue,
+                        "6-STAGE DfMA SUPPLY CHAIN PIPELINE",
+                        12.5,
+                        theme.text_primary,
+                        true,
                     );
                     ui.label(
                         RichText::new("Click any stage to filter modular prefabricated elements")
@@ -151,11 +155,15 @@ impl IndustrializedView {
             .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("📡 SIMULATED QR / RFID SCANNER & SITE GATE CHECK-IN CONSOLE")
-                        .size(12.0)
-                        .strong()
-                        .color(theme.accent_blue),
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Target,
+                    12.0,
+                    theme.accent_blue,
+                    "SIMULATED QR / RFID SCANNER & SITE GATE CHECK-IN CONSOLE",
+                    12.0,
+                    theme.accent_blue,
+                    true,
                 );
                 ui.add_space(6.0);
 
@@ -175,34 +183,34 @@ impl IndustrializedView {
                         scan_trigger = true;
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("📡 Scan & Check-In")
-                                    .size(10.5)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_blue)
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Target,
+                        "Scan & Check-In",
+                        10.5,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         scan_trigger = true;
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("⏭️ Advance Stage")
-                                    .size(10.5)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_green)
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::ArrowRight,
+                        "Advance Stage",
+                        10.5,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         advance_selected_trigger = true;
                     }
@@ -388,20 +396,12 @@ impl IndustrializedView {
                                             .color(st_col),
                                     );
                                 });
-                            ui.label(
-                                RichText::new(if unit.qa_passed {
-                                    "✅ QA Passed"
-                                } else {
-                                    "⏳ Pending QA"
-                                })
-                                .size(9.5)
-                                .strong()
-                                .color(if unit.qa_passed {
-                                    theme.accent_green
-                                } else {
-                                    theme.accent_orange
-                                }),
-                            );
+                            let (qa_icon, qa_lbl, qa_col) = if unit.qa_passed {
+                                (crate::icons::AppIcon::CheckCircle, "QA Passed", theme.accent_green)
+                            } else {
+                                (crate::icons::AppIcon::Clock, "Pending QA", theme.accent_orange)
+                            };
+                            crate::icons::icon_label(ui, qa_icon, 10.0, qa_col, qa_lbl, 9.5, qa_col, true);
                         });
 
                         ui.add_space(4.0);
@@ -469,32 +469,34 @@ impl IndustrializedView {
                                     .size(9.0)
                                     .color(theme.text_muted),
                             );
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new("📡 Select")
-                                            .size(9.5)
-                                            .color(theme.accent_blue),
-                                    )
-                                    .fill(theme.bg_canvas)
-                                    .corner_radius(CornerRadius::same(4)),
-                                )
-                                .clicked()
+                            if crate::icons::icon_button(
+                                ui,
+                                crate::icons::AppIcon::Target,
+                                "Select",
+                                9.5,
+                                theme.accent_blue,
+                                theme.bg_canvas,
+                                Stroke::NONE,
+                                CornerRadius::same(4),
+                                Vec2::ZERO,
+                            )
+                            .clicked()
                             {
                                 card_select_tag = Some(unit.tag_id.clone());
                             }
                             if let Some(next_st) = unit.stage.next() {
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new(format!("⏭️ {}", next_st.label()))
-                                                .size(9.5)
-                                                .color(theme.accent_green),
-                                        )
-                                        .fill(theme.bg_canvas)
-                                        .corner_radius(CornerRadius::same(4)),
-                                    )
-                                    .clicked()
+                                if crate::icons::icon_button(
+                                    ui,
+                                    crate::icons::AppIcon::ArrowRight,
+                                    next_st.label(),
+                                    9.5,
+                                    theme.accent_green,
+                                    theme.bg_canvas,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::ZERO,
+                                )
+                                .clicked()
                                 {
                                     card_advance_idx = Some(u_idx);
                                 }
@@ -569,11 +571,15 @@ impl IndustrializedView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("🦾 Automated Structural Steel Robotic Workcell")
-                        .size(13.5)
-                        .strong()
-                        .color(theme.text_primary),
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Cpu,
+                    13.5,
+                    theme.accent_blue,
+                    "Automated Structural Steel Robotic Workcell",
+                    13.5,
+                    theme.text_primary,
+                    true,
                 );
                 ui.add_space(10.0);
 
@@ -599,13 +605,15 @@ impl IndustrializedView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new(
-                        "🏗️ Autonomous Crane, Collision-Free Trajectory & LiDAR Drone Inspection",
-                    )
-                    .size(13.5)
-                    .strong()
-                    .color(theme.text_primary),
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Hammer,
+                    13.5,
+                    theme.accent_orange,
+                    "Autonomous Crane, Collision-Free Trajectory & LiDAR Drone Inspection",
+                    13.5,
+                    theme.text_primary,
+                    true,
                 );
                 ui.add_space(10.0);
 

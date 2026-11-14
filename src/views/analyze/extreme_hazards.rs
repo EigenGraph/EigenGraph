@@ -23,15 +23,22 @@ impl AnalyzeView {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("🏛️ FEMA P-58 Seismic Performance & REDi™ Resilience Engine").size(13.0).strong().color(theme.accent_blue));
+                    icons::icon_label(ui, AppIcon::Building, 14.0, theme.accent_blue, "FEMA P-58 Seismic Performance & REDi™ Resilience Engine", 13.0, theme.accent_blue, true);
                     ui.label(RichText::new("FEMA P-58-1 / ATC-58 · Arup REDi™ Rating System · ASCE 7-22 / ASCE 41-17 · ISO 14040 Embodied Carbon").size(10.5).color(theme.text_secondary));
                 });
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new(RichText::new("📥 Export FEMA P-58 Dossier (.md)").size(11.0).color(Color32::WHITE))
-                        .fill(theme.bg_canvas)
-                        .stroke(Stroke::new(1.0, theme.accent_blue))
-                        .corner_radius(CornerRadius::same(7))).clicked() {
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SaveDisk,
+                        "Export FEMA P-58 Dossier (.md)",
+                        11.0,
+                        Color32::WHITE,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.accent_blue),
+                        CornerRadius::same(7),
+                        Vec2::ZERO,
+                    ).clicked() {
                         let dossier = crate::core::FemaP58Engine::generate_markdown_dossier(&input, &rep);
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_FEMA_P58_Seismic_Loss_Dossier.md", &dossier) {
                             self.export_status = Some(format!("FEMA P-58 Calculation Dossier saved to: {}", path));
@@ -86,7 +93,12 @@ ui.label(RichText::new("EMBODIED CARBON").size(10.0).strong().color(theme.text_s
                     ui.set_width(ui.available_width());
 ui.label(RichText::new("REDi™ RATING").size(10.0).strong().color(theme.text_secondary));
                 ui.label(RichText::new(format!("{:?}", rep.achieved_redi_tier)).size(16.5).strong().color(redi_col));
-                ui.label(RichText::new(if rep.is_target_redi_achieved { "✅ Target Tier Achieved" } else { "⚠️ Below Target Tier" }).size(10.0).color(theme.text_muted));
+                let (r_ic, r_txt, r_col) = if rep.is_target_redi_achieved {
+                    (AppIcon::CheckCircle, "Target Tier Achieved", theme.accent_green)
+                } else {
+                    (AppIcon::AlertTriangle, "Below Target Tier", theme.accent_orange)
+                };
+                icons::icon_label(ui, r_ic, 11.0, r_col, r_txt, 10.0, theme.text_muted, false);
             });
     }
 });
@@ -177,7 +189,7 @@ ui.label(RichText::new("REDi™ RATING").size(10.0).strong().color(theme.text_se
         // 2D Vector CAD Canvas: Fragility Curves Plot + Story-by-Story Loss Distribution
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📐 2D Vector CAD Component Fragility Curves & Story Loss Breakdown").size(12.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::RulerSquare, 13.5, theme.accent_blue, "2D Vector CAD Component Fragility Curves & Story Loss Breakdown", 12.5, theme.accent_blue, true);
                 ui.add_space(20.0);
                 ui.label(RichText::new(format!("Direct Loss: ${:.0} | Total Exposure: ${:.0}", rep.total_repair_cost_usd, rep.total_economic_loss_usd)).size(11.0).color(theme.accent_green));
             });
@@ -312,11 +324,14 @@ ui.label(RichText::new("REDi™ RATING").size(10.0).strong().color(theme.text_se
         // Regulatory & REDi Compliance Audit Table
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📋 FEMA P-58 / REDi™ Performance Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::Clipboard, 13.5, theme.accent_blue, "FEMA P-58 / REDi™ Performance Compliance Audit", 12.5, theme.accent_blue, true);
                 ui.add_space(20.0);
-                let overall_status = if rep.is_target_redi_achieved { "🟢 TARGET REDi™ RESILIENCE TIER ACHIEVED" } else { "🔴 TARGET RESILIENCE TIER DEFICIT" };
-                let status_col = if rep.is_target_redi_achieved { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+                let (ov_ic, overall_status, status_col) = if rep.is_target_redi_achieved {
+                    (AppIcon::CheckCircle, "TARGET REDi™ RESILIENCE TIER ACHIEVED", theme.accent_green)
+                } else {
+                    (AppIcon::AlertTriangle, "TARGET RESILIENCE TIER DEFICIT", Color32::from_rgb(239, 68, 68))
+                };
+                icons::pill_badge(ui, ov_ic, overall_status, status_col);
             });
 
             ui.add_space(6.0);
@@ -350,7 +365,8 @@ ui.label(RichText::new("REDi™ RATING").size(10.0).strong().color(theme.text_se
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.3}", item.utilization_ratio)).size(10.5).strong().color(row_col));
                     ui.add_space(20.0);
-                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                    let (r_ic, r_txt) = if item.is_passed { (AppIcon::CheckCircle, "PASS") } else { (AppIcon::AlertTriangle, "FAIL") };
+                    icons::icon_label(ui, r_ic, 11.0, row_col, r_txt, 10.5, row_col, true);
                 });
                 ui.separator();
             }
@@ -384,7 +400,7 @@ ui.label(RichText::new("REDi™ RATING").size(10.0).strong().color(theme.text_se
         // Card 1: Threat Intensity
             theme.card_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
-ui.label(RichText::new("💣 Blast Threat Intensity").size(11.0).strong().color(theme.text_secondary));
+                icons::icon_label(ui, AppIcon::Flame, 12.0, Color32::from_rgb(239, 68, 68), "Blast Threat Intensity", 11.0, theme.text_secondary, true);
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(format!("{:.1} kg TNT", rep.blast_wave.effective_tnt_mass_kg))
@@ -409,7 +425,7 @@ ui.label(RichText::new("💣 Blast Threat Intensity").size(11.0).strong().color(
         // Card 2: Reflected Impulse & Duration
             theme.card_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
-ui.label(RichText::new("⚡ Reflected Shock & Impulse").size(11.0).strong().color(theme.text_secondary));
+                icons::icon_label(ui, AppIcon::Bolt, 12.0, Color32::from_rgb(245, 158, 11), "Reflected Shock & Impulse", 11.0, theme.text_secondary, true);
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(format!("{:.1} kPa", rep.blast_wave.peak_reflected_overpressure_kpa))
@@ -433,7 +449,7 @@ ui.label(RichText::new("⚡ Reflected Shock & Impulse").size(11.0).strong().colo
         // Card 3: Dynamic Structural Deformation
             theme.card_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
-ui.label(RichText::new("📐 Dynamic SDOF Demands").size(11.0).strong().color(theme.text_secondary));
+                icons::icon_label(ui, AppIcon::RulerSquare, 12.0, theme.accent_blue, "Dynamic SDOF Demands", 11.0, theme.text_secondary, true);
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(format!("μ = {:.2}", rep.dynamic_ductility_ratio))
@@ -459,7 +475,7 @@ ui.label(RichText::new("📐 Dynamic SDOF Demands").size(11.0).strong().color(th
             let status_badge_col = Color32::from_rgb(r, g, b);
             theme.card_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
-ui.label(RichText::new("🛡️ UFC 3-340-02 Damage Tier").size(11.0).strong().color(theme.text_secondary));
+                icons::icon_label(ui, AppIcon::Shield, 12.0, status_badge_col, "UFC 3-340-02 Damage Tier", 11.0, theme.text_secondary, true);
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(format!("{:?}", rep.evaluated_damage_level))
@@ -467,19 +483,16 @@ ui.label(RichText::new("🛡️ UFC 3-340-02 Damage Tier").size(11.0).strong().c
                         .strong()
                         .color(status_badge_col),
                 );
-                let achieved_str = if rep.is_target_damage_achieved {
-                    "🟢 Target Limit Satisfied"
+                let (ach_ic, achieved_str, ach_col) = if rep.is_target_damage_achieved {
+                    (AppIcon::CheckCircle, "Target Limit Satisfied", theme.accent_green)
                 } else {
-                    "🔴 Target Limit Deficit"
+                    (AppIcon::AlertTriangle, "Target Limit Deficit", Color32::from_rgb(239, 68, 68))
                 };
+                icons::icon_label(ui, ach_ic, 11.0, ach_col, achieved_str, 10.5, ach_col, true);
                 ui.label(
-                    RichText::new(format!(
-                        "{}\nRegime: {}",
-                        achieved_str,
-                        rep.sdof_system.response_regime.label()
-                    ))
-                    .size(10.5)
-                    .color(theme.text_secondary),
+                    RichText::new(format!("Regime: {}", rep.sdof_system.response_regime.label()))
+                        .size(10.5)
+                        .color(theme.text_secondary),
                 );
             });
     }
@@ -489,7 +502,7 @@ ui.label(RichText::new("🛡️ UFC 3-340-02 Damage Tier").size(11.0).strong().c
 
         // Parameter Controls Panel (3 Columns)
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("⚙️ Blast Threat, Structural Geometry & Antiterrorism Design Parameters").size(12.5).strong().color(theme.accent_blue));
+            icons::icon_label(ui, AppIcon::SettingsGear, 13.5, theme.accent_blue, "Blast Threat, Structural Geometry & Antiterrorism Design Parameters", 12.5, theme.accent_blue, true);
             ui.add_space(8.0);
 
             ui_kit::responsive_grid_n(ui, 3, 240.0, |ui, col_idx| match col_idx {
@@ -618,7 +631,7 @@ ui.label(RichText::new("🛡️ UFC 3-340-02 Damage Tier").size(11.0).strong().c
 
         // 2D Vector CAD Canvas: Blast Waveform P(t) (Left) & SDOF Response y(t) with P-I Contour (Right)
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("📈 Dynamic Waveform & SDOF Elastoplastic Response Trajectory (UFC 3-340-02)").size(12.5).strong().color(theme.accent_blue));
+            icons::icon_label(ui, AppIcon::ChartLine, 13.5, theme.accent_blue, "Dynamic Waveform & SDOF Elastoplastic Response Trajectory (UFC 3-340-02)", 12.5, theme.accent_blue, true);
             ui.add_space(6.0);
 
             let (canvas_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 260.0), Sense::hover());
@@ -758,11 +771,14 @@ ui.label(RichText::new("🛡️ UFC 3-340-02 Damage Tier").size(11.0).strong().c
         // Regulatory & UFC 3-340-02 / ASCE 59-11 Compliance Audit Table
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📋 UFC 3-340-02 & ASCE 59-11 Antiterrorism Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::Clipboard, 13.5, theme.accent_blue, "UFC 3-340-02 & ASCE 59-11 Antiterrorism Compliance Audit", 12.5, theme.accent_blue, true);
                 ui.add_space(20.0);
-                let overall_status = if rep.is_target_damage_achieved { "🟢 TARGET DAMAGE LEVEL ACHIEVED" } else { "🔴 TARGET DAMAGE DEFICIT" };
-                let status_col = if rep.is_target_damage_achieved { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+                let (ov_ic, overall_status, status_col) = if rep.is_target_damage_achieved {
+                    (AppIcon::CheckCircle, "TARGET DAMAGE LEVEL ACHIEVED", theme.accent_green)
+                } else {
+                    (AppIcon::AlertTriangle, "TARGET DAMAGE DEFICIT", Color32::from_rgb(239, 68, 68))
+                };
+                icons::pill_badge(ui, ov_ic, overall_status, status_col);
             });
 
             ui.add_space(6.0);
@@ -796,7 +812,8 @@ ui.label(RichText::new("🛡️ UFC 3-340-02 Damage Tier").size(11.0).strong().c
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.3}", item.utilization_ratio)).size(10.5).strong().color(row_col));
                     ui.add_space(20.0);
-                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                    let (r_ic, r_txt) = if item.is_passed { (AppIcon::CheckCircle, "PASS") } else { (AppIcon::AlertTriangle, "FAIL") };
+                    icons::icon_label(ui, r_ic, 11.0, row_col, r_txt, 10.5, row_col, true);
                 });
                 ui.separator();
             }
@@ -834,7 +851,7 @@ ui.label(RichText::new("🛡️ UFC 3-340-02 Damage Tier").size(11.0).strong().c
         // Card 1: Fire Exposure & Gas Temp
             theme.card_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
-ui.label(RichText::new("🔥 Fire Exposure & Temperatures").size(11.0).strong().color(theme.text_secondary));
+                icons::icon_label(ui, AppIcon::Flame, 12.0, Color32::from_rgb(239, 68, 68), "Fire Exposure & Temperatures", 11.0, theme.text_secondary, true);
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(format!("{:.0} °C", rep.final_member_temp_c))
@@ -859,7 +876,7 @@ ui.label(RichText::new("🔥 Fire Exposure & Temperatures").size(11.0).strong().
             let frr_col = if rep.is_target_frr_achieved { theme.accent_green } else { Color32::from_rgb(245, 158, 11) };
             theme.card_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
-ui.label(RichText::new("🛡️ Fire Endurance Rating").size(11.0).strong().color(theme.text_secondary));
+                icons::icon_label(ui, AppIcon::Shield, 12.0, frr_col, "Fire Endurance Rating", 11.0, theme.text_secondary, true);
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(format!("R{:.0} ({:.0} min)", rep.fire_endurance_rating_minutes, rep.fire_endurance_rating_minutes))
@@ -867,15 +884,15 @@ ui.label(RichText::new("🛡️ Fire Endurance Rating").size(11.0).strong().colo
                         .strong()
                         .color(frr_col),
                 );
-                let achieved_str = if rep.is_target_frr_achieved {
-                    "🟢 Target FRR Satisfied"
+                let (ach_ic, achieved_str, ach_col) = if rep.is_target_frr_achieved {
+                    (AppIcon::CheckCircle, "Target FRR Satisfied", theme.accent_green)
                 } else {
-                    "🔴 Target FRR Deficit"
+                    (AppIcon::AlertTriangle, "Target FRR Deficit", Color32::from_rgb(239, 68, 68))
                 };
+                icons::icon_label(ui, ach_ic, 11.0, ach_col, achieved_str, 10.5, ach_col, true);
                 ui.label(
                     RichText::new(format!(
-                        "{}\nTarget: R{:.0} | Tcrit = {:.0} °C",
-                        achieved_str,
+                        "Target: R{:.0} | Tcrit = {:.0} °C",
                         rep.input.target_frr_minutes,
                         rep.critical_temperature_c
                     ))
@@ -888,7 +905,7 @@ ui.label(RichText::new("🛡️ Fire Endurance Rating").size(11.0).strong().colo
         // Card 3: Degraded Elevated Capacity
             theme.card_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
-ui.label(RichText::new("📉 Elevated Structural Capacity").size(11.0).strong().color(theme.text_secondary));
+                icons::icon_label(ui, AppIcon::ChartLine, 12.0, theme.accent_blue, "Elevated Structural Capacity", 11.0, theme.text_secondary, true);
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(format!("D/C = {:.2}", rep.max_utilization_ratio))
@@ -912,7 +929,7 @@ ui.label(RichText::new("📉 Elevated Structural Capacity").size(11.0).strong().
         // Card 4: Passive Fire Insulation Sizing
             theme.card_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
-ui.label(RichText::new("🧱 Passive Protection Sizing").size(11.0).strong().color(theme.text_secondary));
+                icons::icon_label(ui, AppIcon::Wall, 12.0, Color32::from_rgb(168, 85, 247), "Passive Protection Sizing", 11.0, theme.text_secondary, true);
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(format!("{:.1} mm", rep.input.protection_thickness_mm))
@@ -937,7 +954,7 @@ ui.label(RichText::new("🧱 Passive Protection Sizing").size(11.0).strong().col
 
         // Parameter Controls Panel (3 Columns)
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("⚙️ Fire Exposure, Member Section Geometry & Passive Protection Controls").size(12.5).strong().color(theme.accent_blue));
+            icons::icon_label(ui, AppIcon::SettingsGear, 13.5, theme.accent_blue, "Fire Exposure, Member Section Geometry & Passive Protection Controls", 12.5, theme.accent_blue, true);
             ui.add_space(8.0);
 
             ui_kit::responsive_grid_n(ui, 3, 240.0, |ui, col_idx| match col_idx {
@@ -1053,7 +1070,7 @@ ui.label(RichText::new("🧱 Passive Protection Sizing").size(11.0).strong().col
 
         // 2D Vector CAD Canvas: Temperature Histories (Left) & Capacity Degradation (Right)
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("📈 Transient Heat Conduction & Elevated Temperature Structural Degradation").size(12.5).strong().color(theme.accent_blue));
+            icons::icon_label(ui, AppIcon::ChartLine, 13.5, theme.accent_blue, "Transient Heat Conduction & Elevated Temperature Structural Degradation", 12.5, theme.accent_blue, true);
             ui.add_space(6.0);
 
             let (canvas_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 260.0), Sense::hover());
@@ -1193,11 +1210,14 @@ ui.label(RichText::new("🧱 Passive Protection Sizing").size(11.0).strong().col
         // Regulatory & Code Compliance Audit Table (AISC 360-16 / Eurocode 2 & 3)
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("📋 AISC 360-16 & Eurocode 1/2/3 Fire Compliance Audit").size(12.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::Clipboard, 13.5, theme.accent_blue, "AISC 360-16 & Eurocode 1/2/3 Fire Compliance Audit", 12.5, theme.accent_blue, true);
                 ui.add_space(20.0);
-                let overall_status = if rep.is_target_frr_achieved { "🟢 TARGET FIRE ENDURANCE ACHIEVED" } else { "🔴 TARGET FIRE ENDURANCE DEFICIT" };
-                let status_col = if rep.is_target_frr_achieved { theme.accent_green } else { Color32::from_rgb(239, 68, 68) };
-                ui.label(RichText::new(overall_status).size(11.0).strong().color(status_col));
+                let (ov_ic, overall_status, status_col) = if rep.is_target_frr_achieved {
+                    (AppIcon::CheckCircle, "TARGET FIRE ENDURANCE ACHIEVED", theme.accent_green)
+                } else {
+                    (AppIcon::AlertTriangle, "TARGET FIRE ENDURANCE DEFICIT", Color32::from_rgb(239, 68, 68))
+                };
+                icons::pill_badge(ui, ov_ic, overall_status, status_col);
             });
 
             ui.add_space(6.0);
@@ -1231,7 +1251,8 @@ ui.label(RichText::new("🧱 Passive Protection Sizing").size(11.0).strong().col
                     ui.add_space(15.0);
                     ui.label(RichText::new(format!("{:.3}", item.utilization_ratio)).size(10.5).strong().color(row_col));
                     ui.add_space(20.0);
-                    ui.label(RichText::new(if item.is_passed { "🟢 PASS" } else { "🔴 FAIL" }).size(10.5).strong().color(row_col));
+                    let (r_ic, r_txt) = if item.is_passed { (AppIcon::CheckCircle, "PASS") } else { (AppIcon::AlertTriangle, "FAIL") };
+                    icons::icon_label(ui, r_ic, 11.0, row_col, r_txt, 10.5, row_col, true);
                 });
                 ui.separator();
             }

@@ -90,12 +90,19 @@ impl ResultsView {
                     ui.add_space(10.0);
                     theme.card_frame().show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(RichText::new("📊 AUDIT STATUS:").size(11.5).strong().color(theme.accent_green));
+                            crate::icons::icon_label(ui, crate::icons::AppIcon::ChartBar, 12.0, theme.accent_green, "AUDIT STATUS:", 11.5, theme.accent_green, true);
                             ui.label(RichText::new(status_msg).size(11.5).color(theme.text_primary));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.add(egui::Button::new(RichText::new("✕").size(11.0).color(theme.text_muted))
-                                    .fill(theme.bg_card)
-                                    .corner_radius(CornerRadius::same(4))).clicked() {
+                                if crate::icons::icon_only_button(
+                                    ui,
+                                    crate::icons::AppIcon::Close,
+                                    theme.text_muted,
+                                    theme.bg_card,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::splat(20.0),
+                                    "Dismiss",
+                                ).clicked() {
                                     dismiss_status = true;
                                 }
                             });
@@ -152,7 +159,7 @@ impl ResultsView {
             .inner_margin(Margin::symmetric(14, 10))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("📐 ACTIVE SHEET:").size(11.0).strong().color(theme.accent_blue));
+                    crate::icons::icon_label(ui, crate::icons::AppIcon::RulerSquare, 12.0, theme.accent_blue, "ACTIVE SHEET:", 11.0, theme.accent_blue, true);
                     for (idx, sheet) in self.drawing_sheets.iter().enumerate() {
                         let is_sel = self.selected_sheet_idx == idx;
                         let bg = if is_sel { theme.accent_blue } else { theme.bg_sidebar };
@@ -170,33 +177,27 @@ impl ResultsView {
 
                     // Annotation Layer Toggles
                     ui.label(RichText::new("Overlays:").size(11.0).color(theme.text_secondary));
-                    if ui.selectable_label(self.show_annotation_dimensions, "📏 Dims").clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::DimensionRuler, "Dims", 11.0, if self.show_annotation_dimensions { Color32::WHITE } else { theme.text_secondary }, if self.show_annotation_dimensions { theme.accent_blue } else { Color32::TRANSPARENT }, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO).clicked() {
                         self.show_annotation_dimensions = !self.show_annotation_dimensions;
                     }
-                    if ui.selectable_label(self.show_grid_bubbles_sheet, "📐 Grids").clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Grid, "Grids", 11.0, if self.show_grid_bubbles_sheet { Color32::WHITE } else { theme.text_secondary }, if self.show_grid_bubbles_sheet { theme.accent_blue } else { Color32::TRANSPARENT }, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO).clicked() {
                         self.show_grid_bubbles_sheet = !self.show_grid_bubbles_sheet;
                     }
-                    if ui.selectable_label(self.show_pe_seal, "🛡️ PE Seal").clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Shield, "PE Seal", 11.0, if self.show_pe_seal { Color32::WHITE } else { theme.text_secondary }, if self.show_pe_seal { theme.accent_blue } else { Color32::TRANSPARENT }, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO).clicked() {
                         self.show_pe_seal = !self.show_pe_seal;
                     }
-                    if ui.selectable_label(self.show_revision_clouds, "☁️ Revisions").clicked() {
+                    if crate::icons::icon_button(ui, crate::icons::AppIcon::Layers, "Revisions", 11.0, if self.show_revision_clouds { Color32::WHITE } else { theme.text_secondary }, if self.show_revision_clouds { theme.accent_blue } else { Color32::TRANSPARENT }, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO).clicked() {
                         self.show_revision_clouds = !self.show_revision_clouds;
                     }
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.add(egui::Button::new(RichText::new("📥 Export Vector PDF (ISO A1)").size(11.0).strong().color(Color32::WHITE))
-                            .fill(theme.accent_green)
-                            .corner_radius(CornerRadius::same(6))).clicked() {
+                        if crate::icons::icon_button(ui, crate::icons::AppIcon::UploadImport, "Export Vector PDF (ISO A1)", 11.0, Color32::WHITE, theme.accent_green, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                             self.export_status = Some("Vector PDF generated successfully (ISO A1 standard, 300 DPI vector lines, TrueType annotations, embedded PE seal).".to_string());
                         }
-                        if ui.add(egui::Button::new(RichText::new("📐 AutoCAD 2024 DXF").size(11.0).color(theme.text_primary))
-                            .fill(theme.bg_sidebar)
-                            .corner_radius(CornerRadius::same(6))).clicked() {
+                        if crate::icons::icon_button(ui, crate::icons::AppIcon::RulerSquare, "AutoCAD 2024 DXF", 11.0, theme.text_primary, theme.bg_sidebar, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                             self.export_status = Some("AutoCAD 2024 DXF export generated with organized layers (S-GRID, S-COLS, S-BEAMS, S-ANNO-DIMS).".to_string());
                         }
-                        if ui.add(egui::Button::new(RichText::new("🌐 SVG").size(11.0).color(theme.text_primary))
-                            .fill(theme.bg_sidebar)
-                            .corner_radius(CornerRadius::same(6))).clicked() {
+                        if crate::icons::icon_button(ui, crate::icons::AppIcon::Globe, "SVG", 11.0, theme.text_primary, theme.bg_sidebar, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                             self.export_status = Some("Scalable Vector Graphics (SVG) exported with responsive viewport bounding box.".to_string());
                         }
                     });
@@ -208,8 +209,8 @@ impl ResultsView {
         // Phase 32+ Preview Slot: Auto-Projected DED Sheets from Active BimProject
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::AutoProjectedBimDedSheets, |ui| {
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.button("📐 Auto-Project Framing Plan from BimProject");
-                let _ = ui.button("🔩 Link Column & Footing Schedule to Active Model");
+                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::RulerSquare, "Auto-Project Framing Plan from BimProject", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Wrench, "Link Column & Footing Schedule to Active Model", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 ui.label(
                     RichText::new("Live BIM-to-Sheet projection locked until Phase 32 • Sheet preview active")
                         .size(11.0)
@@ -464,11 +465,15 @@ impl ResultsView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("📑 Report -> Docs: Living WYSIWYG DED Layout & Calculation Dossier")
-                                .size(18.0)
-                                .strong()
-                                .color(theme.text_primary),
+                        crate::icons::icon_label(
+                            ui,
+                            crate::icons::AppIcon::Document,
+                            18.0,
+                            theme.accent_blue,
+                            "Report -> Docs: Living WYSIWYG DED Layout & Calculation Dossier",
+                            18.0,
+                            theme.text_primary,
+                            true,
                         );
                         ui.label(
                             RichText::new("Dynamic page compositor embedding live 2D/3D technical drawings, reactive variables, and official municipal title blocks.")
@@ -478,10 +483,16 @@ impl ResultsView {
                     });
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.add(
-                            egui::Button::new(RichText::new("📄 Export Vector PDF").size(12.0).strong().color(Color32::WHITE))
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6))
+                        if crate::icons::icon_button(
+                            ui,
+                            crate::icons::AppIcon::Document,
+                            "Export Vector PDF",
+                            12.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
                         ).clicked() {
                             self.export_status = Some("Vector PDF drawing sheets exported successfully to exports/DED_Sheets_A1.pdf".to_string());
                         }
@@ -502,7 +513,7 @@ impl ResultsView {
                     .inner_margin(Margin::same(16))
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("🏷️ Title Block Metadata (Kop Gambar)").size(14.0).strong().color(theme.text_primary));
+                        crate::icons::icon_label(ui, crate::icons::AppIcon::Clipboard, 14.0, theme.accent_blue, "Title Block Metadata (Kop Gambar)", 14.0, theme.text_primary, true);
                         ui.add_space(8.0);
 
                         ui.label(RichText::new("Project Title:").size(11.0).color(theme.text_muted));
@@ -537,7 +548,7 @@ impl ResultsView {
                     .inner_margin(Margin::same(16))
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("⚡ Live Reactive Variable Substitution").size(14.0).strong().color(theme.text_primary));
+                        crate::icons::icon_label(ui, crate::icons::AppIcon::Bolt, 14.0, theme.accent_blue, "Live Reactive Variable Substitution", 14.0, theme.text_primary, true);
                         ui.add_space(8.0);
 
                         let tokens = [
@@ -550,7 +561,7 @@ impl ResultsView {
                         for (tok, val) in tokens {
                             ui.horizontal_wrapped(|ui| {
                                 ui.label(RichText::new(tok).size(11.5).monospace().color(theme.accent_blue));
-                                ui.label(RichText::new("➔").size(11.0).color(theme.text_muted));
+                                crate::icons::draw_icon(ui, crate::icons::AppIcon::ArrowRight, 11.0, theme.text_muted);
                                 ui.label(RichText::new(val).size(11.5).strong().color(theme.text_primary));
                             });
                             ui.add_space(4.0);
@@ -568,7 +579,7 @@ impl ResultsView {
             .stroke(Stroke::new(1.0, theme.border_card))
             .inner_margin(Margin::same(16))
             .show(ui, |ui| {
-                ui.label(RichText::new("📐 Printable Sheet Space Preview (ISO A1 / 1:100)").size(14.0).strong().color(theme.text_primary));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::RulerSquare, 14.0, theme.accent_blue, "Printable Sheet Space Preview (ISO A1 / 1:100)", 14.0, theme.text_primary, true);
                 ui.add_space(8.0);
 
                 let sheet_w = ui.available_width().max(260.0);
@@ -647,11 +658,15 @@ impl ResultsView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("📊 Report -> Sheets: Dynamic Engineering Spreadsheet & BoQ Engine")
-                                .size(18.0)
-                                .strong()
-                                .color(theme.text_primary),
+                        crate::icons::icon_label(
+                            ui,
+                            crate::icons::AppIcon::ChartBar,
+                            18.0,
+                            theme.accent_blue,
+                            "Report -> Sheets: Dynamic Engineering Spreadsheet & BoQ Engine",
+                            18.0,
+                            theme.text_primary,
+                            true,
                         );
                         ui.label(
                             RichText::new("Multi-cell formula parsing, automated Bill of Quantities (BoQ) derivation, and live AHSP price synchronization.")
@@ -661,10 +676,16 @@ impl ResultsView {
                     });
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.add(
-                            egui::Button::new(RichText::new("📊 Export .CSV").size(12.0).strong().color(theme.text_primary))
-                                .fill(theme.bg_canvas)
-                                .corner_radius(CornerRadius::same(6))
+                        if crate::icons::icon_button(
+                            ui,
+                            crate::icons::AppIcon::ChartBar,
+                            "Export .CSV",
+                            12.0,
+                            theme.text_primary,
+                            theme.bg_canvas,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
                         ).clicked() {
                             self.export_status = Some("Engineering spreadsheet exported to exports/BoQ_Dynamic_Ledger.csv".to_string());
                         }
@@ -755,11 +776,15 @@ impl ResultsView {
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("📽️ Report -> Slides: Client Presentation Deck & Live 3D Orbit Viewport")
-                                .size(18.0)
-                                .strong()
-                                .color(theme.text_primary),
+                        crate::icons::icon_label(
+                            ui,
+                            crate::icons::AppIcon::Layers,
+                            18.0,
+                            theme.accent_blue,
+                            "Report -> Slides: Client Presentation Deck & Live 3D Orbit Viewport",
+                            18.0,
+                            theme.text_primary,
+                            true,
                         );
                         ui.label(
                             RichText::new("Author executive briefing decks with embedded interactive 3D model orbit viewports for municipal permitting and client hearings.")
@@ -769,11 +794,17 @@ impl ResultsView {
                     });
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let pres_btn = if self.is_presentation_mode { "Exit Fullscreen (Esc)" } else { "▶ Present Fullscreen (F5)" };
-                        if ui.add(
-                            egui::Button::new(RichText::new(pres_btn).size(12.0).strong().color(Color32::WHITE))
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6))
+                        let (pres_icon, pres_btn) = if self.is_presentation_mode { (crate::icons::AppIcon::Close, "Exit Fullscreen (Esc)") } else { (crate::icons::AppIcon::Play, "Present Fullscreen (F5)") };
+                        if crate::icons::icon_button(
+                            ui,
+                            pres_icon,
+                            pres_btn,
+                            12.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
                         ).clicked() {
                             self.is_presentation_mode = !self.is_presentation_mode;
                         }
@@ -880,7 +911,7 @@ impl ResultsView {
                                 ui.painter().text(
                                     vp_rect.center(),
                                     egui::Align2::CENTER_CENTER,
-                                    "🎮 Live Interactive 3D Model Viewport Embedded in Slide",
+                                    "Interactive 3D Model Viewport Embedded in Slide",
                                     egui::FontId::proportional(11.0),
                                     Color32::from_rgb(180, 180, 190),
                                 );
@@ -908,8 +939,12 @@ impl ResultsView {
             .inner_margin(Margin::same(14))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new(if critical_count == 0 { "✅ FEASIBILITY STATUS: STRUCTURE MEETS CODE STANDARDS (SAFE)" } else { "⚠️ FEASIBILITY STATUS: CRITICAL ELEMENTS DETECTED (REVIEW NEEDED)" })
-                        .size(14.0).strong().color(Color32::WHITE));
+                    let (feas_icon, feas_text) = if critical_count == 0 {
+                        (crate::icons::AppIcon::CheckCircle, "FEASIBILITY STATUS: STRUCTURE MEETS CODE STANDARDS (SAFE)")
+                    } else {
+                        (crate::icons::AppIcon::AlertTriangle, "FEASIBILITY STATUS: CRITICAL ELEMENTS DETECTED (REVIEW NEEDED)")
+                    };
+                    crate::icons::icon_label(ui, feas_icon, 14.0, Color32::WHITE, feas_text, 14.0, Color32::WHITE, true);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(RichText::new("SNI 1729:2020 / AISC 360-16 LRFD").size(11.0).color(Color32::from_white_alpha(200)));
                     });
@@ -966,7 +1001,7 @@ impl ResultsView {
 
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("🌟 MULTI-DIMENSIONAL PROJECT SUMMARY (BIM 1D - 10D INTEGRATION)").size(13.0).strong().color(theme.text_primary));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Star, 13.0, theme.accent_blue, "MULTI-DIMENSIONAL PROJECT SUMMARY (BIM 1D - 10D INTEGRATION)", 13.0, theme.text_primary, true);
             });
             ui.add_space(6.0);
 
@@ -997,7 +1032,7 @@ impl ResultsView {
     fn render_member_matrix(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("📋 COMPLETE ELEMENT PERFORMANCE AUDIT TABLE").size(14.0).strong().color(theme.text_primary));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Clipboard, 14.0, theme.accent_blue, "COMPLETE ELEMENT PERFORMANCE AUDIT TABLE", 14.0, theme.text_primary, true);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.checkbox(&mut self.filter_critical_only, "Show Critical Elements Only (ARI < 0.70)");
                 });
@@ -1050,7 +1085,10 @@ impl ResultsView {
                                 ui.label(RichText::new(format!("{:.1} kN", m.capacity_kn)).size(11.0).color(theme.text_secondary));
                                 ui.label(RichText::new(format!("{:.3}", dcr)).size(11.0).color(if dcr < 0.85 { theme.accent_green } else { theme.accent_orange }));
                                 ui.label(RichText::new(format!("{:.4}", m.ari)).size(11.0).strong().color(ari_color));
-                                ui.label(RichText::new(if m.ari >= 0.70 { "✅ SAFE" } else { "⚠️ CRITICAL" }).size(11.0).strong().color(ari_color));
+                                ui.horizontal(|ui| {
+                                    let (ari_icon, ari_lbl) = if m.ari >= 0.70 { (crate::icons::AppIcon::CheckCircle, "SAFE") } else { (crate::icons::AppIcon::AlertTriangle, "CRITICAL") };
+                                    crate::icons::icon_label(ui, ari_icon, 11.0, ari_color, ari_lbl, 11.0, ari_color, true);
+                                });
                                 ui.end_row();
                             }
                         });
@@ -1061,7 +1099,7 @@ impl ResultsView {
     fn render_deformations_and_forces(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("📈 DEFORMATION ENVELOPES, LRFD COMBINATIONS & SUPPORT REACTIONS").size(14.0).strong().color(theme.text_primary));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::ChartLine, 14.0, theme.accent_blue, "DEFORMATION ENVELOPES, LRFD COMBINATIONS & SUPPORT REACTIONS", 14.0, theme.text_primary, true);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("6 SNI 1727:2020 / ASCE 7-22 LRFD Load Combinations").size(11.0).color(theme.accent_blue));
                 });
@@ -1096,7 +1134,7 @@ impl ResultsView {
             });
 
             ui.add_space(16.0);
-            ui.label(RichText::new("🔩 HIGH-STRENGTH BOLT, FILLET WELD & GUSSET BLOCK SHEAR AUDIT (AISC 360-16 / SNI 1729:2020 CH. J)").size(12.5).strong().color(theme.text_primary));
+            crate::icons::icon_label(ui, crate::icons::AppIcon::Wrench, 12.5, theme.accent_blue, "HIGH-STRENGTH BOLT, FILLET WELD & GUSSET BLOCK SHEAR AUDIT (AISC 360-16 / SNI 1729:2020 CH. J)", 12.5, theme.text_primary, true);
             ui.add_space(4.0);
             ui.label(RichText::new("Joint connection capacity is protected with overstrength factor Ω_ARI = 1.0 + 0.35(1 - ARI_e) ensuring brittle bolt/weld fracture does not precede ductile load redistribution.")
                 .size(11.0).color(theme.text_secondary));
@@ -1133,7 +1171,9 @@ impl ResultsView {
                                         ui.label(RichText::new(format!("{:.1} kN", c.bolt_shear_capacity_kn)).size(11.0).color(theme.text_secondary));
                                         ui.label(RichText::new(format!("t={:.0}mm ({:.0} kN)", c.gusset_thickness_mm, c.block_shear_capacity_kn)).size(11.0).color(theme.text_secondary));
                                         ui.label(RichText::new(format!("a={:.0}mm, L={:.0}mm", c.weld_leg_mm, c.weld_length_mm)).size(11.0).color(theme.text_secondary));
-                                        ui.label(RichText::new(format!("{:.3} ✅", c.governing_dcr)).size(11.0).strong().color(dcr_col));
+                                        ui.horizontal(|ui| {
+                                            crate::icons::icon_label(ui, crate::icons::AppIcon::CheckCircle, 11.0, dcr_col, format!("{:.3}", c.governing_dcr), 11.0, dcr_col, true);
+                                        });
                                         ui.end_row();
                                     }
                                 });
@@ -1146,7 +1186,7 @@ impl ResultsView {
     fn render_certification_export(&mut self, ui: &mut Ui, theme: &MacTheme, _members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("📑 OFFICIAL AUDIT DOCUMENTS, LATEX PUBLICATION TABLES & MULTI-FORMAT EXPORT").size(14.0).strong().color(theme.text_primary));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Document, 14.0, theme.accent_blue, "OFFICIAL AUDIT DOCUMENTS, LATEX PUBLICATION TABLES & MULTI-FORMAT EXPORT", 14.0, theme.text_primary, true);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("Platform EigenGraph 2026 • SHA-256 Sealed").size(11.0).color(theme.accent_blue));
                 });
@@ -1161,15 +1201,13 @@ impl ResultsView {
                 0 => {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("📜 AUDIT REPORTS, LATEX JOURNALS & .EIGEN ARCHIVES").size(12.0).strong().color(theme.text_primary));
+                        crate::icons::icon_label(ui, crate::icons::AppIcon::Document, 12.0, theme.accent_blue, "AUDIT REPORTS, LATEX JOURNALS & .EIGEN ARCHIVES", 12.0, theme.text_primary, true);
                         ui.add_space(4.0);
                         ui.label(RichText::new("Save interactive 3D HTML dossier, publication-ready LaTeX Booktabs tables (.tex) for peer-reviewed journals, or SHA-256 sealed .eigen project archives.")
                             .size(10.5).color(theme.text_secondary));
                         ui.add_space(10.0);
                         ui.horizontal_wrapped(|ui| {
-                            if ui.add(egui::Button::new(RichText::new("📄 3D HTML Audit Dossier").size(10.5).color(Color32::WHITE))
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Document, "3D HTML Audit Dossier", 10.5, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
@@ -1180,9 +1218,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🎓 LaTeX Booktabs Table (.tex)").size(10.5).color(Color32::WHITE))
-                                .fill(theme.accent_green)
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Book, "LaTeX Booktabs Table (.tex)", 10.5, Color32::WHITE, theme.accent_green, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     if let Ok(ari) = crate::core::AriEngine::evaluate_redundancy(&model) {
@@ -1195,9 +1231,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🔐 Project Archive (.eigen)").size(10.5).color(theme.text_primary))
-                                .fill(theme.bg_card)
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Lock, "Project Archive (.eigen)", 10.5, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     if let Ok(json) = crate::core::EigenProjectArchive::serialize_to_eigen_json(&model) {
@@ -1208,9 +1242,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🏛️ PBG/SIMBG Dossier (.html)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(180, 83, 9))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Building, "PBG/SIMBG Dossier (.html)", 10.5, Color32::WHITE, Color32::from_rgb(180, 83, 9), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     if let Ok(ari) = crate::core::AriEngine::evaluate_redundancy(&model) {
@@ -1223,9 +1255,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("📋 Bar Bending Schedule (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(109, 40, 217))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Rebar, "Bar Bending Schedule (.md)", 10.5, Color32::WHITE, Color32::from_rgb(109, 40, 217), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     let bbs = crate::core::RebarBbsDetailer::generate_from_model(&model, 30.0, 420.0);
@@ -1236,9 +1266,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("📉 ASCE 41 Pushover Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(14, 165, 233))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::ChartLine, "ASCE 41 Pushover Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(14, 165, 233), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     let csm = crate::core::PushoverEngine::evaluate_csm(
@@ -1256,9 +1284,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🌱 Geotech & SSI Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(16, 185, 129))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Leaf, "Geotech & SSI Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(16, 185, 129), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     let soil = crate::core::SoilLayer::new_standard(crate::core::SoilType::MediumSand, 0.0, 20.0);
@@ -1270,9 +1296,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🔩 AISC 360 Connection Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(234, 88, 12))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Wrench, "AISC 360 Connection Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(234, 88, 12), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let rep = crate::core::ConnectionEngine::evaluate_extended_end_plate(
                                     "Beam-to-Column 4E Extended End-Plate Moment Connection",
                                     crate::core::BoltGrade::A325X,
@@ -1297,9 +1321,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🌪️ ASCE 7 Wind Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(2, 132, 199))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Wind, "ASCE 7 Wind Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(2, 132, 199), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let rep = crate::core::WindEngine::run_wind_analysis(
                                     "High-Rise MWFRS & Dynamic Comfort Assessment",
                                     38.0,
@@ -1319,9 +1341,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🥞 AISC Composite Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(13, 148, 136))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Layers, "AISC Composite Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(13, 148, 136), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let slab = crate::core::CompositeSlabDeck::default();
                                 let stud = crate::core::ShearStud::default();
                                 let rep = crate::core::CompositeBeamEngine::evaluate_composite_beam(
@@ -1335,9 +1355,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("📐 Spatial Geometry Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(124, 58, 237))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::RulerSquare, "Spatial Geometry Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(124, 58, 237), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let truss = crate::core::ParametricSpatialWizard::generate_double_layer_space_truss("Spatial Space Truss MERO", 24.0, 24.0, 2.0, 6, 6);
                                 let poly = crate::core::SectionIntegrator::build_i_section(300.0, 150.0, 9.0, 6.5);
                                 let rep = crate::core::SectionIntegrator::evaluate_polygon("WF 300x150", &poly).ok();
@@ -1347,9 +1365,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🪢 Prestressed PT Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(16, 185, 129))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::LinkChain, "Prestressed PT Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(16, 185, 129), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let rep = crate::core::PrestressedConcreteEngine::evaluate_girder(
                                     "EigenGraph Viaduct",
                                     "Span 4 Girder G-03",
@@ -1375,9 +1391,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🏢 RC Shear Wall Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(2, 132, 199))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Wall, "RC Shear Wall Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(2, 132, 199), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let rep = crate::core::ShearWallEngine::evaluate_wall(
                                     "SW-Core-01", 6.0, 36.0, 350.0, 3.5, 35.0, 420.0, 420.0,
                                     3600.0, 14500.0, 1850.0, 0.012,
@@ -1389,9 +1403,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🛡️ Base Isolation Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(147, 51, 234))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Shield, "Base Isolation Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(147, 51, 234), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let input = crate::core::SeismicIsolationInput::default();
                                 let rep = crate::core::SeismicIsolationEngine::evaluate(&input);
                                 let md = crate::core::SeismicIsolationEngine::generate_markdown_dossier(&input, &rep);
@@ -1400,9 +1412,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🌊 NL-THA Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(14, 165, 233))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Pulse, "NL-THA Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(14, 165, 233), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let input = crate::core::TimeHistoryInput::default();
                                 let rep = crate::core::TimeHistoryEngine::evaluate(&input);
                                 let md = crate::core::TimeHistoryEngine::generate_markdown_dossier(&input, &rep);
@@ -1411,9 +1421,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🏛️ FEMA P-58 Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(168, 85, 247))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Building, "FEMA P-58 Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(168, 85, 247), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let input = crate::core::FemaP58Input::default();
                                 let rep = crate::core::FemaP58Engine::evaluate(&input);
                                 let md = crate::core::FemaP58Engine::generate_markdown_dossier(&input, &rep);
@@ -1422,9 +1430,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("💣 Blast Dynamics Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(239, 68, 68))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::AlertTriangle, "Blast Dynamics Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(239, 68, 68), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let input = crate::core::BlastAnalysisInput::default();
                                 let rep = crate::core::BlastEngine::run_assessment(&input);
                                 let md = crate::core::BlastEngine::generate_markdown_dossier(&rep);
@@ -1433,9 +1439,7 @@ impl ResultsView {
                                 }
                             }
 
-                            if ui.add(egui::Button::new(RichText::new("🔥 Structural Fire Dossier (.md)").size(10.5).color(Color32::WHITE))
-                                .fill(Color32::from_rgb(249, 115, 22))
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Flame, "Structural Fire Dossier (.md)", 10.5, Color32::WHITE, Color32::from_rgb(249, 115, 22), Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let input = crate::core::FireAnalysisInput::default();
                                 let rep = crate::core::FireEngine::run_assessment(&input);
                                 let md = crate::core::FireEngine::generate_markdown_dossier(&rep);
@@ -1449,15 +1453,13 @@ impl ResultsView {
                 _ => {
                     Frame::new().fill(theme.bg_sidebar).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new("🌐 OPENBIM & CAD TRIAD DISK EXPORT").size(12.0).strong().color(theme.text_primary));
+                        crate::icons::icon_label(ui, crate::icons::AppIcon::Globe, 12.0, theme.accent_blue, "OPENBIM & CAD TRIAD DISK EXPORT", 12.0, theme.text_primary, true);
                         ui.add_space(4.0);
                         ui.label(RichText::new("Export structural topology to industry standards: IFC 4.3, CSI ETABS (.e2k), CSI SAP2000 (.s2k), or AutoCAD 3D DXF.")
                             .size(10.5).color(theme.text_secondary));
                         ui.add_space(10.0);
                         ui.horizontal_wrapped(|ui| {
-                            if ui.add(egui::Button::new(RichText::new("🌐 IFC 4.3 (.ifc)").size(10.5).color(theme.accent_blue))
-                                .fill(theme.bg_card)
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Globe, "IFC 4.3 (.ifc)", 10.5, theme.accent_blue, theme.bg_card, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
@@ -1467,9 +1469,7 @@ impl ResultsView {
                                     }
                                 }
                             }
-                            if ui.add(egui::Button::new(RichText::new("🏛️ IFC4 SAM (.ifc)").size(10.5).color(theme.accent_blue))
-                                .fill(theme.bg_card)
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Building, "IFC4 SAM (.ifc)", 10.5, theme.accent_blue, theme.bg_card, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
@@ -1479,9 +1479,7 @@ impl ResultsView {
                                     }
                                 }
                             }
-                            if ui.add(egui::Button::new(RichText::new("🏢 CSI ETABS (.e2k)").size(10.5).color(theme.accent_green))
-                                .fill(theme.bg_card)
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Building, "CSI ETABS (.e2k)", 10.5, theme.accent_green, theme.bg_card, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
@@ -1491,9 +1489,7 @@ impl ResultsView {
                                     }
                                 }
                             }
-                            if ui.add(egui::Button::new(RichText::new("📐 SAP2000 (.s2k)").size(10.5).color(theme.accent_blue))
-                                .fill(theme.bg_card)
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::RulerSquare, "SAP2000 (.s2k)", 10.5, theme.accent_blue, theme.bg_card, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
@@ -1503,9 +1499,7 @@ impl ResultsView {
                                     }
                                 }
                             }
-                            if ui.add(egui::Button::new(RichText::new("📏 AutoCAD 3D (.dxf)").size(10.5).color(theme.accent_blue))
-                                .fill(theme.bg_card)
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::DimensionRuler, "AutoCAD 3D (.dxf)", 10.5, theme.accent_blue, theme.bg_card, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let mut engine = crate::core::ParametricEngine::new();
                                 if let Ok(model) = engine.generate_warren_truss() {
                                     let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
@@ -1515,9 +1509,7 @@ impl ResultsView {
                                     }
                                 }
                             }
-                            if ui.add(egui::Button::new(RichText::new("🧊 Wavefront 3D (.obj)").size(10.5).color(theme.accent_green))
-                                .fill(theme.bg_card)
-                                .corner_radius(CornerRadius::same(6))).clicked() {
+                            if crate::icons::icon_button(ui, crate::icons::AppIcon::Cube3D, "Wavefront 3D (.obj)", 10.5, theme.accent_green, theme.bg_card, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                                 let truss = crate::core::ParametricSpatialWizard::generate_double_layer_space_truss("Spatial Space Truss", 24.0, 24.0, 2.0, 6, 6);
                                 let obj = crate::core::MeshTopologyEngine::export_to_obj(&truss);
                                 if let Ok(path) = crate::core::DiskExporter::write_export_file("EigenGraph_Spatial_Truss.obj", &obj) {
@@ -1582,7 +1574,7 @@ impl ResultsView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Include SNI 1726 Spectral Base Shear");
                     let _ = ui.selectable_label(true, "Embed SCWB Joint & Drift Envelopes");
-                    let _ = ui.button("🏛️ Assemble Permit Calculation Book (.html / .pdf)");
+                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Building, "Assemble Permit Calculation Book (.html / .pdf)", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(12.0);
 
@@ -1731,7 +1723,7 @@ impl ResultsView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Include IFC4 Record Model + COBie.xlsx");
                     let _ = ui.selectable_label(true, "Verify SHA-256 Custody Tree");
-                    let _ = ui.button("📦 Package As-Built Handover Dossier & Checksum Ledger");
+                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::BoxPackage, "Package As-Built Handover Dossier & Checksum Ledger", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(10.0);
 

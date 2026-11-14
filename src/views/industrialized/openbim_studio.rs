@@ -67,33 +67,42 @@ impl IndustrializedView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("📂 OPEN IFC SOURCE:")
-                            .size(11.5)
-                            .strong()
-                            .color(theme.text_secondary),
+                    crate::icons::icon_label(
+                        ui,
+                        crate::icons::AppIcon::Folder,
+                        12.0,
+                        theme.text_secondary,
+                        "OPEN IFC SOURCE:",
+                        11.5,
+                        theme.text_secondary,
+                        true,
                     );
 
                     let sources = [
-                        (IfcSourceMode::SampleVillaIfc4, "🏡 Sample Villa (IFC4)"),
-                        (IfcSourceMode::SamplePortalFrameIfc4, "🏭 Steel Portal (IFC4)"),
-                        (IfcSourceMode::SampleDiagridIfc2x3, "🏢 Diagrid Tower (IFC2x3)"),
-                        (IfcSourceMode::CustomPaste, "📋 Paste STEP SPF"),
-                        (IfcSourceMode::FilePath, "📁 Open Local File"),
+                        (IfcSourceMode::SampleVillaIfc4, crate::icons::AppIcon::Building, "Sample Villa (IFC4)"),
+                        (IfcSourceMode::SamplePortalFrameIfc4, crate::icons::AppIcon::BoxPackage, "Steel Portal (IFC4)"),
+                        (IfcSourceMode::SampleDiagridIfc2x3, crate::icons::AppIcon::Building, "Diagrid Tower (IFC2x3)"),
+                        (IfcSourceMode::CustomPaste, crate::icons::AppIcon::Clipboard, "Paste STEP SPF"),
+                        (IfcSourceMode::FilePath, crate::icons::AppIcon::Folder, "Open Local File"),
                     ];
 
-                    for (src, label) in sources {
+                    for (src, icon, label) in sources {
                         let is_sel = self.ifc_source_mode == src;
                         let bg = if is_sel { theme.accent_blue } else { theme.bg_canvas };
                         let fg = if is_sel { Color32::WHITE } else { theme.text_primary };
 
-                        if ui
-                            .add(
-                                egui::Button::new(RichText::new(label).size(11.0).strong().color(fg))
-                                    .fill(bg)
-                                    .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if crate::icons::icon_button(
+                            ui,
+                            icon,
+                            label,
+                            11.0,
+                            fg,
+                            bg,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.ifc_source_mode = src;
                             match src {
@@ -166,18 +175,18 @@ impl IndustrializedView {
                             .desired_width(f32::INFINITY),
                     );
                     ui.add_space(4.0);
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("⚡ Parse & Decompose Pasted IFC")
-                                    .size(11.5)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_green)
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Bolt,
+                        "Parse & Decompose Pasted IFC",
+                        11.5,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         match IfcModel::parse(&self.custom_ifc_paste) {
                             Ok(m) => {
@@ -211,18 +220,18 @@ impl IndustrializedView {
                             egui::TextEdit::singleline(&mut self.custom_ifc_path)
                                 .desired_width(w),
                         );
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("📂 Read & Inspect")
-                                        .size(11.0)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if crate::icons::icon_button(
+                            ui,
+                            crate::icons::AppIcon::Folder,
+                            "Read & Inspect",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             #[cfg(not(target_arch = "wasm32"))]
                             {
@@ -275,7 +284,7 @@ impl IndustrializedView {
                     FeatureId::WasmLocalIfcFileDropPicker,
                     |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            let _ = ui.button("📂 Choose Local .IFC / .E2K / .JSON File...");
+                            let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Folder, "Choose Local .IFC / .E2K / .JSON File...", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                             let _ = ui.selectable_label(true, "Drag-and-Drop Zone Active");
                             let _ = ui.selectable_label(false, "Auto-Detect IFC2x3 / IFC4.3 Schema");
                         });
@@ -309,18 +318,18 @@ impl IndustrializedView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("🚀 Sync to 3D Viewport & Analytical Solver")
-                                    .size(12.0)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_blue)
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Play,
+                        "Sync to 3D Viewport & Analytical Solver",
+                        12.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         if let Some(ref m) = self.ifc_model {
                             match m.to_structural_model() {
@@ -342,18 +351,18 @@ impl IndustrializedView {
                         }
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("🌐 Export Clean IFC 4.3 (.ifc)")
-                                    .size(12.0)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_green)
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Globe,
+                        "Export Clean IFC 4.3 (.ifc)",
+                        12.0,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         if let Some(ref _m) = self.ifc_model {
                             let mut engine = crate::core::ParametricEngine::new();
@@ -370,18 +379,18 @@ impl IndustrializedView {
                         }
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("🦾 Export DSTV CNC (.nc1)")
-                                    .size(12.0)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(Color32::from_rgb(139, 92, 246))
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Cpu,
+                        "Export DSTV CNC (.nc1)",
+                        12.0,
+                        Color32::WHITE,
+                        Color32::from_rgb(139, 92, 246),
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         let mut engine = crate::core::ParametricEngine::new();
                         if let Ok(model) = engine.generate_warren_truss() {
@@ -393,18 +402,18 @@ impl IndustrializedView {
                         }
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("📋 Export ifcJSON-4 (.json)")
-                                    .size(12.0)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(Color32::from_rgb(234, 88, 12))
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Document,
+                        "Export ifcJSON-4 (.json)",
+                        12.0,
+                        Color32::WHITE,
+                        Color32::from_rgb(234, 88, 12),
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         if let Some(ref m) = self.ifc_model {
                             let json = m.to_ifc_json();
@@ -416,18 +425,18 @@ impl IndustrializedView {
                         }
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("📬 Export BCF Topics (.xml)")
-                                    .size(12.0)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(Color32::from_rgb(14, 165, 233))
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Document,
+                        "Export BCF Topics (.xml)",
+                        12.0,
+                        Color32::WHITE,
+                        Color32::from_rgb(14, 165, 233),
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         if let Some(ref m) = self.ifc_model {
                             let empty = Vec::new();
@@ -456,11 +465,15 @@ impl IndustrializedView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("🌳 SPATIAL HIERARCHY TREE")
-                            .size(12.0)
-                            .strong()
-                            .color(theme.accent_blue),
+                    crate::icons::icon_label(
+                        ui,
+                        crate::icons::AppIcon::Layers,
+                        12.0,
+                        theme.accent_blue,
+                        "SPATIAL HIERARCHY TREE",
+                        12.0,
+                        theme.accent_blue,
+                        true,
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if let Some(ref m) = self.ifc_model {
@@ -475,7 +488,7 @@ impl IndustrializedView {
                 ui.add_space(6.0);
 
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("🔍").size(11.0));
+                    crate::icons::draw_icon(ui, crate::icons::AppIcon::Search, 11.0, theme.text_muted);
                     ui.add(
                         egui::TextEdit::singleline(&mut self.element_search_query)
                             .hint_text("Filter elements by name/class...")
@@ -551,21 +564,30 @@ impl IndustrializedView {
     ) {
         let is_expanded = *self.spatial_tree_expanded.get(&node.step_id).unwrap_or(&true);
         let icon = match node.class_name.as_str() {
-            "IfcProject" => "🏢",
-            "IfcSite" => "🌍",
-            "IfcBuilding" => "🏛️",
-            "IFCBUILDINGSTOREY" => "📍",
-            _ => "📁",
+            "IfcProject" => crate::icons::AppIcon::Building,
+            "IfcSite" => crate::icons::AppIcon::Globe,
+            "IfcBuilding" => crate::icons::AppIcon::Building,
+            "IFCBUILDINGSTOREY" => crate::icons::AppIcon::MapPin,
+            _ => crate::icons::AppIcon::Folder,
         };
 
         ui.horizontal_wrapped(|ui| {
-            let arrow = if is_expanded { "▼" } else { "▶" };
-            if ui
-                .add(
-                    egui::Button::new(RichText::new(arrow).size(9.0).color(theme.text_muted))
-                        .frame(false),
-                )
-                .clicked()
+            let arrow_icon = if is_expanded {
+                crate::icons::AppIcon::ChevronDown
+            } else {
+                crate::icons::AppIcon::ArrowRight
+            };
+            if crate::icons::icon_only_button(
+                ui,
+                arrow_icon,
+                theme.text_muted,
+                Color32::TRANSPARENT,
+                Stroke::NONE,
+                CornerRadius::same(3),
+                Vec2::splat(16.0),
+                if is_expanded { "Collapse" } else { "Expand" },
+            )
+            .clicked()
             {
                 self.spatial_tree_expanded.insert(node.step_id, !is_expanded);
             }
@@ -574,11 +596,15 @@ impl IndustrializedView {
                 .elevation_m
                 .map(|e| format!(" (El: {:.1}m)", e * 0.001))
                 .unwrap_or_default();
-            ui.label(
-                RichText::new(format!("{} {}{}", icon, node.name, elev_str))
-                    .size(11.0)
-                    .strong()
-                    .color(theme.text_primary),
+            crate::icons::icon_label(
+                ui,
+                icon,
+                12.0,
+                theme.accent_blue,
+                format!("{}{}", node.name, elev_str),
+                11.0,
+                theme.text_primary,
+                true,
             );
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -608,14 +634,14 @@ impl IndustrializedView {
 
                         let is_selected = self.selected_element_id == Some(el.step_id);
                         let el_icon = match el.class_name.as_str() {
-                            "IFCCOLUMN" => "🏛️",
-                            "IFCBEAM" => "📏",
-                            "IFCWALL" | "IFCWALLSTANDARDCASE" => "🧱",
-                            "IFCSLAB" => "🔲",
-                            "IFCDOOR" => "🚪",
-                            "IFCWINDOW" => "🪟",
-                            "IFCMEMBER" => "⛓️",
-                            _ => "📦",
+                            "IFCCOLUMN" => crate::icons::AppIcon::Column,
+                            "IFCBEAM" => crate::icons::AppIcon::Beam,
+                            "IFCWALL" | "IFCWALLSTANDARDCASE" => crate::icons::AppIcon::Wall,
+                            "IFCSLAB" => crate::icons::AppIcon::Slab,
+                            "IFCDOOR" => crate::icons::AppIcon::Door,
+                            "IFCWINDOW" => crate::icons::AppIcon::Window,
+                            "IFCMEMBER" => crate::icons::AppIcon::NodesGraph,
+                            _ => crate::icons::AppIcon::BoxPackage,
                         };
 
                         let bg = if is_selected {
@@ -635,7 +661,7 @@ impl IndustrializedView {
                             .inner_margin(Margin::symmetric(4, 2))
                             .show(ui, |ui| {
                                 ui.horizontal_wrapped(|ui| {
-                                    ui.label(RichText::new(el_icon).size(10.5));
+                                    crate::icons::draw_icon(ui, el_icon, 11.0, fg);
                                     if ui
                                         .selectable_label(
                                             is_selected,

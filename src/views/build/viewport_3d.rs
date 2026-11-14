@@ -19,10 +19,22 @@ struct Member3D {
 
 
 impl BuildView {
-    pub(super) fn render_canvas(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember], features: &mut FeatureRegistry, stacked_height: Option<f32>) {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn render_canvas(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        members: &[StructuralMember],
+        features: &mut FeatureRegistry,
+        universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
+        parametric_variables: &[crate::models::ParametricVariable],
+        workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
+        sidebar_toggle_inset_px: f32,
+        stacked_height: Option<f32>,
+    ) {
         ui.vertical(|ui| {
             // Master Multi-Discipline BIM Ribbon Toolbar (Phase 26)
-            self.render_bim_master_ribbon(ui, theme);
+            self.render_bim_master_ribbon(ui, theme, sidebar_toggle_inset_px);
             ui.add_space(4.0);
 
             // Contextual Top Modeling Ribbon
@@ -33,23 +45,32 @@ impl BuildView {
                 .show(ui, |ui| {
                     ui.horizontal_wrapped(|ui| {
                         // Render Style & Internal Force Diagrams Toggle
-                        if ui.selectable_label(self.render_mode == Render3DMode::CsgSolidBrep, "🧊 CSG B-Rep").on_hover_text("True 3D CSG Boolean Mesh (Openings, WF Flanges & Rebar)").clicked() {
-                            self.render_mode = Render3DMode::CsgSolidBrep;
-                        }
-                        if ui.selectable_label(self.render_mode == Render3DMode::SolidShaded, "🧱 Solid").clicked() {
-                            self.render_mode = Render3DMode::SolidShaded;
-                        }
-                        if ui.selectable_label(self.render_mode == Render3DMode::Wireframe, "🕸️ Wireframe").clicked() {
-                            self.render_mode = Render3DMode::Wireframe;
-                        }
-                        if ui.selectable_label(self.render_mode == Render3DMode::AxialForceNFD, "📊 NFD").on_hover_text("Normal / Axial Force Diagram (Red=Tension, Blue=Compression)").clicked() {
-                            self.render_mode = Render3DMode::AxialForceNFD;
-                        }
-                        if ui.selectable_label(self.render_mode == Render3DMode::ShearForceSFD, "⚡ SFD").on_hover_text("Shear Force Diagram (SFD)").clicked() {
-                            self.render_mode = Render3DMode::ShearForceSFD;
-                        }
-                        if ui.selectable_label(self.render_mode == Render3DMode::BendingMomentBMD, "📈 BMD").on_hover_text("Bending Moment Diagram (BMD)").clicked() {
-                            self.render_mode = Render3DMode::BendingMomentBMD;
+                        let modes = [
+                            (Render3DMode::CsgSolidBrep, AppIcon::Cube3D, "CSG B-Rep", "True 3D CSG Boolean Mesh (Openings, WF Flanges & Rebar)"),
+                            (Render3DMode::SolidShaded, AppIcon::SolidBox, "Solid", "Shaded solid structural frame"),
+                            (Render3DMode::Wireframe, AppIcon::Wireframe, "Wireframe", "Vector wireframe members"),
+                            (Render3DMode::AxialForceNFD, AppIcon::ChartBar, "NFD", "Normal / Axial Force Diagram (Red=Tension, Blue=Compression)"),
+                            (Render3DMode::ShearForceSFD, AppIcon::Bolt, "SFD", "Shear Force Diagram (SFD)"),
+                            (Render3DMode::BendingMomentBMD, AppIcon::ChartLine, "BMD", "Bending Moment Diagram (BMD)"),
+                        ];
+                        for (rm, icon, lbl, tip) in modes {
+                            let sel = self.render_mode == rm;
+                            if icons::icon_button(
+                                ui,
+                                icon,
+                                lbl,
+                                10.5,
+                                if sel { Color32::WHITE } else { theme.text_secondary },
+                                if sel { theme.accent_blue } else { theme.bg_card },
+                                Stroke::NONE,
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .on_hover_text(tip)
+                            .clicked()
+                            {
+                                self.render_mode = rm;
+                            }
                         }
 
                         ui.add_space(6.0);
@@ -79,7 +100,7 @@ impl BuildView {
                         ];
                         egui::ComboBox::from_id_salt("model_archetype_combo")
                             .selected_text(RichText::new(self.active_model.label()).size(11.5).strong().color(theme.text_primary))
-                            .width(ui.available_width().clamp(140.0, 235.0))
+                            .width(ui.available_width().clamp(140.0, 230.0))
                             .show_ui(ui, |ui| {
                                 for m in models {
                                     let is_m_sel = self.active_model == m;
@@ -99,7 +120,7 @@ impl BuildView {
                         ui.add_space(6.0);
 
                         // ViewCube Camera Presets
-                        ui.label(RichText::new("🎥").size(12.0));
+                        icons::draw_icon(ui, AppIcon::Camera, 13.0, theme.text_secondary);
                         if ui.add(egui::Button::new(RichText::new("Iso").size(11.0).color(theme.text_secondary))
                             .fill(theme.bg_card).corner_radius(CornerRadius::same(4))).clicked() {
                             self.cam_yaw = 0.65;
@@ -120,8 +141,19 @@ impl BuildView {
                             self.cam_yaw = 1.57;
                             self.cam_pitch = 0.0;
                         }
-                        if ui.add(egui::Button::new(RichText::new("🔍 Fit").size(11.0).color(theme.accent_blue))
-                            .fill(theme.bg_card).corner_radius(CornerRadius::same(4))).clicked() {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::ZoomFit,
+                            "Fit",
+                            10.5,
+                            theme.accent_blue,
+                            theme.bg_card,
+                            Stroke::NONE,
+                            CornerRadius::same(4),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .clicked()
+                        {
                             self.cam_zoom = 1.15;
                             self.cam_pan = Vec2::ZERO;
                         }
@@ -131,29 +163,132 @@ impl BuildView {
                             self.perspective = !self.perspective;
                         }
 
+                        ui.separator();
+
+                        // Freeze Canvas Toggle (shared with page scroll guard)
+                        let freeze_bg = if universal_canvas.is_frozen {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        };
+                        let freeze_fg = if universal_canvas.is_frozen {
+                            Color32::WHITE
+                        } else {
+                            theme.accent_orange
+                        };
+                        let freeze_stroke = Stroke::new(
+                            1.0,
+                            if universal_canvas.is_frozen {
+                                theme.accent_blue
+                            } else {
+                                theme.accent_orange.gamma_multiply(0.6)
+                            },
+                        );
+                        if icons::icon_button(
+                            ui,
+                            if universal_canvas.is_frozen {
+                                AppIcon::Snowflake
+                            } else {
+                                AppIcon::Unlock
+                            },
+                            if universal_canvas.is_frozen {
+                                "Frozen (Scroll Page)"
+                            } else {
+                                "Freeze Canvas"
+                            },
+                            10.5,
+                            freeze_fg,
+                            freeze_bg,
+                            freeze_stroke,
+                            CornerRadius::same(5),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .on_hover_text("Freeze 3D viewport zoom so vertical scrolling moves the page smoothly")
+                        .clicked()
+                        {
+                            universal_canvas.is_frozen = !universal_canvas.is_frozen;
+                            ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
+                        }
+
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::SaveDisk,
+                            "Save 1-File",
+                            10.5,
+                            Color32::WHITE,
+                            theme.accent_green,
+                            Stroke::NONE,
+                            CornerRadius::same(5),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .on_hover_text("Save unified workspace (.eigen.json)")
+                        .clicked()
+                        {
+                            universal_canvas.export_unified_file(
+                                &self.bim_bus.project,
+                                members,
+                                parametric_variables,
+                                workspace_settings,
+                            );
+                            if let Some(ref msg) = universal_canvas.status_message {
+                                self.modify_status_msg = Some(msg.clone());
+                            }
+                        }
+
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::UploadImport,
+                            "Import",
+                            10.5,
+                            theme.text_secondary,
+                            theme.bg_card,
+                            Stroke::NONE,
+                            CornerRadius::same(5),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .on_hover_text("Import unified .eigen.json workspace archive")
+                        .clicked()
+                        {
+                            universal_canvas.import_json_open = true;
+                        }
+
                         // Right Status Badges
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            let (badge_text, badge_col) = if !self.simulated_eliminated_ids.is_empty() {
-                                (format!("⚠️ N-{} DISRUPTION: MEMBERS {:?}", self.simulated_eliminated_ids.len(), self.simulated_eliminated_ids), theme.accent_red)
+                            if !self.simulated_eliminated_ids.is_empty() {
+                                icons::pill_badge(
+                                    ui,
+                                    AppIcon::AlertTriangle,
+                                    format!(
+                                        "N-{} DISRUPTION: MEMBERS {:?}",
+                                        self.simulated_eliminated_ids.len(),
+                                        self.simulated_eliminated_ids
+                                    ),
+                                    theme.accent_red,
+                                );
                             } else {
-                                (format!("🎨 {}", self.color_mode), theme.accent_blue)
-                            };
+                                icons::pill_badge(
+                                    ui,
+                                    AppIcon::Palette,
+                                    self.color_mode.clone(),
+                                    theme.accent_blue,
+                                );
+                            }
 
-                            Frame::new()
-                                .fill(badge_col.gamma_multiply(0.2))
-                                .stroke(Stroke::new(1.0, badge_col))
-                                .corner_radius(CornerRadius::same(6))
-                                .inner_margin(Margin::symmetric(8, 2))
-                                .show(ui, |ui| {
-                                    ui.label(RichText::new(badge_text).size(10.5).strong().color(Color32::WHITE));
-                                });
-
-                            if self.selected_member_id.is_some() {
-                                if ui.add(egui::Button::new(RichText::new("✕ Clear").size(10.5).color(theme.text_secondary))
-                                    .fill(theme.bg_card)
-                                    .corner_radius(CornerRadius::same(4))).clicked() {
-                                    self.selected_member_id = None;
-                                }
+                            if self.selected_member_id.is_some()
+                                && icons::icon_button(
+                                    ui,
+                                    AppIcon::Close,
+                                    "Clear",
+                                    10.5,
+                                    theme.text_secondary,
+                                    theme.bg_card,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::new(0.0, 22.0),
+                                )
+                                .clicked()
+                            {
+                                self.selected_member_id = None;
                             }
                         });
                     });
@@ -174,6 +309,7 @@ impl BuildView {
                 .show(ui, |ui| {
                     let (response, painter) = ui.allocate_painter(Vec2::new(canvas_width, canvas_height), Sense::click_and_drag());
                     let rect = response.rect;
+                    self.last_viewport_rect = Some(rect);
 
                     // Mouse Orbit, Pan, and Zoom Controls
                     if response.dragged_by(egui::PointerButton::Secondary) || (response.dragged() && ui.input(|i| i.modifiers.shift)) {
@@ -916,7 +1052,7 @@ impl BuildView {
                     painter.text(
                         Pos2::new(rect.left() + 14.0, rect.top() + 14.0),
                         Align2::LEFT_TOP,
-                        format!("🎥 3D VIEWPORT: {} • {}", self.active_model.label(), mode_str),
+                        format!("3D VIEWPORT: {} • {}", self.active_model.label(), mode_str),
                         egui::FontId::monospace(10.5),
                         Color32::from_rgb(140, 165, 205),
                     );
@@ -928,6 +1064,37 @@ impl BuildView {
                         egui::FontId::monospace(9.5),
                         Color32::from_rgb(110, 130, 160),
                     );
+
+                    if crate::ui_kit::is_canvas_frozen(ui.ctx()) {
+                        let badge_pos = Pos2::new(rect.left() + 14.0, rect.bottom() - 14.0);
+                        let text_rect = Rect::from_min_size(
+                            Pos2::new(badge_pos.x, badge_pos.y - 24.0),
+                            Vec2::new(280.0, 24.0),
+                        );
+                        painter.rect_filled(
+                            text_rect,
+                            CornerRadius::same(6),
+                            theme.accent_blue.gamma_multiply(0.22),
+                        );
+                        painter.rect_stroke(
+                            text_rect,
+                            CornerRadius::same(6),
+                            Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.7)),
+                            StrokeKind::Inside,
+                        );
+                        let icon_rect = Rect::from_min_size(
+                            Pos2::new(text_rect.left() + 7.0, text_rect.center().y - 6.0),
+                            Vec2::splat(12.0),
+                        );
+                        icons::paint_icon(&painter, icon_rect, AppIcon::Snowflake, theme.accent_blue);
+                        painter.text(
+                            Pos2::new(text_rect.left() + 24.0, text_rect.center().y),
+                            Align2::LEFT_CENTER,
+                            "CANVAS FROZEN • Scroll moves page vertically",
+                            egui::FontId::proportional(10.5),
+                            theme.text_primary,
+                        );
+                    }
 
                     // 7. Floating Hover Glass Tooltip
                     if let Some(hid) = hovered_member {
@@ -984,27 +1151,27 @@ impl BuildView {
 
                         ui.separator();
                         // Visual toggles
-                        if ui.selectable_label(self.show_sun_shadows, "☀️ Sun").clicked() {
+                        if icons::icon_button(ui, AppIcon::Sun, "Sun", 10.0, if self.show_sun_shadows { Color32::WHITE } else { theme.text_secondary }, if self.show_sun_shadows { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
                             self.show_sun_shadows = !self.show_sun_shadows;
                         }
-                        if ui.selectable_label(self.show_level_datums, "📏 Datums").clicked() {
+                        if icons::icon_button(ui, AppIcon::RulerSquare, "Datums", 10.0, if self.show_level_datums { Color32::WHITE } else { theme.text_secondary }, if self.show_level_datums { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
                             self.show_level_datums = !self.show_level_datums;
                         }
-                        if ui.selectable_label(self.show_grid_bubbles, "📐 Grids").clicked() {
+                        if icons::icon_button(ui, AppIcon::Grid, "Grids", 10.0, if self.show_grid_bubbles { Color32::WHITE } else { theme.text_secondary }, if self.show_grid_bubbles { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
                             self.show_grid_bubbles = !self.show_grid_bubbles;
                         }
-                        if ui.selectable_label(self.section_box_enabled, "📦 Section Box").clicked() {
+                        if icons::icon_button(ui, AppIcon::BoxPackage, "Section Box", 10.0, if self.section_box_enabled { Color32::WHITE } else { theme.text_secondary }, if self.section_box_enabled { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
                             self.section_box_enabled = !self.section_box_enabled;
                         }
-                        if ui.selectable_label(self.temporary_isolate_active, "👓 Isolate").clicked() {
+                        if icons::icon_button(ui, AppIcon::Target, "Isolate", 10.0, if self.temporary_isolate_active { Color32::WHITE } else { theme.text_secondary }, if self.temporary_isolate_active { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
                             self.temporary_isolate_active = !self.temporary_isolate_active;
                         }
-                        if ui.selectable_label(self.show_3d_clash_markers, "⚔️ Clashes").clicked() {
+                        if icons::icon_button(ui, AppIcon::AlertTriangle, "Clashes", 10.0, if self.show_3d_clash_markers { Color32::WHITE } else { theme.text_secondary }, if self.show_3d_clash_markers { theme.accent_blue } else { theme.bg_card }, Stroke::NONE, CornerRadius::same(4), Vec2::new(0.0, 22.0)).clicked() {
                             self.show_3d_clash_markers = !self.show_3d_clash_markers;
                         }
 
                         ui.separator();
-                        ui.label(RichText::new(format!("● {} Elements", members.len())).size(10.0).strong().color(theme.accent_green));
+                        icons::icon_label(ui, AppIcon::CheckCircle, 11.0, theme.accent_green, format!("{} Elements", members.len()), 10.0, theme.accent_green, true);
                     });
                 });
 

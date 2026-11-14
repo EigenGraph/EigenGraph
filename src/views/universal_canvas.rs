@@ -10,6 +10,7 @@ use egui::{
 use serde::{Deserialize, Serialize};
 
 use crate::core::{BimProject, DiskExporter, Sha256Hasher};
+use crate::icons::{self, AppIcon};
 use crate::models::{NavigationPillar, ParametricVariable, StructuralMember};
 use crate::theme::{MacTheme, ThemeMode};
 use crate::ui_kit;
@@ -39,16 +40,29 @@ impl UniversalCanvasTool {
         Self::Eraser,
     ];
 
+    pub fn app_icon(self) -> AppIcon {
+        match self {
+            Self::SelectPan => AppIcon::CursorPan,
+            Self::Freehand => AppIcon::Pencil,
+            Self::Line => AppIcon::LineSeg,
+            Self::Rectangle => AppIcon::RectShape,
+            Self::Circle => AppIcon::CircleShape,
+            Self::Dimension => AppIcon::DimensionRuler,
+            Self::Callout => AppIcon::CommentNote,
+            Self::Eraser => AppIcon::Eraser,
+        }
+    }
+
     pub fn short_label(self) -> &'static str {
         match self {
-            Self::SelectPan => "✋ Pan",
-            Self::Freehand => "✏️ Draw",
-            Self::Line => "╱ Line",
-            Self::Rectangle => "▭ Rect",
-            Self::Circle => "◯ Circle",
-            Self::Dimension => "📏 Dim",
-            Self::Callout => "💬 Note",
-            Self::Eraser => "🧹 Erase",
+            Self::SelectPan => "Pan",
+            Self::Freehand => "Draw",
+            Self::Line => "Line",
+            Self::Rectangle => "Rect",
+            Self::Circle => "Circle",
+            Self::Dimension => "Dim",
+            Self::Callout => "Note",
+            Self::Eraser => "Erase",
         }
     }
 
@@ -608,13 +622,29 @@ impl UniversalCanvasState {
                         .inner_margin(Margin::symmetric(12, 5))
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
-                                ui.label(
-                                    RichText::new(format!("✅ {msg}"))
-                                        .size(11.0)
-                                        .color(theme.accent_green),
+                                icons::icon_label(
+                                    ui,
+                                    AppIcon::CheckCircle,
+                                    13.0,
+                                    theme.accent_green,
+                                    msg,
+                                    11.0,
+                                    theme.accent_green,
+                                    false,
                                 );
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    if ui.small_button("✕").clicked() {
+                                    if icons::icon_only_button(
+                                        ui,
+                                        AppIcon::Close,
+                                        theme.text_secondary,
+                                        Color32::TRANSPARENT,
+                                        Stroke::NONE,
+                                        CornerRadius::same(4),
+                                        Vec2::splat(20.0),
+                                        "Dismiss notification",
+                                    )
+                                    .clicked()
+                                    {
                                         self.status_message = None;
                                     }
                                 });
@@ -700,7 +730,7 @@ impl UniversalCanvasState {
                     let badge_pos = Pos2::new(rect.left() + 14.0, rect.bottom() - 14.0);
                     let text_rect = Rect::from_min_size(
                         Pos2::new(badge_pos.x, badge_pos.y - 24.0),
-                        Vec2::new(265.0, 24.0),
+                        Vec2::new(280.0, 24.0),
                     );
                     painter.rect_filled(
                         text_rect,
@@ -713,10 +743,15 @@ impl UniversalCanvasState {
                         Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.7)),
                         StrokeKind::Inside,
                     );
+                    let icon_rect = Rect::from_min_size(
+                        Pos2::new(text_rect.left() + 7.0, text_rect.center().y - 6.0),
+                        Vec2::splat(12.0),
+                    );
+                    icons::paint_icon(&painter, icon_rect, AppIcon::Snowflake, theme.accent_blue);
                     painter.text(
-                        text_rect.center(),
-                        Align2::CENTER_CENTER,
-                        "❄️ CANVAS FROZEN • Scroll moves page vertically",
+                        Pos2::new(text_rect.left() + 24.0, text_rect.center().y),
+                        Align2::LEFT_CENTER,
+                        "CANVAS FROZEN • Scroll moves page vertically",
                         egui::FontId::proportional(10.5),
                         theme.text_primary,
                     );
@@ -759,11 +794,6 @@ impl UniversalCanvasState {
                         });
                 }
             });
-
-        // 4. Unified Single-File Import Modal
-        if self.import_json_open {
-            self.render_import_modal(ui.ctx(), theme, bim_project, members, variables);
-        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -790,24 +820,16 @@ impl UniversalCanvasState {
                     }
 
                     // Active Module Pill
-                    Frame::new()
-                        .fill(theme.accent_blue.gamma_multiply(0.16))
-                        .stroke(Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.55)))
-                        .corner_radius(CornerRadius::same(7))
-                        .inner_margin(Margin::symmetric(8, 4))
-                        .show(ui, |ui| {
-                            ui.label(
-                                RichText::new(format!(
-                                    "{} {} • {}",
-                                    active_pillar.icon(),
-                                    active_pillar.clean_name(),
-                                    active_pillar.badge()
-                                ))
-                                .size(11.0)
-                                .strong()
-                                .color(theme.accent_blue),
-                            );
-                        });
+                    icons::pill_badge(
+                        ui,
+                        active_pillar.app_icon(),
+                        format!(
+                            "{} • {}",
+                            active_pillar.clean_name(),
+                            active_pillar.badge()
+                        ),
+                        theme.accent_blue,
+                    );
 
                     ui.separator();
 
@@ -824,15 +846,19 @@ impl UniversalCanvasState {
                         } else {
                             theme.text_secondary
                         };
-                        if ui
-                            .add(
-                                egui::Button::new(RichText::new(tool.short_label()).size(10.5).color(fg))
-                                    .fill(bg)
-                                    .corner_radius(CornerRadius::same(6))
-                                    .min_size(Vec2::new(0.0, 26.0)),
-                            )
-                            .on_hover_text(tool.tooltip())
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            tool.app_icon(),
+                            tool.short_label(),
+                            10.5,
+                            fg,
+                            bg,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 26.0),
+                        )
+                        .on_hover_text(tool.tooltip())
+                        .clicked()
                         {
                             self.active_tool = tool;
                             self.pending_start_mm = None;
@@ -863,80 +889,84 @@ impl UniversalCanvasState {
                     ui.separator();
 
                     // Undo, Grid, Snap, Fit
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("↩ Undo")
-                                    .size(10.5)
-                                    .color(theme.text_secondary),
-                            )
-                            .fill(theme.bg_card)
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(0.0, 26.0)),
-                        )
-                        .on_hover_text("Undo last canvas change")
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Undo,
+                        "Undo",
+                        10.5,
+                        theme.text_secondary,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Undo last canvas change")
+                    .clicked()
                     {
                         self.undo();
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(RichText::new("# Grid").size(10.5).color(
-                                if self.show_grid {
-                                    Color32::WHITE
-                                } else {
-                                    theme.text_secondary
-                                },
-                            ))
-                            .fill(if self.show_grid {
-                                theme.accent_blue.gamma_multiply(0.75)
-                            } else {
-                                theme.bg_card
-                            })
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(0.0, 26.0)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Grid,
+                        "Grid",
+                        10.5,
+                        if self.show_grid {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.show_grid {
+                            theme.accent_blue.gamma_multiply(0.75)
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .clicked()
                     {
                         self.show_grid = !self.show_grid;
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(RichText::new("🧲 Snap").size(10.5).color(
-                                if self.snap_to_grid {
-                                    Color32::WHITE
-                                } else {
-                                    theme.text_secondary
-                                },
-                            ))
-                            .fill(if self.snap_to_grid {
-                                theme.accent_blue.gamma_multiply(0.75)
-                            } else {
-                                theme.bg_card
-                            })
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(0.0, 26.0)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::MagnetSnap,
+                        "Snap",
+                        10.5,
+                        if self.snap_to_grid {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.snap_to_grid {
+                            theme.accent_blue.gamma_multiply(0.75)
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .clicked()
                     {
                         self.snap_to_grid = !self.snap_to_grid;
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("🔍 Fit")
-                                    .size(10.5)
-                                    .color(theme.text_secondary),
-                            )
-                            .fill(theme.bg_card)
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(0.0, 26.0)),
-                        )
-                        .on_hover_text("Reset canvas pan and zoom to fit model")
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ZoomFit,
+                        "Fit",
+                        10.5,
+                        theme.text_secondary,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Reset canvas pan and zoom to fit model")
+                    .clicked()
                     {
                         self.pan = Vec2::ZERO;
                         self.zoom = 1.0;
@@ -945,10 +975,15 @@ impl UniversalCanvasState {
                     ui.separator();
 
                     // Prominent Freeze Canvas Toggle (Prevents scroll zoom so vertical page scroll works smoothly)
-                    let freeze_label = if self.is_frozen {
-                        "❄️ Frozen (Scroll Page)"
+                    let freeze_icon = if self.is_frozen {
+                        AppIcon::Snowflake
                     } else {
-                        "🔓 Freeze Canvas"
+                        AppIcon::Unlock
+                    };
+                    let freeze_label = if self.is_frozen {
+                        "Frozen (Scroll Page)"
+                    } else {
+                        "Freeze Canvas"
                     };
                     let freeze_bg = if self.is_frozen {
                         theme.accent_blue
@@ -960,30 +995,29 @@ impl UniversalCanvasState {
                     } else {
                         theme.accent_orange
                     };
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new(freeze_label)
-                                    .size(10.5)
-                                    .strong()
-                                    .color(freeze_fg),
-                            )
-                            .fill(freeze_bg)
-                            .stroke(Stroke::new(
-                                1.0,
-                                if self.is_frozen {
-                                    theme.accent_blue
-                                } else {
-                                    theme.accent_orange.gamma_multiply(0.6)
-                                },
-                            ))
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(0.0, 26.0)),
-                        )
-                        .on_hover_text(
-                            "Freeze canvas zoom/pan so vertical scrolling moves the page without zooming in or out",
-                        )
-                        .clicked()
+                    let freeze_stroke = Stroke::new(
+                        1.0,
+                        if self.is_frozen {
+                            theme.accent_blue
+                        } else {
+                            theme.accent_orange.gamma_multiply(0.6)
+                        },
+                    );
+                    if icons::icon_button(
+                        ui,
+                        freeze_icon,
+                        freeze_label,
+                        10.5,
+                        freeze_fg,
+                        freeze_bg,
+                        freeze_stroke,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text(
+                        "Freeze canvas zoom/pan so vertical scrolling moves the page without zooming in or out",
+                    )
+                    .clicked()
                     {
                         self.is_frozen = !self.is_frozen;
                     }
@@ -999,38 +1033,39 @@ impl UniversalCanvasState {
                     } else {
                         theme.text_secondary
                     };
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("🎛️ Panel").size(10.5).strong().color(insp_fg),
-                            )
-                            .fill(insp_bg)
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(0.0, 26.0)),
-                        )
-                        .on_hover_text("Show or hide floating canvas & domain inspector panel")
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SlidersPanel,
+                        "Panel",
+                        10.5,
+                        insp_fg,
+                        insp_bg,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Show or hide floating canvas & domain inspector panel")
+                    .clicked()
                     {
                         self.inspector_open = !self.inspector_open;
                     }
 
                     // Single-File Unified Sync Save
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("💾 Save 1-File")
-                                    .size(10.5)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_green)
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(0.0, 26.0)),
-                        )
-                        .on_hover_text(
-                            "Save all 15 modules, BIM geometry, and canvas drawings into 1 unified .eigen.json file",
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SaveDisk,
+                        "Save 1-File",
+                        10.5,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text(
+                        "Save all 15 modules, BIM geometry, and canvas drawings into 1 unified .eigen.json file",
+                    )
+                    .clicked()
                     {
                         self.export_unified_file(
                             bim_project,
@@ -1647,16 +1682,16 @@ impl UniversalCanvasState {
                 clip_painter.text(
                     sun + Vec2::new(10.0, -4.0),
                     Align2::LEFT_CENTER,
-                    "☀️ Heliodon Azimuth 52° • OTTV 31 W/m²",
+                    "Heliodon Azimuth 52° • OTTV 31 W/m²",
                     egui::FontId::monospace(9.5),
                     theme.accent_orange,
                 );
             }
             NavigationPillar::FacilityManagement => {
                 for (x, y, tag) in [
-                    (1500.0, 4500.0, "📡 SHM-01"),
-                    (6000.0, 4500.0, "📡 SHM-02"),
-                    (10500.0, 4500.0, "🔧 MEP Riser"),
+                    (1500.0, 4500.0, "SHM-01"),
+                    (6000.0, 4500.0, "SHM-02"),
+                    (10500.0, 4500.0, "MEP Riser"),
                 ] {
                     let p = to_screen([x, y]);
                     clip_painter.circle_filled(p, 5.0, theme.accent_green);
@@ -1685,7 +1720,7 @@ impl UniversalCanvasState {
                 clip_painter.text(
                     mast + Vec2::new(10.0, -10.0),
                     Align2::LEFT_BOTTOM,
-                    "🏗️ TC-01 Jib Sweep Radius (45m)",
+                    "TC-01 Jib Sweep Radius (45m)",
                     egui::FontId::monospace(9.5),
                     theme.accent_orange,
                 );
@@ -1732,7 +1767,7 @@ impl UniversalCanvasState {
                 clip_painter.text(
                     p + Vec2::new(0.0, -48.0),
                     Align2::CENTER_BOTTOM,
-                    "🔮 Drift Hotspot Watch • Pf < 1e-4",
+                    "Drift Hotspot Watch • Pf < 1e-4",
                     egui::FontId::monospace(9.5),
                     theme.accent_orange,
                 );
@@ -1754,6 +1789,19 @@ impl UniversalCanvasState {
                 );
             }
         }
+    }
+
+    /// Paint synchronized sketch/annotation entities onto any compatible 2D world canvas
+    /// (used to sync Universal Canvas markup inside ParametricView's single 2D canvas).
+    pub fn paint_entities_world(
+        &self,
+        painter: &egui::Painter,
+        rect: Rect,
+        theme: &MacTheme,
+        active_pillar: NavigationPillar,
+        to_screen: &impl Fn([f64; 2]) -> Pos2,
+    ) {
+        self.paint_entities(painter, rect, theme, active_pillar, to_screen);
     }
 
     fn paint_entities(
@@ -1939,17 +1987,29 @@ impl UniversalCanvasState {
                     .auto_shrink([false, true])
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(
-                                RichText::new(format!(
-                                    "{} Canvas Inspector",
-                                    active_pillar.icon()
-                                ))
-                                .size(12.5)
-                                .strong()
-                                .color(theme.text_primary),
+                            icons::icon_label(
+                                ui,
+                                active_pillar.app_icon(),
+                                14.0,
+                                theme.accent_blue,
+                                "Canvas Inspector",
+                                12.5,
+                                theme.text_primary,
+                                true,
                             );
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.small_button("✕").clicked() {
+                                if icons::icon_only_button(
+                                    ui,
+                                    AppIcon::Close,
+                                    theme.text_secondary,
+                                    Color32::TRANSPARENT,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::splat(20.0),
+                                    "Close inspector panel",
+                                )
+                                .clicked()
+                                {
                                     self.inspector_open = false;
                                 }
                             });
@@ -1996,13 +2056,34 @@ impl UniversalCanvasState {
 
                         ui.add_space(8.0);
                         ui.horizontal_wrapped(|ui| {
-                            if ui
-                                .small_button("🧹 Clear Active Layer")
-                                .clicked()
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Eraser,
+                                "Clear Active Layer",
+                                10.5,
+                                theme.text_primary,
+                                theme.bg_sidebar,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 22.0),
+                            )
+                            .clicked()
                             {
                                 self.clear_entities(Some(active_pillar));
                             }
-                            if ui.small_button("🗑️ Clear All").clicked() {
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Trash,
+                                "Clear All",
+                                10.5,
+                                theme.accent_red,
+                                theme.bg_sidebar,
+                                Stroke::new(1.0, theme.accent_red.gamma_multiply(0.45)),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 22.0),
+                            )
+                            .clicked()
+                            {
                                 self.clear_entities(None);
                             }
                         });
@@ -2017,7 +2098,19 @@ impl UniversalCanvasState {
                         );
                         ui.add_space(4.0);
                         ui.horizontal_wrapped(|ui| {
-                            if ui.button("💾 Save 1-File (.eigen.json)").clicked() {
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::SaveDisk,
+                                "Save 1-File (.eigen.json)",
+                                10.5,
+                                Color32::WHITE,
+                                theme.accent_green,
+                                Stroke::NONE,
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .clicked()
+                            {
                                 self.export_unified_file(
                                     bim_project,
                                     members,
@@ -2025,10 +2118,34 @@ impl UniversalCanvasState {
                                     workspace_settings,
                                 );
                             }
-                            if ui.button("📥 Import 1-File").clicked() {
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::UploadImport,
+                                "Import 1-File",
+                                10.5,
+                                theme.text_primary,
+                                theme.bg_sidebar,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .clicked()
+                            {
                                 self.import_json_open = true;
                             }
-                            if ui.button("🖼️ Export SVG").clicked() {
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Palette,
+                                "Export SVG",
+                                10.5,
+                                theme.text_primary,
+                                theme.bg_sidebar,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .clicked()
+                            {
                                 let svg = self.export_svg(bim_project, active_pillar);
                                 match DiskExporter::write_export_file(
                                     "EigenGraph_Unified_Canvas.svg",
@@ -2044,10 +2161,19 @@ impl UniversalCanvasState {
                                     }
                                 }
                             }
-                            if ui
-                                .button("📂 Split Active Module")
-                                .on_hover_text("Export only this module's drawing layer separately")
-                                .clicked()
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Folder,
+                                "Split Active Module",
+                                10.5,
+                                theme.text_primary,
+                                theme.bg_sidebar,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .on_hover_text("Export only this module's drawing layer separately")
+                            .clicked()
                             {
                                 self.export_split_module_file(active_pillar);
                             }
@@ -2070,9 +2196,10 @@ impl UniversalCanvasState {
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal_wrapped(|ui| {
+                    icons::draw_icon(ui, AppIcon::MapPin, 12.0, theme.accent_blue);
                     ui.label(
                         RichText::new(format!(
-                            "📍 ({:.0}, {:.0}) mm  •  🔍 {:.0}%  •  🧩 {} Synced Drawings ({} in {})  •  🏗️ {} BIM Elements",
+                            "({:.0}, {:.0}) mm  •  Zoom {:.0}%  •  {} Synced Drawings ({} in {})  •  {} BIM Elements",
                             self.cursor_world_mm[0],
                             self.cursor_world_mm[1],
                             self.zoom * 100.0,
@@ -2089,28 +2216,41 @@ impl UniversalCanvasState {
                     );
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new(format!(
-                                        "⬇ {} Workbench",
-                                        active_pillar.clean_name()
-                                    ))
-                                    .size(10.5)
-                                    .strong()
-                                    .color(theme.accent_blue),
-                                )
-                                .fill(theme.accent_blue.gamma_multiply(0.14))
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .on_hover_text("Scroll down to the detailed module workbench")
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::ArrowDown,
+                            format!("{} Workbench", active_pillar.clean_name()),
+                            10.5,
+                            theme.accent_blue,
+                            theme.accent_blue.gamma_multiply(0.14),
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 22.0),
+                        )
+                        .on_hover_text("Scroll down to the detailed module workbench")
+                        .clicked()
                         {
                             self.request_scroll_to_workbench = true;
                         }
                     });
                 });
             });
+    }
+
+    /// Render the Unified Single-File Import Modal whenever `import_json_open` is true.
+    /// Invoked from the root app loop so single-file import works seamlessly across all 15 modules,
+    /// including single-canvas Parametric and Geometry modules.
+    pub fn render_import_modal_if_open(
+        &mut self,
+        ctx: &egui::Context,
+        theme: &MacTheme,
+        bim_project: &mut BimProject,
+        members: &mut Vec<StructuralMember>,
+        variables: &mut Vec<ParametricVariable>,
+    ) {
+        if self.import_json_open {
+            self.render_import_modal(ctx, theme, bim_project, members, variables);
+        }
     }
 
     fn render_import_modal(
@@ -2123,7 +2263,7 @@ impl UniversalCanvasState {
     ) {
         let mut open = self.import_json_open;
         let mut close_now = false;
-        egui::Window::new("📥 Import Unified Workspace (.eigen.json)")
+        egui::Window::new("Import Unified Workspace (.eigen.json)")
             .open(&mut open)
             .collapsible(false)
             .resizable(true)
@@ -2157,18 +2297,18 @@ impl UniversalCanvasState {
                     });
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("✅ Verify & Restore Workspace")
-                                    .size(11.5)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_green)
-                            .corner_radius(CornerRadius::same(7)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::CheckCircle,
+                        "Verify & Restore Workspace",
+                        11.5,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(7),
+                        Vec2::new(0.0, 28.0),
+                    )
+                    .clicked()
                     {
                         match self.apply_unified_archive(
                             &self.import_json_buffer.clone(),

@@ -79,8 +79,16 @@ impl LeanView {
                         .inner_margin(Margin::same(10))
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
-                                ui.label(RichText::new("✅").size(14.0));
-                                ui.label(RichText::new(status).size(12.0).color(theme.text_primary));
+                                crate::icons::icon_label(
+                                    ui,
+                                    crate::icons::AppIcon::CheckCircle,
+                                    14.0,
+                                    theme.accent_green,
+                                    status,
+                                    12.0,
+                                    theme.text_primary,
+                                    false,
+                                );
                                 if ui.button(RichText::new("Dismiss").size(11.0)).clicked() {
                                     dismiss_toast = true;
                                 }
@@ -124,30 +132,34 @@ impl LeanView {
             .inner_margin(Margin::same(6))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                let lps_label = format!("📋 Last Planner System (PPC {:.1}%)", live_ppc);
+                let lps_label = format!("Last Planner System (PPC {:.1}%)", live_ppc);
                 let tabs = [
-                    (LeanSubTab::CuttingStock, "✂️ 1D/2D Cutting Stock Optimizer".to_string()),
-                    (LeanSubTab::LastPlanner, lps_label),
-                    (LeanSubTab::ValueStream, "🌊 Value Stream & 7 Wastes".to_string()),
-                    (LeanSubTab::JitDelivery, "🚚 Just-In-Time (JIT) Delivery Buffer".to_string()),
-                    (LeanSubTab::TaktConcreteDispatch, "🚋 Takt Trains & Pour Dispatch".to_string()),
-                    (LeanSubTab::RfiSubmittalTracker, "📝 RFI & Submittal SLA".to_string()),
+                    (LeanSubTab::CuttingStock, crate::icons::AppIcon::Scissors, "1D/2D Cutting Stock Optimizer".to_string()),
+                    (LeanSubTab::LastPlanner, crate::icons::AppIcon::Clipboard, lps_label),
+                    (LeanSubTab::ValueStream, crate::icons::AppIcon::ChartLine, "Value Stream & 7 Wastes".to_string()),
+                    (LeanSubTab::JitDelivery, crate::icons::AppIcon::Truck, "Just-In-Time (JIT) Delivery Buffer".to_string()),
+                    (LeanSubTab::TaktConcreteDispatch, crate::icons::AppIcon::Layers, "Takt Trains & Pour Dispatch".to_string()),
+                    (LeanSubTab::RfiSubmittalTracker, crate::icons::AppIcon::Document, "RFI & Submittal SLA".to_string()),
                 ];
 
                 ui.horizontal_wrapped(|ui| {
-                    for (tab, label) in tabs {
+                    for (tab, icon, label) in tabs {
                         let is_active = self.active_subtab == tab;
                         let bg = if is_active { theme.accent_blue } else { Color32::TRANSPARENT };
                         let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
 
-                        if ui
-                            .add(
-                                egui::Button::new(RichText::new(label).size(12.0).strong().color(fg))
-                                    .fill(bg)
-                                    .corner_radius(CornerRadius::same(7))
-                                    .min_size(Vec2::new(0.0, 30.0)),
-                            )
-                            .clicked()
+                        if crate::icons::icon_button(
+                            ui,
+                            icon,
+                            label,
+                            12.0,
+                            fg,
+                            bg,
+                            egui::Stroke::NONE,
+                            CornerRadius::same(7),
+                            Vec2::new(0.0, 30.0),
+                        )
+                        .clicked()
                         {
                             self.active_subtab = tab;
                         }
@@ -240,7 +252,17 @@ impl LeanView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Source: Active BimProject Bar Marks (D16-D25)");
                 let _ = ui.selectable_label(false, "12m Stock Splice Coupler Pairing");
-                let _ = ui.button("✂️ Optimize BIM Rebar Schedule (1D BFD)");
+                let _ = crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Scissors,
+                    "Optimize BIM Rebar Schedule (1D BFD)",
+                    12.0,
+                    theme.text_primary,
+                    theme.bg_card,
+                    egui::Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
         });
 
@@ -254,7 +276,16 @@ impl LeanView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("⚙️ Cutting Optimization Parameters").size(13.0).strong().color(theme.text_primary));
+                    crate::icons::icon_label(
+                        ui,
+                        crate::icons::AppIcon::SettingsGear,
+                        13.0,
+                        theme.accent_blue,
+                        "Cutting Optimization Parameters",
+                        13.0,
+                        theme.text_primary,
+                        true,
+                    );
                     ui.add_space(12.0);
 
                     // Profile selector
@@ -292,7 +323,16 @@ impl LeanView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("✂️ Optimized Steel Bar Cutting Patterns (Dynamic BFD)").size(13.5).strong().color(theme.text_primary));
+                    crate::icons::icon_label(
+                        ui,
+                        crate::icons::AppIcon::Scissors,
+                        13.5,
+                        theme.accent_blue,
+                        "Optimized Steel Bar Cutting Patterns (Dynamic BFD)",
+                        13.5,
+                        theme.text_primary,
+                        true,
+                    );
                     ui.label(RichText::new(format!("Algorithm: Best-Fit Decreasing • Total Cut Pieces: {} pcs", report.total_pieces_demanded))
                         .size(11.0).color(theme.accent_blue));
                 });
@@ -313,12 +353,12 @@ impl LeanView {
                 for (bar_idx, bar) in report.bars.iter().enumerate() {
                     ui.vertical(|ui| {
                         ui.horizontal_wrapped(|ui| {
-                            let status_badge = if bar.remainder_m < 0.05 {
-                                "⭐ 100% Efficiency (Zero Waste)"
+                            let (status_icon, status_badge) = if bar.remainder_m < 0.05 {
+                                (crate::icons::AppIcon::Star, "100% Efficiency (Zero Waste)")
                             } else if bar.is_reusable_offcut {
-                                "♻️ Reusable Offcut (Gusset/Stiffener Ready)"
+                                (crate::icons::AppIcon::Recycle, "Reusable Offcut (Gusset/Stiffener Ready)")
                             } else {
-                                "🟡 Net Scrap Waste"
+                                (crate::icons::AppIcon::AlertTriangle, "Net Scrap Waste")
                             };
 
                             let badge_color = if bar.remainder_m < 0.05 {
@@ -335,7 +375,7 @@ impl LeanView {
                             )).size(12.5).strong().color(theme.text_primary));
 
                             ui.label(RichText::new(format!("Yield: {:.1}%", bar.yield_pct)).size(11.0).color(theme.text_muted));
-                            ui.label(RichText::new(status_badge).size(11.5).strong().color(badge_color));
+                            crate::icons::icon_label(ui, status_icon, 12.0, badge_color, status_badge, 11.5, badge_color, true);
                         });
                         ui.add_space(4.0);
 
@@ -417,9 +457,17 @@ impl LeanView {
 
                 // 6. Real Action Export Buttons
                 ui.horizontal_wrapped(|ui| {
-                    if ui.add(egui::Button::new(RichText::new("📥 Export Bar Bending Schedule (BBS) .CSV").size(12.0).strong().color(Color32::WHITE))
-                        .fill(theme.accent_blue)
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::UploadImport,
+                        "Export Bar Bending Schedule (BBS) .CSV",
+                        12.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        egui::Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    ).clicked() {
                         let bbs = CuttingStockOptimizer::generate_sample_bbs(members.len());
                         let csv = CuttingStockOptimizer::export_bbs_csv(&bbs);
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("Bar_Bending_Schedule_SNI2847.csv", &csv) {
@@ -427,9 +475,17 @@ impl LeanView {
                         }
                     }
 
-                    if ui.add(egui::Button::new(RichText::new("📄 Export Cutting Plan .CSV").size(12.0).strong().color(Color32::WHITE))
-                        .fill(Color32::from_rgb(16, 185, 129))
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Document,
+                        "Export Cutting Plan .CSV",
+                        12.0,
+                        Color32::WHITE,
+                        Color32::from_rgb(16, 185, 129),
+                        egui::Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    ).clicked() {
                         let csv = CuttingStockOptimizer::export_cutting_plan_csv(&report);
                         if let Ok(path) = crate::core::DiskExporter::write_export_file("Cutting_Plan_Optimized.csv", &csv) {
                             self.export_status = Some(format!("Cutting plan exported to: {}", path));
@@ -496,11 +552,15 @@ impl LeanView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("📋 6-Week Make-Ready Lookahead & Weekly Work Plan (WWP)")
-                            .size(14.0)
-                            .strong()
-                            .color(theme.text_primary),
+                    crate::icons::icon_label(
+                        ui,
+                        crate::icons::AppIcon::Clipboard,
+                        14.0,
+                        theme.accent_blue,
+                        "6-Week Make-Ready Lookahead & Weekly Work Plan (WWP)",
+                        14.0,
+                        theme.text_primary,
+                        true,
                     );
                     Frame::new()
                         .fill(ppc_col.gamma_multiply(0.16))
@@ -544,18 +604,18 @@ impl LeanView {
                                 ui.selectable_value(&mut self.lps_new_task_week, wk.to_string(), wk);
                             }
                         });
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("➕ Add Work Package")
-                                    .size(11.0)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.accent_blue)
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Plus,
+                        "Add Work Package",
+                        11.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        egui::Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                         && !self.lps_new_task_name.trim().is_empty()
                     {
                         let next_id = self.lps_tasks.iter().map(|t| t.id).max().unwrap_or(0) + 1;
@@ -646,22 +706,23 @@ impl LeanView {
                                     .color(row_col),
                                 );
 
-                                let sound_lbl = if task.is_sound {
-                                    "🔓 Sound Ready"
+                                let (sound_icon, sound_lbl, sound_col) = if task.is_sound {
+                                    (crate::icons::AppIcon::Unlock, "Sound Ready", theme.accent_green)
                                 } else {
-                                    "🔒 Clear Constraint"
+                                    (crate::icons::AppIcon::Lock, "Clear Constraint", theme.accent_orange)
                                 };
-                                if ui
-                                    .add(
-                                        egui::Button::new(RichText::new(sound_lbl).size(10.0).color(if task.is_sound {
-                                            theme.accent_green
-                                        } else {
-                                            theme.accent_orange
-                                        }))
-                                        .fill(theme.bg_card)
-                                        .corner_radius(CornerRadius::same(4)),
-                                    )
-                                    .clicked()
+                                if crate::icons::icon_button(
+                                    ui,
+                                    sound_icon,
+                                    sound_lbl,
+                                    10.0,
+                                    sound_col,
+                                    theme.bg_card,
+                                    egui::Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::ZERO,
+                                )
+                                .clicked()
                                 {
                                     task.is_sound = !task.is_sound;
                                     if task.is_sound {
@@ -719,11 +780,15 @@ impl LeanView {
                 .inner_margin(Margin::same(16))
                 .stroke(Stroke::new(1.0, theme.border_subtle))
                 .show(ui, |ui| {
-                    ui.label(
-                        RichText::new("📈 Weekly PPC Trend vs 80% Benchmark")
-                            .size(13.0)
-                            .strong()
-                            .color(theme.text_primary),
+                    crate::icons::icon_label(
+                        ui,
+                        crate::icons::AppIcon::ChartLine,
+                        13.0,
+                        theme.accent_blue,
+                        "Weekly PPC Trend vs 80% Benchmark",
+                        13.0,
+                        theme.text_primary,
+                        true,
                     );
                     ui.label(
                         RichText::new("Historical weekly reliability progression including live WWP simulation")
@@ -812,11 +877,15 @@ impl LeanView {
                 .inner_margin(Margin::same(16))
                 .stroke(Stroke::new(1.0, theme.border_subtle))
                 .show(ui, |ui| {
-                    ui.label(
-                        RichText::new("📊 Variance Root-Cause Pareto (Non-Completions)")
-                            .size(13.0)
-                            .strong()
-                            .color(theme.text_primary),
+                    crate::icons::icon_label(
+                        ui,
+                        crate::icons::AppIcon::ChartBar,
+                        13.0,
+                        theme.accent_blue,
+                        "Variance Root-Cause Pareto (Non-Completions)",
+                        13.0,
+                        theme.text_primary,
+                        true,
                     );
                     ui.label(
                         RichText::new("Primary blockers preventing 100% Weekly Work Plan reliability")
@@ -831,11 +900,15 @@ impl LeanView {
                             .corner_radius(CornerRadius::same(8))
                             .inner_margin(Margin::same(14))
                             .show(ui, |ui| {
-                                ui.label(
-                                    RichText::new("🎉 100% Reliability! Zero open variance reasons in current Weekly Work Plan.")
-                                        .size(11.5)
-                                        .strong()
-                                        .color(theme.accent_green),
+                                crate::icons::icon_label(
+                                    ui,
+                                    crate::icons::AppIcon::CheckCircle,
+                                    12.0,
+                                    theme.accent_green,
+                                    "100% Reliability! Zero open variance reasons in current Weekly Work Plan.",
+                                    11.5,
+                                    theme.accent_green,
+                                    true,
                                 );
                             });
                     } else {
@@ -872,7 +945,16 @@ impl LeanView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("🌊 Value Stream Mapping: Eliminating 7 Construction Wastes").size(13.5).strong().color(theme.text_primary));
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::ChartLine,
+                    13.5,
+                    theme.accent_blue,
+                    "Value Stream Mapping: Eliminating 7 Construction Wastes",
+                    13.5,
+                    theme.text_primary,
+                    true,
+                );
                 ui.add_space(10.0);
 
                 let wastes = [
@@ -902,7 +984,16 @@ impl LeanView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(RichText::new("🚚 Just-In-Time (JIT) Delivery Buffer Scheduling").size(13.5).strong().color(theme.text_primary));
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Truck,
+                    13.5,
+                    theme.accent_blue,
+                    "Just-In-Time (JIT) Delivery Buffer Scheduling",
+                    13.5,
+                    theme.text_primary,
+                    true,
+                );
                 ui.add_space(10.0);
 
                 let cards = [
@@ -936,7 +1027,17 @@ impl LeanView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Takt Rhythm: 5-Day Trade Train");
                 let _ = ui.selectable_label(false, "Alert on Transit > 75 min");
-                let _ = ui.button("🚋 Sync Trade Train & Dispatch Mixer Slot");
+                let _ = crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Layers,
+                    "Sync Trade Train & Dispatch Mixer Slot",
+                    12.0,
+                    theme.text_primary,
+                    theme.bg_card,
+                    egui::Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
             ui.add_space(10.0);
 
@@ -951,8 +1052,8 @@ impl LeanView {
                         }
                         ui.end_row();
                         for (zn, w1, w2, w3, w4, pour) in [
-                            ("Zone A (West)", "Rebar Deck", "MEP Sleeves", "Slab Pour ✓", "Strip & MEP", "110 m³ Completed"),
-                            ("Zone B (Center)", "Formwork", "Rebar Deck", "MEP Sleeves", "Slab Pour ▶", "210 m³ Tonight"),
+                            ("Zone A (West)", "Rebar Deck", "MEP Sleeves", "Slab Pour [Done]", "Strip & MEP", "110 m³ Completed"),
+                            ("Zone B (Center)", "Formwork", "Rebar Deck", "MEP Sleeves", "Slab Pour [Active]", "210 m³ Tonight"),
                             ("Zone C (East)", "Shoring", "Formwork", "Rebar Deck", "MEP Sleeves", "105 m³ Next Week"),
                         ] {
                             ui.label(RichText::new(zn).size(10.5).strong().color(theme.text_primary));
@@ -990,7 +1091,17 @@ impl LeanView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "5-Day Contractual Consultant SLA");
                 let _ = ui.selectable_label(false, "Auto-Flag LPS Make-Ready Holds");
-                let _ = ui.button("📝 Escalate Overdue RFI & Clear Lookahead Hold");
+                let _ = crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Document,
+                    "Escalate Overdue RFI & Clear Lookahead Hold",
+                    12.0,
+                    theme.text_primary,
+                    theme.bg_card,
+                    egui::Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                );
             });
             ui.add_space(10.0);
 

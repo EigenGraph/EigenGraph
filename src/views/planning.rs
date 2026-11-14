@@ -6,6 +6,7 @@ use egui::{
     ScrollArea, Sense, Stroke, StrokeKind, Ui, Vec2,
 };
 use crate::features::{FeatureId, FeatureRegistry};
+use crate::icons::{self, AppIcon};
 use crate::models::{
     ConstructionSimulationPhase, CurrencyUnit, NavigationPillar, ParametricVariable,
     StructuralMember, WbsCostItem,
@@ -355,23 +356,23 @@ impl PlanningView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    let (switch_lbl, target_pillar, target_tab) = if is_time_mode {
-                        ("💰 Open 5D Budgeting", NavigationPillar::CostBudgeting, PlanningSubTab::DynamicRab)
+                    let (switch_icon, switch_lbl, target_pillar, target_tab) = if is_time_mode {
+                        (AppIcon::Coins, "Open 5D Budgeting", NavigationPillar::CostBudgeting, PlanningSubTab::DynamicRab)
                     } else {
-                        ("⏱️ Open 4D Scheduling", NavigationPillar::TimeScheduling, PlanningSubTab::Schedule4d)
+                        (AppIcon::Clock, "Open 4D Scheduling", NavigationPillar::TimeScheduling, PlanningSubTab::Schedule4d)
                     };
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new(switch_lbl)
-                                    .size(11.0)
-                                    .strong()
-                                    .color(theme.accent_blue),
-                            )
-                            .fill(theme.accent_blue.gamma_multiply(0.15))
-                            .corner_radius(CornerRadius::same(6)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        switch_icon,
+                        switch_lbl,
+                        11.0,
+                        theme.accent_blue,
+                        theme.accent_blue.gamma_multiply(0.15),
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         *active_pillar = target_pillar;
                         self.active_subtab = target_tab;
@@ -415,17 +416,18 @@ impl PlanningView {
 
                     ui.separator();
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("📄 Export BoQ (CSV)")
-                                    .size(11.5)
-                                    .color(theme.text_primary),
-                            )
-                            .fill(theme.bg_canvas)
-                            .corner_radius(CornerRadius::same(8)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Document,
+                        "Export BoQ (CSV)",
+                        11.5,
+                        theme.text_primary,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(8),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         self.export_status = Some(format!(
                             "File BoQ-5D_L{:.0}m.csv exported successfully!",
@@ -433,28 +435,28 @@ impl PlanningView {
                         ));
                     }
 
-                    let pub_text = if self.published_to_dossier {
-                        "✅ Saved to Dossier"
+                    let (pub_icon, pub_text) = if self.published_to_dossier {
+                        (AppIcon::CheckCircle, "Saved to Dossier")
                     } else {
-                        "📁 Save to MY PROJECT"
+                        (AppIcon::Folder, "Save to MY PROJECT")
                     };
                     let pub_bg = if self.published_to_dossier {
                         theme.accent_green
                     } else {
                         theme.accent_blue.gamma_multiply(0.85)
                     };
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new(pub_text)
-                                    .size(11.5)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(pub_bg)
-                            .corner_radius(CornerRadius::same(8)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        pub_icon,
+                        pub_text,
+                        11.5,
+                        Color32::WHITE,
+                        pub_bg,
+                        Stroke::NONE,
+                        CornerRadius::same(8),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         self.published_to_dossier = true;
                         self.export_status = Some(
@@ -472,7 +474,7 @@ impl PlanningView {
                 .corner_radius(CornerRadius::same(6))
                 .inner_margin(Margin::symmetric(12, 6))
                 .show(ui, |ui| {
-                    ui.label(RichText::new(format!("🟢 {}", msg)).size(11.5).color(theme.accent_green));
+                    icons::icon_label(ui, AppIcon::CheckCircle, 13.0, theme.accent_green, msg.as_str(), 11.5, theme.accent_green, false);
                 });
         }
     }
@@ -485,7 +487,7 @@ impl PlanningView {
             .inner_margin(Margin::symmetric(14, 10))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("🔗 BOUND TO PARAMETRIC MODEL:").size(11.5).strong().color(theme.accent_blue));
+                    icons::icon_label(ui, AppIcon::LinkChain, 13.0, theme.accent_blue, "BOUND TO PARAMETRIC MODEL:", 11.5, theme.accent_blue, true);
                     ui.label(RichText::new(format!("Span L = {:.1} m", takeoff.span_m)).size(11.5).color(theme.text_primary));
                     ui.label(RichText::new("•").size(11.5).color(theme.text_muted));
                     ui.label(RichText::new(format!("Height H = {:.1} m (L/{:.1})", takeoff.height_m, takeoff.span_m / takeoff.height_m)).size(11.5).color(theme.text_primary));
@@ -493,7 +495,7 @@ impl PlanningView {
                     ui.label(RichText::new(format!("ρ = {:.0} kg/m³", takeoff.density_kg_m3)).size(11.5).color(theme.text_primary));
                     ui.label(RichText::new("•").size(11.5).color(theme.text_muted));
                     ui.label(RichText::new(format!("Steel Rate: IDR {}/kg", format_idr(takeoff.price_steel_kg))).size(11.5).color(theme.accent_green));
-                    ui.label(RichText::new("⚡ Live Dynamic Calculation").size(11.0).color(theme.text_muted));
+                    icons::icon_label(ui, AppIcon::Bolt, 12.5, theme.text_muted, "Live Dynamic Calculation", 11.0, theme.text_muted, false);
                 });
             });
     }
@@ -633,9 +635,9 @@ impl PlanningView {
                             .strong()
                             .color(theme.text_primary),
                     );
-                    let _ = ui.button("📐 Extract Concrete m³");
-                    let _ = ui.button("🔩 Extract Rebar Tonnage");
-                    let _ = ui.button("🔄 Sync Active BIM Quantities -> BoQ");
+                    let _ = icons::icon_button(ui, AppIcon::RulerSquare, "Extract Concrete m³", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    let _ = icons::icon_button(ui, AppIcon::Wrench, "Extract Rebar Tonnage", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    let _ = icons::icon_button(ui, AppIcon::Recycle, "Sync Active BIM Quantities -> BoQ", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
             },
         );
@@ -735,26 +737,20 @@ impl PlanningView {
             .inner_margin(Margin::symmetric(14, 10))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("⏱️ 4D SYNCHRO SIMULATION PLAYER").size(12.5).strong().color(theme.accent_blue));
+                    icons::icon_label(ui, AppIcon::Clock, 14.0, theme.accent_blue, "4D SYNCHRO SIMULATION PLAYER", 12.5, theme.accent_blue, true);
 
                     // Play / Pause toggle
-                    let play_label = if self.is_simulating { "⏸ Pause" } else { "▶ Play 4D" };
+                    let (play_icon, play_label) = if self.is_simulating { (AppIcon::Pause, "Pause") } else { (AppIcon::Play, "Play 4D") };
                     let play_bg = if self.is_simulating { theme.accent_orange } else { theme.accent_green };
-                    if ui.add(egui::Button::new(RichText::new(play_label).size(11.0).strong().color(Color32::WHITE))
-                        .fill(play_bg)
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if icons::icon_button(ui, play_icon, play_label, 11.0, Color32::WHITE, play_bg, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                         self.is_simulating = !self.is_simulating;
                     }
 
                     // Rewind & Reset
-                    if ui.add(egui::Button::new(RichText::new("⏪ Day 1").size(11.0).color(theme.text_primary))
-                        .fill(theme.bg_canvas)
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if icons::icon_button(ui, AppIcon::SkipBack, "Day 1", 11.0, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO).clicked() {
                         self.simulation_day = 1;
                     }
-                    if ui.add(egui::Button::new(RichText::new("⏩ Day 360").size(11.0).color(theme.text_primary))
-                        .fill(theme.bg_canvas)
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if icons::icon_button(ui, AppIcon::SkipNext, "Day 360", 11.0, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO).clicked() {
                         self.simulation_day = 360;
                     }
 
@@ -805,10 +801,10 @@ impl PlanningView {
                                     .color(Color32::from_rgb(phase.color_rgb.0, phase.color_rgb.1, phase.color_rgb.2)));
                             });
 
-                        ui.label(RichText::new(format!("👷 Manpower: {} Workers", phase.manpower_count)).size(11.0).color(theme.text_secondary));
-                        ui.label(RichText::new(format!("🏗️ Cranes/Equipment: {} Units", phase.equipment_count)).size(11.0).color(theme.text_secondary));
+                        icons::icon_label(ui, AppIcon::HardHat, 13.0, theme.text_secondary, format!("Manpower: {} Workers", phase.manpower_count), 11.0, theme.text_secondary, false);
+                        icons::icon_label(ui, AppIcon::Wrench, 13.0, theme.text_secondary, format!("Cranes/Equipment: {} Units", phase.equipment_count), 11.0, theme.text_secondary, false);
                         if phase.concrete_volume_m3 > 0.0 {
-                            ui.label(RichText::new(format!("🏢 Concrete Poured: {:.0} m³", phase.concrete_volume_m3)).size(11.0).color(theme.accent_blue));
+                            icons::icon_label(ui, AppIcon::Building, 13.0, theme.accent_blue, format!("Concrete Poured: {:.0} m³", phase.concrete_volume_m3), 11.0, theme.accent_blue, false);
                         }
                         ui.label(RichText::new(format!("Planned: {:.1}% | Actual: {:.1}%", phase.planned_progress_pct, phase.actual_progress_pct)).size(11.0).color(theme.text_muted));
                     });
@@ -820,7 +816,7 @@ impl PlanningView {
         // 2D Staged Building Erection Elevation Canvas
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("🏗️ 4D STAGED ERECTION ELEVATION & TOWER CRANE SIMULATION").size(13.0).strong().color(theme.text_primary));
+                icons::icon_label(ui, AppIcon::Building, 15.0, theme.accent_blue, "4D STAGED ERECTION ELEVATION & TOWER CRANE SIMULATION", 13.0, theme.text_primary, true);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new(format!("Scale 1:200 • Day {} Staging", self.simulation_day)).size(11.0).color(theme.text_muted));
                 });
@@ -910,7 +906,7 @@ impl PlanningView {
 
         // CPM Activities Breakdown with Planned vs. Current Day Status
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("📅 CRITICAL PATH METHOD (CPM) & STAGED WBS SCHEDULE").size(13.0).strong().color(theme.text_primary));
+            icons::icon_label(ui, AppIcon::Clock, 15.0, theme.accent_blue, "CRITICAL PATH METHOD (CPM) & STAGED WBS SCHEDULE", 13.0, theme.text_primary, true);
             ui.add_space(8.0);
 
             for phase in &self.simulation_phases {
@@ -924,12 +920,12 @@ impl PlanningView {
                     theme.border_subtle
                 };
 
-                let status_text = if is_done {
-                    "✅ Completed"
+                let (status_icon, status_text) = if is_done {
+                    (AppIcon::CheckCircle, "Completed")
                 } else if is_current {
-                    "⚡ In Progress"
+                    (AppIcon::Bolt, "In Progress")
                 } else {
-                    "⏳ Pending"
+                    (AppIcon::Clock, "Pending")
                 };
 
                 ui.horizontal_wrapped(|ui| {
@@ -943,7 +939,7 @@ impl PlanningView {
                             .corner_radius(CornerRadius::same(4))
                             .inner_margin(Margin::symmetric(6, 2))
                             .show(ui, |ui| {
-                                ui.label(RichText::new(status_text).size(10.0).color(bar_color));
+                                icons::icon_label(ui, status_icon, 11.5, bar_color, status_text, 10.0, bar_color, false);
                             });
 
                         ui.add_space(10.0);
@@ -987,8 +983,8 @@ impl PlanningView {
                             .strong()
                             .color(theme.text_primary),
                     );
-                    let _ = ui.button("🔗 Map Selected 3D Elements to WBS");
-                    let _ = ui.button("🏗️ Highlight Erection Stage in 3D Viewport");
+                    let _ = icons::icon_button(ui, AppIcon::LinkChain, "Map Selected 3D Elements to WBS", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    let _ = icons::icon_button(ui, AppIcon::Cube3D, "Highlight Erection Stage in 3D Viewport", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
             },
         );
@@ -1020,7 +1016,7 @@ impl PlanningView {
         // Division Filter Pills
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("📁 DIVISION FILTER:").size(11.5).strong().color(theme.accent_blue));
+                icons::icon_label(ui, AppIcon::Folder, 13.0, theme.accent_blue, "DIVISION FILTER:", 11.5, theme.accent_blue, true);
 
                 let is_all = self.selected_wbs_division.is_none();
                 let all_bg = if is_all { theme.accent_blue } else { theme.bg_canvas };
@@ -1052,7 +1048,7 @@ impl PlanningView {
 
         // WBS Table (Horizontally scrollable grid on narrow viewports)
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("📊 5D WORK BREAKDOWN STRUCTURE (WBS) QUANTITIES & RATES").size(13.0).strong().color(theme.text_primary));
+            icons::icon_label(ui, AppIcon::ChartBar, 14.5, theme.accent_blue, "5D WORK BREAKDOWN STRUCTURE (WBS) QUANTITIES & RATES", 13.0, theme.text_primary, true);
             ui.add_space(10.0);
 
             ScrollArea::horizontal()
@@ -1105,13 +1101,13 @@ impl PlanningView {
             ui.add_space(14.0);
 
             let options = [
-                ("Option 1: Minimum Code Compliance", 0.64, t.grand_total_rab * 0.92, "-8.0%", "🔴 Vulnerable to Single Failure (1 Member Removed = Collapse)", theme.accent_red),
-                ("Option 2: Baseline Standard Design", 0.78, t.grand_total_rab * 0.97, "-3.0%", "🟡 Meets Minimal SNI / AISC Standards", theme.accent_orange),
-                ("Option 3: Redundancy-Optimized Design (Recommended)", t.predicted_system_ari, t.grand_total_rab, "0.0% (Base)", "🟢 Robust Multi-Path (High Reserve Capacity)", theme.accent_green),
-                ("Option 4: Ultra-Redundant (Critical Infrastructure)", 0.965, t.grand_total_rab * 1.075, "+7.5%", "🛡️ Dual-Path Collapse Proof (Strategic Bridge)", theme.accent_blue),
+                ("Option 1: Minimum Code Compliance", 0.64, t.grand_total_rab * 0.92, "-8.0%", AppIcon::AlertTriangle, "Vulnerable to Single Failure (1 Member Removed = Collapse)", theme.accent_red),
+                ("Option 2: Baseline Standard Design", 0.78, t.grand_total_rab * 0.97, "-3.0%", AppIcon::Info, "Meets Minimal SNI / AISC Standards", theme.accent_orange),
+                ("Option 3: Redundancy-Optimized Design (Recommended)", t.predicted_system_ari, t.grand_total_rab, "0.0% (Base)", AppIcon::CheckCircle, "Robust Multi-Path (High Reserve Capacity)", theme.accent_green),
+                ("Option 4: Ultra-Redundant (Critical Infrastructure)", 0.965, t.grand_total_rab * 1.075, "+7.5%", AppIcon::Shield, "Dual-Path Collapse Proof (Strategic Bridge)", theme.accent_blue),
             ];
 
-            for (title, ari, cost, diff, desc, badge_color) in options {
+            for (title, ari, cost, diff, desc_icon, desc, badge_color) in options {
                 Frame::new()
                     .fill(theme.bg_sidebar)
                     .stroke(Stroke::new(1.0, theme.border_subtle))
@@ -1122,7 +1118,7 @@ impl PlanningView {
                             ui.vertical(|ui| {
                                 ui.label(RichText::new(title).size(13.0).strong().color(theme.text_primary));
                                 ui.add_space(2.0);
-                                ui.label(RichText::new(desc).size(11.5).color(badge_color));
+                                icons::icon_label(ui, desc_icon, 12.5, badge_color, desc, 11.5, badge_color, false);
                             });
 
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -1148,7 +1144,7 @@ impl PlanningView {
             ui.add_space(8.0);
 
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("💡 VALUE ENGINEERING CONCLUSION:").size(12.0).strong().color(theme.accent_green));
+                icons::icon_label(ui, AppIcon::Sparkles, 13.5, theme.accent_green, "VALUE ENGINEERING CONCLUSION:", 12.0, theme.accent_green, true);
                 ui.label(RichText::new("With only a +3.8% cost increase from baseline standard, the ARI redundancy index jumps significantly by +16.9%, preventing catastrophic collapse mechanisms during earthquakes or vehicular impacts.").size(12.0).color(theme.text_secondary));
             });
         });
@@ -1181,7 +1177,11 @@ impl PlanningView {
             if let Some(stages) = staged_results {
                 for stage in &stages {
                     let col = if stage.is_stable { theme.accent_green } else { theme.accent_red };
-                    let status_str = if stage.is_stable { "🟢 STABLE / NO MECHANISM" } else { "🔴 CRITICAL / SHORING REQUIRED" };
+                    let (status_icon, status_str) = if stage.is_stable {
+                        (AppIcon::CheckCircle, "STABLE / NO MECHANISM")
+                    } else {
+                        (AppIcon::AlertTriangle, "CRITICAL / SHORING REQUIRED")
+                    };
                     let note = match stage.warning.as_deref() {
                         Some(w) => w,
                         None => "Staged stiffness stable with full rank, deflections within limits.",
@@ -1194,12 +1194,12 @@ impl PlanningView {
                         .inner_margin(Margin::symmetric(14, 10))
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
-                                ui.label(RichText::new("●").size(14.0).color(col));
+                                icons::draw_icon(ui, status_icon, 14.0, col);
                                 ui.vertical(|ui| {
                                     ui.label(RichText::new(&stage.stage_name).size(12.5).strong().color(theme.text_primary));
                                     ui.label(RichText::new(format!("Elements: {} members • SVD Rank: {}/{} • Condition: {:.1e}", stage.erected_elements_count, stage.rank, stage.active_dofs, stage.condition_number)).size(11.0).color(theme.text_secondary));
                                     ui.add_space(2.0);
-                                    ui.label(RichText::new(format!("💡 Evaluation: {}", note)).size(11.0).color(theme.text_muted));
+                                    icons::icon_label(ui, AppIcon::Info, 12.0, theme.text_muted, format!("Evaluation: {}", note), 11.0, theme.text_muted, false);
                                 });
 
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -1212,7 +1212,9 @@ impl PlanningView {
                                             ui.label(RichText::new(format!("Defl: {:.2} mm", stage.max_deflection_mm)).size(11.5).strong().color(col));
                                         });
                                     ui.add_space(12.0);
-                                    ui.label(RichText::new(status_str).size(11.0).strong().color(col));
+                                    ui.horizontal(|ui| {
+                                        icons::icon_label(ui, status_icon, 12.5, col, status_str, 11.0, col, true);
+                                    });
                                 });
                             });
                         });
@@ -1276,7 +1278,7 @@ impl PlanningView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Sampling: 1,000 Latin Hypercube Trials");
                     let _ = ui.selectable_label(false, "PERT Beta Distribution (O / M / P)");
-                    let _ = ui.button("🎲 Run Monte Carlo Schedule Simulation");
+                    let _ = icons::icon_button(ui, AppIcon::ChartBar, "Run Monte Carlo Schedule Simulation", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(12.0);
 
@@ -1427,7 +1429,7 @@ impl PlanningView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Policy: Level Within Free Float Only");
                     let _ = ui.selectable_label(false, "Site Crew Cap = 85 Workers");
-                    let _ = ui.button("👷 Recompute Leveled Manpower Histogram");
+                    let _ = icons::icon_button(ui, AppIcon::HardHat, "Recompute Leveled Manpower Histogram", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(10.0);
 
@@ -1551,7 +1553,7 @@ impl PlanningView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Reporting Cutoff: Month 07 (IPC-07)");
                     let _ = ui.selectable_label(false, "Contract Retention: 5.0%");
-                    let _ = ui.button("📈 Certify Monthly Progress Claim (.PDF / .CSV)");
+                    let _ = icons::icon_button(ui, AppIcon::ChartLine, "Certify Monthly Progress Claim (.PDF / .CSV)", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(12.0);
 
@@ -1726,7 +1728,7 @@ impl PlanningView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Outlier Threshold: ±15% vs Owner Est");
                     let _ = ui.selectable_label(false, "Preserve ARI >= 0.90 Constraint");
-                    let _ = ui.button("⚖️ Export Normalized Bid Leveling Matrix (.XLSX/.MD)");
+                    let _ = icons::icon_button(ui, AppIcon::SlidersPanel, "Export Normalized Bid Leveling Matrix (.XLSX/.MD)", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(10.0);
 
@@ -1747,14 +1749,15 @@ impl PlanningView {
                                 ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                             }
                             ui.end_row();
-                            for (pkg, oe, a, b, c, flag, col) in [
+                            for (pkg, oe, a, b, c, flag_icon, flag, col) in [
                                 (
                                     "02 Bored Piles",
                                     curr.format_value(t.cost_substructure),
                                     curr.format_value(t.cost_substructure * 0.98),
                                     curr.format_value(t.cost_substructure * 0.95),
                                     curr.format_value(t.cost_substructure * 1.28),
-                                    "⚠️ Bidder C +28%",
+                                    AppIcon::AlertTriangle,
+                                    "Bidder C +28%",
                                     theme.accent_orange,
                                 ),
                                 (
@@ -1763,7 +1766,8 @@ impl PlanningView {
                                     curr.format_value(t.cost_steel_material * 0.97),
                                     curr.format_value(t.cost_steel_material * 0.92),
                                     curr.format_value(t.cost_steel_material * 0.99),
-                                    "🟢 Balanced",
+                                    AppIcon::CheckCircle,
+                                    "Balanced",
                                     theme.accent_green,
                                 ),
                                 (
@@ -1772,7 +1776,8 @@ impl PlanningView {
                                     curr.format_value(t.cost_workshop_fab * 1.03),
                                     curr.format_value(t.cost_workshop_fab * 0.94),
                                     curr.format_value(t.cost_workshop_fab * 0.96),
-                                    "🟢 Balanced",
+                                    AppIcon::CheckCircle,
+                                    "Balanced",
                                     theme.accent_green,
                                 ),
                                 (
@@ -1781,7 +1786,8 @@ impl PlanningView {
                                     curr.format_value(t.cost_erection_crane * 1.02),
                                     curr.format_value(t.cost_erection_crane * 0.91),
                                     curr.format_value(t.cost_erection_crane * 0.95),
-                                    "🟢 Best Value (Bidder B)",
+                                    AppIcon::Star,
+                                    "Best Value (Bidder B)",
                                     theme.accent_blue,
                                 ),
                             ] {
@@ -1790,7 +1796,7 @@ impl PlanningView {
                                 ui.label(RichText::new(a).size(10.5).color(theme.text_secondary));
                                 ui.label(RichText::new(b).size(10.5).strong().color(theme.accent_green));
                                 ui.label(RichText::new(c).size(10.5).color(theme.text_secondary));
-                                ui.label(RichText::new(flag).size(10.5).strong().color(col));
+                                icons::icon_label(ui, flag_icon, 12.0, col, flag, 10.5, col, true);
                                 ui.end_row();
                             }
                         });

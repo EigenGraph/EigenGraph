@@ -6,11 +6,15 @@ impl BuildView {
     pub(super) fn render_clash_tab(&mut self, ui: &mut Ui, theme: &MacTheme, features: &mut FeatureRegistry) {
         use crate::models::{BcfPriority, BcfTopicRecord, BcfTopicStatus, ClashSeverity, ClashStatus};
 
-        ui.label(
-            RichText::new("⚔️ SPATIAL CLASH MATRIX & INTERFERENCE DETECTOR")
-                .size(11.5)
-                .strong()
-                .color(theme.text_secondary),
+        crate::icons::icon_label(
+            ui,
+            crate::icons::AppIcon::AlertTriangle,
+            13.5,
+            theme.text_secondary,
+            "SPATIAL CLASH MATRIX & INTERFERENCE DETECTOR",
+            11.5,
+            theme.text_secondary,
+            true,
         );
         ui.add_space(4.0);
 
@@ -18,7 +22,17 @@ impl BuildView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Bvh3D AABB Tree (0.01mm)");
                 let _ = ui.selectable_label(false, "Rebar vs Duct Sweep");
-                let _ = ui.button("⚡ Recompute Live 3D BVH Clashes");
+                let _ = crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Bolt,
+                    "Recompute Live 3D BVH Clashes",
+                    10.5,
+                    theme.text_primary,
+                    theme.bg_card,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(5),
+                    Vec2::ZERO,
+                );
             });
         });
         ui.add_space(6.0);
@@ -58,22 +72,26 @@ impl BuildView {
         // KPI Summary Counters (wraps gracefully on narrow viewports)
         ui.horizontal_wrapped(|ui| {
             let kpis = [
-                ("🔴 Hard", format!("{}", hard_active), theme.accent_red),
-                ("🟡 Soft/Code", format!("{}", soft_active), theme.accent_orange),
-                ("🟢 Resolved", format!("{}", resolved_cnt), theme.accent_green),
+                (crate::icons::AppIcon::AlertTriangle, "Hard", format!("{}", hard_active), theme.accent_red),
+                (crate::icons::AppIcon::Info, "Soft/Code", format!("{}", soft_active), theme.accent_orange),
+                (crate::icons::AppIcon::CheckCircle, "Resolved", format!("{}", resolved_cnt), theme.accent_green),
             ];
-            for (label, val, col) in kpis {
+            for (ico, label, val, col) in kpis {
                 Frame::new()
                     .fill(theme.bg_card)
                     .corner_radius(CornerRadius::same(6))
                     .inner_margin(Margin::symmetric(8, 4))
                     .stroke(Stroke::new(1.0, theme.border_card))
                     .show(ui, |ui| {
-                        ui.label(
-                            RichText::new(format!("{}: {}", label, val))
-                                .size(10.5)
-                                .strong()
-                                .color(col),
+                        crate::icons::icon_label(
+                            ui,
+                            ico,
+                            12.0,
+                            col,
+                            format!("{}: {}", label, val),
+                            10.5,
+                            col,
+                            true,
                         );
                     });
             }
@@ -125,17 +143,23 @@ impl BuildView {
             });
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
-                let sev_opts: [(Option<ClashSeverity>, &str); 4] = [
-                    (None, "All"),
-                    (Some(ClashSeverity::Hard), "🔴 Hard"),
-                    (Some(ClashSeverity::Soft), "🟡 Soft"),
-                    (Some(ClashSeverity::CodeTolerance), "🟠 Code"),
+                let sev_opts: [(Option<ClashSeverity>, Option<crate::icons::AppIcon>, &str); 4] = [
+                    (None, None, "All"),
+                    (Some(ClashSeverity::Hard), Some(crate::icons::AppIcon::AlertTriangle), "Hard"),
+                    (Some(ClashSeverity::Soft), Some(crate::icons::AppIcon::Info), "Soft"),
+                    (Some(ClashSeverity::CodeTolerance), Some(crate::icons::AppIcon::Shield), "Code"),
                 ];
-                for (opt, lbl) in sev_opts {
-                    if ui
-                        .selectable_label(self.clash_filter_severity == opt, lbl)
-                        .clicked()
-                    {
+                for (opt, maybe_ico, lbl) in sev_opts {
+                    let is_sel = self.clash_filter_severity == opt;
+                    let fg = if is_sel { Color32::WHITE } else { theme.text_secondary };
+                    let bg = if is_sel { theme.accent_blue } else { theme.bg_card };
+                    let stroke = Stroke::new(1.0, if is_sel { theme.accent_blue } else { theme.border_subtle });
+                    let clicked = if let Some(ico) = maybe_ico {
+                        crate::icons::icon_button(ui, ico, lbl, 10.5, fg, bg, stroke, CornerRadius::same(5), Vec2::ZERO).clicked()
+                    } else {
+                        ui.add(egui::Button::new(RichText::new(lbl).size(10.5).color(fg)).fill(bg).stroke(stroke).corner_radius(CornerRadius::same(5))).clicked()
+                    };
+                    if clicked {
                         self.clash_filter_severity = opt;
                     }
                 }
@@ -143,22 +167,21 @@ impl BuildView {
             ui.add_space(4.0);
             ui.checkbox(
                 &mut self.show_3d_clash_markers,
-                "📍 Highlight Clash Boxes & Pins in 3D Viewport",
+                "Highlight Clash Boxes & Pins in 3D Viewport",
             );
             ui.add_space(6.0);
-            if ui
-                .add(
-                    egui::Button::new(
-                        RichText::new("🔄 Re-run 3D AABB Collision Solver")
-                            .size(11.0)
-                            .strong()
-                            .color(Color32::WHITE),
-                    )
-                    .fill(theme.accent_blue)
-                    .corner_radius(CornerRadius::same(6))
-                    .min_size(Vec2::new(ui.available_width(), 26.0)),
-                )
-                .clicked()
+            if crate::icons::icon_button(
+                ui,
+                crate::icons::AppIcon::Redo,
+                "Re-run 3D AABB Collision Solver",
+                11.0,
+                Color32::WHITE,
+                theme.accent_blue,
+                Stroke::NONE,
+                CornerRadius::same(6),
+                Vec2::new(ui.available_width(), 26.0),
+            )
+            .clicked()
             {
                 let stamp = crate::core::web_bridge::unix_timestamp_label();
                 self.clash_last_run_label = format!("Verified {} ({:.0} mm)", stamp, self.clash_tolerance_mm);
@@ -168,7 +191,7 @@ impl BuildView {
                     self.clash_tolerance_mm, hard_active, soft_active, resolved_cnt
                 ));
                 self.bim_console_logs.push(format!(
-                    "⚔️ [Clash Solver {}] Evaluated {} zones at tol={:.1}mm -> {} Hard, {} Soft/Code.",
+                    "[Clash Solver {}] Evaluated {} zones at tol={:.1}mm -> {} Hard, {} Soft/Code.",
                     stamp,
                     self.clash_items.len(),
                     self.clash_tolerance_mm,
@@ -285,33 +308,35 @@ impl BuildView {
                             ui.add_space(4.0);
 
                             ui.horizontal_wrapped(|ui| {
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("👁️ Focus 3D")
-                                                .size(9.5)
-                                                .color(theme.accent_blue),
-                                        )
-                                        .fill(theme.bg_canvas)
-                                        .corner_radius(CornerRadius::same(4)),
-                                    )
-                                    .clicked()
+                                if crate::icons::icon_button(
+                                    ui,
+                                    crate::icons::AppIcon::Target,
+                                    "Focus 3D",
+                                    9.5,
+                                    theme.accent_blue,
+                                    theme.bg_canvas,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::ZERO,
+                                )
+                                .clicked()
                                 {
                                     focus_target =
                                         Some((item.id, item.tag.clone(), item.point_3d));
                                 }
 
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("💬 Log BCF")
-                                                .size(9.5)
-                                                .color(theme.text_primary),
-                                        )
-                                        .fill(theme.bg_canvas)
-                                        .corner_radius(CornerRadius::same(4)),
-                                    )
-                                    .clicked()
+                                if crate::icons::icon_button(
+                                    ui,
+                                    crate::icons::AppIcon::CommentNote,
+                                    "Log BCF",
+                                    9.5,
+                                    theme.text_primary,
+                                    theme.bg_canvas,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::ZERO,
+                                )
+                                .clicked()
                                 {
                                     log_bcf_for = Some((
                                         item.id,
@@ -322,20 +347,18 @@ impl BuildView {
                                     ));
                                 }
 
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new(format!(
-                                                "🔄 {}",
-                                                item.status.next().label()
-                                            ))
-                                            .size(9.5)
-                                            .color(theme.accent_green),
-                                        )
-                                        .fill(theme.bg_canvas)
-                                        .corner_radius(CornerRadius::same(4)),
-                                    )
-                                    .clicked()
+                                if crate::icons::icon_button(
+                                    ui,
+                                    crate::icons::AppIcon::Redo,
+                                    item.status.next().label(),
+                                    9.5,
+                                    theme.accent_green,
+                                    theme.bg_canvas,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::ZERO,
+                                )
+                                .clicked()
                                 {
                                     status_toggle_idx = Some(idx);
                                 }
@@ -416,11 +439,15 @@ impl BuildView {
     pub(super) fn render_bcf_tab(&mut self, ui: &mut Ui, theme: &MacTheme) {
         use crate::models::{BcfComment, BcfPriority, BcfTopicRecord, BcfTopicStatus};
 
-        ui.label(
-            RichText::new("💬 BCF 2.1 COORDINATION ISSUES & TOPICS")
-                .size(11.5)
-                .strong()
-                .color(theme.text_secondary),
+        crate::icons::icon_label(
+            ui,
+            crate::icons::AppIcon::CommentNote,
+            13.5,
+            theme.text_secondary,
+            "BCF 2.1 COORDINATION ISSUES & TOPICS",
+            11.5,
+            theme.text_secondary,
+            true,
         );
         ui.add_space(4.0);
 
@@ -441,37 +468,48 @@ impl BuildView {
             .count();
 
         ui.horizontal_wrapped(|ui| {
-            let new_btn_label = if self.show_new_bcf_form {
-                "✕ Cancel Draft"
+            let new_btn_ico = if self.show_new_bcf_form {
+                crate::icons::AppIcon::Close
             } else {
-                "➕ New Topic"
+                crate::icons::AppIcon::Plus
             };
-            if ui
-                .add(
-                    egui::Button::new(RichText::new(new_btn_label).size(10.5).color(Color32::WHITE))
-                        .fill(if self.show_new_bcf_form {
-                            theme.accent_orange
-                        } else {
-                            theme.accent_blue
-                        })
-                        .corner_radius(CornerRadius::same(5)),
-                )
-                .clicked()
+            let new_btn_label = if self.show_new_bcf_form {
+                "Cancel Draft"
+            } else {
+                "New Topic"
+            };
+            if crate::icons::icon_button(
+                ui,
+                new_btn_ico,
+                new_btn_label,
+                10.5,
+                Color32::WHITE,
+                if self.show_new_bcf_form {
+                    theme.accent_orange
+                } else {
+                    theme.accent_blue
+                },
+                Stroke::NONE,
+                CornerRadius::same(5),
+                Vec2::ZERO,
+            )
+            .clicked()
             {
                 self.show_new_bcf_form = !self.show_new_bcf_form;
             }
 
-            if ui
-                .add(
-                    egui::Button::new(
-                        RichText::new("📬 Export BCF 2.1 XML")
-                            .size(10.5)
-                            .color(theme.text_primary),
-                    )
-                    .fill(theme.bg_card)
-                    .corner_radius(CornerRadius::same(5)),
-                )
-                .clicked()
+            if crate::icons::icon_button(
+                ui,
+                crate::icons::AppIcon::UploadImport,
+                "Export BCF 2.1 XML",
+                10.5,
+                theme.text_primary,
+                theme.bg_card,
+                Stroke::NONE,
+                CornerRadius::same(5),
+                Vec2::ZERO,
+            )
+            .clicked()
             {
                 let xml = BcfTopicRecord::export_bcf_xml(
                     &self.bcf_topics,
@@ -490,7 +528,7 @@ impl BuildView {
                     Err(err) => format!("BCF 2.1 XML prepared ({} bytes): {}", xml.len(), err),
                 };
                 self.modify_status_msg = Some(msg.clone());
-                self.bim_console_logs.push(format!("📦 [BCF 2.1] {}", msg));
+                self.bim_console_logs.push(format!("[BCF 2.1] {}", msg));
             }
         });
 
@@ -509,11 +547,15 @@ impl BuildView {
 
         if self.show_new_bcf_form {
             theme.card_frame().show(ui, |ui| {
-                ui.label(
-                    RichText::new("📸 CREATE BCF 2.1 TOPIC + 3D VIEWPOINT")
-                        .size(10.5)
-                        .strong()
-                        .color(theme.accent_blue),
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Camera,
+                    12.5,
+                    theme.accent_blue,
+                    "CREATE BCF 2.1 TOPIC + 3D VIEWPOINT",
+                    10.5,
+                    theme.accent_blue,
+                    true,
                 );
                 ui.add_space(4.0);
                 ui.label(RichText::new("Title:").size(9.5).color(theme.text_muted));
@@ -557,19 +599,18 @@ impl BuildView {
                     .color(theme.text_secondary),
                 );
                 ui.add_space(4.0);
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("✅ Create Topic")
-                                .size(10.5)
-                                .strong()
-                                .color(Color32::WHITE),
-                        )
-                        .fill(theme.accent_green)
-                        .corner_radius(CornerRadius::same(5))
-                        .min_size(Vec2::new(ui.available_width(), 24.0)),
-                    )
-                    .clicked()
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::CheckCircle,
+                    "Create Topic",
+                    10.5,
+                    Color32::WHITE,
+                    theme.accent_green,
+                    Stroke::NONE,
+                    CornerRadius::same(5),
+                    Vec2::new(ui.available_width(), 24.0),
+                )
+                .clicked()
                 {
                     let next_id = self.bcf_topics.iter().map(|t| t.id).max().unwrap_or(0) + 1;
                     let tag = format!("BCF-{:03}", 100 + next_id);
@@ -616,7 +657,7 @@ impl BuildView {
                         tag
                     ));
                     self.bim_console_logs
-                        .push(format!("💬 [BCF 2.1] Created topic {} with 3D snapshot.", tag));
+                        .push(format!("[BCF 2.1] Created topic {} with 3D snapshot.", tag));
                 }
             });
             ui.add_space(6.0);
@@ -692,31 +733,42 @@ impl BuildView {
                                     .color(theme.text_primary),
                             );
                             ui.horizontal_wrapped(|ui| {
-                                ui.label(
-                                    RichText::new(format!("👤 {}", topic.assignee))
-                                        .size(9.5)
-                                        .color(theme.text_muted),
+                                crate::icons::icon_label(
+                                    ui,
+                                    crate::icons::AppIcon::HardHat,
+                                    11.0,
+                                    theme.text_muted,
+                                    &topic.assignee,
+                                    9.5,
+                                    theme.text_muted,
+                                    false,
                                 );
-                                ui.label(
-                                    RichText::new(format!("📅 {}", topic.due_date))
-                                        .size(9.5)
-                                        .color(theme.text_muted),
+                                crate::icons::icon_label(
+                                    ui,
+                                    crate::icons::AppIcon::Clock,
+                                    11.0,
+                                    theme.text_muted,
+                                    &topic.due_date,
+                                    9.5,
+                                    theme.text_muted,
+                                    false,
                                 );
                             });
                             ui.add_space(4.0);
 
                             ui.horizontal_wrapped(|ui| {
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("📷 Restore Viewpoint")
-                                                .size(9.5)
-                                                .color(theme.accent_blue),
-                                        )
-                                        .fill(theme.bg_canvas)
-                                        .corner_radius(CornerRadius::same(4)),
-                                    )
-                                    .clicked()
+                                if crate::icons::icon_button(
+                                    ui,
+                                    crate::icons::AppIcon::Camera,
+                                    "Restore Viewpoint",
+                                    9.5,
+                                    theme.accent_blue,
+                                    theme.bg_canvas,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::ZERO,
+                                )
+                                .clicked()
                                 {
                                     restore_cam = Some((
                                         topic.tag.clone(),
@@ -727,22 +779,29 @@ impl BuildView {
                                     ));
                                 }
 
-                                let thread_lbl = if is_expanded {
-                                    format!("🔽 Hide Thread ({})", topic.comments.len())
-                                } else {
-                                    format!("💬 Thread ({})", topic.comments.len())
-                                };
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new(thread_lbl)
-                                                .size(9.5)
-                                                .color(theme.text_secondary),
-                                        )
-                                        .fill(theme.bg_canvas)
-                                        .corner_radius(CornerRadius::same(4)),
+                                let (thread_ico, thread_lbl) = if is_expanded {
+                                    (
+                                        crate::icons::AppIcon::ChevronUp,
+                                        format!("Hide Thread ({})", topic.comments.len()),
                                     )
-                                    .clicked()
+                                } else {
+                                    (
+                                        crate::icons::AppIcon::CommentNote,
+                                        format!("Thread ({})", topic.comments.len()),
+                                    )
+                                };
+                                if crate::icons::icon_button(
+                                    ui,
+                                    thread_ico,
+                                    thread_lbl,
+                                    9.5,
+                                    theme.text_secondary,
+                                    theme.bg_canvas,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::ZERO,
+                                )
+                                .clicked()
                                 {
                                     select_topic_id = Some(if is_expanded {
                                         None

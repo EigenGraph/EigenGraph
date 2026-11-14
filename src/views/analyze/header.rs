@@ -7,18 +7,22 @@ impl AnalyzeView {
         theme.card_frame().show(ui, |ui| {
             // Top Row: Suite Title & Interop / Dossier Export Actions
             ui.horizontal_wrapped(|ui| {
-                ui.label(
-                    RichText::new("🛡️ 8D Structural Resilience & Multi-Code Verification Suite")
-                        .size(12.5)
-                        .strong()
-                        .color(theme.accent_blue),
+                icons::icon_label(
+                    ui,
+                    AppIcon::Shield,
+                    14.0,
+                    theme.accent_blue,
+                    "8D Structural Resilience & Multi-Code Verification Suite",
+                    12.5,
+                    theme.accent_blue,
+                    true,
                 );
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let publish_text = if self.published_to_dossier {
-                        "✅ Synced to MY PROJECT"
+                    let (publish_icon, publish_text) = if self.published_to_dossier {
+                        (AppIcon::CheckCircle, "Synced to MY PROJECT")
                     } else {
-                        "📤 Publish to MY PROJECT Dossier"
+                        (AppIcon::UploadImport, "Publish to MY PROJECT Dossier")
                     };
                     let publish_bg = if self.published_to_dossier {
                         theme.accent_green
@@ -26,36 +30,36 @@ impl AnalyzeView {
                         theme.accent_blue.gamma_multiply(0.85)
                     };
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new(publish_text)
-                                    .size(11.5)
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(publish_bg)
-                            .corner_radius(CornerRadius::same(7)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        publish_icon,
+                        publish_text,
+                        11.5,
+                        Color32::WHITE,
+                        publish_bg,
+                        Stroke::NONE,
+                        CornerRadius::same(7),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         self.published_to_dossier = true;
                         self.export_status =
                             Some("Model & ARI Analytics synced to MY PROJECT Dossier".to_string());
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("📥 SAP2000 (.s2k)")
-                                    .size(11.0)
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.bg_canvas)
-                            .stroke(Stroke::new(1.0, theme.accent_blue))
-                            .corner_radius(CornerRadius::same(7)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SaveDisk,
+                        "SAP2000 (.s2k)",
+                        11.0,
+                        Color32::WHITE,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.accent_blue),
+                        CornerRadius::same(7),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         let mut engine = crate::core::ParametricEngine::new();
                         if let Ok(model) = engine.generate_warren_truss() {
@@ -72,18 +76,18 @@ impl AnalyzeView {
                         }
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("📥 DXF 3D (.dxf)")
-                                    .size(11.0)
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.bg_canvas)
-                            .stroke(Stroke::new(1.0, theme.accent_green))
-                            .corner_radius(CornerRadius::same(7)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SaveDisk,
+                        "DXF 3D (.dxf)",
+                        11.0,
+                        Color32::WHITE,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.accent_green),
+                        CornerRadius::same(7),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         let mut engine = crate::core::ParametricEngine::new();
                         if let Ok(model) = engine.generate_warren_truss() {
@@ -100,18 +104,18 @@ impl AnalyzeView {
                         }
                     }
 
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("🌐 OpenBIM (.ifc)")
-                                    .size(11.0)
-                                    .color(Color32::WHITE),
-                            )
-                            .fill(theme.bg_canvas)
-                            .stroke(Stroke::new(1.0, Color32::from_rgb(180, 100, 255)))
-                            .corner_radius(CornerRadius::same(7)),
-                        )
-                        .clicked()
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Globe,
+                        "OpenBIM (.ifc)",
+                        11.0,
+                        Color32::WHITE,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, Color32::from_rgb(180, 100, 255)),
+                        CornerRadius::same(7),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         let mut engine = crate::core::ParametricEngine::new();
                         if let Ok(model) = engine.generate_warren_truss() {
@@ -162,14 +166,17 @@ impl AnalyzeView {
                     } else {
                         Stroke::new(1.0, theme.border_subtle)
                     };
-                    if ui
-                        .add(
-                            egui::Button::new(RichText::new(cat.label()).size(11.5).strong().color(fg))
-                                .fill(bg)
-                                .stroke(stroke)
-                                .corner_radius(CornerRadius::same(7)),
-                        )
-                        .clicked()
+                    if icons::smart_button(
+                        ui,
+                        cat.label(),
+                        11.5,
+                        fg,
+                        bg,
+                        stroke,
+                        CornerRadius::same(7),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
                     {
                         active_category = cat;
                     }
@@ -215,7 +222,17 @@ impl AnalyzeView {
                 }
                 _ => {
                     ui.label(RichText::new("Reactive Solver Trigger").size(10.5).strong().color(theme.text_muted));
-                    let _ = ui.button("⚡ Compile & Solve Live BIM -> FEM");
+                    let _ = icons::icon_button(
+                        ui,
+                        AppIcon::Bolt,
+                        "Compile & Solve Live BIM -> FEM",
+                        11.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    );
                 }
             });
         });

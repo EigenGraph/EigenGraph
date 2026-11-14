@@ -190,24 +190,28 @@ impl IndustrializedView {
                     ui.add_space(10.0);
                     theme.card_frame().show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(
-                                RichText::new("📦 OPENBIM IFC BUS:")
-                                    .size(11.5)
-                                    .strong()
-                                    .color(theme.accent_green),
+                            crate::icons::icon_label(
+                                ui,
+                                crate::icons::AppIcon::BoxPackage,
+                                12.0,
+                                theme.accent_green,
+                                "OPENBIM IFC BUS:",
+                                11.5,
+                                theme.accent_green,
+                                true,
                             );
                             ui.label(RichText::new(status_msg).size(11.5).color(theme.text_primary));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("✕").size(11.0).color(theme.text_muted),
-                                        )
-                                        .fill(theme.bg_card)
-                                        .corner_radius(CornerRadius::same(4)),
-                                    )
-                                    .clicked()
-                                {
+                                if crate::icons::icon_only_button(
+                                    ui,
+                                    crate::icons::AppIcon::Close,
+                                    theme.text_muted,
+                                    theme.bg_card,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::splat(20.0),
+                                    "Dismiss",
+                                ).clicked() {
                                     dismiss_status = true;
                                 }
                             });

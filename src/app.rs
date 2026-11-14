@@ -7,6 +7,7 @@ use egui::{
 };
 
 use crate::features::FeatureRegistry;
+use crate::icons::{self, AppIcon};
 use crate::models::{DatabaseComponent, NavigationPillar, ProjectItem, StructuralMember};
 use crate::theme::MacTheme;
 use crate::views::{
@@ -19,6 +20,7 @@ use crate::views::{
 pub struct EigenGraphApp {
     pub theme: MacTheme,
     pub active_pillar: NavigationPillar,
+    pub last_active_pillar: NavigationPillar,
     pub search_query: String,
     pub show_settings: bool,
     pub sidebar_open: bool,
@@ -29,20 +31,20 @@ pub struct EigenGraphApp {
     pub feature_registry: FeatureRegistry,
 
     // 15-Pillar Master Shell High-Fidelity Views
-    pub my_project_view: MyProjectView,         // Pillar 1: 📁 My Library (Obsidian-Style Vault)
-    pub ai_firm_view: AiFirmView,               // Pillar 2: 🤖 AI Agent (Virtual Engineering Firm)
-    pub research_view: ResearchConceptView,     // Pillar 3: 💡 Research (GIS, CRS & DEM TIN Mesh)
-    pub parametric_view: ParametricView,        // Pillar 4: 📐 Parametric (2D CAD & 3D Companion)
-    pub build_view: BuildView,                  // Pillar 5: 🏗️ Geometry (Clean BIM Spatial Assembly)
-    pub analyze_view: AnalyzeView,              // Pillar 6: ⚡ Analysis (3D Geo-Structural Solver)
-    pub planning_view: PlanningView,            // Pillars 7 & 8: ⏱️ Time (4D) & 💰 Cost (5D Heatmap)
-    pub sustainability_view: SustainabilityView,// Pillar 9: 🌱 Sustainability (6D Solar Heliodon)
-    pub facility_view: FacilityView,            // Pillar 10: 🏢 Facility Management (7D Digital Twin)
-    pub safety_view: SafetyView,                // Pillar 11: 🛡️ Safety & Health (8D Crane & Fall Risk)
-    pub lean_view: LeanView,                    // Pillar 12: ♻️ Lean Construction (9D Staging)
-    pub industrialized_view: IndustrializedView,// Pillar 13: 🤖 Industrialized & Automation (10D DfMA)
-    pub prediction_view: PredictionView,        // Pillar 14: 🔮 Prediction (AI Aging & Drift)
-    pub results_view: ResultsView,              // Pillar 15: 📑 Report (Living Docs, Sheets, Slides)
+    pub my_project_view: MyProjectView,         // Pillar 1: My Library (Obsidian-Style Vault)
+    pub ai_firm_view: AiFirmView,               // Pillar 2: AI Agent (Virtual Engineering Firm)
+    pub research_view: ResearchConceptView,     // Pillar 3: Research (GIS, CRS & DEM TIN Mesh)
+    pub parametric_view: ParametricView,        // Pillar 4: Parametric (2D CAD & 3D Companion)
+    pub build_view: BuildView,                  // Pillar 5: Geometry (Clean BIM Spatial Assembly)
+    pub analyze_view: AnalyzeView,              // Pillar 6: Analysis (3D Geo-Structural Solver)
+    pub planning_view: PlanningView,            // Pillars 7 & 8: Time (4D) & Cost (5D Heatmap)
+    pub sustainability_view: SustainabilityView,// Pillar 9: Sustainability (6D Solar Heliodon)
+    pub facility_view: FacilityView,            // Pillar 10: Facility Management (7D Digital Twin)
+    pub safety_view: SafetyView,                // Pillar 11: Safety & Health (8D Crane & Fall Risk)
+    pub lean_view: LeanView,                    // Pillar 12: Lean Construction (9D Staging)
+    pub industrialized_view: IndustrializedView,// Pillar 13: Industrialized & Automation (10D DfMA)
+    pub prediction_view: PredictionView,        // Pillar 14: Prediction (AI Aging & Drift)
+    pub results_view: ResultsView,              // Pillar 15: Report (Living Docs, Sheets, Slides)
     pub settings_view: SettingsView,
     pub universal_canvas: UniversalCanvasState,
     pub ai_assistant_view: AiAssistantView,
@@ -58,6 +60,7 @@ impl Default for EigenGraphApp {
         Self {
             theme: MacTheme::default(),
             active_pillar: NavigationPillar::MyLibrary,
+            last_active_pillar: NavigationPillar::MyLibrary,
             search_query: String::new(),
             show_settings: false,
             sidebar_open: true,
@@ -116,33 +119,39 @@ impl EigenGraphApp {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 ui.add_space(2.0);
-                ui.label(
-                    RichText::new("⚛️ EigenGraph")
-                        .size(13.0)
-                        .strong()
-                        .color(self.theme.text_primary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::Sparkles,
+                    16.0,
+                    self.theme.accent_blue,
+                    "EigenGraph",
+                    13.0,
+                    self.theme.text_primary,
+                    true,
                 );
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let close_icon = if is_overlay { "✕" } else { "◀" };
+                    let close_icon = if is_overlay {
+                        AppIcon::Close
+                    } else {
+                        AppIcon::ChevronLeft
+                    };
                     let close_hint = if is_overlay {
                         "Close navigation drawer"
                     } else {
                         "Collapse sidebar"
                     };
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new(close_icon)
-                                    .size(12.0)
-                                    .color(self.theme.text_secondary),
-                            )
-                            .fill(self.theme.bg_card)
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(26.0, 24.0)),
-                        )
-                        .on_hover_text(close_hint)
-                        .clicked()
+                    if icons::icon_only_button(
+                        ui,
+                        close_icon,
+                        self.theme.text_secondary,
+                        self.theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(26.0, 24.0),
+                        close_hint,
+                    )
+                    .clicked()
                     {
                         self.sidebar_open = false;
                     }
@@ -166,9 +175,10 @@ impl EigenGraphApp {
                 .stroke(Stroke::new(1.0, self.theme.border_card))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
+                        icons::draw_icon(ui, AppIcon::Search, 13.0, self.theme.text_muted);
                         ui.add(
                             egui::TextEdit::singleline(&mut self.search_query)
-                                .hint_text("🔍 Search modules...")
+                                .hint_text("Search modules...")
                                 .desired_width((ui.available_width() - 4.0).max(80.0))
                                 .frame(Frame::NONE),
                         );
@@ -253,13 +263,27 @@ impl EigenGraphApp {
                                     self.theme.text_secondary
                                 };
 
-                                let item_label =
-                                    format!("{}   {}", pillar.icon(), pillar.clean_name());
+                                let icon_color = if is_active {
+                                    self.theme.accent_blue
+                                } else {
+                                    text_color
+                                };
+                                let icon_rect = Rect::from_center_size(
+                                    Pos2::new(rect.left() + 18.0, rect.center().y),
+                                    Vec2::splat(14.0),
+                                );
+                                icons::paint_icon(
+                                    ui.painter(),
+                                    icon_rect,
+                                    pillar.app_icon(),
+                                    icon_color,
+                                );
+
                                 ui.painter().text(
-                                    rect.left_center() + Vec2::new(12.0, 0.0),
+                                    rect.left_center() + Vec2::new(32.0, 0.0),
                                     Align2::LEFT_CENTER,
-                                    item_label,
-                                    egui::FontId::proportional(12.5),
+                                    pillar.clean_name(),
+                                    egui::FontId::proportional(12.2),
                                     text_color,
                                 );
 
@@ -287,19 +311,19 @@ impl EigenGraphApp {
             ui.separator();
             ui.add_space(6.0);
 
-            if ui
-                .add(
-                    egui::Button::new(
-                        RichText::new("⚙️ Settings")
-                            .size(11.5)
-                            .color(self.theme.text_secondary),
-                    )
-                    .fill(self.theme.bg_card)
-                    .corner_radius(CornerRadius::same(7))
-                    .min_size(Vec2::new(ui.available_width(), 32.0)),
-                )
-                .on_hover_text("Workspace Settings & Future Roadmap")
-                .clicked()
+            if icons::icon_button(
+                ui,
+                AppIcon::SettingsGear,
+                "Settings",
+                11.5,
+                self.theme.text_secondary,
+                self.theme.bg_card,
+                Stroke::NONE,
+                CornerRadius::same(7),
+                Vec2::new(ui.available_width(), 32.0),
+            )
+            .on_hover_text("Workspace Settings & Future Roadmap")
+            .clicked()
             {
                 self.show_settings = !self.show_settings;
                 if is_overlay {
@@ -314,6 +338,16 @@ impl EigenGraphApp {
 impl App for EigenGraphApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+
+        // Keep 2D BIM (Parametric) and 3D BIM (Geometry) projects bidirectionally synced on pillar switches
+        if self.active_pillar != self.last_active_pillar {
+            if self.last_active_pillar == NavigationPillar::ParametricDED {
+                self.build_view.bim_bus.project = self.parametric_view.bim_bus.project.clone();
+            } else if self.active_pillar == NavigationPillar::ParametricDED {
+                self.parametric_view.bim_bus.project = self.build_view.bim_bus.project.clone();
+            }
+            self.last_active_pillar = self.active_pillar;
+        }
 
         if let Some(imported) = self.universal_canvas.pending_imported_settings.take() {
             self.settings_view.apply_workspace_settings(
@@ -376,9 +410,17 @@ impl App for EigenGraphApp {
             &self.universal_canvas,
             self.ai_assistant_view.is_visible,
         );
-        let scroll_source = if !self.universal_canvas.is_frozen
-            && self.universal_canvas.is_pointer_in_live_canvas(&ctx)
-        {
+        let pointer_in_live_canvas = !self.universal_canvas.is_frozen
+            && match self.active_pillar {
+                NavigationPillar::ParametricDED => self
+                    .parametric_view
+                    .is_pointer_in_live_canvas(&ctx, self.universal_canvas.is_frozen),
+                NavigationPillar::GeometryAssembly => self
+                    .build_view
+                    .is_pointer_in_live_canvas(&ctx, self.universal_canvas.is_frozen),
+                _ => self.universal_canvas.is_pointer_in_live_canvas(&ctx),
+            };
+        let scroll_source = if pointer_in_live_canvas {
             egui::scroll_area::ScrollSource::SCROLL_BAR
         } else {
             egui::scroll_area::ScrollSource::default()
@@ -389,6 +431,10 @@ impl App for EigenGraphApp {
             Margin::symmetric(14, 12)
         };
         let sidebar_inset = if !self.sidebar_open { 44.0 } else { 0.0 };
+        let uses_native_single_canvas = matches!(
+            self.active_pillar,
+            NavigationPillar::ParametricDED | NavigationPillar::GeometryAssembly
+        );
 
         CentralPanel::default()
             .frame(Frame::new().fill(self.theme.bg_canvas))
@@ -399,36 +445,32 @@ impl App for EigenGraphApp {
                     .scroll_source(scroll_source)
                     .show(ui, |ui| {
                         Frame::new().inner_margin(outer_margin).show(ui, |ui| {
-                            let active_bim_project =
-                                if self.active_pillar == NavigationPillar::ParametricDED {
-                                    &mut self.parametric_view.bim_bus.project
-                                } else {
-                                    &mut self.build_view.bim_bus.project
-                                };
-                            self.universal_canvas.show(
-                                ui,
-                                &self.theme,
-                                self.active_pillar,
-                                active_bim_project,
-                                &mut self.members,
-                                &mut self.parametric_view.variables,
-                                workspace_snapshot,
-                                sidebar_inset,
-                            );
+                            if !uses_native_single_canvas {
+                                self.universal_canvas.show(
+                                    ui,
+                                    &self.theme,
+                                    self.active_pillar,
+                                    &mut self.build_view.bim_bus.project,
+                                    &mut self.members,
+                                    &mut self.parametric_view.variables,
+                                    workspace_snapshot.clone(),
+                                    sidebar_inset,
+                                );
 
-                            ui.add_space(10.0);
+                                ui.add_space(10.0);
 
-                            let (_anchor_rect, anchor_resp) = ui.allocate_exact_size(
-                                Vec2::new(ui.available_width().max(1.0), 1.0),
-                                egui::Sense::hover(),
-                            );
-                            if std::mem::take(
-                                &mut self.universal_canvas.request_scroll_to_workbench,
-                            ) {
-                                anchor_resp.scroll_to_me(Some(Align::TOP));
+                                let (_anchor_rect, anchor_resp) = ui.allocate_exact_size(
+                                    Vec2::new(ui.available_width().max(1.0), 1.0),
+                                    egui::Sense::hover(),
+                                );
+                                if std::mem::take(
+                                    &mut self.universal_canvas.request_scroll_to_workbench,
+                                ) {
+                                    anchor_resp.scroll_to_me(Some(Align::TOP));
+                                }
+
+                                ui.add_space(4.0);
                             }
-
-                            ui.add_space(4.0);
 
                             match self.active_pillar {
                     NavigationPillar::MyLibrary => {
@@ -465,6 +507,10 @@ impl App for EigenGraphApp {
                             &mut self.db_components,
                             &mut self.active_pillar,
                             &mut self.feature_registry,
+                            &mut self.universal_canvas,
+                            &self.members,
+                            workspace_snapshot.clone(),
+                            sidebar_inset,
                         );
                     }
                     NavigationPillar::GeometryAssembly => {
@@ -474,6 +520,10 @@ impl App for EigenGraphApp {
                             &self.members,
                             &self.db_components,
                             &mut self.feature_registry,
+                            &mut self.universal_canvas,
+                            &self.parametric_view.variables,
+                            workspace_snapshot.clone(),
+                            sidebar_inset,
                         );
                     }
                     NavigationPillar::AnalysisSimulation => {
@@ -593,21 +643,17 @@ impl App for EigenGraphApp {
                 .order(Order::Foreground)
                 .fixed_pos(Pos2::new(screen_rect.left() + 10.0, screen_rect.top() + 10.0))
                 .show(&ctx, |ui| {
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                RichText::new("☰")
-                                    .size(16.0)
-                                    .strong()
-                                    .color(self.theme.text_primary),
-                            )
-                            .fill(self.theme.bg_card.gamma_multiply(0.95))
-                            .stroke(Stroke::new(1.0, self.theme.border_card))
-                            .corner_radius(CornerRadius::same(8))
-                            .min_size(Vec2::new(34.0, 34.0)),
-                        )
-                        .on_hover_text("Open navigation menu")
-                        .clicked()
+                    if icons::icon_only_button(
+                        ui,
+                        AppIcon::Menu,
+                        self.theme.text_primary,
+                        self.theme.bg_card.gamma_multiply(0.95),
+                        Stroke::new(1.0, self.theme.border_card),
+                        CornerRadius::same(8),
+                        Vec2::new(34.0, 34.0),
+                        "Open navigation menu",
+                    )
+                    .clicked()
                     {
                         self.sidebar_open = true;
                     }
@@ -677,7 +723,7 @@ impl App for EigenGraphApp {
         if self.show_settings {
             let mut open = self.show_settings;
             let mut close_after_jump = false;
-            egui::Window::new("⚙️ Settings — Workspace & Future Roadmap")
+            egui::Window::new("Settings — Workspace & Future Roadmap")
                 .open(&mut open)
                 .collapsible(false)
                 .resizable(true)
@@ -713,6 +759,23 @@ impl App for EigenGraphApp {
                     }
                 });
             self.show_settings = open && !close_after_jump;
+        }
+
+        // 6. UNIFIED SINGLE-FILE IMPORT MODAL (works across all 15 modules)
+        {
+            let import_bim_project =
+                if self.active_pillar == NavigationPillar::ParametricDED {
+                    &mut self.parametric_view.bim_bus.project
+                } else {
+                    &mut self.build_view.bim_bus.project
+                };
+            self.universal_canvas.render_import_modal_if_open(
+                &ctx,
+                &self.theme,
+                import_bim_project,
+                &mut self.members,
+                &mut self.parametric_view.variables,
+            );
         }
 
         // 8. SCREENSHOT HOOK (AUTOMATED QA & PREVIEWS)

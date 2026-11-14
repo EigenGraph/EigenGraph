@@ -66,12 +66,19 @@ impl PredictionView {
                     ui.add_space(10.0);
                     theme.card_frame().show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(RichText::new("🔮 PREDICTION COMPLETE:").size(11.5).strong().color(theme.accent_blue));
+                            crate::icons::icon_label(ui, crate::icons::AppIcon::Pulse, 12.0, theme.accent_blue, "PREDICTION COMPLETE:", 11.5, theme.accent_blue, true);
                             ui.label(RichText::new(status_msg).size(11.5).color(theme.text_primary));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.add(egui::Button::new(RichText::new("✕").size(11.0).color(theme.text_muted))
-                                    .fill(theme.bg_card)
-                                    .corner_radius(CornerRadius::same(4))).clicked() {
+                                if crate::icons::icon_only_button(
+                                    ui,
+                                    crate::icons::AppIcon::Close,
+                                    theme.text_muted,
+                                    theme.bg_card,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::splat(20.0),
+                                    "Dismiss",
+                                ).clicked() {
                                     dismiss_status = true;
                                 }
                             });
@@ -126,14 +133,14 @@ impl PredictionView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Inputs: Live FEA Forces + 7D SHM Strain");
                 let _ = ui.selectable_label(false, "Drift Threshold Alerting (β < 3.8)");
-                let _ = ui.button("🔮 Run Live Stress Anomaly Ranker");
+                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Pulse, "Run Live Stress Anomaly Ranker", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
             });
         });
         ui.add_space(12.0);
 
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("🔮 AI STRUCTURAL FAILURE FORECASTING").size(14.0).strong().color(theme.text_primary));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Pulse, 14.0, theme.accent_blue, "AI STRUCTURAL FAILURE FORECASTING", 14.0, theme.text_primary, true);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("Target Reliability β = 3.80 (Class I Structure)").size(11.0).color(theme.accent_blue));
                 });
@@ -147,9 +154,17 @@ impl PredictionView {
                 ui.label(RichText::new("Target Reliability Index (β):").size(11.5).color(theme.text_primary));
                 ui.add(egui::Slider::new(&mut self.target_reliability_beta, 2.5..=5.0).step_by(0.1));
                 ui.add_space(12.0);
-                if ui.add(egui::Button::new(RichText::new("⚡ Evaluate FOSM β & FEMA P-58 Fragility Curves").size(11.0).color(Color32::WHITE))
-                    .fill(theme.accent_blue)
-                    .corner_radius(CornerRadius::same(6))).clicked() {
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Bolt,
+                    "Evaluate FOSM β & FEMA P-58 Fragility Curves",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                ).clicked() {
                     let mut engine = crate::core::ParametricEngine::new();
                     if let Ok(model) = engine.generate_warren_truss() {
                         let min_ari = crate::core::AriEngine::evaluate_redundancy(&model)
@@ -237,7 +252,7 @@ impl PredictionView {
     fn render_progressive_collapse(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("⚡ NONLINEAR PROGRESSIVE COLLAPSE SIMULATION (APM)").size(14.0).strong().color(theme.text_primary));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Bolt, 14.0, theme.accent_red, "NONLINEAR PROGRESSIVE COLLAPSE SIMULATION (APM)", 14.0, theme.text_primary, true);
                 ui.label(RichText::new("• Standard: DoD UFC 4-023-03 / ASCE 7-22").size(11.0).color(theme.accent_blue));
             });
             ui.add_space(4.0);
@@ -253,9 +268,17 @@ impl PredictionView {
                 let max_id = members.len().max(1);
                 ui.add(egui::DragValue::new(&mut self.initial_disrupt_member_id).range(1..=max_id));
                 ui.add_space(8.0);
-                if ui.add(egui::Button::new(RichText::new("💥 Simulate Collapse (Newmark-β Transient)").size(11.0).color(Color32::WHITE))
-                    .fill(theme.accent_orange)
-                    .corner_radius(CornerRadius::same(6))).clicked() {
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::AlertTriangle,
+                    "Simulate Collapse (Newmark-β Transient)",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_orange,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                ).clicked() {
                     let mut engine = crate::core::ParametricEngine::new();
                     if let Ok(model) = engine.generate_warren_truss() {
                         if let Ok(rep) = crate::core::DynamicsEngine::simulate_sudden_member_removal(
@@ -315,7 +338,7 @@ impl PredictionView {
     fn render_erection_bottleneck(&mut self, ui: &mut Ui, theme: &MacTheme) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("🏗️ 4D ERECTION BOTTLENECK & STABILITY FORECASTING").size(14.0).strong().color(theme.text_primary));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::Hammer, 14.0, theme.accent_orange, "4D ERECTION BOTTLENECK & STABILITY FORECASTING", 14.0, theme.text_primary, true);
                 ui.label(RichText::new("• SVD Guard & Wind Risk Engine").size(11.0).color(theme.accent_blue));
             });
             ui.add_space(4.0);
@@ -338,7 +361,7 @@ impl PredictionView {
     fn render_lifetime_degradation(&mut self, ui: &mut Ui, theme: &MacTheme) {
         theme.card_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("📉 50-YEAR SERVICEABILITY & FATIGUE PREDICTION (LIFE-CYCLE DEGRADATION)").size(14.0).strong().color(theme.text_primary));
+                crate::icons::icon_label(ui, crate::icons::AppIcon::ChartLine, 14.0, theme.accent_blue, "50-YEAR SERVICEABILITY & FATIGUE PREDICTION (LIFE-CYCLE DEGRADATION)", 14.0, theme.text_primary, true);
                 ui.label(RichText::new("• ISO 9223 Corrosion Model & Miner's Rule").size(11.0).color(theme.accent_blue));
             });
             ui.add_space(4.0);
@@ -383,8 +406,20 @@ impl PredictionView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("📈 LOG-NORMAL SEISMIC FRAGILITY CURVES (FEMA P-58 / HAZUS)").size(11.5).strong().color(theme.text_primary));
-                    ui.label(RichText::new("■ Complete (Collapse)   ■ Extensive   ■ Moderate   ■ Slight").size(10.0).color(theme.text_secondary));
+                    crate::icons::icon_label(ui, crate::icons::AppIcon::ChartLine, 12.0, theme.accent_blue, "LOG-NORMAL SEISMIC FRAGILITY CURVES (FEMA P-58 / HAZUS)", 11.5, theme.text_primary, true);
+                    ui.horizontal_wrapped(|ui| {
+                        for (col, lbl) in [
+                            (Color32::from_rgb(245, 85, 85), "Complete (Collapse)"),
+                            (theme.accent_orange, "Extensive"),
+                            (theme.accent_blue, "Moderate"),
+                            (theme.accent_green, "Slight"),
+                        ] {
+                            let (rect, _) = ui.allocate_exact_size(Vec2::splat(8.0), egui::Sense::hover());
+                            ui.painter().rect_filled(rect, CornerRadius::same(2), col);
+                            ui.label(RichText::new(lbl).size(10.0).color(theme.text_secondary));
+                            ui.add_space(6.0);
+                        }
+                    });
                 });
                 ui.add_space(6.0);
 
@@ -453,7 +488,7 @@ impl PredictionView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("🌊 NEWMARK-β TRANSIENT OSCILLATION TIME HISTORY POST SUDDEN MEMBER REMOVAL").size(11.5).strong().color(theme.text_primary));
+                    crate::icons::icon_label(ui, crate::icons::AppIcon::Pulse, 12.0, theme.accent_blue, "NEWMARK-β TRANSIENT OSCILLATION TIME HISTORY POST SUDDEN MEMBER REMOVAL", 11.5, theme.text_primary, true);
                     ui.label(RichText::new(format!("Active DAF = {:.2}x", self.daf_multiplier)).size(10.5).strong().color(theme.accent_orange));
                 });
                 ui.add_space(6.0);
@@ -522,8 +557,19 @@ impl PredictionView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("📉 ARI(t) DEGRADATION EVOLUTION CURVE OVER SERVICE LIFE (ISO 9223)").size(11.5).strong().color(theme.text_primary));
-                    ui.label(RichText::new("■ ARI(t) Curve   --- Safe Redundancy Threshold ARI = 0.70").size(10.0).color(theme.text_secondary));
+                    crate::icons::icon_label(ui, crate::icons::AppIcon::ChartLine, 12.0, theme.accent_blue, "ARI(t) DEGRADATION EVOLUTION CURVE OVER SERVICE LIFE (ISO 9223)", 11.5, theme.text_primary, true);
+                    ui.horizontal_wrapped(|ui| {
+                        let (rect, _) = ui.allocate_exact_size(Vec2::splat(8.0), egui::Sense::hover());
+                        ui.painter().rect_filled(rect, CornerRadius::same(2), theme.accent_green);
+                        ui.label(RichText::new("ARI(t) Curve").size(10.0).color(theme.text_secondary));
+                        ui.add_space(8.0);
+                        let (line_rect, _) = ui.allocate_exact_size(Vec2::new(14.0, 8.0), egui::Sense::hover());
+                        ui.painter().line_segment(
+                            [line_rect.left_center(), line_rect.right_center()],
+                            Stroke::new(1.5, Color32::from_rgb(245, 85, 85)),
+                        );
+                        ui.label(RichText::new("Safe Redundancy Threshold ARI = 0.70").size(10.0).color(theme.text_secondary));
+                    });
                 });
                 ui.add_space(6.0);
 
@@ -618,7 +664,7 @@ impl PredictionView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Fick's 2nd Law erfc() Profile");
                     let _ = ui.selectable_label(false, "Couple Silica Fume Cover Diffusivity");
-                    let _ = ui.button("🧪 Run Chloride Ingress & Service-Life Curve");
+                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Pulse, "Run Chloride Ingress & Service-Life Curve", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(12.0);
 
@@ -773,7 +819,7 @@ impl PredictionView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Ingest Peak Sensor Drift + Strain");
                     let _ = ui.selectable_label(false, "Auto-Generate ATC-20 Field Placards");
-                    let _ = ui.button("🏷️ Classify Building Wings & Dispatch Rapid Evaluation");
+                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Shield, "Classify Building Wings & Dispatch Rapid Evaluation", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(12.0);
 

@@ -28,11 +28,15 @@ impl ParametricView {
 
                 // Active Storey Level Selector
                 theme.card_frame().show(ui, |ui| {
-                    ui.label(
-                        RichText::new("🏢 ACTIVE STOREY LEVEL & VIEW RANGE")
-                            .size(11.0)
-                            .strong()
-                            .color(theme.accent_blue),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Building,
+                        13.0,
+                        theme.accent_blue,
+                        "ACTIVE STOREY LEVEL & VIEW RANGE",
+                        10.5,
+                        theme.accent_blue,
+                        true,
                     );
                     ui.add_space(4.0);
                     for (idx, lvl) in self.bim_bus.project.levels.iter().enumerate() {
@@ -65,14 +69,30 @@ impl ParametricView {
                 // Enclosed Planar Rooms Schedule Summary
                 theme.card_frame().show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::new("🏠 AUTO-BOUNDED ROOMS (HALF-EDGE)")
-                                .size(10.5)
-                                .strong()
-                                .color(theme.accent_orange),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Layers,
+                            12.0,
+                            theme.accent_orange,
+                            "AUTO-BOUNDED ROOMS (HALF-EDGE)",
+                            10.0,
+                            theme.accent_orange,
+                            true,
                         );
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if ui.small_button("🔄 Recalc").clicked() {
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Redo,
+                                "Recalc",
+                                10.0,
+                                theme.text_primary,
+                                theme.bg_sidebar,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 20.0),
+                            )
+                            .clicked()
+                            {
                                 let lvl_id = self
                                     .bim_bus
                                     .project
@@ -166,36 +186,35 @@ impl ParametricView {
                 }
 
                 ui.add_space(8.0);
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("📊 View Results in PLANNING (5D BoQ) →")
-                                .size(11.0)
-                                .strong()
-                                .color(Color32::WHITE),
-                        )
-                        .fill(theme.accent_blue)
-                        .corner_radius(CornerRadius::same(6))
-                        .min_size(Vec2::new(ui.available_width(), 28.0)),
-                    )
-                    .clicked()
+                if icons::icon_button(
+                    ui,
+                    AppIcon::ChartBar,
+                    "View Results in Cost & Budgeting (5D BoQ)",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::new(ui.available_width(), 28.0),
+                )
+                .clicked()
                 {
                     *active_pillar = NavigationPillar::CostBudgeting;
                 }
 
                 ui.add_space(4.0);
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("🌱 Check Carbon in SUSTAINABILITY (6D) →")
-                                .size(11.0)
-                                .color(theme.text_primary),
-                        )
-                        .fill(theme.bg_card)
-                        .corner_radius(CornerRadius::same(6))
-                        .min_size(Vec2::new(ui.available_width(), 28.0)),
-                    )
-                    .clicked()
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Leaf,
+                    "Check Carbon in Sustainability (6D)",
+                    11.0,
+                    theme.text_primary,
+                    theme.bg_card,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::new(ui.available_width(), 28.0),
+                )
+                .clicked()
                 {
                     *active_pillar = NavigationPillar::SustainabilityEnergy;
                 }
@@ -205,7 +224,17 @@ impl ParametricView {
                     ui.vertical(|ui| {
                         let _ = ui.selectable_label(true, "Source: ParametricView.bim_bus -> BuildView");
                         let _ = ui.selectable_label(false, "Auto-Sync Dynamo Bakes & 2D Walls");
-                        let _ = ui.button("🔄 Push 2D Scene -> 3D BIM Bus");
+                        let _ = icons::icon_button(
+                            ui,
+                            AppIcon::Redo,
+                            "Push 2D Scene -> 3D BIM Bus",
+                            10.5,
+                            theme.text_primary,
+                            theme.bg_sidebar,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(5),
+                            Vec2::new(0.0, 24.0),
+                        );
                     });
                 });
 
@@ -216,11 +245,15 @@ impl ParametricView {
                     .stroke(Stroke::new(1.0, theme.border_card))
                     .inner_margin(Margin::same(10))
                     .show(ui, |ui| {
-                        ui.label(
-                            RichText::new("⚡ LIVE BIM → FEM/ARI SOLVER")
-                                .size(10.5)
-                                .strong()
-                                .color(theme.accent_blue),
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Bolt,
+                            12.0,
+                            theme.accent_blue,
+                            "LIVE BIM -> FEM/ARI SOLVER",
+                            10.5,
+                            theme.accent_blue,
+                            true,
                         );
                         ui.label(
                             RichText::new(format!(

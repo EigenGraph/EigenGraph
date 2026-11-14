@@ -7,6 +7,7 @@ use egui::{
     Stroke, Ui, Vec2,
 };
 use crate::features::{FeatureId, FeatureRegistry};
+use crate::icons::{self, AppIcon};
 use crate::models::{CobieAssetRecord, ShmSensorTelemetry, StructuralMember};
 use crate::theme::MacTheme;
 use crate::ui_kit;
@@ -78,11 +79,15 @@ impl FacilityView {
                         .corner_radius(CornerRadius::same(6))
                         .inner_margin(Margin::symmetric(14, 8))
                         .show(ui, |ui| {
-                            ui.label(
-                                RichText::new(format!("⚡ {}", msg))
-                                    .size(11.5)
-                                    .strong()
-                                    .color(Color32::from_rgb(120, 240, 160)),
+                            icons::icon_label(
+                                ui,
+                                AppIcon::Bolt,
+                                13.0,
+                                Color32::from_rgb(120, 240, 160),
+                                msg.as_str(),
+                                11.5,
+                                Color32::from_rgb(120, 240, 160),
+                                true,
                             );
                         });
                     ui.add_space(12.0);
@@ -137,7 +142,7 @@ impl FacilityView {
             ("STRAIN GAUGE SG-01", strain_str.as_str(), "Member E1 Strain (Safe < 600 µε)", theme.accent_green),
             ("NATURAL FREQUENCY (ACC-01)", freq_str.as_str(), "Mode 1 Transverse (Resonance Free)", theme.accent_blue),
             ("LIVE ARI RESILIENCE", "0.942", "Real-Time ARI(t) Degradation (-0.2%)", theme.accent_green),
-            ("HEALTH STATUS (SHM)", "🟢 OPTIMAL", "16 IoT Sensors Operating Active", theme.accent_green),
+            ("HEALTH STATUS (SHM)", "OPTIMAL", "16 IoT Sensors Operating Active", theme.accent_green),
         ];
         ui_kit::responsive_grid_n(ui, cards.len(), 200.0, |ui, idx| {
             let (title, val, sub, col) = cards[idx];
@@ -151,7 +156,7 @@ impl FacilityView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "wss://shm.eigengraph.net/mqtt-tls");
                 let _ = ui.selectable_label(false, "Auto-Reconnect Backoff");
-                let _ = ui.button("🔌 Connect Live SHM Telemetry Stream");
+                let _ = icons::icon_button(ui, AppIcon::LinkChain, "Connect Live SHM Telemetry Stream", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
             });
         });
 
@@ -165,24 +170,29 @@ impl FacilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("📡 Real-Time IoT Structural Health Telemetry & Vibration FFT")
-                            .size(13.5)
-                            .strong()
-                            .color(theme.text_primary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Pulse,
+                        15.0,
+                        theme.accent_blue,
+                        "Real-Time IoT Structural Health Telemetry & Vibration FFT",
+                        13.5,
+                        theme.text_primary,
+                        true,
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("📊 Export Telemetry Log (.CSV)")
-                                        .size(11.0)
-                                        .color(theme.text_primary),
-                                )
-                                .fill(theme.bg_canvas)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::ChartBar,
+                            "Export Telemetry Log (.CSV)",
+                            11.0,
+                            theme.text_primary,
+                            theme.bg_canvas,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.maintenance_dispatch_status = Some(
                                 "Exported 720-hour sensor telemetry archive to CSV format (100 Hz sample rate)."
@@ -190,18 +200,18 @@ impl FacilityView {
                             );
                         }
 
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("⚡ Trigger Stress Test")
-                                        .size(11.0)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Bolt,
+                            "Trigger Stress Test",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.simulated_strain_micro += 45.0;
                             self.maintenance_dispatch_status = Some(
@@ -338,25 +348,29 @@ impl FacilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("📑 buildingSMART COBie 3.0 / 2.4 Facility Asset Inspector")
-                            .size(13.5)
-                            .strong()
-                            .color(theme.text_primary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Document,
+                        15.0,
+                        theme.accent_blue,
+                        "buildingSMART COBie 3.0 / 2.4 Facility Asset Inspector",
+                        13.5,
+                        theme.text_primary,
+                        true,
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("📥 Export COBie (.xlsx / JSON)")
-                                        .size(11.0)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(theme.accent_green)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::SaveDisk,
+                            "Export COBie (.xlsx / JSON)",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_green,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.maintenance_dispatch_status = Some(
                                 "COBie 3.0 spreadsheet workbook exported successfully (6 worksheets compliant with ISO 19650-4)."
@@ -402,7 +416,7 @@ impl FacilityView {
                     }
 
                     ui.add_space(8.0);
-                    ui.label(RichText::new("🔍 Search:").size(11.0).color(theme.text_muted));
+                    icons::icon_label(ui, AppIcon::Search, 12.5, theme.text_muted, "Search:", 11.0, theme.text_muted, false);
                     let search_w = ui.available_width().min(180.0).max(110.0);
                     ui.add(
                         egui::TextEdit::singleline(&mut self.cobie_search_query)
@@ -505,27 +519,29 @@ impl FacilityView {
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new(
-                            "🛠️ Predictive Maintenance & Computerized Maintenance Management (CMMS)",
-                        )
-                        .size(13.5)
-                        .strong()
-                        .color(theme.text_primary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Wrench,
+                        15.0,
+                        theme.accent_blue,
+                        "Predictive Maintenance & Computerized Maintenance Management (CMMS)",
+                        13.5,
+                        theme.text_primary,
+                        true,
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("👷 Dispatch Structural Inspector")
-                                        .size(11.0)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(theme.accent_blue)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::HardHat,
+                            "Dispatch Structural Inspector",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.maintenance_dispatch_status = Some(
                                 "Structural inspection team dispatched for Zone B-2 Column Foundation. Inspection ticket #INSP-2026-904 opened."
@@ -533,17 +549,18 @@ impl FacilityView {
                             );
                         }
 
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("📋 Generate Emergency Work Order")
-                                        .size(11.0)
-                                        .color(theme.text_primary),
-                                )
-                                .fill(theme.bg_canvas)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Clipboard,
+                            "Generate Emergency Work Order",
+                            11.0,
+                            theme.text_primary,
+                            theme.bg_canvas,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.maintenance_dispatch_status = Some(
                                 "Emergency Work Order #WO-EMG-044 generated and routed to On-Site Facilities Engineer."
@@ -563,12 +580,12 @@ impl FacilityView {
                 ui.add_space(14.0);
 
                 let work_orders = [
-                    ("WO-2026-088", "Visual Inspection & Torque Verification of Gusset Joint J-04 Bolts", "Bi-annual Routine", "Scheduled: Apr 15, 2027", "🟢 Planned", theme.accent_blue),
-                    ("WO-2026-089", "NDT Ultrasonic Testing of Critical Tension Member E1 (Bottom Chord)", "Based on ARI Sensitivity (CI=0.42)", "Scheduled: Oct 10, 2027", "🟢 Ready to Execute", theme.accent_green),
-                    ("WO-2026-090", "Drainage Channel Cleaning & Bearing Expansion Clearing", "Prevent Chloride/Moisture Corrosion", "Scheduled: Dec 01, 2026", "🟡 Upcoming", theme.text_secondary),
+                    ("WO-2026-088", "Visual Inspection & Torque Verification of Gusset Joint J-04 Bolts", "Bi-annual Routine", "Scheduled: Apr 15, 2027", AppIcon::Clock, "Planned", theme.accent_blue),
+                    ("WO-2026-089", "NDT Ultrasonic Testing of Critical Tension Member E1 (Bottom Chord)", "Based on ARI Sensitivity (CI=0.42)", "Scheduled: Oct 10, 2027", AppIcon::CheckCircle, "Ready to Execute", theme.accent_green),
+                    ("WO-2026-090", "Drainage Channel Cleaning & Bearing Expansion Clearing", "Prevent Chloride/Moisture Corrosion", "Scheduled: Dec 01, 2026", AppIcon::AlertTriangle, "Upcoming", theme.text_secondary),
                 ];
 
-                for (code, task, reason, sched, status, col) in work_orders {
+                for (code, task, reason, sched, status_icon, status, col) in work_orders {
                     Frame::new()
                         .fill(theme.bg_canvas)
                         .corner_radius(CornerRadius::same(8))
@@ -590,7 +607,9 @@ impl FacilityView {
                                     );
                                 });
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    ui.label(RichText::new(status).size(12.0).strong().color(col));
+                                    ui.horizontal(|ui| {
+                                        icons::icon_label(ui, status_icon, 13.0, col, status, 12.0, col, true);
+                                    });
                                 });
                             });
                         });
@@ -606,11 +625,15 @@ impl FacilityView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("💵 30-Year Life Cycle Costing (LCC) Analysis")
-                        .size(13.5)
-                        .strong()
-                        .color(theme.text_primary),
+                icons::icon_label(
+                    ui,
+                    AppIcon::Coins,
+                    15.0,
+                    theme.accent_blue,
+                    "30-Year Life Cycle Costing (LCC) Analysis",
+                    13.5,
+                    theme.text_primary,
+                    true,
                 );
                 ui.add_space(10.0);
 
@@ -648,7 +671,7 @@ impl FacilityView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "System: Chilled Water Loop (CHW)");
                 let _ = ui.selectable_label(false, "Fire Sprinkler Zones");
-                let _ = ui.button("🚱 Trace Downstream Impacted Spaces");
+                let _ = icons::icon_button(ui, AppIcon::Wrench, "Trace Downstream Impacted Spaces", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
             });
             ui.add_space(10.0);
 
@@ -702,7 +725,7 @@ impl FacilityView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "AI Vision: ACI 224R Crack Thresholds");
                 let _ = ui.selectable_label(false, "Thermal Spall Overlay");
-                let _ = ui.button("🛸 Import UAV Defect CSV & Auto-Pin 3D Markers");
+                let _ = icons::icon_button(ui, AppIcon::Camera, "Import UAV Defect CSV & Auto-Pin 3D Markers", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
             });
             ui.add_space(10.0);
 

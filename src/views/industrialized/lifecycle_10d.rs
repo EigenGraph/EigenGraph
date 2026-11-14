@@ -14,11 +14,15 @@ impl IndustrializedView {
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(
-                            RichText::new("🌐 10D BIM MULTI-DISCIPLINE LIFECYCLE MASTER HUB")
-                                .size(15.0)
-                                .strong()
-                                .color(theme.text_primary),
+                        crate::icons::icon_label(
+                            ui,
+                            crate::icons::AppIcon::Globe,
+                            15.0,
+                            theme.accent_blue,
+                            "10D BIM MULTI-DISCIPLINE LIFECYCLE MASTER HUB",
+                            15.0,
+                            theme.text_primary,
+                            true,
                         );
                         ui.label(
                             RichText::new("ISO 19650 / IPD COMPLIANT")
@@ -36,35 +40,36 @@ impl IndustrializedView {
                     );
                     ui.add_space(8.0);
                     ui.horizontal_wrapped(|ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("📥 Export 10D Audit Report (PDF)")
-                                        .size(11.0)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(theme.accent_green)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if crate::icons::icon_button(
+                            ui,
+                            crate::icons::AppIcon::UploadImport,
+                            "Export 10D Audit Report (PDF)",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_green,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.export_status = Some(
                                 "10D BIM Lifecycle Executive Audit Report successfully exported to PDF."
                                     .to_string(),
                             );
                         }
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("🌐 Sync Speckle CDE")
-                                        .size(11.0)
-                                        .color(theme.text_primary),
-                                )
-                                .fill(theme.bg_sidebar)
-                                .corner_radius(CornerRadius::same(6)),
-                            )
-                            .clicked()
+                        if crate::icons::icon_button(
+                            ui,
+                            crate::icons::AppIcon::Globe,
+                            "Sync Speckle CDE",
+                            11.0,
+                            theme.text_primary,
+                            theme.bg_sidebar,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
                         {
                             self.export_status = Some(
                                 "Common Data Environment (CDE) synchronized with Speckle Cloud stream."
@@ -139,11 +144,15 @@ impl IndustrializedView {
             .inner_margin(Margin::same(14))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.label(
-                    RichText::new("💰 5D EARNED VALUE MANAGEMENT (EVM)")
-                        .size(11.5)
-                        .strong()
-                        .color(theme.accent_green),
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Coins,
+                    12.0,
+                    theme.accent_green,
+                    "5D EARNED VALUE MANAGEMENT (EVM)",
+                    11.5,
+                    theme.accent_green,
+                    true,
                 );
                 ui.add_space(6.0);
 
@@ -183,11 +192,15 @@ impl IndustrializedView {
             .inner_margin(Margin::same(14))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.label(
-                    RichText::new("🏢 7D DIGITAL TWIN & REAL-TIME IOT TELEMETRY")
-                        .size(11.5)
-                        .strong()
-                        .color(Color32::from_rgb(175, 82, 222)),
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Building,
+                    12.0,
+                    Color32::from_rgb(175, 82, 222),
+                    "7D DIGITAL TWIN & REAL-TIME IOT TELEMETRY",
+                    11.5,
+                    Color32::from_rgb(175, 82, 222),
+                    true,
                 );
                 ui.add_space(6.0);
 
@@ -219,11 +232,15 @@ impl IndustrializedView {
             .inner_margin(Margin::same(14))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.label(
-                    RichText::new("🛡️ 8D SITE SAFETY & TOWER CRANE LOGISTICS")
-                        .size(11.5)
-                        .strong()
-                        .color(theme.accent_orange),
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Shield,
+                    12.0,
+                    theme.accent_orange,
+                    "8D SITE SAFETY & TOWER CRANE LOGISTICS",
+                    11.5,
+                    theme.accent_orange,
+                    true,
                 );
                 ui.add_space(6.0);
 
@@ -255,11 +272,15 @@ impl IndustrializedView {
             .inner_margin(Margin::same(14))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.label(
-                    RichText::new("♻️ 9D LEAN CONSTRUCTION LAST PLANNER (LPS)")
-                        .size(11.5)
-                        .strong()
-                        .color(theme.accent_green),
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::Recycle,
+                    12.0,
+                    theme.accent_green,
+                    "9D LEAN CONSTRUCTION LAST PLANNER (LPS)",
+                    11.5,
+                    theme.accent_green,
+                    true,
                 );
                 ui.add_space(6.0);
 

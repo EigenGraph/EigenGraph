@@ -3,6 +3,7 @@
 use super::*;
 
 impl ParametricView {
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn render_drawing_canvas(
         &mut self,
         ui: &mut Ui,
@@ -10,6 +11,7 @@ impl ParametricView {
         _db_components: &[DatabaseComponent],
         _active_pillar: &mut NavigationPillar,
         features: &mut FeatureRegistry,
+        universal_canvas: Option<&crate::views::universal_canvas::UniversalCanvasState>,
         stacked_height: Option<f32>,
     ) {
         ui.vertical(|ui| {
@@ -21,8 +23,16 @@ impl ParametricView {
                     .inner_margin(Margin::symmetric(14, 6))
                     .show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(RichText::new("✅").size(13.0));
-                            ui.label(RichText::new(note).size(11.5).color(theme.accent_green));
+                            icons::icon_label(
+                                ui,
+                                AppIcon::CheckCircle,
+                                13.0,
+                                theme.accent_green,
+                                note,
+                                11.5,
+                                theme.accent_green,
+                                false,
+                            );
                         });
                     });
                 ui.add_space(4.0);
@@ -64,6 +74,7 @@ impl ParametricView {
                             Sense::click_and_drag(),
                         );
                         let rect = response.rect;
+                        self.last_canvas_rect = Some(rect);
 
                         // Pan & Zoom with Secondary Drag / Scroll Wheel
                         if response.dragged_by(egui::PointerButton::Secondary)
@@ -81,7 +92,13 @@ impl ParametricView {
 
                         match self.view_mode {
                             DraftingViewMode::FloorPlanViewRange => {
-                                self.draw_interactive_floor_plan(&response, &painter, rect, theme);
+                                self.draw_interactive_floor_plan(
+                                    &response,
+                                    &painter,
+                                    rect,
+                                    theme,
+                                    universal_canvas,
+                                );
                             }
                             DraftingViewMode::LiveSectionCutPoche => {
                                 self.draw_live_section_cut(&painter, rect, theme);
@@ -92,6 +109,37 @@ impl ParametricView {
                             DraftingViewMode::VisualNodeGraphDynamo
                             | DraftingViewMode::RebarBbsDetailing
                             | DraftingViewMode::ElevationsAndMepRiser => {}
+                        }
+
+                        if crate::ui_kit::is_canvas_frozen(ui.ctx()) {
+                            let badge_pos = Pos2::new(rect.left() + 14.0, rect.bottom() - 14.0);
+                            let text_rect = Rect::from_min_size(
+                                Pos2::new(badge_pos.x, badge_pos.y - 24.0),
+                                Vec2::new(280.0, 24.0),
+                            );
+                            painter.rect_filled(
+                                text_rect,
+                                CornerRadius::same(6),
+                                theme.accent_blue.gamma_multiply(0.22),
+                            );
+                            painter.rect_stroke(
+                                text_rect,
+                                CornerRadius::same(6),
+                                Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.7)),
+                                StrokeKind::Inside,
+                            );
+                            let icon_rect = Rect::from_min_size(
+                                Pos2::new(text_rect.left() + 7.0, text_rect.center().y - 6.0),
+                                Vec2::splat(12.0),
+                            );
+                            icons::paint_icon(&painter, icon_rect, AppIcon::Snowflake, theme.accent_blue);
+                            painter.text(
+                                Pos2::new(text_rect.left() + 24.0, text_rect.center().y),
+                                Align2::LEFT_CENTER,
+                                "CANVAS FROZEN • Scroll moves page vertically",
+                                egui::FontId::proportional(10.5),
+                                theme.text_primary,
+                            );
                         }
                     });
             }
@@ -135,7 +183,7 @@ impl ParametricView {
 
                             let enter_pressed = (cmd_res.lost_focus()
                                 && ui.input(|i| i.key_pressed(egui::Key::Enter)))
-                                || ui.button("Enter ↵").clicked();
+                                || ui.button("Enter").clicked();
 
                             if enter_pressed && !self.command_line_input.trim().is_empty() {
                                 let raw = self.command_line_input.trim().to_string();
@@ -155,6 +203,7 @@ impl ParametricView {
         painter: &egui::Painter,
         rect: Rect,
         theme: &MacTheme,
+        universal_canvas: Option<&crate::views::universal_canvas::UniversalCanvasState>,
     ) {
         let scale = 0.042 * self.canvas_zoom; // mm -> screen px
         let origin = Pos2::new(
@@ -480,7 +529,7 @@ impl ParametricView {
                     painter.text(
                         mid,
                         Align2::CENTER_CENTER,
-                        format!("📏 {:.0} mm  ∠ {:.1}°", dist_mm, ang_deg),
+                        format!("L={:.0} mm | {:.1} deg", dist_mm, ang_deg),
                         egui::FontId::monospace(11.0),
                         Color32::from_rgb(253, 224, 71),
                     );
@@ -613,12 +662,25 @@ impl ParametricView {
             self.last_snap_hit = Some(snap_hit);
         }
 
+        if self.sketch_overlay_synced {
+            if let Some(uc) = universal_canvas {
+                let to_screen_mm = |mm: [f64; 2]| to_screen(P2(mm[0], mm[1]));
+                uc.paint_entities_world(
+                    painter,
+                    rect,
+                    theme,
+                    NavigationPillar::ParametricDED,
+                    &to_screen_mm,
+                );
+            }
+        }
+
         // Top-Left HUD Overlay
         painter.text(
             Pos2::new(rect.left() + 14.0, rect.top() + 12.0),
             Align2::LEFT_TOP,
             format!(
-                "🗺️ FLOOR PLAN VIEW RANGE (Cut +1200mm) • Active Tool: {:?} • Right-Click to finish chain / Drag to Pan",
+                "FLOOR PLAN VIEW RANGE (Cut +1200mm) • Tool: {:?} • Right-Click to finish / Drag to Pan",
                 self.bim_tool
             ),
             egui::FontId::monospace(10.5),
@@ -646,10 +708,20 @@ impl ParametricView {
                 [p0, p1],
                 Stroke::new(1.0, Color32::from_rgba_premultiplied(56, 189, 248, 140)),
             );
+            let tri_pts = vec![
+                p1 + Vec2::new(4.0, 2.0),
+                p1 + Vec2::new(10.0, 2.0),
+                p1 + Vec2::new(7.0, -4.0),
+            ];
+            painter.add(egui::Shape::convex_polygon(
+                tri_pts,
+                Color32::from_rgb(56, 189, 248),
+                Stroke::NONE,
+            ));
             painter.text(
-                p1 + Vec2::new(8.0, 0.0),
+                p1 + Vec2::new(14.0, 0.0),
                 Align2::LEFT_CENTER,
-                format!("▲ {} ({:+.0} mm)", lname, elev),
+                format!("{} ({:+.0} mm)", lname, elev),
                 egui::FontId::monospace(10.0),
                 Color32::from_rgb(125, 211, 252),
             );
@@ -694,7 +766,7 @@ impl ParametricView {
             Pos2::new(rect.left() + 14.0, rect.top() + 12.0),
             Align2::LEFT_TOP,
             format!(
-                "🔪 LIVE SECTION CUT A-A (True 3D Mesh Plane Slice) • {} Cut Segments • {} Rebar Cut Dots",
+                "LIVE SECTION CUT A-A (3D Mesh Slice) • {} Cut Segments • {} Rebar Cut Dots",
                 sec.cut_segments_2d.len(),
                 sec.rebar_dots_2d.len()
             ),
@@ -897,9 +969,9 @@ impl ParametricView {
 
         // Section Levels & Poché
         let levels = [
-            ("∇ Roof FL (+7.00m)", 0.22),
-            ("∇ Level 2 FL (+3.50m)", 0.48),
-            ("∇ Level 1 Ground (±0.00m)", 0.74),
+            ("EL Roof FL (+7.00m)", 0.22),
+            ("EL Level 2 FL (+3.50m)", 0.48),
+            ("EL Level 1 Ground (±0.00m)", 0.74),
         ];
         for (lvl_label, frac) in levels {
             let y = sec_vp_rect.top() + sec_vp_rect.height() * frac;
@@ -988,7 +1060,7 @@ impl ParametricView {
         );
 
         let lines = [
-            "⚛️ EIGENGRAPH 10D BIM & STRUCTURAL SUITE",
+            "EIGENGRAPH 10D BIM & STRUCTURAL SUITE",
             &format!("Project: {}", self.bim_bus.project.project_name),
             &format!("Sheet: {} — {}", self.sheet_number, self.sheet_title),
             &format!("Scale: {} | Size: {}", self.sheet_scale.label(), self.sheet_paper_size.display_name()),

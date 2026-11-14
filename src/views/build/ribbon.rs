@@ -3,18 +3,26 @@
 use super::*;
 
 impl BuildView {
-    pub(super) fn render_bim_master_ribbon(&mut self, ui: &mut Ui, theme: &MacTheme) {
+    pub(super) fn render_bim_master_ribbon(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        sidebar_toggle_inset_px: f32,
+    ) {
         Frame::new()
             .fill(theme.bg_sidebar)
             .inner_margin(Margin::symmetric(10, 6))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                // Tier 1: Ribbon Tab Selector Chips
+                // Tier 1: Ribbon Tab Selector Chips (indented when sidebar is collapsed)
                 ScrollArea::horizontal()
                     .id_salt("bim_ribbon_tabs_scroll")
                     .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
+                            if sidebar_toggle_inset_px > 0.0 {
+                                ui.add_space(sidebar_toggle_inset_px);
+                            }
                             let tabs = [
                                 BimRibbonTab::Architecture,
                                 BimRibbonTab::Structure,
@@ -34,10 +42,19 @@ impl BuildView {
                                 let bg = if is_active { theme.accent_blue } else { theme.bg_card };
                                 let fg = if is_active { Color32::WHITE } else { theme.text_secondary };
 
-                                if ui.add(egui::Button::new(RichText::new(tab.label()).size(10.5).color(fg))
-                                    .fill(bg)
-                                    .corner_radius(CornerRadius::same(6))
-                                    .min_size(Vec2::new(0.0, 24.0))).clicked() {
+                                if icons::icon_button(
+                                    ui,
+                                    tab.app_icon(),
+                                    tab.label(),
+                                    10.5,
+                                    fg,
+                                    bg,
+                                    Stroke::NONE,
+                                    CornerRadius::same(6),
+                                    Vec2::new(0.0, 24.0),
+                                )
+                                .clicked()
+                                {
                                     self.active_ribbon_tab = tab;
                                 }
                             }
@@ -73,10 +90,11 @@ impl BuildView {
                                         ("📏 Level Datum", "Add building elevation datum level (LL)"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("🔧 Active Architectural Tool: {} • Click viewport to place or define geometry", tool);
-                                            self.bim_console_logs.push(format!("Architectural tool activated: {}", tool));
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("Active Architectural Tool: {} • Click viewport to place or define geometry", label);
+                                            self.bim_console_logs.push(format!("Architectural tool activated: {}", label));
                                         }
                                     }
                                 }
@@ -98,10 +116,11 @@ impl BuildView {
                                         ("📍 Support Restraint", "Apply Fixed, Pinned, or Roller boundary conditions"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("🔧 Active Structural Tool: {} • Ready for member placement", tool);
-                                            self.bim_console_logs.push(format!("Structural tool activated: {}", tool));
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("Active Structural Tool: {} • Ready for member placement", label);
+                                            self.bim_console_logs.push(format!("Structural tool activated: {}", label));
                                         }
                                     }
                                 }
@@ -122,10 +141,11 @@ impl BuildView {
                                         ("🚿 Wet Riser", "Route vertical fire standpipe riser"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("🔧 Active MEP Tool: {} • Routing active across level", tool);
-                                            self.bim_console_logs.push(format!("MEP systems tool activated: {}", tool));
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("Active MEP Tool: {} • Routing active across level", label);
+                                            self.bim_console_logs.push(format!("MEP systems tool activated: {}", label));
                                         }
                                     }
                                 }
@@ -141,10 +161,11 @@ impl BuildView {
                                         ("🕳️ Drainage Culvert", "Place stormwater box culvert run"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("🔧 Active Civil Infrastructure Tool: {}", tool);
-                                            self.bim_console_logs.push(format!("Civil infrastructure tool activated: {}", tool));
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("Active Civil Infrastructure Tool: {}", label);
+                                            self.bim_console_logs.push(format!("Civil infrastructure tool activated: {}", label));
                                         }
                                     }
                                 }
@@ -161,13 +182,14 @@ impl BuildView {
                                         ("📐 BMD Moment", "Render 3D bending moment envelope"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("⚡ Executed Solver Command: {}", tool);
-                                            self.bim_console_logs.push(format!("Analysis command executed: {}", tool));
-                                            if tool.contains("NFD") { self.render_mode = Render3DMode::AxialForceNFD; }
-                                            else if tool.contains("SFD") { self.render_mode = Render3DMode::ShearForceSFD; }
-                                            else if tool.contains("BMD") { self.render_mode = Render3DMode::BendingMomentBMD; }
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("Executed Solver Command: {}", label);
+                                            self.bim_console_logs.push(format!("Analysis command executed: {}", label));
+                                            if label.contains("NFD") { self.render_mode = Render3DMode::AxialForceNFD; }
+                                            else if label.contains("SFD") { self.render_mode = Render3DMode::ShearForceSFD; }
+                                            else if label.contains("BMD") { self.render_mode = Render3DMode::BendingMomentBMD; }
                                         }
                                     }
                                 }
@@ -181,13 +203,14 @@ impl BuildView {
                                         ("🔗 Auto WBS Linker", "Map building storeys to construction tasks"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            if tool.contains("Play") { self.simulation_4d_playing = true; }
-                                            else if tool.contains("Pause") { self.simulation_4d_playing = false; }
-                                            else if tool.contains("Day 1") { self.simulation_4d_day = 1; }
-                                            else if tool.contains("Day 180") { self.simulation_4d_day = 180; }
-                                            self.active_tool_status = format!("⏱️ 4D Construction Simulation: {}", tool);
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            if label.contains("Play") { self.simulation_4d_playing = true; }
+                                            else if label.contains("Pause") { self.simulation_4d_playing = false; }
+                                            else if label.contains("Day 180") { self.simulation_4d_day = 180; }
+                                            else if label.contains("Day 1") { self.simulation_4d_day = 1; }
+                                            self.active_tool_status = format!("4D Construction Simulation: {}", label);
                                             self.bottom_deck_expanded = true;
                                             self.active_bottom_deck_tab = BottomDeckTab::TimeSimulation4D;
                                         }
@@ -202,9 +225,10 @@ impl BuildView {
                                         ("🪙 Currency USD/EUR/IDR", "Toggle project base currency"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("💰 5D Cost Estimating: {}", tool);
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("5D Cost Estimating: {}", label);
                                             self.bottom_deck_expanded = true;
                                             self.active_bottom_deck_tab = BottomDeckTab::ScheduleQto;
                                         }
@@ -219,9 +243,10 @@ impl BuildView {
                                         ("🏆 LEED Scorecard", "Audit credits for Green Building rating"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("🌱 6D Sustainability Command: {}", tool);
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("6D Sustainability Command: {}", label);
                                         }
                                     }
                                 }
@@ -233,9 +258,10 @@ impl BuildView {
                                         ("📄 COBie Spreadsheet", "Export building asset management ledger"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("🏢 7D Digital Twin Command: {}", tool);
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("7D Digital Twin Command: {}", label);
                                         }
                                     }
                                 }
@@ -247,9 +273,10 @@ impl BuildView {
                                         ("📬 Export BCF XML", "Package topics into standardized BCF 3.0 archive"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("🛡️ Coordination: {}", tool);
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("Coordination: {}", label);
                                             self.active_sidebar_tab = SidebarTab::ClashMatrix;
                                         }
                                     }
@@ -264,10 +291,11 @@ impl BuildView {
                                         ("📏 AutoCAD 3D DXF", "Export 3D CAD vectors with layers"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("🌐 OpenBIM Action: {}", tool);
-                                            self.bim_console_logs.push(format!("OpenBIM action executed: {}", tool));
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("OpenBIM Action: {}", label);
+                                            self.bim_console_logs.push(format!("OpenBIM action executed: {}", label));
                                         }
                                     }
                                 }
@@ -277,12 +305,13 @@ impl BuildView {
                                         ("🔲 Viewport Place", "Drag and drop floor plan or 3D view onto sheet"),
                                         ("🏷️ Title Block Stamp", "Fill project metadata, revisions, and approval stamps"),
                                         ("📐 Smart Dimensions", "Place aligned, linear, and spot elevation tags"),
-                                        ("📑 Rebar BBS Table", "Generate ACI/BS bar bending schedule schedule"),
+                                        ("📑 Rebar BBS Table", "Generate ACI/BS bar bending schedule"),
                                     ];
                                     for (tool, tip) in tools {
-                                        if ui.add(egui::Button::new(RichText::new(tool).size(10.0).color(theme.text_primary))
-                                            .fill(theme.bg_card).corner_radius(CornerRadius::same(5))).on_hover_text(tip).clicked() {
-                                            self.active_tool_status = format!("📑 Documentation Action: {}", tool);
+                                        let label = icons::clean_text(tool);
+                                        if icons::smart_button(ui, tool, 10.0, theme.text_primary, theme.bg_card, Stroke::NONE, CornerRadius::same(5), Vec2::new(0.0, 22.0))
+                                            .on_hover_text(tip).clicked() {
+                                            self.active_tool_status = format!("Documentation Action: {}", label);
                                         }
                                     }
                                 }

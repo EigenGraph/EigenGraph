@@ -10,10 +10,10 @@ impl AnalyzeView {
         // 4 KPI Metric Cards
         ui_kit::responsive_grid_n(ui, 4, 190.0, |ui, col_idx| match col_idx {
             0 => {
-                self.metric_card(ui, theme, "GLOBAL REDUNDANCY (ARI)", "0.912", "🟢 Robust Multi-Path", theme.accent_green);
+                self.metric_card(ui, theme, "GLOBAL REDUNDANCY (ARI)", "0.912", "Robust Multi-Path", theme.accent_green);
             }
             1 => {
-                self.metric_card(ui, theme, "MINIMUM MEMBER ARI", "0.308", "🔴 Member E0 (Critical)", theme.accent_red);
+                self.metric_card(ui, theme, "MINIMUM MEMBER ARI", "0.308", "Member E0 (Critical)", theme.accent_red);
             }
             2 => {
                 self.metric_card(ui, theme, "SVD KINEMATIC GUARD", "Rank Safe (14/14)", "0 Mechanisms Detected", theme.accent_blue);
@@ -27,11 +27,11 @@ impl AnalyzeView {
 
         // SVD Kinematic Guard & Sherman-Morrison Engine Banner
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("🛡️ SVD Kinematic Guard & Sherman-Morrison Engine:").size(13.0).strong().color(theme.text_primary));
+            ui.horizontal_wrapped(|ui| {
+                icons::icon_label(ui, AppIcon::Shield, 14.0, theme.accent_blue, "SVD Kinematic Guard & Sherman-Morrison Engine:", 13.0, theme.text_primary, true);
                 ui.label(RichText::new("rank(K) = ndof - nrigid. Fast perturbation m_e(λ) = 1 - (1-λ)h_e via Sherman-Morrison Rank-1 O(N²) verified safe.").size(12.0).color(theme.text_secondary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(RichText::new("Gate 1 SVD & ARI v2 Certified").size(11.0).color(theme.accent_green).strong());
+                    icons::pill_badge(ui, AppIcon::CheckCircle, "Gate 1 SVD & ARI v2 Certified", theme.accent_green);
                 });
             });
 
@@ -39,14 +39,22 @@ impl AnalyzeView {
             ui.separator();
             ui.add_space(8.0);
 
-            // 🎬 SVD Rigid-Body Mechanism Mode Player
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("🎬 SVD Kinematic Mechanism Mode Player:").size(12.0).strong().color(theme.accent_blue));
+            // SVD Rigid-Body Mechanism Mode Player
+            ui.horizontal_wrapped(|ui| {
+                icons::icon_label(ui, AppIcon::Play, 13.0, theme.accent_blue, "SVD Kinematic Mechanism Mode Player:", 12.0, theme.accent_blue, true);
                 ui.label(RichText::new("Spectral Condition: kappa(K) = 1.42e4  |  dim(Null(K)) = 0 (Zero Singular Mechanisms)").size(11.5).color(theme.text_secondary));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new(RichText::new("▶ Animate Rigid Swing Mode").size(11.0).color(Color32::WHITE))
-                        .fill(theme.accent_blue)
-                        .corner_radius(CornerRadius::same(6))).clicked() {
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Play,
+                        "Animate Rigid Swing Mode",
+                        11.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    ).clicked() {
                         // Triggers visual swing oscillation
                     }
                 });
@@ -55,9 +63,9 @@ impl AnalyzeView {
 
         ui.add_space(16.0);
 
-        // 🌐 Multigraph K-Disjoint Load Path Tracer (Menger Theorem, Eq 2.9 & 2.10)
+        // Multigraph K-Disjoint Load Path Tracer (Menger Theorem, Eq 2.9 & 2.10)
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("🌐 MULTIGRAPH K-DISJOINT LOAD PATH TRACER (MENGER THEOREM)").size(13.0).strong().color(theme.text_primary));
+            icons::icon_label(ui, AppIcon::NodesGraph, 14.0, theme.accent_blue, "MULTIGRAPH K-DISJOINT LOAD PATH TRACER (MENGER THEOREM)", 13.0, theme.text_primary, true);
             ui.add_space(4.0);
             ui.label(RichText::new("Independent edge-disjoint load path search from loaded node (Node 3) to support reactions (Nodes 0 & 6):").size(11.5).color(theme.text_secondary));
             ui.add_space(8.0);
@@ -69,7 +77,8 @@ impl AnalyzeView {
 
             for (title, route, len, cost, cap, col) in paths {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("●").size(12.0).color(col));
+                    let (dot_r, _) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
+                    ui.painter().circle_filled(dot_r.center(), 4.0, col);
                     ui.label(RichText::new(title).size(12.0).strong().color(col));
                     ui.label(RichText::new(route).size(11.5).color(theme.text_primary));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -159,10 +168,10 @@ impl AnalyzeView {
 
         ui.add_space(16.0);
 
-        // 🚨 TOP-5 FRACTURE CRITICAL ELEMENTS RANKING (Vulnerability Order)
+        // TOP-5 FRACTURE CRITICAL ELEMENTS RANKING (Vulnerability Order)
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("🚨 TOP-5 FRACTURE CRITICAL MEMBERS RANKING (ASCE 7 & UFC 4-023-03)").size(13.0).strong().color(theme.accent_red));
+                icons::icon_label(ui, AppIcon::AlertTriangle, 14.0, theme.accent_red, "TOP-5 FRACTURE CRITICAL MEMBERS RANKING (ASCE 7 & UFC 4-023-03)", 13.0, theme.accent_red, true);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("Ranked by Lowest ARI Score").size(11.0).color(theme.text_muted));
                 });
@@ -190,9 +199,12 @@ impl AnalyzeView {
                     ui.label(RichText::new(format!("SVD Margin: {:.4}", m.svd_margin)).size(11.5).color(theme.accent_orange));
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let stat_label = if m.ari < 0.70 { "⚠️ SINGLE POINT OF FAILURE" } else { "MODERATE REDUNDANT" };
-                        let stat_color = if m.ari < 0.70 { theme.accent_red } else { theme.accent_blue };
-                        ui.label(RichText::new(stat_label).size(11.0).strong().color(stat_color));
+                        let (stat_icon, stat_label, stat_color) = if m.ari < 0.70 {
+                            (AppIcon::AlertTriangle, "SINGLE POINT OF FAILURE", theme.accent_red)
+                        } else {
+                            (AppIcon::CheckCircle, "MODERATE REDUNDANT", theme.accent_blue)
+                        };
+                        icons::pill_badge(ui, stat_icon, stat_label, stat_color);
                     });
                 });
                 ui.add_space(4.0);
@@ -235,8 +247,12 @@ impl AnalyzeView {
                     ui.add_space(80.0);
                     ui.label(RichText::new(format!("{:.6}", m.svd_margin)).size(12.0).color(theme.accent_orange));
                     ui.add_space(70.0);
-                    let (stat, col) = if m.is_critical || m.ari < 0.70 { ("🔴 Critical / Non-Redundant", theme.accent_red) } else { ("🟢 Safe Redundant", theme.accent_green) };
-                    ui.label(RichText::new(stat).size(12.0).color(col));
+                    let (icon, stat, col) = if m.is_critical || m.ari < 0.70 {
+                        (AppIcon::AlertTriangle, "Critical / Non-Redundant", theme.accent_red)
+                    } else {
+                        (AppIcon::CheckCircle, "Safe Redundant", theme.accent_green)
+                    };
+                    icons::icon_label(ui, icon, 12.0, col, stat, 12.0, col, false);
                 });
                 ui.add_space(3.0);
             }
@@ -247,7 +263,7 @@ impl AnalyzeView {
         // N-2 WOODBURY RANK-2 SIMULTANEOUS DUAL-MEMBER SCREENING
         theme.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("🔥 N-2 SIMULTANEOUS DUAL-MEMBER DISRUPTION SCREENING MATRIX (WOODBURY RANK-2 IDENTITY)").size(13.0).strong().color(theme.text_primary));
+                icons::icon_label(ui, AppIcon::Flame, 14.0, theme.accent_orange, "N-2 SIMULTANEOUS DUAL-MEMBER DISRUPTION SCREENING MATRIX (WOODBURY RANK-2 IDENTITY)", 13.0, theme.text_primary, true);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(RichText::new("det(I_2 - (1-λ)H_{ab}) = (1 - (1-λ)h_a)(1 - (1-λ)h_b) - (1-λ)² h_{ab}²").size(10.5).color(theme.accent_blue));
                 });
@@ -284,7 +300,12 @@ impl AnalyzeView {
                                 ui.label(RichText::new(format!("{:.4}", pair.h12_coupling)).size(11.0).color(theme.text_secondary));
                                 ui.label(RichText::new(format!("{:.4}", pair.woodbury_determinant)).size(11.0).color(theme.accent_blue));
                                 ui.label(RichText::new(format!("{:.4}", pair.pair_ari)).size(11.0).strong().color(col));
-                                ui.label(RichText::new(if pair.is_coupled_mechanism { "⚠️ N-2 Mechanism" } else { "✅ Stable Redundant" }).size(11.0).color(col));
+                                let (p_icon, p_lbl) = if pair.is_coupled_mechanism {
+                                    (AppIcon::AlertTriangle, "N-2 Mechanism")
+                                } else {
+                                    (AppIcon::CheckCircle, "Stable Redundant")
+                                };
+                                icons::icon_label(ui, p_icon, 11.5, col, p_lbl, 11.0, col, false);
                                 ui.end_row();
                             }
                         });
@@ -406,8 +427,12 @@ impl AnalyzeView {
                     let dcr_col = if m.dcr_interaction < 0.70 { theme.accent_green } else if m.dcr_interaction < 1.0 { theme.accent_orange } else { theme.accent_red };
                     ui.label(RichText::new(format!("{:.2}%", m.dcr_interaction * 100.0)).size(12.0).strong().color(dcr_col));
                     ui.add_space(40.0);
-                    let stat_text = if m.dcr_interaction < 1.0 { "🟢 Code Compliant (AISC OK)" } else { "🔴 Yield Exceeded" };
-                    ui.label(RichText::new(stat_text).size(11.5).color(dcr_col));
+                    let (stat_icon, stat_text) = if m.dcr_interaction < 1.0 {
+                        (AppIcon::CheckCircle, "Code Compliant (AISC OK)")
+                    } else {
+                        (AppIcon::AlertTriangle, "Yield Exceeded")
+                    };
+                    icons::icon_label(ui, stat_icon, 11.5, dcr_col, stat_text, 11.5, dcr_col, false);
                 });
                 ui.add_space(4.0);
             }
@@ -428,7 +453,7 @@ impl AnalyzeView {
                     "rank(K) < n_free (Unstable Sway Mechanism)",
                     0.000,
                     1.00,
-                    "🔴 TOTAL MECHANISM (CATASTROPHIC)",
+                    "TOTAL MECHANISM (CATASTROPHIC)",
                     theme.accent_red,
                     "Severing both central chord members triggers instantaneous collapse.",
                 ),
@@ -437,7 +462,7 @@ impl AnalyzeView {
                     "rank(K) = n_free (Stable), Max DCR = 94.5%",
                     0.412,
                     0.25,
-                    "🟡 WARNING (HIGH LOAD / CASCADE RISK)",
+                    "WARNING (HIGH LOAD / CASCADE RISK)",
                     theme.accent_orange,
                     "Forces redistribute to members E2 & E4. Nearing cross-section yield limit.",
                 ),
@@ -446,7 +471,7 @@ impl AnalyzeView {
                     "rank(K) = n_free (Stable), Max DCR = 72.0%",
                     0.765,
                     0.00,
-                    "🟢 STABLE (DUAL-PATH ACTIVE)",
+                    "STABLE (DUAL-PATH ACTIVE)",
                     theme.accent_blue,
                     "Structure retains 28% elastic reserve with zero domino collapse effect.",
                 ),
@@ -455,7 +480,7 @@ impl AnalyzeView {
                     "rank(K) = n_free (Stable), Max DCR = 61.0%",
                     0.850,
                     0.00,
-                    "🟢 FULLY SAFE REDUNDANT",
+                    "FULLY SAFE REDUNDANT",
                     theme.accent_green,
                     "Primary load path successfully transferred via chords without disruption.",
                 ),
@@ -469,7 +494,8 @@ impl AnalyzeView {
                     .inner_margin(Margin::symmetric(14, 10))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("●").size(14.0).color(col));
+                            let (dot_r, _) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
+                            ui.painter().circle_filled(dot_r.center(), 4.5, col);
                             ui.vertical(|ui| {
                                 ui.label(RichText::new(pair_title).size(12.5).strong().color(theme.text_primary));
                                 ui.label(RichText::new(format!("SVD Condition: {} • {}", rank_info, note)).size(11.0).color(theme.text_secondary));
@@ -497,7 +523,7 @@ impl AnalyzeView {
     pub(super) fn render_cascading_collapse(&mut self, ui: &mut Ui, theme: &MacTheme) {
         // Controls card
         theme.card_frame().show(ui, |ui| {
-            ui.label(RichText::new("💥 PROGRESSIVE COLLAPSE & CASCADE SIMULATION (PROGRESSIVE COLLAPSE ENGINE)").size(14.0).strong().color(theme.text_primary));
+            icons::icon_label(ui, AppIcon::AlertTriangle, 15.0, theme.accent_red, "PROGRESSIVE COLLAPSE & CASCADE SIMULATION (PROGRESSIVE COLLAPSE ENGINE)", 14.0, theme.text_primary, true);
             ui.add_space(4.0);
             ui.label(RichText::new("Dynamic progressive collapse modeling per DoD UFC 4-023-03 and ASCE 7-22 Alternate Path Method. Specify initial disruption triggers to evaluate Dynamic Amplification Factor (DAF) and domino propagation across secondary load-bearing elements.").size(12.0).color(theme.text_secondary));
             ui.add_space(12.0);
@@ -511,9 +537,17 @@ impl AnalyzeView {
                 ui.add(egui::Slider::new(&mut self.daf_val, 1.0..=2.0).step_by(0.05));
                 ui.add_space(16.0);
 
-                if ui.add(egui::Button::new(RichText::new("💥 Run Simulation").size(12.0).strong().color(Color32::WHITE))
-                    .fill(theme.accent_red)
-                    .corner_radius(CornerRadius::same(6))).clicked() {
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Play,
+                    "Run Simulation",
+                    12.0,
+                    Color32::WHITE,
+                    theme.accent_red,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                ).clicked() {
                     let ids: Vec<usize> = self.initial_disrupt_input
                         .split(',')
                         .filter_map(|s| s.trim().parse::<usize>().ok())
@@ -532,13 +566,13 @@ impl AnalyzeView {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Quick Scenarios:").size(11.0).color(theme.text_muted));
-                if ui.button("⚡ Midspan Single Member (ID 1)").clicked() {
+                if icons::icon_button(ui, AppIcon::Bolt, "Midspan Single Member (ID 1)", 11.0, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO).clicked() {
                     self.initial_disrupt_input = "1".to_string();
                 }
-                if ui.button("💥 Critical Dual Disruption (ID 1, 2)").clicked() {
+                if icons::icon_button(ui, AppIcon::AlertTriangle, "Critical Dual Disruption (ID 1, 2)", 11.0, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO).clicked() {
                     self.initial_disrupt_input = "1, 2".to_string();
                 }
-                if ui.button("🛡️ Diagonal Web Member (ID 18)").clicked() {
+                if icons::icon_button(ui, AppIcon::Shield, "Diagonal Web Member (ID 18)", 11.0, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO).clicked() {
                     self.initial_disrupt_input = "18".to_string();
                 }
             });
@@ -612,7 +646,7 @@ impl AnalyzeView {
                     ui.add_space(20.0);
                     ui.label(RichText::new("No cascading collapse simulation has been executed yet.").size(13.0).color(theme.text_muted));
                     ui.add_space(6.0);
-                    ui.label(RichText::new("Click '💥 Run Simulation' above to initiate ASCE 7-22 nonlinear domino analysis.").size(12.0).color(theme.text_secondary));
+                    ui.label(RichText::new("Click 'Run Simulation' above to initiate ASCE 7-22 nonlinear domino analysis.").size(12.0).color(theme.text_secondary));
                     ui.add_space(20.0);
                 });
             });

@@ -52,7 +52,7 @@ impl IndustrializedView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Corridor: Precast Yard -> Gate B-2");
                     let _ = ui.selectable_label(false, "Laser Tracker Millimeter QA");
-                    let _ = ui.button("🚛 Run Highway Envelope & Joint Fit-Up Check");
+                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Truck, "Run Highway Envelope & Joint Fit-Up Check", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(10.0);
 
@@ -187,7 +187,7 @@ impl IndustrializedView {
                 ui.horizontal_wrapped(|ui| {
                     let _ = ui.selectable_label(true, "Slicer: Continuous Spiralize Contour");
                     let _ = ui.selectable_label(false, "6-Axis Gantry Kinematic Limits");
-                    let _ = ui.button("🖨️ Slice Selected Element & Export 3DCP G-Code (.gcode)");
+                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Printer, "Slice Selected Element & Export 3DCP G-Code (.gcode)", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
                 });
                 ui.add_space(12.0);
 

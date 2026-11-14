@@ -13,8 +13,15 @@ pub enum ThemeMode {
 impl ThemeMode {
     pub fn label(self) -> &'static str {
         match self {
-            Self::ProDark => "🌑 Pro Obsidian Dark",
-            Self::EngineeringLight => "☀️ Engineering Daylight",
+            Self::ProDark => "Pro Obsidian Dark",
+            Self::EngineeringLight => "Engineering Daylight",
+        }
+    }
+
+    pub fn app_icon(self) -> crate::icons::AppIcon {
+        match self {
+            Self::ProDark => crate::icons::AppIcon::Moon,
+            Self::EngineeringLight => crate::icons::AppIcon::Sun,
         }
     }
 }

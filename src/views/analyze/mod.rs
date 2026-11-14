@@ -14,6 +14,7 @@ use egui::{
 };
 use crate::core::PnaLocation;
 use crate::features::{FeatureId, FeatureRegistry};
+use crate::icons::{self, AppIcon};
 use crate::models::StructuralMember;
 use crate::theme::MacTheme;
 use crate::ui_kit;
@@ -535,11 +536,15 @@ impl AnalyzeView {
                     ui.add_space(10.0);
                     theme.card_frame().show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(
-                                RichText::new("📦 AEC EXPORT READY:")
-                                    .size(11.5)
-                                    .strong()
-                                    .color(theme.accent_green),
+                            icons::icon_label(
+                                ui,
+                                AppIcon::CheckCircle,
+                                13.0,
+                                theme.accent_green,
+                                "AEC EXPORT READY:",
+                                11.5,
+                                theme.accent_green,
+                                true,
                             );
                             ui.label(
                                 RichText::new(status_msg)
@@ -547,15 +552,17 @@ impl AnalyzeView {
                                     .color(theme.text_primary),
                             );
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new("✕").size(11.0).color(theme.text_muted),
-                                        )
-                                        .fill(theme.bg_card)
-                                        .corner_radius(CornerRadius::same(4)),
-                                    )
-                                    .clicked()
+                                if icons::icon_only_button(
+                                    ui,
+                                    AppIcon::Close,
+                                    theme.text_muted,
+                                    theme.bg_card,
+                                    Stroke::NONE,
+                                    CornerRadius::same(4),
+                                    Vec2::splat(22.0),
+                                    "Dismiss",
+                                )
+                                .clicked()
                                 {
                                     dismiss_status = true;
                                 }

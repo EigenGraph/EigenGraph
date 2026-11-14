@@ -8,7 +8,8 @@ pub mod ribbon;
 pub mod sidebar;
 pub mod viewport_3d;
 
-use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText, ScrollArea, Sense, Stroke, Ui, Vec2};
+use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, Rect, RichText, ScrollArea, Sense, Stroke, StrokeKind, Ui, Vec2};
+use crate::icons::{self, AppIcon};
 use crate::models::{DatabaseComponent, SidebarTab, StructuralMember};
 use crate::features::{FeatureId, FeatureRegistry};
 use crate::theme::MacTheme;
@@ -38,23 +39,23 @@ pub enum ModelArchetype {
 impl ModelArchetype {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::BimCraftBuilding3D => "🏗️ BIMCraft LOD350 (CSG + Rebar)",
-            Self::OpenBimIfcModel3D => "🌐 OpenBIM Duplex Villa (IFC4)",
-            Self::FireCompartmentFrame3D => "🔥 Fire Compartment Steel Frame (AISC/EC3)",
-            Self::BlastResistantBunker3D => "🛡️ Blast Protective Bunker (UFC 3-340-02)",
-            Self::FemaP58HospitalArchetype => "🏥 FEMA P-58 Hospital (10-Story)",
-            Self::BaseIsolatedHospital3D => "🛡️ Base-Isolated Hospital (8-Story)",
-            Self::TimeHistoryTower3D => "🌊 NL-THA Tower (16-Story)",
-            Self::DiagridTower3D => "🏢 NVW_DCR-LOD300 (Eng-CON Frame)",
-            Self::TrussBridge3D => "🧱 NVW_DCR-LOD200 (Eng-CON-1 & 2)",
-            Self::SpaceDome3D => "🔧 NVW_DCR-LOD300 (Eng-HVAC & Roof)",
-            Self::WarrenTruss2D => "📐 NVW_DCR-LOD100 (Arch Massing)",
-            Self::DoubleLayerSpaceTruss3D => "🕸️ Space Truss (24m MERO Octet)",
-            Self::GeodesicDome3D => "🌐 Geodesic Dome (18m Lattice)",
-            Self::HyparRuledShell3D => "🎪 Hypar Umbrella (16m Saddle)",
-            Self::MultiStoryTower3D => "🏢 12-Story Tower (Core Wall)",
-            Self::PrestressedGirderBridge3D => "🌉 Prestressed Bridge (30m PT Girder)",
-            Self::CoupledShearWallCore3D => "🏢 Coupled Shear Wall Core (12-Story)",
+            Self::BimCraftBuilding3D => "BIMCraft LOD350 (CSG + Rebar)",
+            Self::OpenBimIfcModel3D => "OpenBIM Duplex Villa (IFC4)",
+            Self::FireCompartmentFrame3D => "Fire Compartment Steel Frame (AISC/EC3)",
+            Self::BlastResistantBunker3D => "Blast Protective Bunker (UFC 3-340-02)",
+            Self::FemaP58HospitalArchetype => "FEMA P-58 Hospital (10-Story)",
+            Self::BaseIsolatedHospital3D => "Base-Isolated Hospital (8-Story)",
+            Self::TimeHistoryTower3D => "NL-THA Tower (16-Story)",
+            Self::DiagridTower3D => "NVW_DCR-LOD300 (Eng-CON Frame)",
+            Self::TrussBridge3D => "NVW_DCR-LOD200 (Eng-CON-1 & 2)",
+            Self::SpaceDome3D => "NVW_DCR-LOD300 (Eng-HVAC & Roof)",
+            Self::WarrenTruss2D => "NVW_DCR-LOD100 (Arch Massing)",
+            Self::DoubleLayerSpaceTruss3D => "Space Truss (24m MERO Octet)",
+            Self::GeodesicDome3D => "Geodesic Dome (18m Lattice)",
+            Self::HyparRuledShell3D => "Hypar Umbrella (16m Saddle)",
+            Self::MultiStoryTower3D => "12-Story Tower (Core Wall)",
+            Self::PrestressedGirderBridge3D => "Prestressed Bridge (30m PT Girder)",
+            Self::CoupledShearWallCore3D => "Coupled Shear Wall Core (12-Story)",
         }
     }
 }
@@ -86,20 +87,37 @@ pub enum BimRibbonTab {
 }
 
 impl BimRibbonTab {
+    pub fn app_icon(&self) -> AppIcon {
+        match self {
+            Self::Architecture => AppIcon::Building,
+            Self::Structure => AppIcon::Column,
+            Self::MepSystems => AppIcon::Bolt,
+            Self::CivilInfra => AppIcon::Globe,
+            Self::AnalysisFea => AppIcon::Compass,
+            Self::Time4D => AppIcon::Clock,
+            Self::Cost5D => AppIcon::Coins,
+            Self::Sustainability6D => AppIcon::Leaf,
+            Self::FacilityTwin7D => AppIcon::Cube3D,
+            Self::CoordinationAudit => AppIcon::Shield,
+            Self::OpenBimSpec => AppIcon::LinkChain,
+            Self::SheetsDed => AppIcon::Document,
+        }
+    }
+
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Architecture => "🏛️ Architecture",
-            Self::Structure => "🏗️ Structure",
-            Self::MepSystems => "⚡ MEP Systems",
-            Self::CivilInfra => "🌍 Civil & Terrain",
-            Self::AnalysisFea => "🔬 FEA Solver",
-            Self::Time4D => "⏱️ 4D Phased",
-            Self::Cost5D => "💰 5D Cost",
-            Self::Sustainability6D => "🌱 6D Green",
-            Self::FacilityTwin7D => "🏢 7D Twin",
-            Self::CoordinationAudit => "🛡️ Coordination & Clash",
-            Self::OpenBimSpec => "🌐 OpenBIM",
-            Self::SheetsDed => "📑 Sheets & DED",
+            Self::Architecture => "Architecture",
+            Self::Structure => "Structure",
+            Self::MepSystems => "MEP Systems",
+            Self::CivilInfra => "Civil & Terrain",
+            Self::AnalysisFea => "FEA Solver",
+            Self::Time4D => "4D Phased",
+            Self::Cost5D => "5D Cost",
+            Self::Sustainability6D => "6D Green",
+            Self::FacilityTwin7D => "7D Twin",
+            Self::CoordinationAudit => "Coordination & Clash",
+            Self::OpenBimSpec => "OpenBIM",
+            Self::SheetsDed => "Sheets & DED",
         }
     }
 }
@@ -114,13 +132,23 @@ pub enum BottomDeckTab {
 }
 
 impl BottomDeckTab {
+    pub fn app_icon(&self) -> AppIcon {
+        match self {
+            Self::ScheduleQto => AppIcon::ChartBar,
+            Self::TimeSimulation4D => AppIcon::Clock,
+            Self::ClashManager => AppIcon::AlertTriangle,
+            Self::BimConsole => AppIcon::Cpu,
+            Self::PointCloudDeviation => AppIcon::Target,
+        }
+    }
+
     pub fn label(&self) -> &'static str {
         match self {
-            Self::ScheduleQto => "📊 Live Schedules & BoQ (QTO)",
-            Self::TimeSimulation4D => "⏱️ 4D Construction Simulation",
-            Self::ClashManager => "⚔️ Clash & Coordination Deck",
-            Self::BimConsole => "💻 BIM Terminal & Automation",
-            Self::PointCloudDeviation => "📡 LiDAR Point Cloud & Deviation",
+            Self::ScheduleQto => "Live Schedules & BoQ (QTO)",
+            Self::TimeSimulation4D => "4D Construction Simulation",
+            Self::ClashManager => "Clash & Coordination Deck",
+            Self::BimConsole => "BIM Terminal & Automation",
+            Self::PointCloudDeviation => "LiDAR Point Cloud & Deviation",
         }
     }
 }
@@ -212,6 +240,7 @@ pub struct BuildView {
     pub draft_node_z: f64,
     pub draft_member_n1: usize,
     pub draft_member_n2: usize,
+    pub last_viewport_rect: Option<Rect>,
 }
 
 impl Default for BuildView {
@@ -261,10 +290,10 @@ impl Default for BuildView {
             simulation_4d_speed: 1.0,
             bim_console_input: String::new(),
             bim_console_logs: vec![
-                "⚡ [BIM Kernel] Relational spatial graph initialized with LOD 350 topological constraints.".to_string(),
-                "🌐 [OpenBIM] buildingSMART IFC4 Reference View & STEP parser active (ISO 10303-21).".to_string(),
-                "🛡️ [Solibri Engine] Automated model quality checker loaded (Rule 101-208 enabled).".to_string(),
-                "⚔️ [Clash Solver] 3D AABB spatial interference detector online (tol: 15.0mm).".to_string(),
+                "[BIM Kernel] Relational spatial graph initialized with LOD 350 topological constraints.".to_string(),
+                "[OpenBIM] buildingSMART IFC4 Reference View & STEP parser active (ISO 10303-21).".to_string(),
+                "[Solibri Engine] Automated model quality checker loaded (Rule 101-208 enabled).".to_string(),
+                "[Clash Solver] 3D AABB spatial interference detector online (tol: 15.0mm).".to_string(),
             ],
             clash_tolerance_mm: 15.0,
             clash_filter_discipline: "All (Arch vs Struct vs MEP)".to_string(),
@@ -307,12 +336,25 @@ impl Default for BuildView {
             draft_node_z: 0.0,
             draft_member_n1: 0,
             draft_member_n2: 1,
+            last_viewport_rect: None,
         }
     }
 }
 
 
 impl BuildView {
+    /// Returns true while the pointer hovers the 3D BIM viewport and scrolling is active (unfrozen).
+    pub fn is_pointer_in_live_canvas(&self, ctx: &egui::Context, is_frozen: bool) -> bool {
+        if is_frozen {
+            return false;
+        }
+        let Some(rect) = self.last_viewport_rect else {
+            return false;
+        };
+        ctx.input(|i| i.pointer.hover_pos().is_some_and(|p| rect.contains(p)))
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn show(
         &mut self,
         ui: &mut Ui,
@@ -320,11 +362,18 @@ impl BuildView {
         members: &[StructuralMember],
         db_components: &[DatabaseComponent],
         features: &mut FeatureRegistry,
+        universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
+        parametric_variables: &[crate::models::ParametricVariable],
+        workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
+        sidebar_toggle_inset_px: f32,
     ) {
+        ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
+        self.last_viewport_rect = None;
+
         let avail_w = ui.available_width();
-        let deck_h = (MacTheme::viewport_size(ui.ctx()).y * 0.68).clamp(440.0, 680.0);
+        let deck_h = (MacTheme::viewport_size(ui.ctx()).y - 125.0).clamp(480.0, 740.0);
         if avail_w >= 780.0 {
-            let panel_w = (avail_w * 0.30).clamp(250.0, 320.0);
+            let panel_w = (avail_w * 0.30).clamp(245.0, 315.0);
             ui.horizontal(|ui| {
                 ui.allocate_ui(egui::Vec2::new(panel_w, deck_h), |ui| {
                     self.render_unified_sidebar(
@@ -336,12 +385,32 @@ impl BuildView {
                         Some(panel_w),
                     );
                 });
-                self.render_canvas(ui, theme, members, features, Some(deck_h));
+                self.render_canvas(
+                    ui,
+                    theme,
+                    members,
+                    features,
+                    universal_canvas,
+                    parametric_variables,
+                    workspace_settings,
+                    sidebar_toggle_inset_px,
+                    Some(deck_h),
+                );
             });
         } else {
-            let stacked_canvas_h = (MacTheme::viewport_size(ui.ctx()).y * 0.48).clamp(260.0, 420.0);
+            let stacked_canvas_h = (MacTheme::viewport_size(ui.ctx()).y * 0.52).clamp(320.0, 440.0);
             ui.vertical(|ui| {
-                self.render_canvas(ui, theme, members, features, Some(stacked_canvas_h));
+                self.render_canvas(
+                    ui,
+                    theme,
+                    members,
+                    features,
+                    universal_canvas,
+                    parametric_variables,
+                    workspace_settings,
+                    sidebar_toggle_inset_px,
+                    Some(stacked_canvas_h),
+                );
                 ui.add_space(10.0);
                 self.render_unified_sidebar(ui, theme, members, db_components, features, None);
                 ui.add_space(24.0);
