@@ -9,6 +9,10 @@ use egui::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::core::gis::earth_globe::{
+    EarthBrushAction, GlobeScreenTransform, MegastructureKind, PlanetaryWorldState,
+};
+use crate::core::gis::SlippyMapState;
 use crate::core::{BimProject, DiskExporter, Sha256Hasher};
 use crate::icons::{self, AppIcon};
 use crate::models::{NavigationPillar, ParametricVariable, StructuralMember};
@@ -52,6 +56,17 @@ pub enum UniversalCanvasTool {
     Dimension,
     Callout,
     Eraser,
+    // Phase 43: EigenEarth 3D Globe Terraforming & Megaproject Tools
+    EarthUplift,
+    EarthCarve,
+    EarthReclaim,
+    EarthForest,
+    EarthSolar,
+    EarthLake,
+    EarthSeawall,
+    EarthBridge,
+    EarthTower,
+    EarthCorridor,
 }
 
 impl UniversalCanvasTool {
@@ -67,6 +82,45 @@ impl UniversalCanvasTool {
         Self::Eraser,
     ];
 
+    pub const EARTH_TOOLS: [Self; 10] = [
+        Self::EarthUplift,
+        Self::EarthCarve,
+        Self::EarthReclaim,
+        Self::EarthForest,
+        Self::EarthSolar,
+        Self::EarthLake,
+        Self::EarthSeawall,
+        Self::EarthBridge,
+        Self::EarthTower,
+        Self::EarthCorridor,
+    ];
+
+    pub fn earth_brush_action(self) -> Option<EarthBrushAction> {
+        match self {
+            Self::EarthUplift => Some(EarthBrushAction::UpliftMountain),
+            Self::EarthCarve => Some(EarthBrushAction::CarveCanal),
+            Self::EarthReclaim => Some(EarthBrushAction::ReclaimLand),
+            Self::EarthForest => Some(EarthBrushAction::PlantForest),
+            Self::EarthSolar => Some(EarthBrushAction::BuildSolarHub),
+            Self::EarthLake => Some(EarthBrushAction::CarveLake),
+            Self::EarthSeawall => Some(EarthBrushAction::BuildSeawall),
+            _ => None,
+        }
+    }
+
+    pub fn earth_megastructure_kind(self) -> Option<MegastructureKind> {
+        match self {
+            Self::EarthBridge => Some(MegastructureKind::TransStraitBridge),
+            Self::EarthTower => Some(MegastructureKind::ArcologyMegaTower),
+            Self::EarthCorridor => Some(MegastructureKind::SolarCleanCorridor),
+            _ => None,
+        }
+    }
+
+    pub fn is_earth_tool(self) -> bool {
+        self.earth_brush_action().is_some() || self.earth_megastructure_kind().is_some()
+    }
+
     pub fn app_icon(self) -> AppIcon {
         match self {
             Self::SelectPan => AppIcon::CursorPan,
@@ -78,6 +132,16 @@ impl UniversalCanvasTool {
             Self::Dimension => AppIcon::DimensionRuler,
             Self::Callout => AppIcon::CommentNote,
             Self::Eraser => AppIcon::Eraser,
+            Self::EarthUplift => AppIcon::Mountain,
+            Self::EarthCarve => AppIcon::Waves,
+            Self::EarthReclaim => AppIcon::Slab,
+            Self::EarthForest => AppIcon::Trees,
+            Self::EarthSolar => AppIcon::Sun,
+            Self::EarthLake => AppIcon::Waves,
+            Self::EarthSeawall => AppIcon::Shield,
+            Self::EarthBridge => AppIcon::BridgeSpan,
+            Self::EarthTower => AppIcon::Building,
+            Self::EarthCorridor => AppIcon::Bolt,
         }
     }
 
@@ -92,20 +156,40 @@ impl UniversalCanvasTool {
             Self::Dimension => "Dim",
             Self::Callout => "Note",
             Self::Eraser => "Erase",
+            Self::EarthUplift => "Uplift",
+            Self::EarthCarve => "Carve",
+            Self::EarthReclaim => "Reclaim",
+            Self::EarthForest => "Forest",
+            Self::EarthSolar => "Solar",
+            Self::EarthLake => "Lake",
+            Self::EarthSeawall => "Seawall",
+            Self::EarthBridge => "Bridge",
+            Self::EarthTower => "Tower",
+            Self::EarthCorridor => "CleanGrid",
         }
     }
 
     pub fn tooltip(self) -> &'static str {
         match self {
-            Self::SelectPan => "Pan canvas with primary drag (or right-drag in any tool); click to select 1 entity",
+            Self::SelectPan => "Orbit 3D Earth / Pan 2D canvas with drag (or right-drag in any tool); click to select",
             Self::BoxSelect => "Marquee select: drag Left->Right (Blue Window enclosed) or Right->Left (Green Crossing) [V]",
             Self::Freehand => "Freehand engineering sketch synced across all 15 modules",
-            Self::Line => "Draw straight vector line segment (click-drag)",
+            Self::Line => "Draw straight/geodesic line segment (click-drag)",
             Self::Rectangle => "Draw rectangular zone / bay boundary (click-drag)",
             Self::Circle => "Draw radial envelope / circle (drag center to radius)",
             Self::Dimension => "Measure and pin world distance in millimetres",
             Self::Callout => "Click canvas to place text annotation callout",
             Self::Eraser => "Click any user-drawn object to remove it",
+            Self::EarthUplift => "Terraform Brush: Uplift mountains, plateaus & coastal dikes on 3D Earth",
+            Self::EarthCarve => "Terraform Brush: Carve valleys, sea canals & trenches into Earth terrain",
+            Self::EarthReclaim => "Terraform Brush: Reclaim shallow ocean seabed into habitable protected land",
+            Self::EarthForest => "Biome Brush: Plant continental Mega-Forest belt (-CO2, cools Earth)",
+            Self::EarthSolar => "Energy Brush: Build utility Solar Hub array (+GW clean power, -CO2)",
+            Self::EarthLake => "Hydro Brush: Excavate inland Freshwater Lake / Pumped-Hydro Reservoir",
+            Self::EarthSeawall => "Defense Brush: Fortify coastline with Flood Seawall barrier against rising seas",
+            Self::EarthBridge => "Megaproject Span: Drag across straits/oceans to build curved Great-Circle Mega-Bridge",
+            Self::EarthTower => "Megaproject Beacon: Click Earth to erect 3D Arcology Mega-Tower along zenith normal",
+            Self::EarthCorridor => "Clean Energy Span: Drag across continents to deploy HVDC Solar Clean Corridor",
         }
     }
 }
@@ -171,7 +255,15 @@ pub struct UnifiedWorkspaceArchive {
     pub map_center_lat_lon: Option<(f64, f64)>,
     #[serde(default)]
     pub map_zoom: Option<f32>,
+    #[serde(default = "default_globe_true")]
+    pub globe_mode: bool,
+    #[serde(default)]
+    pub planetary_world: PlanetaryWorldState,
     pub sha256_seal: String,
+}
+
+fn default_globe_true() -> bool {
+    true
 }
 
 #[derive(Serialize)]
@@ -311,6 +403,11 @@ pub struct UniversalCanvasState {
     pub cad_cmd_input: String,
     pub shortcuts_modal_open: bool,
     pub quick_jump_query: String,
+    // Phase 43: Default 3D Google Earth Globe & Planetary Terraform / Megaproject Sandbox Game
+    pub globe_mode: bool,
+    pub earth_world: PlanetaryWorldState,
+    pub last_globe_xform: Option<GlobeScreenTransform>,
+    pub pending_earth_arc_start: Option<(f64, f64)>,
 }
 
 impl Default for UniversalCanvasState {
@@ -318,7 +415,7 @@ impl Default for UniversalCanvasState {
         Self {
             pan: Vec2::ZERO,
             zoom: 1.0,
-            // Phase 35: Frozen by default so vertical page scroll never zooms unintentionally; unfreeze to pan/draw on Earth map
+            // Phase 35: Frozen by default so vertical page scroll never zooms unintentionally; unfreeze to orbit/draw on 3D Earth
             is_frozen: true,
             active_tool: UniversalCanvasTool::SelectPan,
             active_color_idx: 0,
@@ -347,7 +444,7 @@ impl Default for UniversalCanvasState {
             marquee_current_mm: None,
             active_freehand_mm: Vec::new(),
             cursor_world_mm: [0.0, 0.0],
-            cursor_lat_lon: (15.0, 15.0),
+            cursor_lat_lon: (5.0, 98.0),
             world_map: crate::core::gis::SlippyMapState::default(),
             ground_origin_lat_lon: (0.0, 0.0),
             ground_origin_anchored: false,
@@ -367,6 +464,10 @@ impl Default for UniversalCanvasState {
             cad_cmd_input: String::new(),
             shortcuts_modal_open: false,
             quick_jump_query: String::new(),
+            globe_mode: true,
+            earth_world: PlanetaryWorldState::default(),
+            last_globe_xform: None,
+            pending_earth_arc_start: None,
         }
     }
 }
@@ -1648,6 +1749,8 @@ impl UniversalCanvasState {
                 .then_some(self.ground_origin_lat_lon),
             map_center_lat_lon: Some(self.world_map.center_lat_lon),
             map_zoom: Some(self.world_map.zoom_level),
+            globe_mode: self.globe_mode,
+            planetary_world: self.earth_world.clone(),
             sha256_seal: String::new(),
         }
     }
@@ -1727,6 +1830,9 @@ impl UniversalCanvasState {
         if let Some(zoom) = archive.map_zoom {
             self.world_map.zoom_level = zoom.clamp(1.0, 19.0);
         }
+        self.globe_mode = archive.globe_mode;
+        self.earth_world = archive.planetary_world;
+        self.earth_world.recompute_vitals();
         self.status_message = Some(format!(
             "Imported verified 1-file workspace '{}' ({} canvas objects)",
             archive.project_name,
@@ -1876,8 +1982,13 @@ impl UniversalCanvasState {
                 ui.set_width(outer_w);
                 ui.set_max_width(outer_w);
 
-                // Apply CAD Keyboard Shortcuts (Space freeze, Esc, Del, Ctrl+Z/Y, F8 Ortho, F3 Snap, single keys)
+                // Apply CAD Keyboard Shortcuts (Space freeze, Esc, Del, Ctrl+Z/Y, F8 Ortho, F3 Snap, single keys, G Globe, [ / ] Tilt)
                 self.handle_universal_shortcuts(ui.ctx(), bim_project);
+
+                // Step Earth animations (smooth auto-spin, inertia, Google Earth fly-to, planetary sim years)
+                if self.globe_mode && !self.is_frozen {
+                    self.earth_world.step_animations(ui.ctx(), &mut self.world_map);
+                }
 
                 // 1. Main Interactive Drawing Viewport (Top — clean, only Freeze pill inside)
                 let avail_w = ui.available_width().max(200.0);
@@ -1886,6 +1997,18 @@ impl UniversalCanvasState {
                 let rect = response.rect;
                 self.last_canvas_rect = Some(rect);
                 self.last_inspector_rect = None;
+
+                if self.globe_mode {
+                    self.last_globe_xform = Some(GlobeScreenTransform::from_view(
+                        rect,
+                        self.world_map.center_lat_lon.0,
+                        self.world_map.center_lat_lon.1,
+                        self.world_map.zoom_level,
+                        &self.earth_world.camera,
+                    ));
+                } else {
+                    self.last_globe_xform = None;
+                }
 
                 painter.rect_filled(rect, CornerRadius::same(10), Self::canvas_bg(theme));
 
@@ -1909,16 +2032,36 @@ impl UniversalCanvasState {
                     pointer_in_freeze_pill,
                 );
 
-                // 1a. Phase 35: Earth World Map Ground Basemap (Vector Continents + Online Raster Tiles + Geodetic/Metric Grid)
-                self.world_map.render_world_background(
-                    ui,
-                    &painter,
-                    rect,
-                    theme,
-                    self.ground_origin_lat_lon,
-                    self.show_grid,
-                    false,
-                );
+                // 1a. Phase 43 / Phase 35: 3D Google Earth Globe (default) or 2D Slippy World Map
+                let active_globe_xform = if self.globe_mode {
+                    let xform = self.earth_world.render_3d_globe(
+                        ui,
+                        &painter,
+                        rect,
+                        theme,
+                        &self.world_map,
+                        self.ground_origin_lat_lon,
+                        self.ground_origin_anchored,
+                        self.show_grid,
+                        self.active_tool.earth_brush_action(),
+                        self.cursor_lat_lon,
+                        self.is_frozen,
+                    );
+                    self.last_globe_xform = Some(xform.clone());
+                    Some(xform)
+                } else {
+                    self.last_globe_xform = None;
+                    self.world_map.render_world_background(
+                        ui,
+                        &painter,
+                        rect,
+                        theme,
+                        self.ground_origin_lat_lon,
+                        self.show_grid,
+                        false,
+                    );
+                    None
+                };
 
                 // 1b. Render Fine Millimeter Engineering Grid (site scale), BIM Base Layer, Domain Overlay, Entities & Preview
                 let world_to_screen = |w: [f64; 2]| self.world_to_screen(rect, w);
@@ -1949,13 +2092,50 @@ impl UniversalCanvasState {
                 }
                 self.paint_entities(&painter, rect, theme, active_pillar, &world_to_screen);
                 self.paint_live_preview(&painter, rect, theme, &world_to_screen);
-                let map_ref = &self.world_map;
-                self.render_geodetic_measure_overlay(&painter, rect, theme, &|lat, lon| {
-                    map_ref.lat_lon_to_screen(lat, lon, rect)
-                });
 
-                // Highlight geodetic site anchor when zoomed out on World Map
-                if self.world_map.zoom_level < 12.5
+                // Live Great-Circle Bridge / Corridor arc preview while dragging Earth megastructures
+                if let (Some(start_ll), Some(kind)) = (
+                    self.pending_earth_arc_start,
+                    self.active_tool.earth_megastructure_kind(),
+                ) {
+                    let arc_pts = crate::core::gis::great_circle_arc(start_ll, self.cursor_lat_lon, 20);
+                    let arc_color = kind.accent_color();
+                    let clip_arc = painter.with_clip_rect(rect);
+                    let proj_ll = |ll: (f64, f64)| -> Option<Pos2> {
+                        if let Some(ref xf) = active_globe_xform {
+                            xf.project_lat_lon_elev(ll.0, ll.1, 0.0)
+                                .and_then(|(p, _, vis)| if vis { Some(p) } else { None })
+                        } else {
+                            Some(self.world_map.lat_lon_to_screen(ll.0, ll.1, rect))
+                        }
+                    };
+                    for pair in arc_pts.windows(2) {
+                        if let (Some(p0), Some(p1)) = (proj_ll(pair[0]), proj_ll(pair[1])) {
+                            clip_arc.line_segment([p0, p1], Stroke::new(2.6, arc_color));
+                        }
+                    }
+                    if let Some(p_end) = proj_ll(self.cursor_lat_lon) {
+                        clip_arc.circle_filled(p_end, 4.5, arc_color);
+                    }
+                }
+
+                let geo_to_screen = |lat: f64, lon: f64| -> Pos2 {
+                    if let Some(ref xf) = active_globe_xform {
+                        if let Some((pos, _, vis)) = xf.project_lat_lon_elev(lat, lon, 0.0) {
+                            if vis {
+                                return pos;
+                            }
+                        }
+                        Pos2::new(-1e6, -1e6)
+                    } else {
+                        self.world_map.lat_lon_to_screen(lat, lon, rect)
+                    }
+                };
+                self.render_geodetic_measure_overlay(&painter, rect, theme, &geo_to_screen);
+
+                // Highlight geodetic site anchor when zoomed out on World Map / 3D Globe
+                if !self.globe_mode
+                    && self.world_map.zoom_level < 12.5
                     && (self.ground_origin_anchored || !self.entities.is_empty() || !bim_project.is_empty())
                 {
                     let site_pos = world_to_screen([0.0, 0.0]);
@@ -2045,6 +2225,7 @@ impl UniversalCanvasState {
         }
         if fb.escape {
             self.pending_start_mm = None;
+            self.pending_earth_arc_start = None;
             self.marquee_anchor_mm = None;
             self.marquee_current_mm = None;
             self.active_freehand_mm.clear();
@@ -2052,11 +2233,23 @@ impl UniversalCanvasState {
             self.set_single_selection(None);
             self.active_tool = UniversalCanvasTool::SelectPan;
         }
-        if fb.undo && self.undo() {
-            self.status_message = Some("Undo canvas action (Ctrl/Cmd+Z)".to_string());
+        if fb.undo {
+            if self.active_tool.is_earth_tool() && self.earth_world.undo_earth() {
+                self.status_message = Some("Undo Earth modification (Ctrl/Cmd+Z)".to_string());
+            } else if self.undo() {
+                self.status_message = Some("Undo canvas action (Ctrl/Cmd+Z)".to_string());
+            } else if self.earth_world.undo_earth() {
+                self.status_message = Some("Undo Earth modification (Ctrl/Cmd+Z)".to_string());
+            }
         }
-        if fb.redo && self.redo() {
-            self.status_message = Some("Redo canvas action (Ctrl/Cmd+Y)".to_string());
+        if fb.redo {
+            if self.active_tool.is_earth_tool() && self.earth_world.redo_earth() {
+                self.status_message = Some("Redo Earth modification (Ctrl/Cmd+Y)".to_string());
+            } else if self.redo() {
+                self.status_message = Some("Redo canvas action (Ctrl/Cmd+Y)".to_string());
+            } else if self.earth_world.redo_earth() {
+                self.status_message = Some("Redo Earth modification (Ctrl/Cmd+Y)".to_string());
+            }
         }
         if fb.delete_selected && self.delete_selected_or_last() {
             self.status_message = Some("Deleted canvas entity (Del)".to_string());
@@ -2081,11 +2274,68 @@ impl UniversalCanvasState {
                 self.fit_world_or_site(!bim_project.is_empty());
             }
         }
+        if !self.is_frozen && self.globe_mode && !ctx.egui_wants_keyboard_input() {
+            let (tilt_down, tilt_up, num_idx) = ctx.input(|i| {
+                let d = i.key_pressed(egui::Key::OpenBracket);
+                let u = i.key_pressed(egui::Key::CloseBracket);
+                let idx = if i.key_pressed(egui::Key::Num1) {
+                    Some(0)
+                } else if i.key_pressed(egui::Key::Num2) {
+                    Some(1)
+                } else if i.key_pressed(egui::Key::Num3) {
+                    Some(2)
+                } else if i.key_pressed(egui::Key::Num4) {
+                    Some(3)
+                } else if i.key_pressed(egui::Key::Num5) {
+                    Some(4)
+                } else if i.key_pressed(egui::Key::Num6) {
+                    Some(5)
+                } else if i.key_pressed(egui::Key::Num7) {
+                    Some(6)
+                } else if i.key_pressed(egui::Key::Num8) {
+                    Some(7)
+                } else if i.key_pressed(egui::Key::Num9) {
+                    Some(8)
+                } else {
+                    None
+                };
+                (d, u, idx)
+            });
+            if tilt_down {
+                self.earth_world.camera.tilt_deg =
+                    (self.earth_world.camera.tilt_deg - 5.0).clamp(0.0, 65.0);
+            }
+            if tilt_up {
+                self.earth_world.camera.tilt_deg =
+                    (self.earth_world.camera.tilt_deg + 5.0).clamp(0.0, 65.0);
+            }
+            if let Some(i) = num_idx {
+                if let Some(tool) = UniversalCanvasTool::EARTH_TOOLS.get(i).copied() {
+                    self.active_tool = tool;
+                    self.pending_start_mm = None;
+                    self.pending_earth_arc_start = None;
+                    self.status_message = Some(format!(
+                        "Selected Earth Tool: {} (key {})",
+                        tool.short_label(),
+                        i + 1
+                    ));
+                }
+            }
+        }
         if let Some(ch) = fb.letter_key {
             let mirror_x = bim_project
                 .plan_extents_mm()
                 .map_or(0.0, |(a, b)| 0.5 * (a[0] + b[0]));
             match ch {
+                'G' => {
+                    self.globe_mode = !self.globe_mode;
+                    self.pending_earth_arc_start = None;
+                    self.status_message = Some(if self.globe_mode {
+                        "3D Google Earth Globe mode active (G)".to_string()
+                    } else {
+                        "2D Slippy World Map mode active (G)".to_string()
+                    });
+                }
                 'V' => self.active_tool = UniversalCanvasTool::BoxSelect,
                 'L' => self.active_tool = UniversalCanvasTool::Line,
                 'R' => self.active_tool = UniversalCanvasTool::Rectangle,
@@ -2641,7 +2891,292 @@ impl UniversalCanvasState {
                         self.shortcuts_modal_open = !self.shortcuts_modal_open;
                     }
                 });
+
+                if self.globe_mode || self.active_tool.is_earth_tool() {
+                    ui.add_space(5.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+                    self.render_earth_sandbox_bar(ui, theme);
+                }
             });
+    }
+
+    /// Earth Terraforming, Sea-Level Flood Defense & Megaproject Game Dock rendered cleanly outside the 3D Globe viewport.
+    fn render_earth_sandbox_bar(&mut self, ui: &mut Ui, theme: &MacTheme) {
+        use crate::core::gis::EarthScenario;
+
+        let inner_w = ui.available_width().max(160.0);
+        ui.set_max_width(inner_w);
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+        ui.spacing_mut().slider_width = crate::ui_kit::clamped_row_width(ui, 52.0, 92.0, 108.0);
+
+        // Row A: Earth Sculpting & Megaproject Brushes (keys 1-9) + Brush Size + Undo/Redo/Reset
+        ui.horizontal_wrapped(|ui| {
+            icons::icon_label(
+                ui,
+                AppIcon::Globe,
+                12.0,
+                theme.accent_blue,
+                "Earth Sandbox:",
+                10.5,
+                theme.text_primary,
+                true,
+            );
+
+            for tool in UniversalCanvasTool::EARTH_TOOLS {
+                let is_sel = self.active_tool == tool;
+                let bg = if is_sel {
+                    theme.accent_blue
+                } else {
+                    theme.bg_card
+                };
+                let fg = if is_sel {
+                    Color32::WHITE
+                } else {
+                    theme.text_secondary
+                };
+                if icons::icon_button(
+                    ui,
+                    tool.app_icon(),
+                    tool.short_label(),
+                    10.0,
+                    fg,
+                    bg,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::new(0.0, 24.0),
+                )
+                .on_hover_text(tool.tooltip())
+                .clicked()
+                {
+                    self.active_tool = tool;
+                    self.pending_start_mm = None;
+                    self.pending_earth_arc_start = None;
+                    self.active_freehand_mm.clear();
+                }
+            }
+
+            ui.separator();
+
+            for (lbl, cells) in [("S", 0_usize), ("M", 1_usize), ("L", 2_usize)] {
+                let sel = self.earth_world.brush_radius_cells == cells;
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Target,
+                    lbl,
+                    9.5,
+                    if sel { Color32::WHITE } else { theme.text_secondary },
+                    if sel { theme.accent_green } else { theme.bg_card },
+                    Stroke::NONE,
+                    CornerRadius::same(5),
+                    Vec2::new(0.0, 22.0),
+                )
+                .on_hover_text(format!(
+                    "Planetary brush footprint radius: {}x{} cells",
+                    cells * 2 + 1,
+                    cells * 2 + 1
+                ))
+                .clicked()
+                {
+                    self.earth_world.brush_radius_cells = cells;
+                }
+            }
+
+            if icons::icon_button(
+                ui,
+                AppIcon::Undo,
+                "Undo Earth",
+                9.5,
+                theme.text_secondary,
+                theme.bg_card,
+                Stroke::NONE,
+                CornerRadius::same(5),
+                Vec2::new(0.0, 22.0),
+            )
+            .on_hover_text("Undo last planetary terrain or megastructure change")
+            .clicked()
+                && self.earth_world.undo_earth()
+            {
+                self.status_message = Some("Undid last planetary Earth modification".to_string());
+            }
+
+            if icons::icon_button(
+                ui,
+                AppIcon::Trash,
+                "Reset Earth",
+                9.5,
+                theme.accent_red,
+                theme.accent_red.gamma_multiply(0.12),
+                Stroke::NONE,
+                CornerRadius::same(5),
+                Vec2::new(0.0, 22.0),
+            )
+            .on_hover_text("Reset Earth terrain cells & megastructures for current scenario")
+            .clicked()
+            {
+                self.earth_world.reset_earth();
+                self.pending_earth_arc_start = None;
+                self.status_message = Some("Reset Earth planetary edits".to_string());
+            }
+        });
+
+        ui.add_space(4.0);
+
+        // Row B: Camera Tilt/Spin/Lighting + Sea Level Slider + Mission Selector + Live Earth Vitals
+        ui.horizontal_wrapped(|ui| {
+            let mission_w = crate::ui_kit::clamped_row_width(ui, 92.0, 148.0, 48.0);
+            crate::ui_kit::wrap_before(ui, mission_w + 56.0);
+            let current_scenario = self.earth_world.scenario;
+            egui::ComboBox::from_id_salt("earth_mission_scenario_combo")
+                .width(mission_w)
+                .selected_text(current_scenario.label())
+                .show_ui(ui, |ui| {
+                    for sc in EarthScenario::all() {
+                        if ui
+                            .selectable_label(current_scenario == *sc, sc.label())
+                            .on_hover_text(sc.goal_summary())
+                            .clicked()
+                        {
+                            let (lat, lon, z) = self.earth_world.load_scenario(*sc);
+                            self.pending_earth_arc_start = None;
+                            self.earth_world
+                                .start_fly_to(&self.world_map, lat, lon, z, sc.label());
+                            self.status_message =
+                                Some(format!("Earth Mission [{}]: {}", sc.label(), sc.goal_summary()));
+                        }
+                    }
+                });
+
+            let slider_w = crate::ui_kit::clamped_row_width(ui, 42.0, 82.0, 120.0);
+            ui.spacing_mut().slider_width = slider_w;
+            crate::ui_kit::wrap_before(ui, slider_w + 96.0);
+            ui.add(
+                egui::Slider::new(&mut self.earth_world.camera.tilt_deg, 0.0..=65.0)
+                    .text("Tilt°")
+                    .max_decimals(0),
+            );
+
+            crate::ui_kit::wrap_before(ui, slider_w + 96.0);
+            let prev_sea = self.earth_world.vitals.sea_level_m;
+            let sea_resp = ui.add(
+                egui::Slider::new(&mut self.earth_world.vitals.sea_level_m, -50.0..=50.0)
+                    .text("Sea m")
+                    .max_decimals(1),
+            );
+            if sea_resp.changed() && (self.earth_world.vitals.sea_level_m - prev_sea).abs() > 0.01 {
+                self.earth_world.recompute_vitals();
+            }
+
+            let spin = self.earth_world.camera.auto_spin;
+            if icons::icon_button(
+                ui,
+                AppIcon::Compass,
+                if spin { "Spin ON" } else { "Spin" },
+                9.5,
+                if spin { Color32::WHITE } else { theme.text_secondary },
+                if spin { theme.accent_blue } else { theme.bg_card },
+                Stroke::NONE,
+                CornerRadius::same(5),
+                Vec2::new(0.0, 22.0),
+            )
+            .on_hover_text("Toggle gentle Earth orbital rotation")
+            .clicked()
+            {
+                self.earth_world.camera.auto_spin = !spin;
+            }
+
+            let day_night = self.earth_world.camera.day_night_lighting;
+            if icons::icon_button(
+                ui,
+                AppIcon::Sun,
+                if day_night { "SunLit" } else { "FlatLit" },
+                9.5,
+                if day_night { Color32::WHITE } else { theme.text_secondary },
+                if day_night { theme.accent_orange } else { theme.bg_card },
+                Stroke::NONE,
+                CornerRadius::same(5),
+                Vec2::new(0.0, 22.0),
+            )
+            .on_hover_text("Toggle real-time solar terminator day/night globe shading")
+            .clicked()
+            {
+                self.earth_world.camera.day_night_lighting = !day_night;
+            }
+
+            let playing = self.earth_world.sim_playing;
+            if icons::icon_button(
+                ui,
+                if playing { AppIcon::Pause } else { AppIcon::Play },
+                if playing { "Pause Sim" } else { "Play Sim" },
+                9.5,
+                if playing { Color32::WHITE } else { theme.text_secondary },
+                if playing { theme.accent_green } else { theme.bg_card },
+                Stroke::NONE,
+                CornerRadius::same(5),
+                Vec2::new(0.0, 22.0),
+            )
+            .on_hover_text("Auto-advance Earth climate & engineering budget years")
+            .clicked()
+            {
+                self.earth_world.sim_playing = !playing;
+            }
+
+            if icons::icon_button(
+                ui,
+                AppIcon::Sparkles,
+                "+1 Yr",
+                9.5,
+                theme.text_primary,
+                theme.bg_card,
+                Stroke::new(1.0, theme.border_subtle),
+                CornerRadius::same(5),
+                Vec2::new(0.0, 22.0),
+            )
+            .on_hover_text("Advance planetary simulation by 1 year")
+            .clicked()
+            {
+                self.earth_world.tick_simulation_years(1);
+            }
+
+            let v = &self.earth_world.vitals;
+            let hab_color = if v.habitability_score >= 78.0 {
+                theme.accent_green
+            } else if v.habitability_score >= 55.0 {
+                theme.accent_orange
+            } else {
+                theme.accent_red
+            };
+            for vital in [
+                format!("Yr {}", v.year),
+                format!("CO2 {:.0}ppm", v.co2_ppm),
+                format!("ΔT {:+.2}°C", v.temp_anomaly_c),
+                format!("Hab {:.0}/100", v.habitability_score),
+                format!("Flood {}", v.flooded_coast_cells),
+                format!("Clean {:.0}GW", v.clean_gw),
+                format!("${:.0}B", v.budget_billion_usd),
+            ] {
+                ui.label(
+                    RichText::new(vital)
+                        .size(10.0)
+                        .monospace()
+                        .color(hab_color),
+                );
+            }
+        });
+        let (prog, prog_text, done) = self.earth_world.scenario_progress();
+        ui.add(
+            egui::Label::new(
+                RichText::new(format!("[{:.0}%] {}", prog * 100.0, prog_text))
+                    .size(10.0)
+                    .strong()
+                    .color(if done {
+                        theme.accent_green
+                    } else {
+                        theme.accent_blue
+                    }),
+            )
+            .wrap(),
+        );
     }
 
     /// World Map basemap selector, Global overview, Ground 1:200 site zoom, and Site Origin anchor controls.
@@ -2652,6 +3187,37 @@ impl UniversalCanvasState {
         btn_h: f32,
     ) {
         use crate::core::gis::TileSource;
+        if icons::icon_button(
+            ui,
+            AppIcon::Globe,
+            if self.globe_mode { "3D Earth" } else { "2D Map" },
+            10.5,
+            if self.globe_mode {
+                Color32::WHITE
+            } else {
+                theme.text_primary
+            },
+            if self.globe_mode {
+                theme.accent_blue
+            } else {
+                theme.bg_card
+            },
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(0.0, btn_h),
+        )
+        .on_hover_text("Toggle between 3D Google Earth Globe and 2D Flat World Map (Shortcut: G)")
+        .clicked()
+        {
+            self.globe_mode = !self.globe_mode;
+            self.pending_earth_arc_start = None;
+            self.status_message = Some(if self.globe_mode {
+                "Switched to 3D Google Earth Globe mode (G)".to_string()
+            } else {
+                "Switched to 2D Flat World Map mode (G)".to_string()
+            });
+        }
+
         let short_name = |src: TileSource| -> &'static str {
             match src {
                 TileSource::OpenStreetMap => "OSM Streets",
@@ -2694,10 +3260,17 @@ impl UniversalCanvasState {
             CornerRadius::same(6),
             Vec2::new(0.0, btn_h),
         )
-        .on_hover_text("Reset view to full Global World Map showing all continents")
+        .on_hover_text("Reset view to full Global Earth orbit showing all continents")
         .clicked()
         {
-            self.world_map.reset_to_global_view();
+            if self.globe_mode {
+                self.earth_world.camera.tilt_deg = 12.0;
+                self.earth_world.camera.heading_deg = 0.0;
+                self.earth_world
+                    .start_fly_to(&self.world_map, 5.0, 98.0, 1.65, "Global Earth");
+            } else {
+                self.world_map.reset_to_global_view();
+            }
         }
 
         if icons::icon_button(
@@ -2721,7 +3294,12 @@ impl UniversalCanvasState {
             };
             self.ground_origin_lat_lon = target;
             self.ground_origin_anchored = true;
-            self.world_map.zoom_to_ground_site(target.0, target.1, 17.5);
+            if self.globe_mode {
+                self.earth_world
+                    .start_fly_to(&self.world_map, target.0, target.1, 17.5, "Ground 1:200");
+            } else {
+                self.world_map.zoom_to_ground_site(target.0, target.1, 17.5);
+            }
         }
 
         if icons::icon_button(
@@ -2779,7 +3357,12 @@ impl UniversalCanvasState {
             if let Some((label, lat, lon, zoom)) =
                 crate::core::gis::SlippyMapState::resolve_location_query(&self.earth_search_query)
             {
-                self.world_map.zoom_to_ground_site(lat, lon, zoom);
+                if self.globe_mode {
+                    self.earth_world
+                        .start_fly_to(&self.world_map, lat, lon, zoom, &label);
+                } else {
+                    self.world_map.zoom_to_ground_site(lat, lon, zoom);
+                }
                 self.ground_origin_lat_lon = (lat, lon);
                 self.ground_origin_anchored = true;
                 self.status_message = Some(format!(
@@ -2896,12 +3479,38 @@ impl UniversalCanvasState {
         }
     }
 
+    /// Converts a viewport screen position into `(lat_deg, lon_deg, hit_globe)` using exact ray-sphere picking when in 3D Globe mode.
+    pub fn screen_to_lat_lon_with_hit(&self, screen: Pos2, rect: Rect) -> (f64, f64, bool) {
+        if self.globe_mode {
+            let xform = self
+                .last_globe_xform
+                .as_ref()
+                .filter(|x| x.rect == rect)
+                .cloned()
+                .unwrap_or_else(|| {
+                    GlobeScreenTransform::from_view(
+                        rect,
+                        self.world_map.center_lat_lon.0,
+                        self.world_map.center_lat_lon.1,
+                        self.world_map.zoom_level,
+                        &self.earth_world.camera,
+                    )
+                });
+            xform.screen_to_lat_lon(screen)
+        } else {
+            let (lat, lon) = self.world_map.screen_to_lat_lon(screen, rect);
+            (lat, lon, true)
+        }
+    }
+
     /// Anchors ground `(0, 0) mm` origin to `screen_pos` on Earth if the workspace is still blank.
     pub fn ensure_ground_origin_at_screen(&mut self, screen_pos: Pos2, rect: Rect) {
         if !self.ground_origin_anchored && self.entities.is_empty() {
-            let (lat, lon) = self.world_map.screen_to_lat_lon(screen_pos, rect);
-            self.ground_origin_lat_lon = (lat, lon);
-            self.ground_origin_anchored = true;
+            let (lat, lon, hit) = self.screen_to_lat_lon_with_hit(screen_pos, rect);
+            if hit {
+                self.ground_origin_lat_lon = (lat, lon);
+                self.ground_origin_anchored = true;
+            }
         }
     }
 
@@ -2975,11 +3584,39 @@ impl UniversalCanvasState {
     }
 
     pub fn world_to_screen(&self, rect: Rect, world_mm: [f64; 2]) -> Pos2 {
+        if self.globe_mode {
+            let xform = self
+                .last_globe_xform
+                .as_ref()
+                .filter(|x| x.rect == rect)
+                .cloned()
+                .unwrap_or_else(|| {
+                    GlobeScreenTransform::from_view(
+                        rect,
+                        self.world_map.center_lat_lon.0,
+                        self.world_map.center_lat_lon.1,
+                        self.world_map.zoom_level,
+                        &self.earth_world.camera,
+                    )
+                });
+            let (lat, lon) =
+                SlippyMapState::world_mm_to_lat_lon(self.ground_origin_lat_lon, world_mm);
+            if let Some((pos, _cam_z, visible)) = xform.project_lat_lon_elev(lat, lon, 0.0) {
+                if visible {
+                    return pos;
+                }
+            }
+            return Pos2::new(-1e6, -1e6);
+        }
         self.world_map
             .world_mm_to_screen(self.ground_origin_lat_lon, world_mm, rect)
     }
 
     pub fn screen_to_world(&self, rect: Rect, screen: Pos2) -> [f64; 2] {
+        if self.globe_mode {
+            let (lat, lon, _) = self.screen_to_lat_lon_with_hit(screen, rect);
+            return SlippyMapState::lat_lon_to_world_mm(self.ground_origin_lat_lon, lat, lon);
+        }
         self.world_map
             .screen_to_world_mm(self.ground_origin_lat_lon, screen, rect)
     }
@@ -3134,6 +3771,53 @@ impl UniversalCanvasState {
         )
     }
 
+    fn orbit_globe_by_pixels(&mut self, rect: Rect, delta: Vec2, alt_held: bool, dt: f32) {
+        self.earth_world.camera.fly_to = None;
+        if alt_held {
+            self.earth_world.camera.tilt_deg =
+                (self.earth_world.camera.tilt_deg - delta.y * 0.35).clamp(0.0, 65.0);
+            self.earth_world.camera.heading_deg =
+                (self.earth_world.camera.heading_deg + delta.x * 0.45).rem_euclid(360.0);
+            self.earth_world.camera.angular_vel_lat = 0.0;
+            self.earth_world.camera.angular_vel_lon = 0.0;
+            return;
+        }
+        let xform = self
+            .last_globe_xform
+            .as_ref()
+            .filter(|x| x.rect == rect)
+            .cloned()
+            .unwrap_or_else(|| {
+                GlobeScreenTransform::from_view(
+                    rect,
+                    self.world_map.center_lat_lon.0,
+                    self.world_map.center_lat_lon.1,
+                    self.world_map.zoom_level,
+                    &self.earth_world.camera,
+                )
+            });
+        let dpp = xform.deg_per_pixel();
+        let cos_lat = self
+            .world_map
+            .center_lat_lon
+            .0
+            .to_radians()
+            .cos()
+            .abs()
+            .max(0.25);
+        let hr = self.earth_world.camera.heading_deg.to_radians() as f64;
+        let dx_east = delta.x as f64 * hr.cos() - delta.y as f64 * hr.sin();
+        let dy_north = -(delta.x as f64 * hr.sin() + delta.y as f64 * hr.cos());
+        let dlon = -dx_east * dpp / cos_lat;
+        let dlat = -dy_north * dpp;
+        let nlat = (self.world_map.center_lat_lon.0 + dlat).clamp(-85.0, 85.0);
+        let nlon = self.world_map.center_lat_lon.1 + dlon;
+        self.world_map.set_center(nlat, nlon);
+        let inv_dt = 1.0 / dt.max(0.008);
+        self.earth_world.camera.angular_vel_lat = (dlat as f32 * inv_dt * 0.35).clamp(-65.0, 65.0);
+        self.earth_world.camera.angular_vel_lon = (dlon as f32 * inv_dt * 0.35).clamp(-85.0, 85.0);
+    }
+
     fn handle_canvas_interaction(
         &mut self,
         ui: &Ui,
@@ -3145,18 +3829,46 @@ impl UniversalCanvasState {
     ) {
         if self.is_frozen || pointer_in_inspector {
             self.pending_start_mm = None;
+            self.pending_earth_arc_start = None;
             self.marquee_anchor_mm = None;
             self.marquee_current_mm = None;
             self.active_freehand_mm.clear();
             return;
         }
 
-        // Scroll Wheel Zoom around cursor on World Map
+        // Scroll Wheel Zoom around cursor on 3D Globe or 2D World Map
         if response.hovered() {
             let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
             if scroll_y.abs() > 0.2 {
-                self.world_map
-                    .zoom_at_screen_pos(scroll_y * 0.0028, response.hover_pos(), rect);
+                if self.globe_mode {
+                    self.earth_world.camera.fly_to = None;
+                    let dz = scroll_y * 0.0028;
+                    if dz > 0.0 {
+                        if let Some(pos) = response.hover_pos() {
+                            let (hlat, hlon, hit) = self.screen_to_lat_lon_with_hit(pos, rect);
+                            if hit {
+                                let pull = (1.0 - 2.0_f64.powf(-(dz as f64))).clamp(0.0, 0.35);
+                                let mut dlon = hlon - self.world_map.center_lat_lon.1;
+                                if dlon > 180.0 {
+                                    dlon -= 360.0;
+                                } else if dlon < -180.0 {
+                                    dlon += 360.0;
+                                }
+                                let nlat = self.world_map.center_lat_lon.0
+                                    + (hlat - self.world_map.center_lat_lon.0) * pull;
+                                let nlon = self.world_map.center_lat_lon.1 + dlon * pull;
+                                self.world_map.set_center(nlat, nlon);
+                            }
+                        }
+                    }
+                    self.world_map.zoom_level = (self.world_map.zoom_level + dz).clamp(1.0, 20.5);
+                } else {
+                    self.world_map.zoom_at_screen_pos(
+                        scroll_y * 0.0028,
+                        response.hover_pos(),
+                        rect,
+                    );
+                }
             }
         }
 
@@ -3165,7 +3877,8 @@ impl UniversalCanvasState {
         self.last_osnap_radius_mm = hit_radius_mm.clamp(250.0, 2500.0);
 
         if let Some(hover) = response.hover_pos() {
-            self.cursor_lat_lon = self.world_map.screen_to_lat_lon(hover, rect);
+            let (lat, lon, _) = self.screen_to_lat_lon_with_hit(hover, rect);
+            self.cursor_lat_lon = (lat, lon);
             let raw_mm = self.screen_to_world(rect, hover);
             let (snapped, kind) = self.snap_point_with_osnap(
                 raw_mm,
@@ -3177,34 +3890,174 @@ impl UniversalCanvasState {
             self.last_osnap_kind = kind;
         }
 
-        // Right-drag, Middle-drag, or Shift-drag pans Earth map in any tool
+        let (shift_held, alt_held, dt) =
+            ui.input(|i| (i.modifiers.shift, i.modifiers.alt, i.unstable_dt));
+
+        // Right-drag, Middle-drag, Shift-drag, or Alt-drag orbits/tilts 3D Globe or pans 2D map in any tool
         if response.dragged_by(egui::PointerButton::Secondary)
             || response.dragged_by(egui::PointerButton::Middle)
-            || (response.dragged() && ui.input(|i| i.modifiers.shift))
+            || (response.dragged() && (shift_held || alt_held))
         {
             let delta = response.drag_delta();
-            self.world_map.pan_by_pixels(delta.x, delta.y);
+            if self.globe_mode {
+                self.orbit_globe_by_pixels(rect, delta, alt_held, dt);
+            } else {
+                self.world_map.pan_by_pixels(delta.x, delta.y);
+            }
             return;
         }
 
         if self.measure_active && response.clicked_by(egui::PointerButton::Primary) {
             if let Some(pos) = response.interact_pointer_pos() {
-                let lat_lon = self.world_map.screen_to_lat_lon(pos, rect);
-                self.measure_points_lat_lon.push(lat_lon);
+                let (lat, lon, hit) = self.screen_to_lat_lon_with_hit(pos, rect);
+                if hit {
+                    self.measure_points_lat_lon.push((lat, lon));
+                }
+            }
+            return;
+        }
+
+        // Phase 43: Earth Terraforming Brushes & Planetary Megaproject Tools
+        if let Some(brush) = self.active_tool.earth_brush_action() {
+            let stroke_start = response.drag_started_by(egui::PointerButton::Primary)
+                || response.clicked_by(egui::PointerButton::Primary);
+            let dragging = response.dragged_by(egui::PointerButton::Primary);
+            if stroke_start || dragging {
+                if let Some(pos) = response
+                    .hover_pos()
+                    .or_else(|| response.interact_pointer_pos())
+                {
+                    let (lat, lon, hit) = self.screen_to_lat_lon_with_hit(pos, rect);
+                    if hit {
+                        let count = self.earth_world.apply_brush(lat, lon, brush, stroke_start);
+                        if count > 0 || stroke_start {
+                            let new_el = self.earth_world.effective_elevation_m(lat, lon);
+                            self.status_message = Some(format!(
+                                "{} @ {:.2}°, {:.2}° (Elev {:+.0}m • CO2 {:.0} ppm • Hab {:.0}/100)",
+                                brush.label(),
+                                lat,
+                                lon,
+                                new_el,
+                                self.earth_world.vitals.co2_ppm,
+                                self.earth_world.vitals.habitability_score,
+                            ));
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        if let Some(kind) = self.active_tool.earth_megastructure_kind() {
+            use crate::core::gis::MegastructureKind;
+            if kind == MegastructureKind::ArcologyMegaTower {
+                if response.clicked_by(egui::PointerButton::Primary) {
+                    if let Some(pos) = response.interact_pointer_pos() {
+                        let (lat, lon, hit) = self.screen_to_lat_lon_with_hit(pos, rect);
+                        if hit {
+                            let id = self.earth_world.add_megastructure(kind, (lat, lon), (lat, lon));
+                            self.status_message = Some(format!(
+                                "Constructed Mega-Tower #{id} at {:.2}°, {:.2}° (Habitability {:.0}/100)",
+                                lat, lon, self.earth_world.vitals.habitability_score
+                            ));
+                        }
+                    }
+                }
+                return;
+            }
+            if response.drag_started_by(egui::PointerButton::Primary) {
+                if let Some(pos) = response
+                    .hover_pos()
+                    .or_else(|| response.interact_pointer_pos())
+                {
+                    let (lat, lon, hit) = self.screen_to_lat_lon_with_hit(pos, rect);
+                    if hit {
+                        self.pending_earth_arc_start = Some((lat, lon));
+                    }
+                }
+            } else if response.drag_stopped_by(egui::PointerButton::Primary) {
+                if let Some(start_ll) = self.pending_earth_arc_start.take() {
+                    if let Some(pos) = response
+                        .hover_pos()
+                        .or_else(|| response.interact_pointer_pos())
+                    {
+                        let (lat, lon, hit) = self.screen_to_lat_lon_with_hit(pos, rect);
+                        if hit {
+                            let id = self.earth_world.add_megastructure(kind, start_ll, (lat, lon));
+                            if let Some(m) = self.earth_world.megastructures.last() {
+                                self.status_message = Some(format!(
+                                    "Built {} (#{id}): {:.0} km (${:.1}B, {:.1} Mt/yr CO2)",
+                                    m.name, m.length_km, m.cost_b_usd, m.carbon_delta_mt_yr
+                                ));
+                            }
+                        }
+                    }
+                }
+            } else if response.clicked_by(egui::PointerButton::Primary) {
+                if let Some(pos) = response.interact_pointer_pos() {
+                    let (lat, lon, hit) = self.screen_to_lat_lon_with_hit(pos, rect);
+                    if hit {
+                        if let Some(start_ll) = self.pending_earth_arc_start.take() {
+                            let id = self.earth_world.add_megastructure(kind, start_ll, (lat, lon));
+                            if let Some(m) = self.earth_world.megastructures.last() {
+                                self.status_message = Some(format!(
+                                    "Built {} (#{id}): {:.0} km",
+                                    m.name, m.length_km
+                                ));
+                            }
+                        } else {
+                            self.pending_earth_arc_start = Some((lat, lon));
+                            self.status_message = Some(format!(
+                                "{} start anchored ({:.2}°, {:.2}°) — click or drag destination",
+                                kind.label(),
+                                lat,
+                                lon
+                            ));
+                        }
+                    }
+                }
             }
             return;
         }
 
         let world_map_snapshot = self.world_map.clone();
         let origin_lat_lon = self.ground_origin_lat_lon;
+        let globe_xform_snapshot = if self.globe_mode {
+            Some(
+                self.last_globe_xform
+                    .as_ref()
+                    .filter(|x| x.rect == rect)
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        GlobeScreenTransform::from_view(
+                            rect,
+                            world_map_snapshot.center_lat_lon.0,
+                            world_map_snapshot.center_lat_lon.1,
+                            world_map_snapshot.zoom_level,
+                            &self.earth_world.camera,
+                        )
+                    }),
+            )
+        } else {
+            None
+        };
         let to_world = |pos: Pos2| -> [f64; 2] {
-            world_map_snapshot.screen_to_world_mm(origin_lat_lon, pos, rect)
+            if let Some(ref xf) = globe_xform_snapshot {
+                let (lat, lon, _) = xf.screen_to_lat_lon(pos);
+                SlippyMapState::lat_lon_to_world_mm(origin_lat_lon, lat, lon)
+            } else {
+                world_map_snapshot.screen_to_world_mm(origin_lat_lon, pos, rect)
+            }
         };
 
         if self.active_tool == UniversalCanvasTool::SelectPan {
             if response.dragged_by(egui::PointerButton::Primary) {
                 let delta = response.drag_delta();
-                self.world_map.pan_by_pixels(delta.x, delta.y);
+                if self.globe_mode {
+                    self.orbit_globe_by_pixels(rect, delta, alt_held, dt);
+                } else {
+                    self.world_map.pan_by_pixels(delta.x, delta.y);
+                }
             } else if response.clicked_by(egui::PointerButton::Primary) {
                 if let Some(pos) = response.interact_pointer_pos() {
                     let w = to_world(pos);
@@ -3536,6 +4389,16 @@ impl UniversalCanvasState {
                     }
                 }
             }
+            UniversalCanvasTool::EarthUplift
+            | UniversalCanvasTool::EarthCarve
+            | UniversalCanvasTool::EarthReclaim
+            | UniversalCanvasTool::EarthForest
+            | UniversalCanvasTool::EarthSolar
+            | UniversalCanvasTool::EarthLake
+            | UniversalCanvasTool::EarthSeawall
+            | UniversalCanvasTool::EarthBridge
+            | UniversalCanvasTool::EarthTower
+            | UniversalCanvasTool::EarthCorridor => {}
         }
     }
 
@@ -4052,6 +4915,17 @@ impl UniversalCanvasState {
     ) {
         let clip_painter = painter.with_clip_rect(rect);
         let active_badge = active_pillar.badge();
+        let is_screen_valid =
+            |p: Pos2| p.x.is_finite() && p.y.is_finite() && p.x > -50_000.0 && p.y > -50_000.0;
+
+        let globe_xform = if self.globe_mode {
+            self.last_globe_xform
+                .as_ref()
+                .filter(|x| x.rect == rect)
+                .cloned()
+        } else {
+            None
+        };
 
         for ent in &self.entities {
             if !self.sync_all_layers && ent.pillar_badge != active_badge {
@@ -4079,44 +4953,134 @@ impl UniversalCanvasState {
                 CanvasShapeKind::Freehand { points_mm } => {
                     let spts: Vec<Pos2> = points_mm.iter().map(|p| to_screen(*p)).collect();
                     for w in spts.windows(2) {
-                        clip_painter.line_segment([w[0], w[1]], stroke);
+                        if is_screen_valid(w[0]) && is_screen_valid(w[1]) {
+                            clip_painter.line_segment([w[0], w[1]], stroke);
+                        }
                     }
                 }
                 CanvasShapeKind::Line { start_mm, end_mm } => {
-                    clip_painter.line_segment([to_screen(*start_mm), to_screen(*end_mm)], stroke);
+                    let len_mm = (end_mm[0] - start_mm[0]).hypot(end_mm[1] - start_mm[1]);
+                    if let Some(xf) = globe_xform.as_ref().filter(|_| len_mm > 5_000_000.0) {
+                        let a = SlippyMapState::world_mm_to_lat_lon(
+                            self.ground_origin_lat_lon,
+                            *start_mm,
+                        );
+                        let b = SlippyMapState::world_mm_to_lat_lon(
+                            self.ground_origin_lat_lon,
+                            *end_mm,
+                        );
+                        let arc = crate::core::gis::great_circle_arc(a, b, 16);
+                        let proj: Vec<Option<Pos2>> = arc
+                            .iter()
+                            .map(|&(la, lo)| {
+                                xf.project_lat_lon_elev(la, lo, 0.0)
+                                    .and_then(|(p, _, vis)| if vis { Some(p) } else { None })
+                            })
+                            .collect();
+                        for pair in proj.windows(2) {
+                            if let (Some(p0), Some(p1)) = (pair[0], pair[1]) {
+                                clip_painter.line_segment([p0, p1], stroke);
+                            }
+                        }
+                    } else {
+                        let p0 = to_screen(*start_mm);
+                        let p1 = to_screen(*end_mm);
+                        if is_screen_valid(p0) && is_screen_valid(p1) {
+                            clip_painter.line_segment([p0, p1], stroke);
+                        }
+                    }
                 }
                 CanvasShapeKind::Rectangle { min_mm, max_mm } => {
-                    let r = Rect::from_two_pos(to_screen(*min_mm), to_screen(*max_mm));
-                    clip_painter.rect_filled(r, CornerRadius::ZERO, col.gamma_multiply(0.08));
-                    clip_painter.rect_stroke(r, CornerRadius::ZERO, stroke, StrokeKind::Inside);
+                    let p0 = to_screen(*min_mm);
+                    let p1 = to_screen(*max_mm);
+                    if is_screen_valid(p0) && is_screen_valid(p1) {
+                        let r = Rect::from_two_pos(p0, p1);
+                        clip_painter.rect_filled(r, CornerRadius::ZERO, col.gamma_multiply(0.08));
+                        clip_painter.rect_stroke(r, CornerRadius::ZERO, stroke, StrokeKind::Inside);
+                    }
                 }
                 CanvasShapeKind::Circle {
                     center_mm,
                     radius_mm,
                 } => {
                     let c = to_screen(*center_mm);
-                    let edge = to_screen([center_mm[0] + radius_mm, center_mm[1]]);
-                    let r_px = (edge.x - c.x).abs().max(2.0);
-                    clip_painter.circle_stroke(c, r_px, stroke);
+                    if is_screen_valid(c) {
+                        let edge = to_screen([center_mm[0] + radius_mm, center_mm[1]]);
+                        let r_px = if is_screen_valid(edge) {
+                            (edge - c).length().max(2.0)
+                        } else {
+                            (self.world_map.pixels_per_mm_at_origin(self.ground_origin_lat_lon)
+                                * (*radius_mm as f32))
+                                .max(2.0)
+                        };
+                        clip_painter.circle_stroke(c, r_px, stroke);
+                    }
                 }
                 CanvasShapeKind::Dimension { start_mm, end_mm } => {
                     let s0 = to_screen(*start_mm);
                     let s1 = to_screen(*end_mm);
-                    clip_painter.line_segment([s0, s1], stroke);
-                    clip_painter.circle_filled(s0, 3.0, col);
-                    clip_painter.circle_filled(s1, 3.0, col);
-                    let dist = (end_mm[0] - start_mm[0]).hypot(end_mm[1] - start_mm[1]);
-                    let mid = Pos2::new((s0.x + s1.x) * 0.5, (s0.y + s1.y) * 0.5 - 10.0);
-                    clip_painter.text(
-                        mid,
-                        Align2::CENTER_BOTTOM,
-                        format!("[{}] {:.0} mm", ent.pillar_badge, dist),
-                        egui::FontId::monospace(10.0),
-                        col,
-                    );
+                    let len_mm = (end_mm[0] - start_mm[0]).hypot(end_mm[1] - start_mm[1]);
+                    if let Some(xf) = globe_xform.as_ref().filter(|_| len_mm > 5_000_000.0) {
+                        let a = SlippyMapState::world_mm_to_lat_lon(
+                            self.ground_origin_lat_lon,
+                            *start_mm,
+                        );
+                        let b = SlippyMapState::world_mm_to_lat_lon(
+                            self.ground_origin_lat_lon,
+                            *end_mm,
+                        );
+                        let arc = crate::core::gis::great_circle_arc(a, b, 16);
+                        let proj: Vec<Option<Pos2>> = arc
+                            .iter()
+                            .map(|&(la, lo)| {
+                                xf.project_lat_lon_elev(la, lo, 0.0)
+                                    .and_then(|(p, _, vis)| if vis { Some(p) } else { None })
+                            })
+                            .collect();
+                        for pair in proj.windows(2) {
+                            if let (Some(p0), Some(p1)) = (pair[0], pair[1]) {
+                                clip_painter.line_segment([p0, p1], stroke);
+                            }
+                        }
+                        if is_screen_valid(s0) {
+                            clip_painter.circle_filled(s0, 3.0, col);
+                        }
+                        if is_screen_valid(s1) {
+                            clip_painter.circle_filled(s1, 3.0, col);
+                        }
+                        if let Some(Some(mid)) = proj.get(proj.len() / 2) {
+                            let label = if len_mm >= 1_000_000.0 {
+                                format!("[{}] {:.2} km", ent.pillar_badge, len_mm / 1_000_000.0)
+                            } else {
+                                format!("[{}] {:.0} mm", ent.pillar_badge, len_mm)
+                            };
+                            clip_painter.text(
+                                *mid + Vec2::new(0.0, -10.0),
+                                Align2::CENTER_BOTTOM,
+                                label,
+                                egui::FontId::monospace(10.0),
+                                col,
+                            );
+                        }
+                    } else if is_screen_valid(s0) && is_screen_valid(s1) {
+                        clip_painter.line_segment([s0, s1], stroke);
+                        clip_painter.circle_filled(s0, 3.0, col);
+                        clip_painter.circle_filled(s1, 3.0, col);
+                        let mid = Pos2::new((s0.x + s1.x) * 0.5, (s0.y + s1.y) * 0.5 - 10.0);
+                        clip_painter.text(
+                            mid,
+                            Align2::CENTER_BOTTOM,
+                            format!("[{}] {:.0} mm", ent.pillar_badge, len_mm),
+                            egui::FontId::monospace(10.0),
+                            col,
+                        );
+                    }
                 }
                 CanvasShapeKind::Callout { pos_mm, text } => {
                     let p = to_screen(*pos_mm);
+                    if !is_screen_valid(p) {
+                        continue;
+                    }
                     clip_painter.circle_filled(p, 4.0, col);
                     let box_pos = p + Vec2::new(8.0, -18.0);
                     let bg = if theme.is_dark() {
@@ -4542,13 +5506,31 @@ impl UniversalCanvasState {
                 ui.set_max_width(inner_w);
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                 let telem = self.world_map.telemetry();
-                let geo_txt = format!(
-                    "{:.4}°, {:.4}° • z{:.1} ({:.1} m/px)",
+                let cur_elev = self
+                    .earth_world
+                    .effective_elevation_m(self.cursor_lat_lon.0, self.cursor_lat_lon.1);
+                let geo_badge = format!(
+                    "[{}] {:.3}°, {:.3}°",
+                    if self.globe_mode { "3D Earth" } else { "2D Map" },
                     self.cursor_lat_lon.0,
                     self.cursor_lat_lon.1,
-                    self.world_map.zoom_level,
-                    telem.ground_resolution_m_px,
                 );
+                let elev_txt = if self.globe_mode {
+                    format!(
+                        "Elev {:+.0}m • Tilt {:.0}° • z{:.1} ({:.1} m/px)",
+                        cur_elev,
+                        self.earth_world.camera.tilt_deg,
+                        self.world_map.zoom_level,
+                        telem.ground_resolution_m_px,
+                    )
+                } else {
+                    format!(
+                        "Elev {:+.0}m • z{:.1} ({:.1} m/px)",
+                        cur_elev,
+                        self.world_map.zoom_level,
+                        telem.ground_resolution_m_px,
+                    )
+                };
                 let coord_txt = format!(
                     "X: {:.0}  Y: {:.0} mm",
                     self.cursor_world_mm[0], self.cursor_world_mm[1],
@@ -4566,33 +5548,53 @@ impl UniversalCanvasState {
                 } else {
                     format!("ON [{}]", self.last_osnap_kind.short_tag())
                 };
-                let mode_txt = format!(
-                    "Tool: {} • Ortho(F8): {} • Snap(F3): {} • OSNAP(F4): {}{}",
-                    self.active_tool.short_label(),
+                let tool_txt = format!("Tool: {}{}", self.active_tool.short_label(), sel_tag);
+                let snap_txt = format!(
+                    "Ortho(F8):{} Snap(F3):{} OSNAP(F4):{}",
                     if self.ortho_mode { "ON" } else { "OFF" },
                     if self.snap_to_grid { "ON" } else { "OFF" },
                     osnap_tag,
-                    sel_tag,
                 );
-                let counts_txt = format!(
-                    "{} Draw ({} {}) • {} BIM",
-                    self.entities.len(),
-                    self.count_for_pillar(active_pillar),
-                    active_pillar.badge(),
-                    bim_project.walls.len()
-                        + bim_project.columns.len()
-                        + bim_project.runs.len()
-                );
+                let counts_txt = if !self.earth_world.cells.is_empty()
+                    || !self.earth_world.megastructures.is_empty()
+                {
+                    format!(
+                        "{} Draw ({} {}) • {} BIM • {} Earth / {} Mega",
+                        self.entities.len(),
+                        self.count_for_pillar(active_pillar),
+                        active_pillar.badge(),
+                        bim_project.walls.len()
+                            + bim_project.columns.len()
+                            + bim_project.runs.len(),
+                        self.earth_world.cells.len(),
+                        self.earth_world.megastructures.len(),
+                    )
+                } else {
+                    format!(
+                        "{} Draw ({} {}) • {} BIM",
+                        self.entities.len(),
+                        self.count_for_pillar(active_pillar),
+                        active_pillar.badge(),
+                        bim_project.walls.len()
+                            + bim_project.columns.len()
+                            + bim_project.runs.len()
+                    )
+                };
                 ui.horizontal_wrapped(|ui| {
                     icons::icon_label(
                         ui,
                         AppIcon::Globe,
                         12.0,
                         theme.accent_blue,
-                        geo_txt,
+                        geo_badge,
                         10.5,
                         theme.text_secondary,
                         false,
+                    );
+                    ui.label(
+                        RichText::new(elev_txt)
+                            .size(10.5)
+                            .color(theme.text_secondary),
                     );
                     icons::icon_label(
                         ui,
@@ -4613,10 +5615,15 @@ impl UniversalCanvasState {
                         } else {
                             theme.text_secondary
                         },
-                        mode_txt,
+                        tool_txt,
                         10.5,
                         theme.text_secondary,
                         false,
+                    );
+                    ui.label(
+                        RichText::new(snap_txt)
+                            .size(10.5)
+                            .color(theme.text_secondary),
                     );
                     icons::icon_label(
                         ui,
@@ -4627,11 +5634,6 @@ impl UniversalCanvasState {
                         10.5,
                         theme.text_secondary,
                         false,
-                    );
-                    ui.label(
-                        RichText::new("Keys: Space Freeze • L/R/C/D Draw • M/O/X Modify • Del Erase • Z Fit")
-                            .size(10.0)
-                            .color(theme.text_muted),
                     );
                     if icons::icon_button(
                         ui,
@@ -4650,6 +5652,14 @@ impl UniversalCanvasState {
                         self.request_scroll_to_workbench = true;
                     }
                 });
+                ui.add(
+                    egui::Label::new(
+                        RichText::new("Keys: Space Freeze • G 3D Earth • [ ] Tilt • 1-9 Earth • L/R/C/D Draw • M/O/X Modify")
+                            .size(10.0)
+                            .color(theme.text_muted),
+                    )
+                    .wrap(),
+                );
             });
     }
 
@@ -5052,5 +6062,119 @@ mod tests {
             &mut bim,
         );
         assert!(arr_msg.contains("Arrayed 2x2"));
+    }
+
+    #[test]
+    fn test_phase43_default_3d_google_earth_mode_and_archive_roundtrip() {
+        use crate::core::gis::{EarthBrushAction, MegastructureKind, TileSource};
+
+        let mut canvas = UniversalCanvasState::default();
+        assert!(canvas.globe_mode);
+        assert_eq!(canvas.world_map.tile_provider, TileSource::EsriWorldImagery);
+        assert!(canvas.world_map.zoom_level < 3.0);
+
+        let before_co2 = canvas.earth_world.vitals.co2_ppm;
+        let touched = canvas
+            .earth_world
+            .apply_brush(-1.0, 114.0, EarthBrushAction::PlantForest, true);
+        assert!(touched > 0);
+        assert!(canvas.earth_world.vitals.co2_ppm < before_co2);
+
+        let id = canvas.earth_world.add_megastructure(
+            MegastructureKind::TransStraitBridge,
+            (-5.9, 105.9),
+            (-6.1, 106.1),
+        );
+        assert!(id >= 1);
+        assert_eq!(canvas.earth_world.megastructures.len(), 1);
+
+        canvas.globe_mode = false;
+        let bim = BimProject::sample_bimcraft_building();
+        let members = vec![StructuralMember::default()];
+        let vars = Vec::new();
+        let archive = canvas.build_unified_archive(&bim, &members, &vars, sample_settings());
+        let json = archive.to_pretty_json().expect("serialize archive");
+        let _verified = UnifiedWorkspaceArchive::from_verified_json(&json).expect("verify archive");
+
+        let mut restored = UniversalCanvasState::default();
+        let mut out_bim = BimProject::default();
+        let mut out_members = Vec::new();
+        let mut out_vars = Vec::new();
+        let out_settings = restored
+            .apply_unified_archive(&json, &mut out_bim, &mut out_members, &mut out_vars)
+            .expect("restore unified archive");
+
+        assert!(!restored.globe_mode);
+        assert_eq!(out_settings.solver_threads, sample_settings().solver_threads);
+        assert_eq!(restored.earth_world.cells.len(), canvas.earth_world.cells.len());
+        assert_eq!(restored.earth_world.megastructures.len(), 1);
+        assert!((restored.earth_world.vitals.co2_ppm - canvas.earth_world.vitals.co2_ppm).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_phase43_3d_globe_projection_and_responsive_viewport() {
+        use crate::core::gis::{EarthBrushAction, EarthScenario, MegastructureKind};
+
+        let mut canvas = UniversalCanvasState::default();
+        let (slat, slon, szoom) = canvas
+            .earth_world
+            .load_scenario(EarthScenario::CoastalDeltaDefense);
+        canvas.world_map.zoom_to_ground_site(slat, slon, szoom);
+        canvas.ground_origin_lat_lon = (slat, slon);
+        canvas.ground_origin_anchored = true;
+        canvas
+            .earth_world
+            .apply_brush(slat, slon, EarthBrushAction::BuildSeawall, true);
+        canvas.earth_world.add_megastructure(
+            MegastructureKind::SolarCleanCorridor,
+            (slat, slon),
+            (slat + 0.8, slon + 1.2),
+        );
+
+        let mut bim = BimProject::sample_bimcraft_building();
+        let mut members = vec![StructuralMember::default()];
+        let mut vars = Vec::new();
+        let theme = MacTheme::for_mode(ThemeMode::ProDark);
+        let ws = sample_settings();
+
+        for w in [1000.0_f32, 700.0, 390.0] {
+            let ctx = egui::Context::default();
+            let input = egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(w, 820.0))),
+                ..Default::default()
+            };
+            let mut max_right = 0.0_f32;
+            let mut panel_right = 0.0_f32;
+            let mut out = ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    panel_right = ui.max_rect().right();
+                    let resp = ui.scope(|ui| {
+                        canvas.show(
+                            ui,
+                            &theme,
+                            NavigationPillar::GeometryAssembly,
+                            &mut bim,
+                            &mut members,
+                            &mut vars,
+                            ws.clone(),
+                            0.0,
+                        );
+                    });
+                    max_right = resp.response.rect.right();
+                });
+            });
+            out.textures_delta.clear();
+            assert!(canvas.last_globe_xform.is_some());
+            assert!(
+                max_right <= panel_right + 1.0,
+                "Overflow at width {w}: content right {max_right} > panel right {panel_right}"
+            );
+        }
+
+        let rect = canvas.last_canvas_rect.expect("canvas rect");
+        let p = canvas.world_to_screen(rect, [0.0, 0.0]);
+        assert!(rect.expand(40.0).contains(p));
+        let back_mm = canvas.screen_to_world(rect, p);
+        assert!(back_mm[0].abs() < 25_000_000.0 && back_mm[1].abs() < 25_000_000.0);
     }
 }

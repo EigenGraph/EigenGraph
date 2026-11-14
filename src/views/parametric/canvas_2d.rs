@@ -135,6 +135,12 @@ impl ParametricView {
                 }
             }
 
+            if !is_frozen_now && universal_canvas.earth_world.camera.fly_to.is_some() {
+                universal_canvas
+                    .earth_world
+                    .step_animations(ui.ctx(), &mut universal_canvas.world_map);
+            }
+
             match self.view_mode {
                 DraftingViewMode::FloorPlanViewRange => {
                     self.draw_interactive_floor_plan(

@@ -7,6 +7,18 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.4.3] - 2026-11-15 — Phase 43: Interactive 3D Google Earth Globe Canvas, Planetary Terraforming & Megaproject Sandbox Game
+
+### Added & Changed
+- **Default 3D Spherical Earth Engine (`src/core/gis/earth_globe.rs`, `src/core/gis/map_widget.rs`, `src/core/gis/mod.rs`)**:
+  - Added a perspective 3D WGS84 spherical Earth viewport (`globe_mode: true` default on startup, toggleable back to `2D Map` via toolbar button or `G` shortcut) featuring a deterministic starfield backdrop, multi-ring Rayleigh atmosphere limb glow, optional solar terminator day/night hemisphere shading, tilted horizon camera (`0°..65°` tilt & `0°..360°` heading, `[` / `]` keys or `Alt+Drag`), smooth spherical orbit with angular momentum inertia, auto-spin, and animated Google Earth Fly-To camera swoops on `"World"`, `"Go"`, `"Ground 1:200"`, and Mission changes.
+  - Wrapped live satellite/map raster tiles (`EsriWorldImagery` default) and `WORLD_LANDMASSES` continental polygons onto spherical triangles (`ear_clip_polygon` reuse + `collect_globe_tile_quads`) with `f64` ray-sphere pointer picking (`GlobeScreenTransform::screen_to_lat_lon`).
+- **Combined Planetary Terraforming & Megaproject Game Loop (`src/core/gis/earth_globe.rs`, `src/views/universal_canvas.rs`, `src/icons.rs`, `src/app.rs`)**:
+  - Added terrain/climate sculpting brushes (`Uplift`, `Carve`, `Reclaim`, `Forest`, `Solar`, `Lake`, `Seawall` — keyboard shortcuts `1..7`, configurable `S`/`M`/`L` brush radii), geodesic megastructures (`Mega-Bridge`, `Mega-Tower`, `Clean Grid` — shortcuts `8..9`), coastal inundation feedback (`Sea Level -50..+50 m`), live planetary telemetry (`Year`, `CO2 ppm`, `Temp ΔT`, `Habitability 0-100`, `Flooded Coast`, `Clean GW`, `Budget $B`), Earth Undo/Redo/Reset, Play/Pause simulation ticks (`+1 Yr`), and four playable missions (`Freeplay Earth`, `Coast +3m Defense`, `Green Nusantara`, `Sahara Solar Oasis`).
+  - Integrated external Earth Sandbox dock below the canvas toolbar matching full canvas width (`390px` Mobile, `700px` Tablet, `1000px` Desktop), keeping the 3D Earth viewport clean (Freeze pill only inside the canvas) with coordinate/vitals telemetry bar directly below the viewport, full archive persistence (`UnifiedWorkspaceArchive` v1 SHA-256), and Great-Circle geodesic CAD/BIM projection onto the curved sphere.
+
+---
+
 ## [v0.4.2] - 2026-11-14 — Phase 42: Live BIM-FEA Solvers, CAD OSNAP & Marquee Promotion, Reactive 4D/5D/9D Sync, Closed-Loop AI Repair & Lean Width Fix
 
 ### Added & Changed

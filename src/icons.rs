@@ -110,6 +110,10 @@ pub enum AppIcon {
     Scissors,
     LinkChain,
     Book,
+    Mountain,
+    Waves,
+    Trees,
+    BridgeSpan,
 }
 
 impl AppIcon {
@@ -741,6 +745,38 @@ pub fn paint_icon(painter: &egui::Painter, rect: Rect, icon: AppIcon, color: Col
             painter.line_segment([p(0.30, 0.80), p(0.30, 0.48)], stroke);
             painter.line_segment([p(0.50, 0.80), p(0.50, 0.26)], stroke);
             painter.line_segment([p(0.70, 0.80), p(0.70, 0.38)], stroke);
+        }
+        AppIcon::Mountain => {
+            painter.line_segment([p(0.14, 0.78), p(0.42, 0.26)], stroke);
+            painter.line_segment([p(0.42, 0.26), p(0.60, 0.56)], stroke);
+            painter.line_segment([p(0.52, 0.46), p(0.66, 0.34)], stroke);
+            painter.line_segment([p(0.66, 0.34), p(0.86, 0.78)], stroke);
+            painter.line_segment([p(0.14, 0.78), p(0.86, 0.78)], thin);
+        }
+        AppIcon::Waves => {
+            painter.line_segment([p(0.14, 0.38), p(0.34, 0.28)], stroke);
+            painter.line_segment([p(0.34, 0.28), p(0.54, 0.42)], stroke);
+            painter.line_segment([p(0.54, 0.42), p(0.74, 0.28)], stroke);
+            painter.line_segment([p(0.74, 0.28), p(0.86, 0.36)], stroke);
+            painter.line_segment([p(0.14, 0.68), p(0.34, 0.58)], stroke);
+            painter.line_segment([p(0.34, 0.58), p(0.54, 0.72)], stroke);
+            painter.line_segment([p(0.54, 0.72), p(0.74, 0.58)], stroke);
+            painter.line_segment([p(0.74, 0.58), p(0.86, 0.66)], stroke);
+        }
+        AppIcon::Trees => {
+            painter.line_segment([p(0.36, 0.82), p(0.36, 0.42)], stroke);
+            painter.circle_stroke(p(0.36, 0.38), w * 0.20, stroke);
+            painter.line_segment([p(0.68, 0.82), p(0.68, 0.48)], stroke);
+            painter.circle_stroke(p(0.68, 0.44), w * 0.16, stroke);
+        }
+        AppIcon::BridgeSpan => {
+            painter.line_segment([p(0.14, 0.66), p(0.86, 0.66)], stroke);
+            painter.line_segment([p(0.32, 0.24), p(0.32, 0.80)], stroke);
+            painter.line_segment([p(0.68, 0.24), p(0.68, 0.80)], stroke);
+            painter.line_segment([p(0.32, 0.26), p(0.50, 0.50)], thin);
+            painter.line_segment([p(0.68, 0.26), p(0.50, 0.50)], thin);
+            painter.line_segment([p(0.32, 0.26), p(0.16, 0.64)], thin);
+            painter.line_segment([p(0.68, 0.26), p(0.84, 0.64)], thin);
         }
         AppIcon::BoxPackage | AppIcon::Database => {
             painter.rect_stroke(

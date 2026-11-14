@@ -6,10 +6,18 @@
 pub mod map_widget;
 pub mod crs_projection;
 pub mod tin_surface;
+pub mod earth_globe;
 
 pub use map_widget::{
     SiteGeodeticPin, SlippyMapState, SlippyMapTelemetry, TileSource, WebMercator,
     EARTH_HALF_CIRCUMFERENCE, EARTH_RADIUS_METERS, MAX_LATITUDE, MIN_LATITUDE,
+};
+
+pub use earth_globe::{
+    estimate_baseline_elevation_m, great_circle_arc, is_point_on_landmass,
+    lat_lon_to_unit_sphere, unit_sphere_to_lat_lon, EarthBiome, EarthBrushAction,
+    EarthCellMod, EarthMegastructure, EarthScenario, GlobeCamera, GlobeFlyTarget,
+    GlobeScreenTransform, MegastructureKind, PlanetaryVitals, PlanetaryWorldState,
 };
 
 pub use crs_projection::{

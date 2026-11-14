@@ -1322,6 +1322,7 @@ impl EigenGraphApp {
                     .show(ui, |ui| {
                         for (keys, desc) in [
                             ("Space", "Freeze / Unfreeze Canvas scroll lock"),
+                            ("G / [ ] / 1-9", "Toggle 3D Google Earth vs 2D Map (G), Tilt ([/]), Earth Brushes (1-9)"),
                             ("L / R / C / D / T / E / V", "2D Line, Rect, Circle, Dim, Callout, Eraser, Box Marquee"),
                             ("W / B / C / F", "3D Author Wall, Beam, Column, Footing"),
                             ("M / O / X / Del", "Move (+Step), Offset (+500mm), Mirror X, Delete"),

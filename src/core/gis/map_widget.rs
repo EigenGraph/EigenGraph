@@ -623,10 +623,10 @@ pub struct SlippyMapState {
 impl Default for SlippyMapState {
     fn default() -> Self {
         Self {
-            // Phase 35: Start zoomed out to Global World Map overview showing all continents
-            center_lat_lon: (15.0, 15.0),
-            zoom_level: 1.85,
-            tile_provider: TileSource::OpenStreetMap,
+            // Phase 43: Start on Satellite imagery framed around the curved 3D Earth overview
+            center_lat_lon: (5.0, 98.0),
+            zoom_level: 1.65,
+            tile_provider: TileSource::EsriWorldImagery,
             active_pin: None,
             site_pins: Vec::new(),
             crosshair_active: true,
@@ -635,7 +635,7 @@ impl Default for SlippyMapState {
             show_elevation_contours: false,
             is_dragging: false,
             drag_start_mouse: None,
-            drag_start_center: (15.0, 15.0),
+            drag_start_center: (5.0, 98.0),
             next_pin_id: 1,
             tile_cache: WorldTileCache::default(),
         }
@@ -892,6 +892,73 @@ impl SlippyMapState {
         out
     }
 
+    /// Streams front-hemisphere Web Mercator tiles sized for curved 3D Earth orbital zoom (`zoom < 4.5`).
+    pub fn collect_globe_tile_quads(
+        &self,
+        ctx: &egui::Context,
+        min_z: u8,
+        center_lat: f64,
+        center_lon: f64,
+    ) -> Vec<TileGeoQuad> {
+        if self.tile_provider == TileSource::SyntheticVectorTerrain {
+            return Vec::new();
+        }
+        let max_z = self.tile_provider.max_zoom();
+        let z_int = (self.zoom_level.round() as i32 + 1).clamp(min_z as i32, max_z.min(4)) as u8;
+        let n_tiles = 1_i64 << z_int;
+        let n_f = n_tiles as f64;
+        let c_vec = super::earth_globe::lat_lon_to_unit_sphere(center_lat, center_lon);
+        let mut out = Vec::new();
+
+        for ty_i in 0..n_tiles {
+            let ty = ty_i as u32;
+            let (north_lat, _) = WebMercator::tile_coords_to_lat_lon(0.0, ty_i as f64, z_int as f32);
+            let (south_lat, _) = WebMercator::tile_coords_to_lat_lon(0.0, (ty_i + 1) as f64, z_int as f32);
+            let mid_lat = 0.5 * (north_lat + south_lat);
+            for tx_i in 0..n_tiles {
+                let tx = tx_i as u32;
+                let west_lon = (tx_i as f64 / n_f) * 360.0 - 180.0;
+                let east_lon = ((tx_i + 1) as f64 / n_f) * 360.0 - 180.0;
+                let mid_lon = 0.5 * (west_lon + east_lon);
+                let t_vec = super::earth_globe::lat_lon_to_unit_sphere(mid_lat, mid_lon);
+                let dot = t_vec[0] * c_vec[0] + t_vec[1] * c_vec[1] + t_vec[2] * c_vec[2];
+                if dot < -0.25 {
+                    continue;
+                }
+                self.tile_cache.request_tile(ctx, self.tile_provider, z_int, tx, ty);
+                if let Some(tex_id) =
+                    self.tile_cache.get_or_upload_texture(ctx, self.tile_provider, z_int, tx, ty)
+                {
+                    out.push(TileGeoQuad {
+                        tex_id,
+                        north_lat,
+                        west_lon,
+                        south_lat,
+                        east_lon,
+                        uv_rect: Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                    });
+                } else if z_int > 1 {
+                    let pz = z_int - 1;
+                    let px = tx / 2;
+                    let py = ty / 2;
+                    if let Some(ptex) = self.tile_cache.get_or_upload_texture(ctx, self.tile_provider, pz, px, py) {
+                        let sx = (tx % 2) as f32 * 0.5;
+                        let sy = (ty % 2) as f32 * 0.5;
+                        out.push(TileGeoQuad {
+                            tex_id: ptex,
+                            north_lat,
+                            west_lon,
+                            south_lat,
+                            east_lon,
+                            uv_rect: Rect::from_min_max(Pos2::new(sx, sy), Pos2::new(sx + 0.5, sy + 0.5)),
+                        });
+                    }
+                }
+            }
+        }
+        out
+    }
+
     /// Converts local CAD ground offset `[east_mm, north_mm]` around `origin_lat_lon` to `(lat, lon)`.
     pub fn world_mm_to_lat_lon(origin_lat_lon: (f64, f64), world_mm: [f64; 2]) -> (f64, f64) {
         let origin_lat = WebMercator::clamp_lat(origin_lat_lon.0);
@@ -945,10 +1012,10 @@ impl SlippyMapState {
         (1.0 / (res_m_px * 1000.0)) as f32
     }
 
-    /// Resets map view to full Global World Map overview showing all continents.
+    /// Resets map view to full Global Earth overview showing all continents.
     pub fn reset_to_global_view(&mut self) {
-        self.center_lat_lon = (15.0, 15.0);
-        self.zoom_level = 1.85;
+        self.center_lat_lon = (5.0, 98.0);
+        self.zoom_level = 1.65;
     }
 
     /// Jumps to high-detail surveying / architectural drawing scale over a ground coordinate.
