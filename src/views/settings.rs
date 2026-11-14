@@ -1542,7 +1542,7 @@ impl SettingsView {
                 ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
                 ui.label(
                     RichText::new(format!(
-                        "v{} — Phase 39 Viewport-First Canvas, Floating Freeze Pill, Auto-Fit Camera & 8 Phase 34 Engineering Modules",
+                        "v{} — Phase 40 Clean Viewports, Coordinate Bar & CAD Shortcuts, Full Phase 34 Suite (62/74 Active)",
                         env!("CARGO_PKG_VERSION")
                     ))
                     .size(13.0)

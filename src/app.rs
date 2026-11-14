@@ -930,6 +930,7 @@ impl App for EigenGraphApp {
                             ui,
                             &self.theme,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &mut self.feature_registry,
                         );
                     }
@@ -956,6 +957,7 @@ impl App for EigenGraphApp {
                             ui,
                             &self.theme,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &mut self.feature_registry,
                         );
                         if let Some(proj) = self.industrialized_view.request_apply_bim_project.take() {
@@ -975,10 +977,18 @@ impl App for EigenGraphApp {
                         }
                     }
                     NavigationPillar::Prediction => {
+                        let shm_feed = crate::views::prediction::ShmPredictionFeed {
+                            strain_micro: self.facility_view.simulated_strain_micro,
+                            freq_hz: self.facility_view.simulated_freq_hz,
+                            degradation_pct: self.facility_view.simulated_degradation_pct,
+                            live_packets: self.facility_view.shm_packets_received,
+                        };
                         self.prediction_view.show(
                             ui,
                             &self.theme,
                             &self.members,
+                            &self.build_view.bim_bus.project,
+                            shm_feed,
                             &mut self.feature_registry,
                         );
                     }

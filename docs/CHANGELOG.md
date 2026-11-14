@@ -7,6 +7,30 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.4.0] - 2026-11-14 — Phase 40: Clean Viewports, Aligned Coordinate Bar, Full CAD Shortcuts & Complete Phase 34 Capability Suite
+
+### Added & Changed
+- **Clean Uncluttered Viewports, Aligned Coordinate Bar & Docked Inspector Architecture (`src/views/universal_canvas.rs`, `src/views/parametric/`, `src/views/build/viewport_3d.rs`)**:
+  - Removed extra HUD text and floating inspector overlays from inside all three drawing canvases (**Universal Earth Canvas**, **Parametric 2D Drafting**, and **Geometry 3D Earth BIM**), keeping only the geometry/map and the top-left Freeze pill inside each viewport.
+  - Standardized the vertical canvas hierarchy across all canvases: **Viewport -> Coordinate & Telemetry Bar -> Notifications -> Rich Bottom Toolbar -> Docked Properties/Inspector Panel**.
+- **Full CAD Keyboard Shortcuts & Rich Bottom Modify Toolbars (`src/core/bim.rs`, `src/views/universal_canvas.rs`, `src/views/parametric/`, `src/views/build/viewport_3d.rs`)**:
+  - Added guarded CAD shortcut dispatch (`!ctx.egui_wants_keyboard_input()`): `Space` (Freeze toggle), `Esc`, `Del`/`Backspace`, `Ctrl/Cmd+Z` (Undo), `Ctrl/Cmd+Y` or `Ctrl/Cmd+Shift+Z` (Redo), `F8` (Ortho), `F3` (Snap), `Z` (Fit Model), plus drafting/modify hotkeys (`W`/`B`/`C`/`F`/`L`/`R`/`D`/`M`/`O`/`X`).
+  - Enriched bottom toolbars with **Redo**, **Ortho**, **Move +1m**, **Offset Wall**, **Mirror**, **Delete**, and **Auto Rooms**, and extended `BimCommandBus` + `BimCommand::MirrorElements` across walls, structural runs, and columns.
+- **Completed & Unlocked All 10 Remaining Phase 34 Engineering Modules (`src/features.rs`: 62 Active / 12 Locked)**:
+  - **PERT 3-Point & Monte Carlo Schedule Risk (`4D-03`: `src/views/planning.rs`)**: Latin Hypercube Sampling (LHS) 1,000+ trial simulation outputting P50/P80/P95 completion dates, histogram/S-curve canvas, sensitivity drivers, and CSV export.
+  - **Daily Site Crew Histogram & Resource Leveling (`4D-04`: `src/views/planning.rs`)**: Float-constrained crew peak smoothing for rebar, formwork, and concrete trades with live daily peak stacked bars and CSV export.
+  - **Earned Value Management & Progress Claim S-Curve (`5D-03`: `src/views/planning.rs`)**: Live `PV`/`EV`/`AC`, `CPI`/`SPI`, `EAC`/`VAC`, retention/advance-payment net claim certificates, and CSV export.
+  - **SNI 6389 Solar OTTV & Facade Daylight (`6D-03`: `src/views/sustainability.rs`)**: N/E/S/W facade wall & glazing OTTV (`W/m²`), solar flux compass, `sDA %`, cooling load savings, and CSV audit export from live `BimProject` walls/openings.
+  - **Live WebSocket/MQTT IoT Sensor Stream Ingestion (`7D-02`: `src/core/web_bridge.rs`, `src/views/facility.rs`)**: Cross-platform `WebSocket` SHM stream client + JSON/CSV telemetry packet parser updating strain/frequency sensors, sparklines, and CSV archives.
+  - **MEP Riser Valve Isolation Tree & Space Utilization (`7D-03`: `src/views/facility.rs`, `src/app.rs`)**: Interactive shutoff valve blast-radius analysis and Gross-to-Net space efficiency driven by live `BimProject` slabs and rooms.
+  - **ACI 347 Slab Formwork Shoring & Reshoring (`8D-03`: `src/views/safety.rs`)**: ACI 209 concrete maturity vs `70% f'c` strip threshold, multi-level shore load transfer, Ring-Lock prop capacity, Euler buckling FS, and CSV export.
+  - **Zone Takt-Time Cadence & Ready-Mix Dispatch (`9D-03`: `src/views/lean.rs`)**: BIM concrete volume pour batching, mixer truck headway intervals, and 90-min ASTM C94 slump cold-joint monitoring.
+  - **Precast Trailer Routing Envelope & Grouted Splice Tolerance (`10D-04`: `src/views/industrialized/`)**: GVW axle limits, highway portal clearances, and PCI MNL-135 laser-tracker splice delta verification across `BimProject` runs/columns.
+  - **Live FEA & SHM Stress Anomaly Forecasting (`PRED-02`: `src/views/prediction.rs`, `src/app.rs`)**: Fuses active FEM axial forces, BIM element density, and 7D SHM strain/frequency trends into live $\beta$, stiffness ratio, RUL, and vulnerability rankings.
+- **Version Bump**: Incremented crate version sequentially from `0.3.9` to `0.4.0` in `Cargo.toml`, `README.md`, `src/views/settings.rs`, and `docs/CHANGELOG.md`.
+
+---
+
 ## [v0.3.9] - 2026-11-14 — Phase 39: Viewport-First Canvas Layout, Top-Left Floating Freeze Toggle, Auto-Fit Camera & 8 Phase 34 Engineering Modules
 
 ### Added & Changed

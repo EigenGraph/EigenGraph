@@ -55,6 +55,171 @@ impl BuildView {
         self.cam_pitch = 0.35;
     }
 
+    fn apply_3d_move_1m(&mut self, universal_canvas: &mut UniversalCanvasState) {
+        if self.sketch_mode_active && universal_canvas.translate_selected_or_last(1000.0, 0.0) {
+            self.modify_status_msg = Some("Moved sketch entity +1000 mm East (M)".to_string());
+            return;
+        }
+        if let Some(id) = self.bim_bus.project.latest_element_id() {
+            match self.bim_bus.execute(crate::core::BimCommand::MoveElement {
+                element_id: id,
+                delta: crate::core::P2(1000.0, 0.0),
+            }) {
+                Ok(msg) => {
+                    self.modify_status_msg = Some(msg.clone());
+                    self.bim_console_logs.push(msg);
+                }
+                Err(e) => self.modify_status_msg = Some(e),
+            }
+        }
+    }
+
+    fn apply_3d_offset_wall(&mut self, universal_canvas: &mut UniversalCanvasState) {
+        if self.sketch_mode_active && universal_canvas.offset_selected_or_last(500.0) {
+            self.modify_status_msg = Some("Created +500 mm offset sketch duplicate (O)".to_string());
+            return;
+        }
+        if let Some(wid) = self.bim_bus.project.latest_wall_id() {
+            match self.bim_bus.execute(crate::core::BimCommand::OffsetWall {
+                wall_id: wid,
+                offset_mm: 500.0,
+            }) {
+                Ok(msg) => {
+                    self.modify_status_msg = Some(msg.clone());
+                    self.bim_console_logs.push(msg);
+                }
+                Err(e) => self.modify_status_msg = Some(e),
+            }
+        } else {
+            self.modify_status_msg =
+                Some("Add a wall first before applying +500 mm Wall Offset".to_string());
+        }
+    }
+
+    fn apply_3d_mirror(&mut self, universal_canvas: &mut UniversalCanvasState) {
+        let cx = self
+            .bim_bus
+            .project
+            .plan_extents_mm()
+            .map_or(0.0, |(a, b)| 0.5 * (a[0] + b[0]));
+        if self.sketch_mode_active && universal_canvas.mirror_selected_or_last(cx) {
+            self.modify_status_msg = Some(format!("Mirrored sketch entity across X={cx:.0} mm (X)"));
+            return;
+        }
+        match self.bim_bus.execute(crate::core::BimCommand::MirrorElements {
+            axis_a: crate::core::P2(cx, -5000.0),
+            axis_b: crate::core::P2(cx, 5000.0),
+        }) {
+            Ok(msg) => {
+                self.modify_status_msg = Some(msg.clone());
+                self.bim_console_logs.push(msg);
+            }
+            Err(e) => self.modify_status_msg = Some(e),
+        }
+    }
+
+    fn apply_3d_delete(&mut self, universal_canvas: &mut UniversalCanvasState) {
+        if self.sketch_mode_active && universal_canvas.delete_selected_or_last() {
+            self.modify_status_msg = Some("Deleted sketch entity (Del)".to_string());
+            return;
+        }
+        let target_id = self
+            .selected_member_id
+            .or_else(|| self.bim_bus.project.latest_element_id());
+        if let Some(id) = target_id {
+            match self
+                .bim_bus
+                .execute(crate::core::BimCommand::DeleteElement { element_id: id })
+            {
+                Ok(msg) => {
+                    self.selected_member_id = None;
+                    self.modify_status_msg = Some(msg.clone());
+                    self.bim_console_logs.push(msg);
+                }
+                Err(e) => self.modify_status_msg = Some(e),
+            }
+        }
+    }
+
+    fn handle_3d_shortcuts(
+        &mut self,
+        ctx: &egui::Context,
+        universal_canvas: &mut UniversalCanvasState,
+        members: &[StructuralMember],
+    ) {
+        let fb = UniversalCanvasState::poll_cad_shortcuts(ctx, universal_canvas.is_frozen);
+        if fb.toggle_freeze {
+            universal_canvas.is_frozen = !universal_canvas.is_frozen;
+            self.pending_3d_start_mm = None;
+            self.modify_status_msg = Some(if universal_canvas.is_frozen {
+                "3D Viewport Frozen (Space) • Scroll safely".to_string()
+            } else {
+                "3D Viewport Live (Space) • Orbit & CAD keys active".to_string()
+            });
+        }
+        if fb.escape {
+            self.pending_3d_start_mm = None;
+            self.selected_member_id = None;
+            self.ground_author_tool = Ground3DAuthorTool::Orbit;
+            universal_canvas.measure_active = false;
+            universal_canvas.selected_entity_id = None;
+        }
+        if fb.undo {
+            if self.sketch_mode_active && universal_canvas.undo() {
+                self.modify_status_msg = Some("Undo sketch edit (Ctrl/Cmd+Z)".to_string());
+            } else if let Some(msg) = self.bim_bus.undo() {
+                self.modify_status_msg = Some(msg);
+            }
+        }
+        if fb.redo {
+            if self.sketch_mode_active && universal_canvas.redo() {
+                self.modify_status_msg = Some("Redo sketch edit (Ctrl/Cmd+Y)".to_string());
+            } else if let Some(msg) = self.bim_bus.redo() {
+                self.modify_status_msg = Some(msg);
+            }
+        }
+        if fb.delete_selected {
+            self.apply_3d_delete(universal_canvas);
+        }
+        if fb.toggle_ortho {
+            universal_canvas.ortho_mode = !universal_canvas.ortho_mode;
+        }
+        if fb.toggle_snap {
+            universal_canvas.snap_to_grid = !universal_canvas.snap_to_grid;
+        }
+        if fb.fit_model {
+            self.fit_view_to_project(universal_canvas, members);
+        }
+        if let Some(ch) = fb.letter_key {
+            match ch {
+                'W' => {
+                    self.sketch_mode_active = false;
+                    self.ground_author_tool = Ground3DAuthorTool::Wall;
+                    self.pending_3d_start_mm = None;
+                }
+                'B' => {
+                    self.sketch_mode_active = false;
+                    self.ground_author_tool = Ground3DAuthorTool::Beam;
+                    self.pending_3d_start_mm = None;
+                }
+                'C' => {
+                    self.sketch_mode_active = false;
+                    self.ground_author_tool = Ground3DAuthorTool::Column;
+                    self.pending_3d_start_mm = None;
+                }
+                'F' => {
+                    self.sketch_mode_active = false;
+                    self.ground_author_tool = Ground3DAuthorTool::Footing;
+                    self.pending_3d_start_mm = None;
+                }
+                'M' => self.apply_3d_move_1m(universal_canvas),
+                'O' => self.apply_3d_offset_wall(universal_canvas),
+                'X' => self.apply_3d_mirror(universal_canvas),
+                _ => {}
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(super) fn render_canvas(
         &mut self,
@@ -68,6 +233,7 @@ impl BuildView {
         workspace_settings: WorkspaceCanvasSettings,
         sidebar_toggle_inset_px: f32,
     ) {
+        self.handle_3d_shortcuts(ui.ctx(), universal_canvas, members);
         let avail_w = ui.available_width().max(200.0);
         let is_wide = avail_w >= 980.0;
         let has_floating_room = avail_w >= 720.0;
@@ -1282,36 +1448,15 @@ impl BuildView {
                         painter.text(triad_center + dz_screen * 1.25, Align2::CENTER_CENTER, "Z", egui::FontId::monospace(10.0), Color32::from_rgb(59, 130, 246));
                     }
 
-                    // 6. Camera Viewport HUD Overlay (Top Left & Bottom Right)
+                    // Clean 3D viewport mode string moved to bottom telemetry bar
                     let mode_str = match self.render_mode {
-                        Render3DMode::CsgSolidBrep => "CSG SOLID B-REP + 3D REBAR",
-                        Render3DMode::SolidShaded => "SOLID EXTRUDED",
-                        Render3DMode::Wireframe => "WIREFRAME",
-                        Render3DMode::AxialForceNFD => "NFD DIAGRAM (AXIAL)",
-                        Render3DMode::ShearForceSFD => "SFD DIAGRAM (SHEAR)",
-                        Render3DMode::BendingMomentBMD => "BMD DIAGRAM (MOMENT)",
+                        Render3DMode::CsgSolidBrep => "CSG B-Rep",
+                        Render3DMode::SolidShaded => "Solid",
+                        Render3DMode::Wireframe => "Wireframe",
+                        Render3DMode::AxialForceNFD => "NFD",
+                        Render3DMode::ShearForceSFD => "SFD",
+                        Render3DMode::BendingMomentBMD => "BMD",
                     };
-        painter.text(
-            Pos2::new(rect.left() + 14.0, rect.top() + 14.0),
-            Align2::LEFT_TOP,
-            format!("3D VIEWPORT: {} • {}", self.active_model.label(), mode_str),
-            egui::FontId::monospace(10.5),
-            theme.text_muted,
-        );
-
-        painter.text(
-            Pos2::new(rect.right() - 14.0, rect.bottom() - 14.0),
-            Align2::RIGHT_BOTTOM,
-            format!(
-                "Yaw: {:.0}° | Pitch: {:.0}° | Zoom: {:.2}x | Elements: {}",
-                self.cam_yaw.to_degrees(),
-                self.cam_pitch.to_degrees(),
-                self.cam_zoom,
-                raw_members.len()
-            ),
-            egui::FontId::monospace(9.5),
-            theme.text_muted,
-        );
 
         // Live Ink Sketch preview rubber-band on 3D ground plane
         if self.sketch_mode_active {
@@ -1394,19 +1539,6 @@ impl BuildView {
             }
         }
 
-        if self.highlight_4d_erection && self.simulation_4d_day > 0 {
-            let badge = Rect::from_min_size(rect.right_top() + Vec2::new(-230.0, 14.0), Vec2::new(212.0, 24.0));
-            painter.rect_filled(badge, CornerRadius::same(6), Color32::from_rgba_unmultiplied(15, 23, 42, 220));
-            painter.rect_stroke(badge, CornerRadius::same(6), Stroke::new(1.0, theme.accent_orange), egui::StrokeKind::Inside);
-            painter.text(
-                badge.center(),
-                Align2::CENTER_CENTER,
-                format!("4D ERECTION DAY {}", self.simulation_4d_day),
-                egui::FontId::monospace(10.0),
-                theme.accent_orange,
-            );
-        }
-
         UniversalCanvasState::paint_rounded_viewport_border(
             &painter,
             rect,
@@ -1417,7 +1549,7 @@ impl BuildView {
 
         ui.add_space(6.0);
 
-        // 8. Sleek Earth & BIM Telemetry Footer Bar below the 3D Viewport
+        // 8. Sleek Earth, Camera & BIM Telemetry Footer Bar below the 3D Viewport
         let synced_count = universal_canvas.entities.len();
         let map_telem = universal_canvas.world_map.telemetry();
         let active_lvl_lbl = self
@@ -1450,14 +1582,25 @@ impl BuildView {
                     universal_canvas.world_map.zoom_level,
                     map_telem.ground_resolution_m_px,
                 );
-                let scale_txt = format!(
-                    "{} • {} • {}",
-                    active_lvl_lbl, self.view_scale, self.lod_level,
+                let cam_txt = format!(
+                    "{} • Yaw {:.0}° Pitch {:.0}° ({:.2}x) • {}",
+                    mode_str,
+                    self.cam_yaw.to_degrees(),
+                    self.cam_pitch.to_degrees(),
+                    self.cam_zoom,
+                    active_lvl_lbl,
                 );
+                let stage_4d = if self.highlight_4d_erection && self.simulation_4d_day > 0 {
+                    format!(" • 4D Day {}", self.simulation_4d_day)
+                } else {
+                    String::new()
+                };
                 let counts_txt = format!(
-                    "{} Elements • {} Synced",
+                    "Tool: {} • {} Elements • {} Synced{}",
+                    self.ground_author_tool.label(),
                     members.len(),
                     synced_count,
+                    stage_4d,
                 );
                 ui.horizontal_wrapped(|ui| {
                     icons::icon_label(
@@ -1472,10 +1615,10 @@ impl BuildView {
                     );
                     icons::icon_label(
                         ui,
-                        AppIcon::Layers,
+                        AppIcon::Cube3D,
                         11.0,
                         theme.text_muted,
-                        scale_txt,
+                        cam_txt,
                         10.0,
                         theme.text_secondary,
                         false,
@@ -1489,6 +1632,11 @@ impl BuildView {
                         10.0,
                         theme.accent_green,
                         true,
+                    );
+                    ui.label(
+                        RichText::new("Keys: Space Freeze • W/B/C/F Author • M/O/X Modify • Z Fit • Esc Orbit")
+                            .size(10.0)
+                            .color(theme.text_muted),
                     );
                 });
             });
@@ -1696,6 +1844,119 @@ impl BuildView {
                     .clicked()
                     {
                         self.sketch_mode_active = !self.sketch_mode_active;
+                    }
+
+                    ui.separator();
+
+                    // CAD/BIM Modify Action Palette in Bottom Toolbar
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Undo,
+                        "Undo",
+                        10.0,
+                        theme.text_secondary,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Undo last 3D BIM or sketch action (Ctrl/Cmd+Z)")
+                    .clicked()
+                    {
+                        if self.sketch_mode_active && universal_canvas.undo() {
+                            self.modify_status_msg = Some("Undo sketch edit".to_string());
+                        } else if let Some(msg) = self.bim_bus.undo() {
+                            self.modify_status_msg = Some(msg);
+                        }
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Redo,
+                        "Redo",
+                        10.0,
+                        theme.text_secondary,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Redo undone 3D BIM or sketch action (Ctrl/Cmd+Y)")
+                    .clicked()
+                    {
+                        if self.sketch_mode_active && universal_canvas.redo() {
+                            self.modify_status_msg = Some("Redo sketch edit".to_string());
+                        } else if let Some(msg) = self.bim_bus.redo() {
+                            self.modify_status_msg = Some(msg);
+                        }
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ArrowRight,
+                        "Move +1m",
+                        10.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Move latest BIM element or sketch +1000 mm East (M)")
+                    .clicked()
+                    {
+                        self.apply_3d_move_1m(universal_canvas);
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Layers,
+                        "Offset Wall",
+                        10.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Create +500 mm parallel duplicate of latest wall or sketch (O)")
+                    .clicked()
+                    {
+                        self.apply_3d_offset_wall(universal_canvas);
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SectionCut,
+                        "Mirror",
+                        10.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Mirror modeled columns/walls/beams across centerline (X)")
+                    .clicked()
+                    {
+                        self.apply_3d_mirror(universal_canvas);
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Trash,
+                        "Delete",
+                        10.0,
+                        theme.accent_red,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.accent_red.gamma_multiply(0.35)),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Delete selected or latest BIM element / sketch (Del)")
+                    .clicked()
+                    {
+                        self.apply_3d_delete(universal_canvas);
                     }
 
                     ui.separator();
@@ -2041,7 +2302,7 @@ impl BuildView {
                     ui.label(RichText::new("BIM Cmd:").size(10.0).strong().color(theme.accent_blue));
                     let cmd_resp = ui.add(
                         egui::TextEdit::singleline(&mut self.bim_console_input)
-                            .hint_text("wall 0,0->6000,0 | col 0,0 | level L2 3500 | clear")
+                            .hint_text("wall 0,0->6000,0 | col 0,0 | move | offset | mirror | del | clear")
                             .desired_width(cmd_w),
                     );
                     let run_clicked = icons::icon_button(

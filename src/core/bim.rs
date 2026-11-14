@@ -1458,6 +1458,25 @@ impl BimProject {
             + self.slabs.len()
     }
 
+    /// Returns the most recently allocated physical BIM element ID (`walls`, `columns`, `runs`, `footings`, `slabs`).
+    pub fn latest_element_id(&self) -> Option<usize> {
+        [
+            self.walls.iter().map(|w| w.id).max(),
+            self.columns.iter().map(|c| c.id).max(),
+            self.runs.iter().map(|r| r.id).max(),
+            self.footings.iter().map(|f| f.id).max(),
+            self.slabs.iter().map(|s| s.id).max(),
+        ]
+        .into_iter()
+        .flatten()
+        .max()
+    }
+
+    /// Returns the most recently created wall ID for quick CAD offset/split actions.
+    pub fn latest_wall_id(&self) -> Option<usize> {
+        self.walls.iter().map(|w| w.id).max()
+    }
+
     /// Computes `[min_x_mm, min_y_mm], [max_x_mm, max_y_mm]` planar bounding box across all
     /// modeled BIM elements (walls, beams/runs, columns, footings, slabs, rooms, and grids).
     pub fn plan_extents_mm(&self) -> Option<([f64; 2], [f64; 2])> {
@@ -2660,6 +2679,55 @@ impl BimCommandBus {
             crate::core::InternalVault::sync_live_bim_state(&self.project, &msg);
             return Ok(msg);
         }
+        if lower == "rooms" || lower == "room" {
+            let lvl_id = self.project.levels.first().map(|l| l.id).unwrap_or(1);
+            return self.execute(BimCommand::AutoDetectRooms { level_id: lvl_id });
+        }
+        if lower == "delete" || lower == "del" || lower == "erase" {
+            let id = self
+                .project
+                .latest_element_id()
+                .ok_or_else(|| "No BIM elements available to delete.".to_string())?;
+            return self.execute(BimCommand::DeleteElement { element_id: id });
+        }
+        if lower == "move" || lower.starts_with("move ") {
+            let id = self
+                .project
+                .latest_element_id()
+                .ok_or_else(|| "No BIM elements available to move.".to_string())?;
+            let delta = lower
+                .strip_prefix("move ")
+                .and_then(parse_pair)
+                .unwrap_or(P2(1000.0, 0.0));
+            return self.execute(BimCommand::MoveElement {
+                element_id: id,
+                delta,
+            });
+        }
+        if lower == "offset" || lower.starts_with("offset ") {
+            let wid = self
+                .project
+                .latest_wall_id()
+                .ok_or_else(|| "Create a wall first before running Offset.".to_string())?;
+            let off_mm = lower
+                .strip_prefix("offset ")
+                .and_then(|s| s.trim().trim_end_matches("mm").parse::<f64>().ok())
+                .unwrap_or(500.0);
+            return self.execute(BimCommand::OffsetWall {
+                wall_id: wid,
+                offset_mm: off_mm,
+            });
+        }
+        if lower == "mirror" || lower.starts_with("mirror ") {
+            let cx = self
+                .project
+                .plan_extents_mm()
+                .map_or(0.0, |(a, b)| 0.5 * (a[0] + b[0]));
+            return self.execute(BimCommand::MirrorElements {
+                axis_a: P2(cx, -5000.0),
+                axis_b: P2(cx, 5000.0),
+            });
+        }
         if lower.contains("rebar") || lower.contains("reinforc") {
             return self.execute(BimCommand::ReinforceAllConcrete {
                 preset: RebarPreset::default(),
@@ -3337,6 +3405,7 @@ impl BimCommandBus {
                     let proj = d * v.dot(d);
                     axis_a + proj * 2.0 - v
                 };
+                let mut count = 0usize;
                 let existing_cols = self.project.columns.clone();
                 for c in existing_cols {
                     let new_pos = reflect(c.pos);
@@ -3344,11 +3413,49 @@ impl BimCommandBus {
                         let id = self.project.alloc_id();
                         let mut mc = c.clone();
                         mc.id = id;
+                        mc.name = format!("{}-Mir", c.name);
                         mc.pos = new_pos;
                         self.project.columns.push(mc);
+                        count += 1;
                     }
                 }
-                Ok("Mirrored structural elements across reference axis".to_string())
+                let existing_walls = self.project.walls.clone();
+                for w in existing_walls {
+                    let ns = reflect(w.start);
+                    let ne = reflect(w.end);
+                    if ns.dist(w.start) > 200.0 || ne.dist(w.end) > 200.0 {
+                        let id = self.project.alloc_id();
+                        let mut mw = w.clone();
+                        mw.id = id;
+                        mw.name = format!("{}-Mir", w.name);
+                        mw.start = ns;
+                        mw.end = ne;
+                        mw.openings.clear();
+                        self.project.walls.push(mw);
+                        count += 1;
+                    }
+                }
+                let existing_runs = self.project.runs.clone();
+                for r in existing_runs {
+                    let ns = reflect(r.start);
+                    let ne = reflect(r.end);
+                    if ns.dist(r.start) > 200.0 || ne.dist(r.end) > 200.0 {
+                        let id = self.project.alloc_id();
+                        let mut mr = r.clone();
+                        mr.id = id;
+                        mr.name = format!("{}-Mir", r.name);
+                        mr.start = ns;
+                        mr.end = ne;
+                        self.project.runs.push(mr);
+                        count += 1;
+                    }
+                }
+                if let Some(lvl_id) = self.project.levels.first().map(|l| l.id) {
+                    self.project.detect_rooms_on_level(lvl_id);
+                }
+                Ok(format!(
+                    "Mirrored {count} structural elements across reference axis"
+                ))
             }
             BimCommand::TrimExtendWalls {
                 wall_a_id,

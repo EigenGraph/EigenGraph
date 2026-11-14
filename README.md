@@ -23,7 +23,7 @@
 
 ## 🏛️ Overview
 
-**EigenGraph** (`EigenGraph/EigenGraph`) is a client-side **WebAssembly + WebGL2** 10D BIM and structural mechanics workstation compiled cleanly from Rust (`v0.3.9`, Phase 39 Viewport-First Canvas Layout, Top-Left Floating Freeze Pill, Auto-Fit Model Camera, Direct Sheet Vector Exports & 8 Phase 34 Engineering Modules: Automated Multi-Code Compliance Auditor, Retaining Wall + Bishop Slope Stability, Geotech Borehole Vs30 & Hydrology IDF/Rational Runoff, Live N/E/S/W Elevations + MEP Riser Schedule, 3D Tower Crane Clearance Radar, PBG/SIMBG & IBC Calc Book Composer, and ISO 19650 CDE Workflow) and deployed automatically to **Cloudflare Workers**.
+**EigenGraph** (`EigenGraph/EigenGraph`) is a client-side **WebAssembly + WebGL2** 10D BIM and structural mechanics workstation compiled cleanly from Rust (`v0.4.0`, Phase 40 Clean Viewports, Coordinate Bar & Docked Inspector Layout, Full CAD Keyboard Shortcuts & Rich Bottom Modify Toolbars, and All 10 Remaining Phase 34 Engineering Modules — 62/74 Active: PERT/Monte Carlo Risk, Crew Leveling, EVM Progress Claims, SNI 6389 Solar OTTV, Live WebSocket SHM Telemetry, MEP Valve Isolation Tree, ACI 347 Shoring & Reshoring, Takt-Time Concrete Dispatch, Precast Trailer & Splice Tolerance, and Live FEA+SHM Anomaly Forecasting) and deployed automatically to **Cloudflare Workers**.
 
 ### 15 Engineering Modules
 1. **📁 My Library** — Project records, parametric component catalog, interactive HTML5 3D viewer & Markdown dossier browser downloads.

@@ -499,3 +499,200 @@ pub fn save_text_file(filename: &str, content: &str, mime_type: &str) -> Result<
         Ok(format!("Saved {}", out_path.display()))
     }
 }
+
+/// Real-time IoT / SHM sensor packet ingested via WebSocket, MQTT-over-WS, or manual CSV/JSON feed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ShmTelemetryPacket {
+    #[serde(default)]
+    pub sensor_id: String,
+    #[serde(default)]
+    pub strain_micro: f32,
+    #[serde(default)]
+    pub freq_hz: f32,
+    #[serde(default)]
+    pub accel_g: f32,
+    #[serde(default)]
+    pub temp_c: f32,
+    #[serde(default)]
+    pub timestamp: String,
+}
+
+static PENDING_SHM_PACKETS: std::sync::Mutex<Vec<ShmTelemetryPacket>> =
+    std::sync::Mutex::new(Vec::new());
+static SHM_SOCKET_STATE: std::sync::Mutex<(bool, String)> =
+    std::sync::Mutex::new((false, String::new()));
+
+#[cfg(target_arch = "wasm32")]
+std::thread_local! {
+    static ACTIVE_SHM_WS: std::cell::RefCell<Option<web_sys::WebSocket>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Parses an incoming JSON object or CSV line (`sensor_id,strain_micro,freq_hz,accel_g,temp_c`) into `ShmTelemetryPacket`.
+pub fn parse_shm_packet_payload(raw: &str) -> Result<ShmTelemetryPacket, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("Empty SHM telemetry packet.".to_string());
+    }
+    if trimmed.starts_with('{') {
+        let mut pkt: ShmTelemetryPacket = serde_json::from_str(trimmed)
+            .map_err(|e| format!("Invalid SHM JSON packet: {e}"))?;
+        if pkt.sensor_id.trim().is_empty() {
+            pkt.sensor_id = "SG-01".to_string();
+        }
+        if pkt.timestamp.trim().is_empty() {
+            pkt.timestamp = unix_timestamp_label();
+        }
+        return Ok(pkt);
+    }
+    let parts: Vec<&str> = trimmed.split(',').map(|s| s.trim()).collect();
+    if parts.len() < 3 {
+        return Err("CSV telemetry packet requires at least: sensor_id,strain_micro,freq_hz".to_string());
+    }
+    let strain_micro = parts[1]
+        .parse::<f32>()
+        .map_err(|_| format!("Invalid strain value '{}'", parts[1]))?;
+    let freq_hz = parts[2]
+        .parse::<f32>()
+        .map_err(|_| format!("Invalid frequency value '{}'", parts[2]))?;
+    let accel_g = parts.get(3).and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.015);
+    let temp_c = parts.get(4).and_then(|v| v.parse::<f32>().ok()).unwrap_or(28.5);
+    Ok(ShmTelemetryPacket {
+        sensor_id: if parts[0].is_empty() { "SG-01" } else { parts[0] }.to_string(),
+        strain_micro,
+        freq_hz,
+        accel_g,
+        temp_c,
+        timestamp: unix_timestamp_label(),
+    })
+}
+
+fn push_shm_packet(pkt: ShmTelemetryPacket) {
+    if let Ok(mut queue) = PENDING_SHM_PACKETS.lock() {
+        queue.push(pkt);
+    }
+}
+
+fn set_shm_socket_state(connected: bool, msg: String) {
+    if let Ok(mut state) = SHM_SOCKET_STATE.lock() {
+        *state = (connected, msg);
+    }
+}
+
+/// Opens a browser WebSocket SHM telemetry stream (`wasm32`) or validates/primes native loopback stream.
+pub fn shm_connect_websocket(url: &str) -> Result<String, String> {
+    let trimmed = url.trim();
+    if !(trimmed.starts_with("ws://") || trimmed.starts_with("wss://")) {
+        return Err("WebSocket endpoint must start with ws:// or wss://".to_string());
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        use wasm_bindgen::{closure::Closure, JsCast as _};
+
+        shm_disconnect_websocket();
+        let ws = web_sys::WebSocket::new(trimmed)
+            .map_err(|e| format!("Failed to open WebSocket ({trimmed}): {e:?}"))?;
+
+        let url_open = trimmed.to_string();
+        let on_open = Closure::wrap(Box::new(move || {
+            set_shm_socket_state(true, format!("WebSocket Connected: {url_open}"));
+        }) as Box<dyn FnMut()>);
+        ws.set_onopen(Some(on_open.as_ref().unchecked_ref()));
+        on_open.forget();
+
+        let on_msg = Closure::wrap(Box::new(move |ev: web_sys::MessageEvent| {
+            if let Some(txt) = ev.data().as_string() {
+                if let Ok(pkt) = parse_shm_packet_payload(&txt) {
+                    push_shm_packet(pkt);
+                }
+            }
+        }) as Box<dyn FnMut(web_sys::MessageEvent)>);
+        ws.set_onmessage(Some(on_msg.as_ref().unchecked_ref()));
+        on_msg.forget();
+
+        let on_err = Closure::wrap(Box::new(move |_ev: web_sys::ErrorEvent| {
+            set_shm_socket_state(
+                false,
+                "WebSocket transport error (stream unreachable or blocked by CORS/TLS).".to_string(),
+            );
+        }) as Box<dyn FnMut(web_sys::ErrorEvent)>);
+        ws.set_onerror(Some(on_err.as_ref().unchecked_ref()));
+        on_err.forget();
+
+        let on_close = Closure::wrap(Box::new(move |_ev: web_sys::CloseEvent| {
+            set_shm_socket_state(false, "WebSocket telemetry stream closed.".to_string());
+        }) as Box<dyn FnMut(web_sys::CloseEvent)>);
+        ws.set_onclose(Some(on_close.as_ref().unchecked_ref()));
+        on_close.forget();
+
+        ACTIVE_SHM_WS.with(|cell| {
+            *cell.borrow_mut() = Some(ws);
+        });
+        let msg = format!("Connecting WebSocket stream to {trimmed}...");
+        set_shm_socket_state(true, msg.clone());
+        Ok(msg)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let msg = format!("Native MQTT/WS telemetry channel armed ({trimmed})");
+        set_shm_socket_state(true, msg.clone());
+        Ok(msg)
+    }
+}
+
+/// Closes any active WebSocket telemetry stream.
+pub fn shm_disconnect_websocket() {
+    #[cfg(target_arch = "wasm32")]
+    {
+        ACTIVE_SHM_WS.with(|cell| {
+            if let Some(ws) = cell.borrow_mut().take() {
+                let _ = ws.close();
+            }
+        });
+    }
+    set_shm_socket_state(false, "Telemetry stream disconnected.".to_string());
+}
+
+/// Enqueues a parsed SHM packet into the non-blocking UI telemetry queue.
+pub fn shm_inject_packet(pkt: ShmTelemetryPacket) {
+    push_shm_packet(pkt);
+}
+
+/// Drains newly arrived SHM telemetry packets for processing in `FacilityView`.
+pub fn shm_poll_packets() -> Vec<ShmTelemetryPacket> {
+    if let Ok(mut queue) = PENDING_SHM_PACKETS.lock() {
+        std::mem::take(&mut *queue)
+    } else {
+        Vec::new()
+    }
+}
+
+/// Returns current `(is_connected, status_message)` for the SHM telemetry stream.
+pub fn shm_connection_snapshot() -> (bool, String) {
+    if let Ok(guard) = SHM_SOCKET_STATE.lock() {
+        guard.clone()
+    } else {
+        (false, String::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shm_packet_json_and_csv_parser() {
+        let json = r#"{"sensor_id":"SG-01","strain_micro":412.5,"freq_hz":3.41,"accel_g":0.022,"temp_c":30.1}"#;
+        let pkt = parse_shm_packet_payload(json).unwrap();
+        assert_eq!(pkt.sensor_id, "SG-01");
+        assert!((pkt.strain_micro - 412.5).abs() < 1e-3);
+        assert!((pkt.freq_hz - 3.41).abs() < 1e-3);
+
+        let csv = "ACC-02,285.0,3.52,0.014,27.8";
+        let pkt2 = parse_shm_packet_payload(csv).unwrap();
+        assert_eq!(pkt2.sensor_id, "ACC-02");
+        assert!((pkt2.temp_c - 27.8).abs() < 1e-3);
+    }
+}

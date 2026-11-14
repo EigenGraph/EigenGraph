@@ -108,6 +108,11 @@ pub struct IndustrializedView {
     pub scanner_log: Vec<String>,
     // Phase 38: One-click IFC -> Editable BimProject bridge
     pub request_apply_bim_project: Option<crate::core::BimProject>,
+    // Phase 40 (10D-04): Precast Trailer Axle & Grout Splice Parameters
+    pub precast_axle_limit_ton: f32,
+    pub precast_portal_clear_m: f32,
+    pub precast_grout_7day_mpa: f32,
+    pub precast_night_escort: bool,
 }
 
 impl Default for IndustrializedView {
@@ -167,6 +172,10 @@ impl Default for IndustrializedView {
             selected_module_tag: String::new(),
             scanner_log: Vec::new(),
             request_apply_bim_project: None,
+            precast_axle_limit_ton: 64.0,
+            precast_portal_clear_m: 4.55,
+            precast_grout_7day_mpa: 68.5,
+            precast_night_escort: true,
         }
     }
 }
@@ -177,6 +186,7 @@ impl IndustrializedView {
         ui: &mut Ui,
         theme: &MacTheme,
         _members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
         ui.vertical(|ui| {
@@ -233,7 +243,7 @@ impl IndustrializedView {
                         self.render_openbim_ifc_studio(ui, theme, features)
                     }
                     IndustrializedSubTab::PrecastLogisticsTolerance => {
-                        self.render_precast_logistics_tolerance(ui, theme, features)
+                        self.render_precast_logistics_tolerance(ui, theme, bim_project, features)
                     }
                     IndustrializedSubTab::Concrete3DPrinting => {
                         self.render_concrete_3d_printing(ui, theme, features)

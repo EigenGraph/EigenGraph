@@ -213,6 +213,20 @@ const PALETTE_SWATCHES: [(&str, [u8; 3]); 6] = [
     ("Slate", [226, 232, 240]),
 ];
 
+/// Cross-module CAD keyboard shortcut snapshot polled only when no text input has focus.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CadShortcutFeedback {
+    pub toggle_freeze: bool,
+    pub escape: bool,
+    pub delete_selected: bool,
+    pub undo: bool,
+    pub redo: bool,
+    pub toggle_ortho: bool,
+    pub toggle_snap: bool,
+    pub fit_model: bool,
+    pub letter_key: Option<char>,
+}
+
 /// Shared interactive drawing canvas state synchronized across all 15 sidebar navigation modules.
 pub struct UniversalCanvasState {
     pub pan: Vec2,
@@ -223,6 +237,7 @@ pub struct UniversalCanvasState {
     pub stroke_width: f32,
     pub show_grid: bool,
     pub snap_to_grid: bool,
+    pub ortho_mode: bool,
     pub grid_spacing_mm: f64,
     pub show_bim_base_layer: bool,
     pub show_domain_overlay: bool,
@@ -233,6 +248,8 @@ pub struct UniversalCanvasState {
     pub entities: Vec<CanvasEntity>,
     pub next_entity_id: usize,
     pub undo_stack: Vec<Vec<CanvasEntity>>,
+    pub redo_stack: Vec<Vec<CanvasEntity>>,
+    pub selected_entity_id: Option<usize>,
     pending_start_mm: Option<[f64; 2]>,
     active_freehand_mm: Vec<[f64; 2]>,
     pub cursor_world_mm: [f64; 2],
@@ -265,6 +282,7 @@ impl Default for UniversalCanvasState {
             stroke_width: 2.2,
             show_grid: true,
             snap_to_grid: true,
+            ortho_mode: false,
             grid_spacing_mm: 500.0,
             show_bim_base_layer: true,
             show_domain_overlay: true,
@@ -275,6 +293,8 @@ impl Default for UniversalCanvasState {
             entities: Vec::new(),
             next_entity_id: 1,
             undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            selected_entity_id: None,
             pending_start_mm: None,
             active_freehand_mm: Vec::new(),
             cursor_world_mm: [0.0, 0.0],
@@ -588,15 +608,262 @@ impl UniversalCanvasState {
         if self.undo_stack.len() > 30 {
             self.undo_stack.remove(0);
         }
+        self.redo_stack.clear();
     }
 
     pub fn undo(&mut self) -> bool {
         if let Some(prev) = self.undo_stack.pop() {
+            self.redo_stack.push(self.entities.clone());
+            if self.redo_stack.len() > 30 {
+                self.redo_stack.remove(0);
+            }
             self.entities = prev;
+            if let Some(sel) = self.selected_entity_id {
+                if !self.entities.iter().any(|e| e.id == sel) {
+                    self.selected_entity_id = None;
+                }
+            }
             true
         } else {
             false
         }
+    }
+
+    pub fn redo(&mut self) -> bool {
+        if let Some(next) = self.redo_stack.pop() {
+            self.undo_stack.push(self.entities.clone());
+            if self.undo_stack.len() > 30 {
+                self.undo_stack.remove(0);
+            }
+            self.entities = next;
+            if let Some(sel) = self.selected_entity_id {
+                if !self.entities.iter().any(|e| e.id == sel) {
+                    self.selected_entity_id = None;
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Polls CAD keyboard shortcuts only when no text field holds focus.
+    pub fn poll_cad_shortcuts(ctx: &egui::Context, is_frozen: bool) -> CadShortcutFeedback {
+        if ctx.egui_wants_keyboard_input() {
+            return CadShortcutFeedback::default();
+        }
+        ctx.input(|i| {
+            let mut fb = CadShortcutFeedback::default();
+            if i.key_pressed(egui::Key::Space) && !i.modifiers.any() {
+                fb.toggle_freeze = true;
+            }
+            if is_frozen {
+                return fb;
+            }
+            fb.escape = i.key_pressed(egui::Key::Escape);
+            fb.delete_selected =
+                i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace);
+            fb.undo = i.modifiers.command && !i.modifiers.shift && i.key_pressed(egui::Key::Z);
+            fb.redo = (i.modifiers.command && i.key_pressed(egui::Key::Y))
+                || (i.modifiers.command && i.modifiers.shift && i.key_pressed(egui::Key::Z));
+            fb.toggle_ortho = i.key_pressed(egui::Key::F8);
+            fb.toggle_snap = i.key_pressed(egui::Key::F3);
+
+            if !i.modifiers.command && !i.modifiers.ctrl && !i.modifiers.alt {
+                if i.key_pressed(egui::Key::Z) {
+                    fb.fit_model = true;
+                } else {
+                    const KEYS: [(egui::Key, char); 14] = [
+                        (egui::Key::W, 'W'),
+                        (egui::Key::B, 'B'),
+                        (egui::Key::C, 'C'),
+                        (egui::Key::F, 'F'),
+                        (egui::Key::L, 'L'),
+                        (egui::Key::R, 'R'),
+                        (egui::Key::D, 'D'),
+                        (egui::Key::M, 'M'),
+                        (egui::Key::O, 'O'),
+                        (egui::Key::X, 'X'),
+                        (egui::Key::E, 'E'),
+                        (egui::Key::T, 'T'),
+                        (egui::Key::A, 'A'),
+                        (egui::Key::V, 'V'),
+                    ];
+                    for (key, ch) in KEYS {
+                        if i.key_pressed(key) {
+                            fb.letter_key = Some(ch);
+                            break;
+                        }
+                    }
+                }
+            }
+            fb
+        })
+    }
+
+    /// Constraints `end_mm` orthogonally relative to `start_mm` when `ortho_mode` is enabled.
+    pub fn apply_ortho(&self, start_mm: [f64; 2], end_mm: [f64; 2]) -> [f64; 2] {
+        if !self.ortho_mode {
+            return end_mm;
+        }
+        let dx = (end_mm[0] - start_mm[0]).abs();
+        let dy = (end_mm[1] - start_mm[1]).abs();
+        if dx >= dy {
+            [end_mm[0], start_mm[1]]
+        } else {
+            [start_mm[0], end_mm[1]]
+        }
+    }
+
+    fn target_entity_idx(&self) -> Option<usize> {
+        if let Some(sel) = self.selected_entity_id {
+            if let Some(pos) = self.entities.iter().position(|e| e.id == sel) {
+                return Some(pos);
+            }
+        }
+        self.entities.len().checked_sub(1)
+    }
+
+    /// Translates the selected (or latest) entity by `(dx_mm, dy_mm)` with undo support.
+    pub fn translate_selected_or_last(&mut self, dx_mm: f64, dy_mm: f64) -> bool {
+        let Some(idx) = self.target_entity_idx() else {
+            return false;
+        };
+        self.push_undo();
+        if let Some(ent) = self.entities.get_mut(idx) {
+            match &mut ent.kind {
+                CanvasShapeKind::Line { start_mm, end_mm }
+                | CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                    start_mm[0] += dx_mm;
+                    start_mm[1] += dy_mm;
+                    end_mm[0] += dx_mm;
+                    end_mm[1] += dy_mm;
+                }
+                CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                    min_mm[0] += dx_mm;
+                    min_mm[1] += dy_mm;
+                    max_mm[0] += dx_mm;
+                    max_mm[1] += dy_mm;
+                }
+                CanvasShapeKind::Circle { center_mm, .. } => {
+                    center_mm[0] += dx_mm;
+                    center_mm[1] += dy_mm;
+                }
+                CanvasShapeKind::Freehand { points_mm } => {
+                    for p in points_mm {
+                        p[0] += dx_mm;
+                        p[1] += dy_mm;
+                    }
+                }
+                CanvasShapeKind::Callout { pos_mm, .. } => {
+                    pos_mm[0] += dx_mm;
+                    pos_mm[1] += dy_mm;
+                }
+            }
+            self.selected_entity_id = Some(ent.id);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Creates a parallel/outward offset duplicate of the selected (or latest) entity.
+    pub fn offset_selected_or_last(&mut self, offset_mm: f64) -> bool {
+        let Some(idx) = self.target_entity_idx() else {
+            return false;
+        };
+        let mut cloned = self.entities[idx].clone();
+        match &mut cloned.kind {
+            CanvasShapeKind::Line { start_mm, end_mm }
+            | CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                let vx = end_mm[0] - start_mm[0];
+                let vy = end_mm[1] - start_mm[1];
+                let len = vx.hypot(vy).max(1.0);
+                let nx = -vy / len * offset_mm;
+                let ny = vx / len * offset_mm;
+                start_mm[0] += nx;
+                start_mm[1] += ny;
+                end_mm[0] += nx;
+                end_mm[1] += ny;
+            }
+            CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                min_mm[0] -= offset_mm;
+                min_mm[1] -= offset_mm;
+                max_mm[0] += offset_mm;
+                max_mm[1] += offset_mm;
+            }
+            CanvasShapeKind::Circle { radius_mm, .. } => {
+                *radius_mm = (*radius_mm + offset_mm).max(100.0);
+            }
+            CanvasShapeKind::Freehand { points_mm } => {
+                for p in points_mm {
+                    p[0] += offset_mm;
+                    p[1] += offset_mm;
+                }
+            }
+            CanvasShapeKind::Callout { pos_mm, .. } => {
+                pos_mm[0] += offset_mm;
+                pos_mm[1] += offset_mm;
+            }
+        }
+        self.push_undo();
+        let new_id = self.next_entity_id;
+        self.next_entity_id += 1;
+        cloned.id = new_id;
+        self.entities.push(cloned);
+        self.selected_entity_id = Some(new_id);
+        true
+    }
+
+    /// Creates a mirrored duplicate of the selected (or latest) entity across vertical axis `x = mirror_x_mm`.
+    pub fn mirror_selected_or_last(&mut self, mirror_x_mm: f64) -> bool {
+        let Some(idx) = self.target_entity_idx() else {
+            return false;
+        };
+        let mut cloned = self.entities[idx].clone();
+        let mx = |x: f64| 2.0 * mirror_x_mm - x;
+        match &mut cloned.kind {
+            CanvasShapeKind::Line { start_mm, end_mm }
+            | CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                start_mm[0] = mx(start_mm[0]);
+                end_mm[0] = mx(end_mm[0]);
+            }
+            CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                let nx0 = mx(max_mm[0]);
+                let nx1 = mx(min_mm[0]);
+                min_mm[0] = nx0.min(nx1);
+                max_mm[0] = nx0.max(nx1);
+            }
+            CanvasShapeKind::Circle { center_mm, .. } => {
+                center_mm[0] = mx(center_mm[0]);
+            }
+            CanvasShapeKind::Freehand { points_mm } => {
+                for p in points_mm {
+                    p[0] = mx(p[0]);
+                }
+            }
+            CanvasShapeKind::Callout { pos_mm, .. } => {
+                pos_mm[0] = mx(pos_mm[0]);
+            }
+        }
+        self.push_undo();
+        let new_id = self.next_entity_id;
+        self.next_entity_id += 1;
+        cloned.id = new_id;
+        self.entities.push(cloned);
+        self.selected_entity_id = Some(new_id);
+        true
+    }
+
+    /// Deletes the selected (or latest) entity with undo support.
+    pub fn delete_selected_or_last(&mut self) -> bool {
+        let Some(idx) = self.target_entity_idx() else {
+            return false;
+        };
+        self.push_undo();
+        self.entities.remove(idx);
+        self.selected_entity_id = None;
+        true
     }
 
     pub fn clear_entities(&mut self, active_pillar: Option<NavigationPillar>) {
@@ -608,6 +875,7 @@ impl UniversalCanvasState {
             }
             None => self.entities.clear(),
         }
+        self.selected_entity_id = None;
     }
 
     pub fn count_for_pillar(&self, pillar: NavigationPillar) -> usize {
@@ -868,12 +1136,16 @@ impl UniversalCanvasState {
                 ui.set_width(outer_w);
                 ui.set_max_width(outer_w);
 
-                // 1. Main Interactive Drawing Viewport (Top)
+                // Apply CAD Keyboard Shortcuts (Space freeze, Esc, Del, Ctrl+Z/Y, F8 Ortho, F3 Snap, single keys)
+                self.handle_universal_shortcuts(ui.ctx(), bim_project);
+
+                // 1. Main Interactive Drawing Viewport (Top — clean, only Freeze pill inside)
                 let avail_w = ui.available_width().max(200.0);
                 let (response, painter) =
                     ui.allocate_painter(Vec2::new(avail_w, canvas_h), Sense::click_and_drag());
                 let rect = response.rect;
                 self.last_canvas_rect = Some(rect);
+                self.last_inspector_rect = None;
 
                 painter.rect_filled(rect, CornerRadius::same(10), Self::canvas_bg(theme));
 
@@ -887,33 +1159,13 @@ impl UniversalCanvasState {
                         sidebar_toggle_inset_px,
                     );
 
-                // Reserve floating inspector rect on wide screens (>= 720px)
-                let floating_inspector_rect = if self.inspector_open && avail_w >= 720.0 {
-                    let insp_w = (avail_w * 0.28).clamp(240.0, 290.0);
-                    let insp_h = (rect.height() - 24.0).max(200.0);
-                    let r = Rect::from_min_size(
-                        Pos2::new(rect.right() - insp_w - 12.0, rect.top() + 12.0),
-                        Vec2::new(insp_w, insp_h),
-                    );
-                    self.last_inspector_rect = Some(r);
-                    Some(r)
-                } else {
-                    self.last_inspector_rect = None;
-                    None
-                };
-
-                let pointer_in_inspector = floating_inspector_rect.is_some_and(|ir| {
-                    ui.ctx()
-                        .input(|i| i.pointer.hover_pos().is_some_and(|p| ir.contains(p)))
-                });
-
-                // Handle Pan / Zoom / Drawing Interaction (respecting Freeze Canvas & Floating Controls)
+                // Handle Pan / Zoom / Drawing Interaction (respecting Freeze Canvas & Floating Freeze Pill)
                 self.handle_canvas_interaction(
                     ui,
                     &response,
                     rect,
                     active_pillar,
-                    pointer_in_inspector || pointer_in_freeze_pill,
+                    pointer_in_freeze_pill,
                 );
 
                 // 1a. Phase 35: Earth World Map Ground Basemap (Vector Continents + Online Raster Tiles + Geodetic/Metric Grid)
@@ -980,34 +1232,6 @@ impl UniversalCanvasState {
                             theme.text_primary,
                         );
                     }
-                } else if !self.is_frozen
-                    && !self.ground_origin_anchored
-                    && self.entities.is_empty()
-                    && bim_project.is_empty()
-                {
-                    painter.text(
-                        Pos2::new(rect.left() + 14.0, rect.top() + 50.0),
-                        Align2::LEFT_TOP,
-                        "World Map Ground Canvas • Pan/Zoom to any site or click Ground 1:200 to draw directly on terrain",
-                        egui::FontId::proportional(11.0),
-                        theme.text_primary.gamma_multiply(0.85),
-                    );
-                }
-
-                // Render Floating Collapsible Inspector Overlay (Desktop / Tablet >= 720px)
-                if let Some(insp_rect) = floating_inspector_rect {
-                    ui.scope_builder(egui::UiBuilder::new().max_rect(insp_rect), |ui| {
-                        self.render_floating_inspector_panel(
-                            ui,
-                            theme,
-                            active_pillar,
-                            bim_project,
-                            members,
-                            variables,
-                            workspace_settings.clone(),
-                            true,
-                        );
-                    });
                 }
 
                 // Floating Top-Left Freeze / Unfreeze Pill inside Viewport
@@ -1029,10 +1253,15 @@ impl UniversalCanvasState {
 
                 ui.add_space(6.0);
 
+                // 2. Coordinate & CAD Telemetry Bar directly below Viewport and above Bottom Toolbar
+                self.render_status_footer(ui, theme, active_pillar, bim_project);
+
                 // Optional status toast
                 Self::render_toast_bar(ui, theme, &mut self.status_message);
 
-                // 2. Bottom Canvas HUD Toolbar (below Main Drawing Viewport)
+                ui.add_space(6.0);
+
+                // 3. Bottom Canvas HUD Toolbar (rich drawing + modify buttons below Coordinate Bar)
                 self.render_canvas_toolbar(
                     ui,
                     theme,
@@ -1044,15 +1273,11 @@ impl UniversalCanvasState {
                     sidebar_toggle_inset_px,
                 );
 
-                ui.add_space(6.0);
-
-                // 3. Bottom Canvas Status Strip
-                self.render_status_footer(ui, theme, active_pillar, bim_project);
-
-                // Stacked Collapsible Inspector on narrower viewports (< 720px)
-                if self.inspector_open && floating_inspector_rect.is_none() {
+                // 4. Bottom-Docked Collapsible Inspector Panel (cleanly outside viewport across all viewports)
+                if self.inspector_open {
+                    ui.add_space(6.0);
                     Frame::new()
-                        .inner_margin(Margin::symmetric(10, 8))
+                        .inner_margin(Margin::symmetric(4, 2))
                         .show(ui, |ui| {
                             self.render_floating_inspector_panel(
                                 ui,
@@ -1067,6 +1292,81 @@ impl UniversalCanvasState {
                         });
                 }
             });
+    }
+
+    fn handle_universal_shortcuts(&mut self, ctx: &egui::Context, bim_project: &BimProject) {
+        let fb = Self::poll_cad_shortcuts(ctx, self.is_frozen);
+        if fb.toggle_freeze {
+            self.is_frozen = !self.is_frozen;
+            self.pending_start_mm = None;
+            self.active_freehand_mm.clear();
+            self.status_message = Some(if self.is_frozen {
+                "Canvas Frozen (Space) • Scroll safely".to_string()
+            } else {
+                "Canvas Live (Space) • CAD keys & pan/draw active".to_string()
+            });
+        }
+        if fb.escape {
+            self.pending_start_mm = None;
+            self.active_freehand_mm.clear();
+            self.measure_active = false;
+            self.selected_entity_id = None;
+            self.active_tool = UniversalCanvasTool::SelectPan;
+        }
+        if fb.undo && self.undo() {
+            self.status_message = Some("Undo canvas action (Ctrl/Cmd+Z)".to_string());
+        }
+        if fb.redo && self.redo() {
+            self.status_message = Some("Redo canvas action (Ctrl/Cmd+Y)".to_string());
+        }
+        if fb.delete_selected && self.delete_selected_or_last() {
+            self.status_message = Some("Deleted canvas entity (Del)".to_string());
+        }
+        if fb.toggle_ortho {
+            self.ortho_mode = !self.ortho_mode;
+        }
+        if fb.toggle_snap {
+            self.snap_to_grid = !self.snap_to_grid;
+        }
+        if fb.fit_model {
+            if let Some(extents) = bim_project.plan_extents_mm() {
+                self.fit_world_to_bim_extents(Some(extents));
+            } else {
+                self.fit_world_or_site(!bim_project.is_empty());
+            }
+        }
+        if let Some(ch) = fb.letter_key {
+            let mirror_x = bim_project
+                .plan_extents_mm()
+                .map_or(0.0, |(a, b)| 0.5 * (a[0] + b[0]));
+            match ch {
+                'L' => self.active_tool = UniversalCanvasTool::Line,
+                'R' => self.active_tool = UniversalCanvasTool::Rectangle,
+                'C' => self.active_tool = UniversalCanvasTool::Circle,
+                'D' => self.active_tool = UniversalCanvasTool::Dimension,
+                'T' => self.active_tool = UniversalCanvasTool::Callout,
+                'E' => self.active_tool = UniversalCanvasTool::Eraser,
+                'M' => {
+                    if self.translate_selected_or_last(1000.0, 0.0) {
+                        self.status_message =
+                            Some("Moved selected/last entity +1000 mm East (M)".to_string());
+                    }
+                }
+                'O' => {
+                    if self.offset_selected_or_last(500.0) {
+                        self.status_message =
+                            Some("Offset duplicate +500 mm (O)".to_string());
+                    }
+                }
+                'X' => {
+                    if self.mirror_selected_or_last(mirror_x) {
+                        self.status_message =
+                            Some(format!("Mirrored duplicate across X={mirror_x:.0} mm (X)"));
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1116,7 +1416,7 @@ impl UniversalCanvasState {
 
                     ui.separator();
 
-                    // Undo, Grid, Snap, Fit
+                    // Undo, Redo, Ortho, Grid, Snap, Fit
                     if icons::icon_button(
                         ui,
                         AppIcon::Undo,
@@ -1128,10 +1428,56 @@ impl UniversalCanvasState {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
-                    .on_hover_text("Undo last canvas change")
+                    .on_hover_text("Undo last canvas change (Ctrl/Cmd+Z)")
                     .clicked()
                     {
                         self.undo();
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Redo,
+                        "Redo",
+                        10.5,
+                        if self.redo_stack.is_empty() {
+                            theme.text_muted
+                        } else {
+                            theme.text_primary
+                        },
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Redo undone canvas change (Ctrl/Cmd+Y)")
+                    .clicked()
+                    {
+                        self.redo();
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::RulerSquare,
+                        "Ortho",
+                        10.5,
+                        if self.ortho_mode {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.ortho_mode {
+                            theme.accent_orange.gamma_multiply(0.85)
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Lock orthogonal H/V axis while drawing lines & dims (F8)")
+                    .clicked()
+                    {
+                        self.ortho_mode = !self.ortho_mode;
                     }
 
                     if icons::icon_button(
@@ -1177,6 +1523,7 @@ impl UniversalCanvasState {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
+                    .on_hover_text("Snap points to metric grid (F3)")
                     .clicked()
                     {
                         self.snap_to_grid = !self.snap_to_grid;
@@ -1193,7 +1540,7 @@ impl UniversalCanvasState {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
-                    .on_hover_text("Auto-fit view to active BIM footprint or Global World Map")
+                    .on_hover_text("Auto-fit view to active BIM footprint or Global World Map (Z)")
                     .clicked()
                     {
                         if let Some(extents) = bim_project.plan_extents_mm() {
@@ -1201,6 +1548,111 @@ impl UniversalCanvasState {
                         } else {
                             self.fit_world_or_site(!bim_project.is_empty());
                         }
+                    }
+
+                    ui.separator();
+
+                    // CAD Modify Palette (Move, Offset, Mirror, Delete)
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ArrowRight,
+                        "Move +1m",
+                        10.5,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Move selected or latest canvas entity +1000 mm East (M)")
+                    .clicked()
+                    {
+                        if self.translate_selected_or_last(1000.0, 0.0) {
+                            self.status_message =
+                                Some("Moved canvas entity +1000 mm East (M)".to_string());
+                        }
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Layers,
+                        "Offset",
+                        10.5,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Duplicate and offset selected or latest entity +500 mm (O)")
+                    .clicked()
+                    {
+                        if self.offset_selected_or_last(500.0) {
+                            self.status_message =
+                                Some("Created +500 mm offset duplicate (O)".to_string());
+                        }
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SectionCut,
+                        "Mirror",
+                        10.5,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Mirror selected or latest entity across project centerline (X)")
+                    .clicked()
+                    {
+                        let mirror_x = bim_project
+                            .plan_extents_mm()
+                            .map_or(0.0, |(a, b)| 0.5 * (a[0] + b[0]));
+                        if self.mirror_selected_or_last(mirror_x) {
+                            self.status_message = Some(format!(
+                                "Mirrored duplicate across X={mirror_x:.0} mm (X)"
+                            ));
+                        }
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Trash,
+                        "Delete",
+                        10.5,
+                        theme.accent_red,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.accent_red.gamma_multiply(0.35)),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Delete selected or latest entity (Del)")
+                    .clicked()
+                    {
+                        if self.delete_selected_or_last() {
+                            self.status_message =
+                                Some("Deleted selected/latest canvas entity (Del)".to_string());
+                        }
+                    }
+
+                    if self.selected_entity_id.is_some()
+                        && icons::icon_button(
+                            ui,
+                            AppIcon::Close,
+                            "Clear Sel",
+                            10.0,
+                            theme.text_secondary,
+                            theme.bg_card,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 26.0),
+                        )
+                        .on_hover_text("Deselect active entity (Esc)")
+                        .clicked()
+                    {
+                        self.selected_entity_id = None;
                     }
 
                     ui.separator();
@@ -1663,10 +2115,25 @@ impl UniversalCanvasState {
             return;
         }
 
+        let scale = self.world_map.pixels_per_mm_at_origin(self.ground_origin_lat_lon);
+        let hit_radius_mm = (16.0 / scale.max(1e-9)) as f64;
+        let world_map_snapshot = self.world_map.clone();
+        let origin_lat_lon = self.ground_origin_lat_lon;
+        let to_world = |pos: Pos2| -> [f64; 2] {
+            world_map_snapshot.screen_to_world_mm(origin_lat_lon, pos, rect)
+        };
+
         if self.active_tool == UniversalCanvasTool::SelectPan {
             if response.dragged_by(egui::PointerButton::Primary) {
                 let delta = response.drag_delta();
                 self.world_map.pan_by_pixels(delta.x, delta.y);
+            } else if response.clicked_by(egui::PointerButton::Primary) {
+                if let Some(pos) = response.interact_pointer_pos() {
+                    let w = to_world(pos);
+                    self.selected_entity_id = self
+                        .find_nearest_entity_idx(w, hit_radius_mm)
+                        .and_then(|i| self.entities.get(i).map(|e| e.id));
+                }
             }
             return;
         }
@@ -1681,13 +2148,6 @@ impl UniversalCanvasState {
             }
         }
 
-        let scale = self.world_map.pixels_per_mm_at_origin(self.ground_origin_lat_lon);
-        let hit_radius_mm = (16.0 / scale.max(1e-9)) as f64;
-        let world_map_snapshot = self.world_map.clone();
-        let origin_lat_lon = self.ground_origin_lat_lon;
-        let to_world = |pos: Pos2| -> [f64; 2] {
-            world_map_snapshot.screen_to_world_mm(origin_lat_lon, pos, rect)
-        };
         self.handle_world_sketch_interaction(response, active_pillar, hit_radius_mm, &to_world);
     }
 
@@ -1807,7 +2267,16 @@ impl UniversalCanvasState {
         let stroke_width = self.stroke_width;
 
         match self.active_tool {
-            UniversalCanvasTool::SelectPan => {}
+            UniversalCanvasTool::SelectPan => {
+                if response.clicked_by(egui::PointerButton::Primary) {
+                    if let Some(pos) = response.interact_pointer_pos() {
+                        let w = screen_to_world(pos);
+                        self.selected_entity_id = self
+                            .find_nearest_entity_idx(w, hit_radius_mm)
+                            .and_then(|i| self.entities.get(i).map(|e| e.id));
+                    }
+                }
+            }
             UniversalCanvasTool::Freehand => {
                 if response.drag_started_by(egui::PointerButton::Primary) {
                     if let Some(pos) = response.interact_pointer_pos() {
@@ -1857,7 +2326,15 @@ impl UniversalCanvasState {
                     if let (Some(start), Some(pos)) =
                         (self.pending_start_mm.take(), response.interact_pointer_pos())
                     {
-                        let end = self.snap_point(screen_to_world(pos));
+                        let raw_end = self.snap_point(screen_to_world(pos));
+                        let end = if matches!(
+                            self.active_tool,
+                            UniversalCanvasTool::Line | UniversalCanvasTool::Dimension
+                        ) {
+                            self.apply_ortho(start, raw_end)
+                        } else {
+                            raw_end
+                        };
                         let dist = (end[0] - start[0]).hypot(end[1] - start[1]);
                         if dist >= 50.0 {
                             let kind = match self.active_tool {
@@ -1882,6 +2359,7 @@ impl UniversalCanvasState {
                             self.push_undo();
                             let id = self.next_entity_id;
                             self.next_entity_id += 1;
+                            self.selected_entity_id = Some(id);
                             self.entities.push(CanvasEntity {
                                 id,
                                 pillar_badge: badge,
@@ -2457,12 +2935,22 @@ impl UniversalCanvasState {
                 continue;
             }
             let base_col = Color32::from_rgb(ent.color_rgb[0], ent.color_rgb[1], ent.color_rgb[2]);
-            let col = if ent.pillar_badge == active_badge {
+            let is_selected = self.selected_entity_id == Some(ent.id);
+            let col = if is_selected {
+                theme.accent_orange
+            } else if ent.pillar_badge == active_badge {
                 base_col
             } else {
                 base_col.gamma_multiply(0.82)
             };
-            let stroke = Stroke::new(ent.stroke_width, col);
+            let stroke = Stroke::new(
+                if is_selected {
+                    ent.stroke_width + 1.4
+                } else {
+                    ent.stroke_width
+                },
+                col,
+            );
 
             match &ent.kind {
                 CanvasShapeKind::Freehand { points_mm } => {
@@ -2569,7 +3057,14 @@ impl UniversalCanvasState {
         }
 
         if let Some(start) = self.pending_start_mm {
-            let end = self.cursor_world_mm;
+            let end = if matches!(
+                self.active_tool,
+                UniversalCanvasTool::Line | UniversalCanvasTool::Dimension
+            ) {
+                self.apply_ortho(start, self.cursor_world_mm)
+            } else {
+                self.cursor_world_mm
+            };
             let s0 = to_screen(start);
             let s1 = to_screen(end);
             match self.active_tool {
@@ -2859,8 +3354,16 @@ impl UniversalCanvasState {
                     telem.ground_resolution_m_px,
                 );
                 let coord_txt = format!(
-                    "({:.0}, {:.0}) mm",
+                    "X: {:.0}  Y: {:.0} mm",
                     self.cursor_world_mm[0], self.cursor_world_mm[1],
+                );
+                let mode_txt = format!(
+                    "Tool: {} • Ortho(F8): {} • Snap(F3): {}{}",
+                    self.active_tool.short_label(),
+                    if self.ortho_mode { "ON" } else { "OFF" },
+                    if self.snap_to_grid { "ON" } else { "OFF" },
+                    self.selected_entity_id
+                        .map_or(String::new(), |id| format!(" • Sel #{id}"))
                 );
                 let counts_txt = format!(
                     "{} Draw ({} {}) • {} BIM",
@@ -2894,6 +3397,20 @@ impl UniversalCanvasState {
                     );
                     icons::icon_label(
                         ui,
+                        AppIcon::RulerSquare,
+                        11.0,
+                        if self.ortho_mode {
+                            theme.accent_orange
+                        } else {
+                            theme.text_secondary
+                        },
+                        mode_txt,
+                        10.5,
+                        theme.text_secondary,
+                        false,
+                    );
+                    icons::icon_label(
+                        ui,
                         AppIcon::Layers,
                         11.0,
                         theme.accent_blue,
@@ -2901,6 +3418,11 @@ impl UniversalCanvasState {
                         10.5,
                         theme.text_secondary,
                         false,
+                    );
+                    ui.label(
+                        RichText::new("Keys: Space Freeze • L/R/C/D Draw • M/O/X Modify • Del Erase • Z Fit")
+                            .size(10.0)
+                            .color(theme.text_muted),
                     );
                     if icons::icon_button(
                         ui,
@@ -3109,5 +3631,53 @@ mod tests {
 
         assert!(canvas.undo());
         assert_eq!(canvas.entities.len(), initial_len);
+        assert!(canvas.redo());
+        assert_eq!(canvas.entities.len(), initial_len + 1);
+    }
+
+    #[test]
+    fn test_canvas_ortho_translate_offset_mirror_and_delete() {
+        let mut canvas = UniversalCanvasState::default();
+        canvas.ortho_mode = true;
+        assert_eq!(
+            canvas.apply_ortho([1000.0, 1000.0], [4500.0, 1200.0]),
+            [4500.0, 1000.0]
+        );
+        assert_eq!(
+            canvas.apply_ortho([1000.0, 1000.0], [1150.0, 3800.0]),
+            [1000.0, 3800.0]
+        );
+
+        canvas.entities.push(CanvasEntity {
+            id: 1,
+            pillar_badge: "3D".to_string(),
+            pillar_name: "Geometry".to_string(),
+            kind: CanvasShapeKind::Line {
+                start_mm: [0.0, 0.0],
+                end_mm: [3000.0, 0.0],
+            },
+            color_rgb: [56, 189, 248],
+            stroke_width: 2.0,
+        });
+        canvas.next_entity_id = 2;
+        canvas.selected_entity_id = Some(1);
+
+        assert!(canvas.translate_selected_or_last(1000.0, 500.0));
+        match &canvas.entities[0].kind {
+            CanvasShapeKind::Line { start_mm, end_mm } => {
+                assert_eq!(*start_mm, [1000.0, 500.0]);
+                assert_eq!(*end_mm, [4000.0, 500.0]);
+            }
+            _ => panic!("expected line"),
+        }
+
+        assert!(canvas.offset_selected_or_last(500.0));
+        assert_eq!(canvas.entities.len(), 2);
+        assert!(canvas.mirror_selected_or_last(6000.0));
+        assert_eq!(canvas.entities.len(), 3);
+        assert!(canvas.delete_selected_or_last());
+        assert_eq!(canvas.entities.len(), 2);
+        assert!(canvas.undo());
+        assert_eq!(canvas.entities.len(), 3);
     }
 }

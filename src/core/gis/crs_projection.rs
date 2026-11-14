@@ -5,8 +5,6 @@
 //! meridian convergence (True North rotation), point scale factors, and IFC4 `IfcMapConversion`
 //! georeferencing matrix formulations with sub-millimeter precision.
 
-use std::f64::consts::PI;
-
 /// WGS84 Ellipsoid semi-major axis in meters (a).
 pub const WGS84_SEMI_MAJOR_AXIS: f64 = 6378137.0;
 
@@ -371,7 +369,7 @@ mod tests {
         assert_eq!(zone, 50, "IKN Nusantara must be in UTM Zone 50");
 
         let engine = GeoProjectionEngine::new(50, true);
-        let (easting, northing, convergence) = engine.wgs84_to_utm(lat, lon);
+        let (easting, northing, _convergence) = engine.wgs84_to_utm(lat, lon);
 
         assert!(easting > 400000.0 && easting < 600000.0);
         assert!(northing > 9800000.0 && northing < 10000000.0);

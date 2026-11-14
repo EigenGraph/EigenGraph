@@ -39,6 +39,96 @@ pub struct LeanView {
     pub lps_new_task_week: String,
     // Phase 38: Live BimProject Rebar BBS -> CSO 1D Sync (9D-02)
     pub use_bim_rebar_source: bool,
+    // Phase 40 (9D-03): Takt-Time Concrete Pour & Mixer Dispatch
+    pub takt_days_per_zone: u32,
+    pub takt_transit_min: f32,
+    pub takt_mixer_cap_m3: f32,
+    pub takt_alert_threshold_min: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaktPourZoneRow {
+    pub zone_name: &'static str,
+    pub pour_m3: f64,
+    pub trucks_needed: usize,
+    pub headway_min: f32,
+    pub cold_joint_status: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaktConcreteDispatchReport {
+    pub total_bim_m3: f64,
+    pub shift_pour_m3: f64,
+    pub total_trucks_shift: usize,
+    pub dispatch_headway_min: f32,
+    pub delayed_trucks: usize,
+    pub slump_margin_min: f32,
+    pub zones: Vec<TaktPourZoneRow>,
+}
+
+/// Computes Takt-Time concrete pour cadence and ready-mix truck dispatch intervals from `BimProject` concrete volumes.
+pub fn compute_takt_concrete_dispatch(
+    bim_project: &crate::core::bim::BimProject,
+    takt_days: u32,
+    transit_min: f32,
+    mixer_cap_m3: f32,
+    alert_threshold_min: f32,
+) -> TaktConcreteDispatchReport {
+    let bim_m3 = bim_project.total_concrete_volume_m3();
+    let levels_n = bim_project.levels.len().max(1) as f64;
+    let typical_floor_m3 = if bim_m3 > 10.0 {
+        (bim_m3 / levels_n).max(90.0)
+    } else {
+        425.0
+    };
+    let cap = mixer_cap_m3.clamp(4.0, 12.0) as f64;
+    let specs = [
+        ("Zone A (West)", 0.28, "Completed"),
+        ("Zone B (Center)", 0.48, if transit_min > alert_threshold_min { "Delay Alert" } else { "Nominal" }),
+        ("Zone C (East)", 0.24, "Scheduled"),
+    ];
+
+    let mut zones = Vec::with_capacity(specs.len());
+    let mut active_pour_m3 = 0.0f64;
+    let mut active_trucks = 0usize;
+    let shift_hours_min = 420.0f32; // 7-hour night pour window
+
+    for (idx, (zname, frac, base_st)) in specs.into_iter().enumerate() {
+        let pour_m3 = typical_floor_m3 * frac;
+        let trucks = (pour_m3 / cap).ceil().max(1.0) as usize;
+        let headway = (shift_hours_min / trucks as f32).clamp(6.0, 35.0);
+        if idx == 1 {
+            active_pour_m3 = pour_m3;
+            active_trucks = trucks;
+        }
+        zones.push(TaktPourZoneRow {
+            zone_name: zname,
+            pour_m3,
+            trucks_needed: trucks,
+            headway_min: headway,
+            cold_joint_status: base_st,
+        });
+    }
+
+    let delayed_trucks = if transit_min > alert_threshold_min {
+        ((transit_min - alert_threshold_min) / 8.0).ceil().max(1.0) as usize
+    } else {
+        0
+    };
+    let dispatch_headway_min = ((shift_hours_min / active_trucks.max(1) as f32)
+        * (5.0 / takt_days.max(1) as f32))
+        .clamp(6.0, 35.0);
+    let slump_margin_min = 90.0 - transit_min;
+
+    TaktConcreteDispatchReport {
+        total_bim_m3: bim_m3,
+        shift_pour_m3: active_pour_m3,
+        total_trucks_shift: active_trucks,
+        dispatch_headway_min,
+        delayed_trucks,
+        slump_margin_min,
+        zones,
+    }
 }
 
 impl Default for LeanView {
@@ -57,6 +147,10 @@ impl Default for LeanView {
             lps_new_task_name: String::new(),
             lps_new_task_week: "W-06".to_string(),
             use_bim_rebar_source: false,
+            takt_days_per_zone: 5,
+            takt_transit_min: 38.0,
+            takt_mixer_cap_m3: 7.0,
+            takt_alert_threshold_min: 75.0,
         }
     }
 }
@@ -116,7 +210,7 @@ impl LeanView {
                     LeanSubTab::ValueStream => self.render_value_stream(ui, theme),
                     LeanSubTab::JitDelivery => self.render_jit_delivery(ui, theme),
                     LeanSubTab::TaktConcreteDispatch => {
-                        self.render_takt_concrete_dispatch(ui, theme, features);
+                        self.render_takt_concrete_dispatch(ui, theme, bim_project, features);
                     }
                     LeanSubTab::RfiSubmittalTracker => {
                         self.render_rfi_submittal_tracker(ui, theme, features);
@@ -1041,38 +1135,119 @@ impl LeanView {
     }
 
     fn render_takt_concrete_dispatch(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        bim_project: &crate::core::bim::BimProject,
         features: &mut FeatureRegistry,
     ) {
+        let rep = compute_takt_concrete_dispatch(
+            bim_project,
+            self.takt_days_per_zone,
+            self.takt_transit_min,
+            self.takt_mixer_cap_m3,
+            self.takt_alert_threshold_min,
+        );
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::TaktTimeConcretePourDispatch, |ui| {
+            let cad_val = format!("{} Days / Zone", self.takt_days_per_zone);
+            let cad_sub = format!(
+                "Zone A -> B -> C ({} BIM Levels)",
+                bim_project.levels.len().max(1)
+            );
+            let tr_val = format!("{:.0} min Avg Transit", self.takt_transit_min);
+            let tr_sub = format!(
+                "Slump Margin: {:+.0} min vs 90 min ASTM C94 Cap",
+                rep.slump_margin_min
+            );
+            let tr_col = if rep.slump_margin_min >= 15.0 {
+                theme.accent_green
+            } else if rep.slump_margin_min >= 0.0 {
+                theme.accent_orange
+            } else {
+                theme.accent_red
+            };
+            let pour_val = format!("{:.1} m³ / Shift", rep.shift_pour_m3);
+            let pour_sub = format!(
+                "{} Mixers ({:.1} m³/truck @ {:.1} min headway) • Total BIM {:.1} m³",
+                rep.total_trucks_shift,
+                self.takt_mixer_cap_m3,
+                rep.dispatch_headway_min,
+                rep.total_bim_m3
+            );
+            let risk_val = if rep.delayed_trucks == 0 {
+                "0 Cold-Joint Risks".to_string()
+            } else {
+                format!("{} Truck Warning(s)", rep.delayed_trucks)
+            };
+            let risk_col = if rep.delayed_trucks == 0 {
+                theme.accent_green
+            } else {
+                theme.accent_orange
+            };
             let cards = [
-                ("TAKT ZONE CADENCE", "5 Days / Zone", "Zone A -> B -> C -> D (Floor L07)", theme.accent_blue),
-                ("READY-MIX TRUCK TRANSIT", "38 min Avg (Live GPS)", "Max Slump Expiry Cap = 90 min", theme.accent_green),
-                ("CONTINUOUS POUR VOLUME", "210 m³ / Night Shift", "30 Trucks Scheduled (K-350 Pump)", theme.accent_blue),
-                ("COLD-JOINT RISK MONITOR", "1 Truck Warning", "TM-14 Delayed 12 min in Ringroad Traffic", theme.accent_orange),
+                ("TAKT ZONE CADENCE", cad_val, cad_sub, theme.accent_blue),
+                ("READY-MIX TRANSIT WINDOW", tr_val, tr_sub, tr_col),
+                ("CONTINUOUS POUR VOLUME", pour_val, pour_sub, theme.accent_blue),
+                (
+                    "COLD-JOINT RISK MONITOR",
+                    risk_val,
+                    format!("Alert Threshold = {:.0} min", self.takt_alert_threshold_min),
+                    risk_col,
+                ),
             ];
             ui_kit::responsive_grid_n(ui, cards.len(), 200.0, |ui, idx| {
-                let (t, v, s, c) = cards[idx];
-                self.render_stat_card(ui, theme, t, v, s, c);
+                let (t, v, s, c) = &cards[idx];
+                self.render_stat_card(ui, theme, t, v, s, *c);
             });
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Takt Rhythm: 5-Day Trade Train");
-                let _ = ui.selectable_label(false, "Alert on Transit > 75 min");
-                let _ = crate::icons::icon_button(
+                ui.label(RichText::new("Takt Rhythm (Days/Zone):").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.takt_days_per_zone, 2..=10));
+                ui.label(RichText::new("Batch Transit (min):").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.takt_transit_min, 15.0..=105.0).step_by(1.0));
+                ui.label(RichText::new("Mixer Cap (m³):").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.takt_mixer_cap_m3, 5.0..=10.0).step_by(0.5));
+                if ui
+                    .selectable_label(
+                        self.takt_alert_threshold_min <= 75.0,
+                        "Alert on Transit > 75 min",
+                    )
+                    .clicked()
+                {
+                    self.takt_alert_threshold_min =
+                        if self.takt_alert_threshold_min <= 75.0 { 90.0 } else { 75.0 };
+                }
+                if crate::icons::icon_button(
                     ui,
                     crate::icons::AppIcon::Layers,
-                    "Sync Trade Train & Dispatch Mixer Slot",
+                    "Export Takt & Mixer Dispatch (.CSV)",
                     12.0,
                     theme.text_primary,
                     theme.bg_card,
                     egui::Stroke::new(1.0, theme.border_subtle),
                     CornerRadius::same(6),
                     Vec2::ZERO,
-                );
+                )
+                .clicked()
+                {
+                    let mut csv = String::from("Zone,Pour_m3,TrucksNeeded,Headway_min,ColdJointStatus\n");
+                    for z in &rep.zones {
+                        csv.push_str(&format!(
+                            "{},{:.1},{},{:.1},{}\n",
+                            z.zone_name, z.pour_m3, z.trucks_needed, z.headway_min, z.cold_joint_status
+                        ));
+                    }
+                    self.export_status = Some(
+                        match crate::core::web_bridge::save_text_file("takt_concrete_dispatch.csv", &csv, "text/csv") {
+                            Ok(msg) => format!(
+                                "Takt Pour Dispatch ({} trucks, {:.1} min headway) • {msg}",
+                                rep.total_trucks_shift, rep.dispatch_headway_min
+                            ),
+                            Err(e) => format!("Takt CSV export failed: {e}"),
+                        },
+                    );
+                }
             });
             ui.add_space(10.0);
 
@@ -1082,21 +1257,28 @@ impl LeanView {
                     .min_col_width(88.0)
                     .spacing(Vec2::new(14.0, 6.0))
                     .show(ui, |ui| {
-                        for h in ["Zone / Level", "W1 (Mon-Fri)", "W2 (Mon-Fri)", "W3 (Mon-Fri)", "W4 (Mon-Fri)", "Pour Batching"] {
+                        for h in ["Zone / Level", "W1 Trade", "W2 Trade", "W3 Pour Gate", "Mixer Headway", "Pour Batching"] {
                             ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                         }
                         ui.end_row();
-                        for (zn, w1, w2, w3, w4, pour) in [
-                            ("Zone A (West)", "Rebar Deck", "MEP Sleeves", "Slab Pour [Done]", "Strip & MEP", "110 m³ Completed"),
-                            ("Zone B (Center)", "Formwork", "Rebar Deck", "MEP Sleeves", "Slab Pour [Active]", "210 m³ Tonight"),
-                            ("Zone C (East)", "Shoring", "Formwork", "Rebar Deck", "MEP Sleeves", "105 m³ Next Week"),
-                        ] {
-                            ui.label(RichText::new(zn).size(10.5).strong().color(theme.text_primary));
-                            ui.label(RichText::new(w1).size(10.5).color(theme.text_secondary));
-                            ui.label(RichText::new(w2).size(10.5).color(theme.accent_blue));
-                            ui.label(RichText::new(w3).size(10.5).color(theme.accent_green));
-                            ui.label(RichText::new(w4).size(10.5).color(theme.accent_orange));
-                            ui.label(RichText::new(pour).size(10.5).color(theme.text_muted));
+                        let trades = [
+                            ("Rebar Deck", "MEP Sleeves", "Slab Pour [Done]"),
+                            ("Formwork", "Rebar Deck", "Slab Pour [Active]"),
+                            ("Shoring", "Formwork", "MEP & Pour Prep"),
+                        ];
+                        for (idx, z) in rep.zones.iter().enumerate() {
+                            let (t1, t2, t3) = trades[idx % trades.len()];
+                            let st_col = if z.cold_joint_status.contains("Delay") {
+                                theme.accent_orange
+                            } else {
+                                theme.accent_green
+                            };
+                            ui.label(RichText::new(z.zone_name).size(10.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(t1).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(t2).size(10.5).color(theme.accent_blue));
+                            ui.label(RichText::new(t3).size(10.5).color(st_col));
+                            ui.label(RichText::new(format!("{:.1} min/truck", z.headway_min)).size(10.5).monospace().color(theme.accent_orange));
+                            ui.label(RichText::new(format!("{:.1} m³ ({} mixers)", z.pour_m3, z.trucks_needed)).size(10.5).color(theme.text_muted));
                             ui.end_row();
                         }
                     });
@@ -1182,5 +1364,21 @@ impl LeanView {
                 ui.add_space(4.0);
                 ui.label(RichText::new(subtitle).size(10.5).color(theme.text_secondary));
             });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::compute_takt_concrete_dispatch;
+    use crate::core::bim::BimProject;
+
+    #[test]
+    fn test_takt_concrete_dispatch_flags_excess_transit_delay() {
+        let proj = BimProject::default();
+        let on_time = compute_takt_concrete_dispatch(&proj, 5, 38.0, 7.0, 75.0);
+        let delayed = compute_takt_concrete_dispatch(&proj, 5, 84.0, 7.0, 75.0);
+        assert_eq!(on_time.delayed_trucks, 0);
+        assert!(delayed.delayed_trucks >= 1);
+        assert!(on_time.total_trucks_shift >= 1);
     }
 }

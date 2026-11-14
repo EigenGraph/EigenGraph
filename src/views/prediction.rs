@@ -17,6 +17,129 @@ pub enum PredictionSubTab {
     PostQuakeAtc20,
 }
 
+/// Live Structural Health Monitoring (SHM) state snapshot passed from 7D Facility Management.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ShmPredictionFeed {
+    pub strain_micro: f32,
+    pub freq_hz: f32,
+    pub degradation_pct: f32,
+    pub live_packets: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnomalyMemberRank {
+    pub member_id: usize,
+    pub name: String,
+    pub axial_force_kn: f64,
+    pub fea_dcr: f32,
+    pub coupled_strain_micro: f32,
+    pub vulnerability_score: f32,
+    pub mechanism: &'static str,
+    pub action: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShmAnomalyForecastReport {
+    pub live_beta: f32,
+    pub stiffness_ratio: f32,
+    pub drift_alert_triggered: bool,
+    pub anomaly_count: usize,
+    pub remaining_useful_life_yrs: f32,
+    pub bim_element_count: usize,
+    pub ranked_members: Vec<AnomalyMemberRank>,
+}
+
+/// Fuses live FEA member forces, BIM element density, and 7D SHM strain/frequency telemetry to forecast anomalies.
+pub fn compute_live_shm_anomaly_forecast(
+    members: &[StructuralMember],
+    bim_project: &crate::core::BimProject,
+    shm: ShmPredictionFeed,
+    target_beta: f32,
+    drift_alert_beta: f32,
+) -> ShmAnomalyForecastReport {
+    let baseline_freq = 3.50_f32;
+    let stiffness_ratio = (shm.freq_hz / baseline_freq).clamp(0.45, 1.15).powi(2);
+    let strain_ratio = (shm.strain_micro / 600.0).clamp(0.05, 1.8);
+    let degradation_penalty = (shm.degradation_pct / 100.0).clamp(0.0, 0.35);
+
+    let live_beta = (target_beta + 0.15
+        - (1.0 - stiffness_ratio).max(0.0) * 1.85
+        - (strain_ratio - 0.65).max(0.0) * 1.10
+        - degradation_penalty * 2.2)
+        .clamp(1.20, 5.20);
+
+    let mut ranked = Vec::new();
+    let max_force = members
+        .iter()
+        .map(|m| m.force_kn.abs())
+        .fold(120.0_f64, f64::max);
+
+    for (idx, m) in members.iter().take(8).enumerate() {
+        let fea_dcr = (m.force_kn.abs() / max_force).clamp(0.12, 1.25) as f32;
+        let local_strain = shm.strain_micro * (0.72 + 0.38 * fea_dcr);
+        let vuln = (fea_dcr * 0.52 + (local_strain / 1100.0) * 0.33 + (1.0 - stiffness_ratio).max(0.0) * 0.65 + (idx as f32 * 0.01))
+            .clamp(0.08, 0.99);
+        let mechanism = if local_strain > 550.0 {
+            "Cyclic Fatigue / Yield"
+        } else if fea_dcr > 0.72 {
+            "Flexural Yield"
+        } else {
+            "Elastic Stress Flow"
+        };
+        let action = if vuln >= 0.62 {
+            "ALERT: Dispatch NDT"
+        } else if vuln >= 0.40 {
+            "Monitor SHM"
+        } else {
+            "Nominal"
+        };
+        ranked.push(AnomalyMemberRank {
+            member_id: m.id,
+            name: m.name.clone(),
+            axial_force_kn: m.force_kn,
+            fea_dcr,
+            coupled_strain_micro: local_strain,
+            vulnerability_score: vuln,
+            mechanism,
+            action,
+        });
+    }
+
+    if ranked.is_empty() {
+        ranked.push(AnomalyMemberRank {
+            member_id: 1,
+            name: "Baseline Spine Member E1".to_string(),
+            axial_force_kn: 420.0,
+            fea_dcr: 0.48,
+            coupled_strain_micro: shm.strain_micro,
+            vulnerability_score: (0.28 + (strain_ratio - 0.5).max(0.0) * 0.35).clamp(0.1, 0.95),
+            mechanism: "Elastic Stress Flow",
+            action: if strain_ratio > 0.95 { "Monitor SHM" } else { "Nominal" },
+        });
+    }
+
+    ranked.sort_by(|a, b| {
+        b.vulnerability_score
+            .partial_cmp(&a.vulnerability_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let anomaly_count = ranked.iter().filter(|r| r.vulnerability_score >= 0.40).count();
+    let drift_alert_triggered = live_beta < drift_alert_beta;
+    let remaining_useful_life_yrs =
+        (65.0 * stiffness_ratio * (1.0 - degradation_penalty) / strain_ratio.max(0.55)).clamp(8.0, 95.0);
+
+    ShmAnomalyForecastReport {
+        live_beta,
+        stiffness_ratio,
+        drift_alert_triggered,
+        anomaly_count,
+        remaining_useful_life_yrs,
+        bim_element_count: bim_project.element_count(),
+        ranked_members: ranked,
+    }
+}
+
 pub struct PredictionView {
     pub active_subtab: PredictionSubTab,
     pub target_reliability_beta: f32,
@@ -27,6 +150,9 @@ pub struct PredictionView {
     pub simulation_status: Option<String>,
     pub reliability_report: Option<crate::core::ReliabilityAndClashReport>,
     pub transient_report: Option<crate::core::SuddenRemovalTransientReport>,
+    // Phase 40 (PRED-02): Live SHM Anomaly & Drift Threshold Controls
+    pub shm_drift_alert_beta: f32,
+    pub shm_include_freq_shift: bool,
 }
 
 impl Default for PredictionView {
@@ -41,6 +167,8 @@ impl Default for PredictionView {
             simulation_status: None,
             reliability_report: None,
             transient_report: None,
+            shm_drift_alert_beta: 3.80,
+            shm_include_freq_shift: true,
         }
     }
 }
@@ -51,6 +179,8 @@ impl PredictionView {
         ui: &mut Ui,
         theme: &MacTheme,
         members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
+        shm_feed: ShmPredictionFeed,
         features: &mut FeatureRegistry,
     ) {
         let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
@@ -93,7 +223,9 @@ impl PredictionView {
 
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
-                    PredictionSubTab::FailureRisk => self.render_failure_risk(ui, theme, members, features),
+                    PredictionSubTab::FailureRisk => {
+                        self.render_failure_risk(ui, theme, members, bim_project, shm_feed, features)
+                    }
                     PredictionSubTab::ProgressiveCollapse => self.render_progressive_collapse(ui, theme, members),
                     PredictionSubTab::ErectionBottleneck => self.render_erection_bottleneck(ui, theme),
                     PredictionSubTab::LifetimeDegradation => self.render_lifetime_degradation(ui, theme),
@@ -127,13 +259,102 @@ impl PredictionView {
         ui: &mut Ui,
         theme: &MacTheme,
         members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
+        shm_feed: ShmPredictionFeed,
         features: &mut FeatureRegistry,
     ) {
+        let effective_shm = if self.shm_include_freq_shift {
+            shm_feed
+        } else {
+            ShmPredictionFeed {
+                freq_hz: 3.50,
+                ..shm_feed
+            }
+        };
+        let forecast = compute_live_shm_anomaly_forecast(
+            members,
+            bim_project,
+            effective_shm,
+            self.target_reliability_beta,
+            self.shm_drift_alert_beta,
+        );
+
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::LiveShmAnomalyForecasting, |ui| {
+            let beta_col = if forecast.drift_alert_triggered {
+                theme.accent_red
+            } else {
+                theme.accent_green
+            };
+            let beta_val = format!("β_live = {:.2}", forecast.live_beta);
+            let beta_sub = format!(
+                "Alert Threshold β < {:.2} ({})",
+                self.shm_drift_alert_beta,
+                if forecast.drift_alert_triggered { "DRIFT ALERT" } else { "PASS" }
+            );
+            let stiff_val = format!("{:.1}% (f1 = {:.2} Hz)", forecast.stiffness_ratio * 100.0, effective_shm.freq_hz);
+            let stiff_sub = format!(
+                "{} BIM Elements • {} Live SHM Pkts",
+                forecast.bim_element_count, effective_shm.live_packets
+            );
+            let anom_val = format!("{} Flagged Members", forecast.anomaly_count);
+            let anom_col = if forecast.anomaly_count > 0 {
+                theme.accent_orange
+            } else {
+                theme.accent_green
+            };
+            let rul_val = format!("{:.1} Years RUL", forecast.remaining_useful_life_yrs);
+            let shm_cards = [
+                ("LIVE COUPLED RELIABILITY", beta_val.as_str(), beta_sub.as_str(), beta_col),
+                ("MODAL STIFFNESS RATIO", stiff_val.as_str(), stiff_sub.as_str(), theme.accent_blue),
+                ("ANOMALY VULNERABILITY", anom_val.as_str(), "FEA + 7D Strain SG-01 Fusion", anom_col),
+                ("REMAINING USEFUL LIFE", rul_val.as_str(), "Fatigue & Stiffness Trajectory", theme.accent_green),
+            ];
+            ui_kit::responsive_grid_n(ui, shm_cards.len(), 185.0, |ui, idx| {
+                let (t, v, s, c) = shm_cards[idx];
+                ui_kit::stat_card(ui, theme, t, v, s, c);
+            });
+            ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Inputs: Live FEA Forces + 7D SHM Strain");
-                let _ = ui.selectable_label(false, "Drift Threshold Alerting (β < 3.8)");
-                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Pulse, "Run Live Stress Anomaly Ranker", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                ui.checkbox(&mut self.shm_include_freq_shift, "Couple 7D Modal Freq Shift (k/k0)");
+                ui.label(RichText::new("Drift Alert β:").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.shm_drift_alert_beta, 3.0..=4.5).step_by(0.05));
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Pulse,
+                    "Export SHM Anomaly Forecast (.CSV)",
+                    12.0,
+                    theme.text_primary,
+                    theme.bg_card,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let mut csv = String::from("MemberID,Name,Force_kN,FEA_DCR,CoupledStrain_ue,Vulnerability,Mechanism,Action\n");
+                    for r in &forecast.ranked_members {
+                        csv.push_str(&format!(
+                            "{},{},{:.2},{:.3},{:.1},{:.3},{},{}\n",
+                            r.member_id,
+                            r.name.replace(',', ";"),
+                            r.axial_force_kn,
+                            r.fea_dcr,
+                            r.coupled_strain_micro,
+                            r.vulnerability_score,
+                            r.mechanism,
+                            r.action
+                        ));
+                    }
+                    self.simulation_status = Some(
+                        match crate::core::web_bridge::save_text_file("shm_anomaly_forecast.csv", &csv, "text/csv") {
+                            Ok(msg) => format!(
+                                "SHM Anomaly Forecast (β_live={:.2}, RUL={:.1} yrs) • {msg}",
+                                forecast.live_beta, forecast.remaining_useful_life_yrs
+                            ),
+                            Err(e) => format!("Anomaly CSV export failed: {e}"),
+                        },
+                    );
+                }
             });
         });
         ui.add_space(12.0);
@@ -229,19 +450,21 @@ impl PredictionView {
                         ui.label(RichText::new("Action Priority").size(11.0).strong().color(theme.text_muted));
                         ui.end_row();
 
-                        let count = members.len().min(6);
-                        for i in 0..count {
-                            let m = &members[i];
-                            let vuln_score = if i == 0 { 0.42 } else if i == 1 { 0.31 } else { 0.18 + (i as f32 * 0.03) };
-                            let vuln_color = if vuln_score > 0.40 { theme.accent_orange } else { theme.accent_green };
-                            let action = if vuln_score > 0.40 { "Monitor SHM" } else { "Nominal" };
+                        for r in &forecast.ranked_members {
+                            let vuln_color = if r.vulnerability_score >= 0.62 {
+                                theme.accent_red
+                            } else if r.vulnerability_score >= 0.40 {
+                                theme.accent_orange
+                            } else {
+                                theme.accent_green
+                            };
 
-                            ui.label(RichText::new(format!("#{}", m.id)).size(11.0).color(theme.text_primary));
-                            ui.label(RichText::new(m.name.clone()).size(11.0).color(theme.text_secondary));
-                            ui.label(RichText::new(format!("{:.1} kN", m.force_kn)).size(11.0).color(theme.text_secondary));
-                            ui.label(RichText::new(format!("{:.2}", vuln_score)).size(11.0).strong().color(vuln_color));
-                            ui.label(RichText::new(if i % 2 == 0 { "Flexural Yield" } else { "Tension Flow" }).size(11.0).color(theme.text_secondary));
-                            ui.label(RichText::new(action).size(11.0).color(vuln_color));
+                            ui.label(RichText::new(format!("#{}", r.member_id)).size(11.0).color(theme.text_primary));
+                            ui.label(RichText::new(&r.name).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("{:.1} kN ({:.0} µε)", r.axial_force_kn, r.coupled_strain_micro)).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("{:.2}", r.vulnerability_score)).size(11.0).strong().color(vuln_color));
+                            ui.label(RichText::new(r.mechanism).size(11.0).color(theme.text_secondary));
+                            ui.label(RichText::new(r.action).size(11.0).strong().color(vuln_color));
                             ui.end_row();
                         }
                     });
@@ -913,5 +1136,62 @@ impl PredictionView {
                 });
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{compute_live_shm_anomaly_forecast, ShmPredictionFeed};
+    use crate::core::BimProject;
+    use crate::models::StructuralMember;
+
+    #[test]
+    fn test_shm_anomaly_forecast_responds_to_high_strain_and_freq_drop() {
+        let proj = BimProject::default();
+        let members = vec![
+            StructuralMember {
+                id: 1,
+                name: "Col C1".to_string(),
+                force_kn: 420.0,
+                capacity_kn: 650.0,
+                utilization: 0.65,
+                ..StructuralMember::default()
+            },
+            StructuralMember {
+                id: 2,
+                name: "Girder G1".to_string(),
+                force_kn: 210.0,
+                capacity_kn: 500.0,
+                utilization: 0.42,
+                ..StructuralMember::default()
+            },
+        ];
+        let nominal = compute_live_shm_anomaly_forecast(
+            &members,
+            &proj,
+            ShmPredictionFeed {
+                strain_micro: 280.0,
+                freq_hz: 3.50,
+                degradation_pct: 1.0,
+                live_packets: 12,
+            },
+            3.80,
+            3.60,
+        );
+        let damaged = compute_live_shm_anomaly_forecast(
+            &members,
+            &proj,
+            ShmPredictionFeed {
+                strain_micro: 720.0,
+                freq_hz: 2.85,
+                degradation_pct: 12.0,
+                live_packets: 24,
+            },
+            3.80,
+            3.60,
+        );
+        assert!(damaged.live_beta < nominal.live_beta);
+        assert!(damaged.drift_alert_triggered);
+        assert!(damaged.remaining_useful_life_yrs < nominal.remaining_useful_life_yrs);
     }
 }

@@ -15,7 +15,7 @@
 //! 7. IFC Model Health & Conformance Quality Assurance Audit (syntax, schema, dangling pointers, uncontained products, duplicate GUIDs).
 //! 8. Bi-directional bridge to EigenGraph's native `StructuralModel` for instant ARI and SVD mechanics.
 
-use crate::core::model::{BoundaryFixity, CrossSection, Element3D, ElementType, Material, NodalLoad, Node3D, StructuralModel};
+use crate::core::model::{BoundaryFixity, Element3D, ElementType, NodalLoad, Node3D, StructuralModel};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -998,7 +998,7 @@ impl IfcModel {
         step_model: &StepModel,
         schema: &IfcSchemaVersion,
         elements: &[IfcElementSummary],
-        spatial_root: &IfcSpatialNode,
+        _spatial_root: &IfcSpatialNode,
     ) -> IfcModelHealthReport {
         let mut checks = Vec::new();
         let mut penalties = 0.0;

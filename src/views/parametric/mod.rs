@@ -21,7 +21,9 @@ use crate::features::{FeatureId, FeatureRegistry};
 use crate::icons::{self, AppIcon};
 use crate::theme::MacTheme;
 use crate::ui_kit;
-use crate::views::universal_canvas::{UniversalCanvasState, WorkspaceCanvasSettings};
+use crate::views::universal_canvas::{
+    UniversalCanvasState, UniversalCanvasTool, WorkspaceCanvasSettings,
+};
 
 pub mod canvas_2d;
 pub mod detailing_2d;
@@ -282,6 +284,9 @@ impl ParametricView {
                 ui.set_width(outer_avail_w);
                 ui.set_max_width(outer_avail_w);
 
+                // Apply Parametric 2D + Ink CAD keyboard shortcuts (Space freeze, Esc, Del, Ctrl+Z/Y, F8, F3, keys)
+                self.handle_parametric_shortcuts(ui.ctx(), universal_canvas);
+
                 // 1. Full-Width Unobstructed World-Grounded Drawing Viewport (Top)
                 self.render_drawing_canvas(
                     ui,
@@ -324,6 +329,227 @@ impl ParametricView {
         universal_canvas.fit_world_to_bim_extents(extents);
         self.canvas_pan = Vec2::ZERO;
         self.canvas_zoom = 1.0;
+    }
+
+    pub(super) fn apply_parametric_move_1m(
+        &mut self,
+        universal_canvas: &mut UniversalCanvasState,
+    ) {
+        if self.sketch_draw_mode {
+            if universal_canvas.translate_selected_or_last(1000.0, 0.0) {
+                self.save_notification =
+                    Some("Moved selected/last sketch entity +1000 mm (M)".to_string());
+            }
+            return;
+        }
+        if let Some(id) = self.bim_bus.project.latest_element_id() {
+            match self.bim_bus.execute(BimCommand::MoveElement {
+                element_id: id,
+                delta: P2(1000.0, 0.0),
+            }) {
+                Ok(msg) => {
+                    self.save_notification = Some(msg.clone());
+                    self.command_history.push(msg);
+                    self.refresh_live_ari();
+                }
+                Err(e) => self.save_notification = Some(e),
+            }
+        }
+    }
+
+    pub(super) fn apply_parametric_offset(
+        &mut self,
+        universal_canvas: &mut UniversalCanvasState,
+    ) {
+        if self.sketch_draw_mode {
+            if universal_canvas.offset_selected_or_last(500.0) {
+                self.save_notification =
+                    Some("Offset duplicate sketch entity +500 mm (O)".to_string());
+            }
+            return;
+        }
+        if let Some(wid) = self.bim_bus.project.latest_wall_id() {
+            match self.bim_bus.execute(BimCommand::OffsetWall {
+                wall_id: wid,
+                offset_mm: 500.0,
+            }) {
+                Ok(msg) => {
+                    self.save_notification = Some(msg.clone());
+                    self.command_history.push(msg);
+                    self.refresh_live_ari();
+                }
+                Err(e) => self.save_notification = Some(e),
+            }
+        } else {
+            self.save_notification =
+                Some("Create a wall first to apply +500 mm CAD Wall Offset".to_string());
+        }
+    }
+
+    pub(super) fn apply_parametric_mirror(
+        &mut self,
+        universal_canvas: &mut UniversalCanvasState,
+    ) {
+        let mirror_x = self
+            .bim_bus
+            .project
+            .plan_extents_mm()
+            .map_or(0.0, |(a, b)| 0.5 * (a[0] + b[0]));
+        if self.sketch_draw_mode {
+            if universal_canvas.mirror_selected_or_last(mirror_x) {
+                self.save_notification = Some(format!(
+                    "Mirrored sketch entity across X={mirror_x:.0} mm (X)"
+                ));
+            }
+            return;
+        }
+        match self.bim_bus.execute(BimCommand::MirrorElements {
+            axis_a: P2(mirror_x, -5000.0),
+            axis_b: P2(mirror_x, 5000.0),
+        }) {
+            Ok(msg) => {
+                self.save_notification = Some(msg.clone());
+                self.command_history.push(msg);
+                self.refresh_live_ari();
+            }
+            Err(e) => self.save_notification = Some(e),
+        }
+    }
+
+    pub(super) fn apply_parametric_delete(
+        &mut self,
+        universal_canvas: &mut UniversalCanvasState,
+    ) {
+        if self.sketch_draw_mode {
+            if universal_canvas.delete_selected_or_last() {
+                self.save_notification = Some("Deleted sketch entity (Del)".to_string());
+            }
+            return;
+        }
+        if let Some(id) = self.bim_bus.project.latest_element_id() {
+            match self
+                .bim_bus
+                .execute(BimCommand::DeleteElement { element_id: id })
+            {
+                Ok(msg) => {
+                    self.save_notification = Some(msg.clone());
+                    self.command_history.push(msg);
+                    self.refresh_live_ari();
+                }
+                Err(e) => self.save_notification = Some(e),
+            }
+        }
+    }
+
+    fn handle_parametric_shortcuts(
+        &mut self,
+        ctx: &egui::Context,
+        universal_canvas: &mut UniversalCanvasState,
+    ) {
+        let fb = UniversalCanvasState::poll_cad_shortcuts(ctx, universal_canvas.is_frozen);
+        if fb.toggle_freeze {
+            universal_canvas.is_frozen = !universal_canvas.is_frozen;
+            self.pending_start_pt = None;
+            self.save_notification = Some(if universal_canvas.is_frozen {
+                "Canvas Frozen (Space) • Page scroll safe".to_string()
+            } else {
+                "Canvas Live (Space) • Drafting shortcuts ready".to_string()
+            });
+        }
+        if fb.escape {
+            self.pending_start_pt = None;
+            universal_canvas.measure_active = false;
+            universal_canvas.selected_entity_id = None;
+            self.active_tool = CadTool::Select;
+            self.bim_tool = BimAuthoringTool::CadStandard;
+            universal_canvas.active_tool = UniversalCanvasTool::SelectPan;
+        }
+        if fb.undo {
+            if self.sketch_draw_mode {
+                if universal_canvas.undo() {
+                    self.save_notification = Some("Undo Ink sketch (Ctrl/Cmd+Z)".to_string());
+                }
+            } else if let Some(msg) = self.bim_bus.undo() {
+                self.save_notification = Some(msg.clone());
+                self.command_history.push(msg);
+                self.refresh_live_ari();
+            }
+        }
+        if fb.redo {
+            if self.sketch_draw_mode {
+                if universal_canvas.redo() {
+                    self.save_notification = Some("Redo Ink sketch (Ctrl/Cmd+Y)".to_string());
+                }
+            } else if let Some(msg) = self.bim_bus.redo() {
+                self.save_notification = Some(msg.clone());
+                self.command_history.push(msg);
+                self.refresh_live_ari();
+            }
+        }
+        if fb.delete_selected {
+            self.apply_parametric_delete(universal_canvas);
+        }
+        if fb.toggle_ortho {
+            self.ortho_mode = !self.ortho_mode;
+            universal_canvas.ortho_mode = self.ortho_mode;
+        }
+        if fb.toggle_snap {
+            self.snap_to_grid = !self.snap_to_grid;
+            universal_canvas.snap_to_grid = self.snap_to_grid;
+        }
+        if fb.fit_model {
+            self.fit_view_to_project(universal_canvas);
+        }
+        if let Some(ch) = fb.letter_key {
+            match ch {
+                'W' => {
+                    self.sketch_draw_mode = false;
+                    self.bim_tool = BimAuthoringTool::WallChain;
+                    self.pending_start_pt = None;
+                }
+                'B' => {
+                    self.sketch_draw_mode = false;
+                    self.bim_tool = BimAuthoringTool::StructuralBeam;
+                    self.pending_start_pt = None;
+                }
+                'C' => {
+                    if self.sketch_draw_mode {
+                        universal_canvas.active_tool = UniversalCanvasTool::Circle;
+                    } else {
+                        self.bim_tool = BimAuthoringTool::StructuralColumn;
+                        self.pending_start_pt = None;
+                    }
+                }
+                'L' => {
+                    if self.sketch_draw_mode {
+                        universal_canvas.active_tool = UniversalCanvasTool::Line;
+                    } else {
+                        self.active_tool = CadTool::Line;
+                        self.bim_tool = BimAuthoringTool::CadStandard;
+                    }
+                }
+                'R' => {
+                    if self.sketch_draw_mode {
+                        universal_canvas.active_tool = UniversalCanvasTool::Rectangle;
+                    } else {
+                        self.active_tool = CadTool::Rectangle;
+                        self.bim_tool = BimAuthoringTool::CadStandard;
+                    }
+                }
+                'D' => {
+                    if self.sketch_draw_mode {
+                        universal_canvas.active_tool = UniversalCanvasTool::Dimension;
+                    } else {
+                        self.active_tool = CadTool::Dimension;
+                        self.bim_tool = BimAuthoringTool::CadStandard;
+                    }
+                }
+                'M' => self.apply_parametric_move_1m(universal_canvas),
+                'O' => self.apply_parametric_offset(universal_canvas),
+                'X' => self.apply_parametric_mirror(universal_canvas),
+                _ => {}
+            }
+        }
     }
 
     pub(super) fn refresh_live_ari(&mut self) {
@@ -416,11 +642,69 @@ impl ParametricView {
             "REC" | "RECTANGLE" => self.active_tool = CadTool::Rectangle,
             "DIM" | "DI" | "DIMENSION" => self.active_tool = CadTool::Dimension,
             "TR" | "TRIM" => self.active_tool = CadTool::Trim,
-            "O" | "OFFSET" => self.active_tool = CadTool::Offset,
-            _ => {
-                self.command_history
-                    .push(format!("Executed instruction: {cmd}"));
+            "O" | "OFFSET" => {
+                self.active_tool = CadTool::Offset;
+                if let Some(wid) = self.bim_bus.project.latest_wall_id() {
+                    if let Ok(msg) = self.bim_bus.execute(BimCommand::OffsetWall {
+                        wall_id: wid,
+                        offset_mm: 500.0,
+                    }) {
+                        self.command_history.push(msg.clone());
+                        self.save_notification = Some(msg);
+                        self.refresh_live_ari();
+                    }
+                }
             }
+            "M" | "MOVE" => {
+                if let Some(id) = self.bim_bus.project.latest_element_id() {
+                    if let Ok(msg) = self.bim_bus.execute(BimCommand::MoveElement {
+                        element_id: id,
+                        delta: P2(1000.0, 0.0),
+                    }) {
+                        self.command_history.push(msg.clone());
+                        self.save_notification = Some(msg);
+                        self.refresh_live_ari();
+                    }
+                }
+            }
+            "MI" | "MIRROR" | "X" => {
+                let cx = self
+                    .bim_bus
+                    .project
+                    .plan_extents_mm()
+                    .map_or(0.0, |(a, b)| 0.5 * (a[0] + b[0]));
+                if let Ok(msg) = self.bim_bus.execute(BimCommand::MirrorElements {
+                    axis_a: P2(cx, -5000.0),
+                    axis_b: P2(cx, 5000.0),
+                }) {
+                    self.command_history.push(msg.clone());
+                    self.save_notification = Some(msg);
+                    self.refresh_live_ari();
+                }
+            }
+            "DEL" | "DELETE" | "ERASE" => {
+                if let Some(id) = self.bim_bus.project.latest_element_id() {
+                    if let Ok(msg) = self
+                        .bim_bus
+                        .execute(BimCommand::DeleteElement { element_id: id })
+                    {
+                        self.command_history.push(msg.clone());
+                        self.save_notification = Some(msg);
+                        self.refresh_live_ari();
+                    }
+                }
+            }
+            _ => match self.bim_bus.execute_natural_language(trimmed) {
+                Ok(msg) => {
+                    self.command_history.push(msg.clone());
+                    self.save_notification = Some(msg);
+                    self.refresh_live_ari();
+                }
+                Err(_) => {
+                    self.command_history
+                        .push(format!("Executed instruction: {cmd}"));
+                }
+            },
         }
     }
 

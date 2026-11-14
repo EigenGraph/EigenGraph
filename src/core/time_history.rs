@@ -262,14 +262,14 @@ impl TimeHistoryEngine {
         // Multi-Story Structural Idealization (MDOF Generalized Coordinate Model)
         let total_mass = (input.total_seismic_weight_kn * 1000.0) / g; // kg
         let n_stories = input.num_stories;
-        let story_mass = total_mass / (n_stories as f64);
+        let _story_mass = total_mass / (n_stories as f64);
         let omega_1 = 2.0 * std::f64::consts::PI / input.fundamental_period_t1_s;
 
         // Effective generalized elastic stiffness K_0 and yield force V_y
         let k_elastic = total_mass * omega_1.powi(2); // N/m
         let v_yield_n = input.yield_shear_coeff_cy * (input.total_seismic_weight_kn * 1000.0); // N
         let u_yield = v_yield_n / k_elastic; // m
-        let k_post = input.post_yield_stiffness_ratio * k_elastic;
+        let _k_post = input.post_yield_stiffness_ratio * k_elastic;
 
         // Classical Rayleigh Damping coefficient C
         let c_damping = 2.0 * input.damping_ratio * total_mass * omega_1; // N·s/m
@@ -290,7 +290,7 @@ impl TimeHistoryEngine {
         let mut f_s: f64 = 0.0;   // nonlinear restoring force (N)
 
         // Energy tracking integrals
-        let mut e_kinetic = 0.0;
+        let mut e_kinetic;
         let mut e_damping = 0.0;
         let mut e_strain = 0.0;
         let mut e_hysteretic = 0.0;

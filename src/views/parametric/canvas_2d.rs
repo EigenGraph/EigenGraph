@@ -198,14 +198,29 @@ impl ParametricView {
                     universal_canvas.world_map.zoom_level,
                 );
                 let local_txt = format!(
-                    "({:.0}, {:.0}, {:.0}) mm • {}",
+                    "X: {:.0}  Y: {:.0}  Z: {:.0} mm • {}",
                     self.cursor_pos_mm.0,
                     self.cursor_pos_mm.1,
                     self.cursor_pos_mm.2,
                     lvl_name,
                 );
+                let active_mode_name = match self.view_mode {
+                    DraftingViewMode::FloorPlanViewRange => {
+                        if self.sketch_draw_mode {
+                            format!("Plan + Ink ({})", universal_canvas.active_tool.short_label())
+                        } else {
+                            format!("Floor Plan +1200mm ({:?})", self.bim_tool)
+                        }
+                    }
+                    DraftingViewMode::LiveSectionCutPoche => "Live Section Cut A-A".to_string(),
+                    DraftingViewMode::SheetLayoutA101 => format!("Sheet {}", self.sheet_number),
+                    DraftingViewMode::VisualNodeGraphDynamo => "Dynamo Node Graph".to_string(),
+                    DraftingViewMode::RebarBbsDetailing => "Rebar & BBS".to_string(),
+                    DraftingViewMode::ElevationsAndMepRiser => "Elevations & MEP".to_string(),
+                };
                 let counts_txt = format!(
-                    "{}W / {}C / {}B / {}Rm • ARI {:.3}",
+                    "{} • {}W / {}C / {}B / {}Rm • ARI {:.3}",
+                    active_mode_name,
                     self.bim_bus.project.walls.len(),
                     self.bim_bus.project.columns.len(),
                     self.bim_bus.project.runs.len(),
@@ -213,16 +228,9 @@ impl ParametricView {
                     self.live_ari_score,
                 );
                 let mode_txt = format!(
-                    "{} • {} Synced",
-                    if self.sketch_draw_mode {
-                        "Universal Ink"
-                    } else if self.ortho_mode {
-                        "ORTHO 90°"
-                    } else if self.snap_to_grid {
-                        "OSNAP On"
-                    } else {
-                        "Freehand BIM"
-                    },
+                    "Ortho(F8): {} • OSNAP(F3): {} • {} Ink",
+                    if self.ortho_mode { "ON" } else { "OFF" },
+                    if self.snap_to_grid { "ON" } else { "OFF" },
                     synced_count,
                 );
                 ui.horizontal_wrapped(|ui| {
@@ -265,6 +273,11 @@ impl ParametricView {
                         10.0,
                         theme.accent_green,
                         true,
+                    );
+                    ui.label(
+                        RichText::new("Keys: Space Freeze • W Wall • B Beam • C Col • M/O/X Modify • Z Fit")
+                            .size(10.0)
+                            .color(theme.text_muted),
                     );
                 });
             });
@@ -881,22 +894,6 @@ impl ParametricView {
         universal_canvas.render_geodetic_measure_overlay(painter, rect, theme, &|lat, lon| {
             world_map_for_measure.lat_lon_to_screen(lat, lon, rect)
         });
-
-        // Top-Left HUD Overlay
-        painter.text(
-            Pos2::new(rect.left() + 14.0, rect.top() + 12.0),
-            Align2::LEFT_TOP,
-            if self.sketch_draw_mode {
-                "FLOOR PLAN + UNIVERSAL INK SKETCH • Draw synced annotations or toggle Sketch off for BIM Authoring".to_string()
-            } else {
-                format!(
-                    "FLOOR PLAN VIEW RANGE (Cut +1200mm) • Tool: {:?} • Right-Click to finish / Drag to Pan",
-                    self.bim_tool
-                )
-            },
-            egui::FontId::monospace(10.5),
-            theme.text_muted,
-        );
     }
 
     pub(super) fn draw_live_section_cut(
@@ -982,18 +979,6 @@ impl ParametricView {
             let r = ((*dia as f32) * scale * 2.5).clamp(2.5, 5.0);
             painter.circle_filled(sp, r, Color32::from_rgb(244, 63, 94));
         }
-
-        painter.text(
-            Pos2::new(rect.left() + 14.0, rect.top() + 12.0),
-            Align2::LEFT_TOP,
-            format!(
-                "LIVE SECTION CUT A-A (3D Mesh Slice) • {} Cut Segments • {} Rebar Cut Dots",
-                sec.cut_segments_2d.len(),
-                sec.rebar_dots_2d.len()
-            ),
-            egui::FontId::monospace(10.5),
-            Color32::from_rgb(251, 191, 36),
-        );
     }
 
     pub(super) fn draw_sheet_layout_a101(&self, painter: &egui::Painter, rect: Rect, theme: &MacTheme) {

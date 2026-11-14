@@ -469,6 +469,143 @@ impl ParametricView {
                                     self.pending_start_pt = None;
                                 }
                             }
+
+                            ui.separator();
+
+                            // Bottom-Toolbar Modify & Rooms Actions (shared with keyboard shortcuts M / O / X / Del)
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Undo,
+                                "Undo",
+                                10.0,
+                                theme.text_secondary,
+                                theme.bg_card,
+                                Stroke::NONE,
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 23.0),
+                            )
+                            .on_hover_text("Undo last BIM command (Ctrl/Cmd+Z)")
+                            .clicked()
+                            {
+                                if let Some(msg) = self.bim_bus.undo() {
+                                    self.save_notification = Some(msg.clone());
+                                    self.command_history.push(msg);
+                                    self.refresh_live_ari();
+                                }
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Redo,
+                                "Redo",
+                                10.0,
+                                theme.text_secondary,
+                                theme.bg_card,
+                                Stroke::NONE,
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 23.0),
+                            )
+                            .on_hover_text("Redo undone BIM command (Ctrl/Cmd+Y)")
+                            .clicked()
+                            {
+                                if let Some(msg) = self.bim_bus.redo() {
+                                    self.save_notification = Some(msg.clone());
+                                    self.command_history.push(msg);
+                                    self.refresh_live_ari();
+                                }
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::ArrowRight,
+                                "Move +1m",
+                                10.0,
+                                theme.text_primary,
+                                theme.bg_card,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 23.0),
+                            )
+                            .on_hover_text("Translate latest element +1000 mm East (M)")
+                            .clicked()
+                            {
+                                self.apply_parametric_move_1m(universal_canvas);
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Layers,
+                                "Offset Wall",
+                                10.0,
+                                theme.text_primary,
+                                theme.bg_card,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 23.0),
+                            )
+                            .on_hover_text("Duplicate and offset latest wall by +500 mm (O)")
+                            .clicked()
+                            {
+                                self.apply_parametric_offset(universal_canvas);
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::SectionCut,
+                                "Mirror",
+                                10.0,
+                                theme.text_primary,
+                                theme.bg_card,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 23.0),
+                            )
+                            .on_hover_text("Mirror walls/columns/beams symmetrically across plan centerline (X)")
+                            .clicked()
+                            {
+                                self.apply_parametric_mirror(universal_canvas);
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Trash,
+                                "Delete",
+                                10.0,
+                                theme.accent_red,
+                                theme.bg_card,
+                                Stroke::new(1.0, theme.accent_red.gamma_multiply(0.35)),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 23.0),
+                            )
+                            .on_hover_text("Delete latest element or selected sketch (Del)")
+                            .clicked()
+                            {
+                                self.apply_parametric_delete(universal_canvas);
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Building,
+                                "Auto Rooms",
+                                10.0,
+                                theme.accent_green,
+                                theme.bg_card,
+                                Stroke::NONE,
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 23.0),
+                            )
+                            .on_hover_text("Auto-detect enclosed planar rooms on active level")
+                            .clicked()
+                            {
+                                let lvl_id = self
+                                    .bim_bus
+                                    .project
+                                    .levels
+                                    .get(self.active_level_idx)
+                                    .map(|l| l.id)
+                                    .unwrap_or(1);
+                                if let Ok(msg) = self
+                                    .bim_bus
+                                    .execute(BimCommand::AutoDetectRooms { level_id: lvl_id })
+                                {
+                                    self.save_notification = Some(msg.clone());
+                                    self.command_history.push(msg);
+                                }
+                            }
                         }
                     });
 
@@ -665,7 +802,7 @@ impl ParametricView {
                         let cli_resp = ui.add(
                             egui::TextEdit::singleline(&mut self.command_line_input)
                                 .desired_width(cli_w)
-                                .hint_text("WA, BM, CL, DR, WN, RM, RF, UNDO..."),
+                                .hint_text("wall 0,0->6000,0 | col 0,0 | move | offset | mirror | del | undo"),
                         );
                         if ((cli_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))
                             || ui

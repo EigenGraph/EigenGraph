@@ -583,7 +583,7 @@ impl FeatureRegistry {
                 code: "4D-03",
                 title: "PERT 3-Point & Monte Carlo Schedule Risk Simulation",
                 description: "1,000-trial probabilistic completion S-curve (P50/P80/P95) and critical-path sensitivity tornado ranking.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/planning.rs",
                 prioritized: false,
             },
@@ -593,7 +593,7 @@ impl FeatureRegistry {
                 code: "4D-04",
                 title: "Daily Site Crew Histogram & Resource Leveling Engine",
                 description: "Smooths ironworker, formwork carpenter, and crane-hour demand spikes within available float windows.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/planning.rs",
                 prioritized: false,
             },
@@ -627,7 +627,7 @@ impl FeatureRegistry {
                 code: "5D-03",
                 title: "Earned Value Management (EVM) & Progress Claim S-Curve",
                 description: "Tracks PV, EV, AC, CPI/SPI variance, Estimate at Completion (EAC), and monthly payment certificates.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/planning.rs",
                 prioritized: false,
             },
@@ -671,7 +671,7 @@ impl FeatureRegistry {
                 code: "6D-03",
                 title: "SNI 6389 Solar OTTV & Facade Daylight Simulation",
                 description: "Computes N/E/S/W facade Overall Thermal Transfer Value (OTTV W/m²), SHGC glazing, and shading factors.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/sustainability.rs",
                 prioritized: false,
             },
@@ -705,7 +705,7 @@ impl FeatureRegistry {
                 code: "7D-02",
                 title: "Live WebSocket/MQTT IoT Sensor Stream Ingestion",
                 description: "Connects browser WebSocket endpoints for live field strain gauge and accelerometer SHM streaming.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/core/web_bridge.rs + src/views/facility.rs",
                 prioritized: false,
             },
@@ -715,7 +715,7 @@ impl FeatureRegistry {
                 code: "7D-03",
                 title: "MEP Riser Valve Isolation Tree & Space Utilization",
                 description: "Maps emergency shutoff valve upstream/downstream dependencies to impacted rooms and gross-to-net KPIs.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/facility.rs",
                 prioritized: false,
             },
@@ -759,7 +759,7 @@ impl FeatureRegistry {
                 code: "8D-03",
                 title: "ACI 347 Slab Formwork Shoring & Reshoring Load Transfer",
                 description: "Checks early-age concrete strength maturity, multi-floor shoring load ratios, and falsework Euler buckling.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/safety.rs",
                 prioritized: false,
             },
@@ -803,7 +803,7 @@ impl FeatureRegistry {
                 code: "9D-03",
                 title: "Zone Takt-Time Wagon Cadence & Ready-Mix Dispatch",
                 description: "Balances multi-zone trade trains and monitors ready-mix concrete truck slump & transit intervals.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/lean.rs",
                 prioritized: false,
             },
@@ -857,7 +857,7 @@ impl FeatureRegistry {
                 code: "10D-04",
                 title: "Precast Trailer Routing Envelope & Grouted Splice Tolerance",
                 description: "Checks highway clearance envelopes, trailer axle weights, and millimeter laser-tracker joint alignment.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/industrialized/automation_slots.rs",
                 prioritized: false,
             },
@@ -891,7 +891,7 @@ impl FeatureRegistry {
                 code: "PRED-02",
                 title: "Live FEA & SHM Stress Anomaly Forecasting",
                 description: "Computes real-time member vulnerability rankings from active FEA forces and 7D SHM sensor trends.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/core/reliability.rs + src/views/prediction.rs",
                 prioritized: false,
             },
@@ -1136,8 +1136,8 @@ mod tests {
             );
         }
         assert_eq!(reg.total_count(), 74);
-        assert_eq!(reg.active_count(), 52);
-        assert_eq!(reg.locked_count(), 22);
+        assert_eq!(reg.active_count(), 62);
+        assert_eq!(reg.locked_count(), 12);
     }
 
     #[test]
@@ -1145,7 +1145,7 @@ mod tests {
         let mut reg = FeatureRegistry::new();
         assert_eq!(reg.locked_by_phase_count("Phase 32"), 0);
         assert_eq!(reg.locked_by_phase_count("Phase 33"), 0);
-        assert_eq!(reg.locked_by_phase_count("Phase 34"), 10);
+        assert_eq!(reg.locked_by_phase_count("Phase 34"), 0);
         assert_eq!(reg.locked_by_phase_count("Phase 35"), 12);
 
         let before = reg

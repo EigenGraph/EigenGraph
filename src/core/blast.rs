@@ -705,8 +705,8 @@ impl BlastEngine {
         let support_rot_deg = theta_rad.to_degrees();
 
         // Shear force demand and capacity check
-        let max_shear_demand = max_reaction_kn * 0.5;
-        let dynamic_shear_cap = match input.component_kind {
+        let _max_shear_demand = max_reaction_kn * 0.5;
+        let _dynamic_shear_cap = match input.component_kind {
             BlastComponentKind::RcWall | BlastComponentKind::RcSlab => {
                 // ACI 318 direct shear capacity with dynamic increase: Vc_dyn = 0.17 * sqrt(f_dc) * b * d
                 let d = input.thickness_m * 0.85;
@@ -961,8 +961,8 @@ impl BlastEngine {
         let mut nodes = Vec::new();
         let mut elements = Vec::new();
 
-        let l = 12.0; // bunker length (m)
-        let w = 8.0;  // bunker width (m)
+        let _l = 12.0; // bunker length (m)
+        let _w = 8.0;  // bunker width (m)
         let h = 4.2;  // bunker story height (m)
         let standoff = 15.0; // defensive revetment perimeter distance (m)
 

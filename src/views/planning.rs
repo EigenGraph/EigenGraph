@@ -66,6 +66,15 @@ pub struct PlanningView {
     pub selected_wbs_division: Option<String>,
     pub show_manpower_curve: bool,
     pub show_cpm_only: bool,
+    // Phase 40: Live 4D-03 / 4D-04 / 5D-03 interactive solver state
+    pub mc_trial_count: usize,
+    pub mc_pert_spread_pct: f32,
+    pub mc_seed: u64,
+    pub leveling_crew_cap: u32,
+    pub leveling_within_float_only: bool,
+    pub evm_cutoff_month: usize,
+    pub evm_retention_pct: f32,
+    pub evm_cpi_factor: f32,
 }
 
 impl Default for PlanningView {
@@ -86,8 +95,50 @@ impl Default for PlanningView {
             selected_wbs_division: None,
             show_manpower_curve: true,
             show_cpm_only: false,
+            mc_trial_count: 1000,
+            mc_pert_spread_pct: 25.0,
+            mc_seed: 40,
+            leveling_crew_cap: 85,
+            leveling_within_float_only: true,
+            evm_cutoff_month: 7,
+            evm_retention_pct: 5.0,
+            evm_cpi_factor: 0.97,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct MonteCarloScheduleResult {
+    pub deterministic_days: f64,
+    pub p50_days: f64,
+    pub p80_days: f64,
+    pub p90_days: f64,
+    pub cdf_points: Vec<(f64, f64)>,
+    pub drivers: Vec<(String, f64, f64)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CrewLevelingResult {
+    pub monthly_unleveled: [f32; 12],
+    pub monthly_leveled: [f32; 12],
+    pub peak_unleveled: f32,
+    pub peak_leveled: f32,
+    pub float_consumed_days: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct EvmMonthSummary {
+    pub month: usize,
+    pub pv_ratio: f64,
+    pub ev_ratio: f64,
+    pub ac_ratio: f64,
+    pub spi: f64,
+    pub cpi: f64,
+    pub ev_val: f64,
+    pub ac_val: f64,
+    pub eac_val: f64,
+    pub vac_val: f64,
+    pub net_claim: f64,
 }
 
 /// Calculated 5D Quantities & Cost Breakdown derived directly from Parametric Variables
@@ -303,10 +354,10 @@ impl PlanningView {
                     }
                     PlanningSubTab::WbsHierarchy => self.render_wbs_hierarchy(ui, theme, &takeoff),
                     PlanningSubTab::ScheduleRiskMonteCarlo => {
-                        self.render_schedule_risk_monte_carlo(ui, theme, features);
+                        self.render_schedule_risk_monte_carlo(ui, theme, &takeoff, bim_project, features);
                     }
                     PlanningSubTab::ResourceLeveling4d => {
-                        self.render_resource_leveling_4d(ui, theme, features);
+                        self.render_resource_leveling_4d(ui, theme, &takeoff, bim_project, features);
                     }
                     PlanningSubTab::EarnedValueEvm => {
                         self.render_earned_value_evm(ui, theme, &takeoff, features);
@@ -1337,26 +1388,236 @@ impl PlanningView {
     }
 
     // -------------------------------------------------------------
-    // SUB-TAB 6: MONTE CARLO & PERT SCHEDULE RISK (4D-03 LOCKED)
+    // SUB-TAB 6: MONTE CARLO SCHEDULE RISK PERT (4D-03 ACTIVE)
     // -------------------------------------------------------------
+    pub fn compute_monte_carlo_pert(
+        t: &Parametric5DTakeoff,
+        bim_project: &crate::core::BimProject,
+        trials: usize,
+        spread_pct: f32,
+        seed: u64,
+    ) -> MonteCarloScheduleResult {
+        let bim_days = (bim_project.walls.len() as f64 * 2.5
+            + bim_project.columns.len() as f64 * 1.8
+            + bim_project.slabs.len() as f64 * 6.0)
+            .clamp(0.0, 240.0);
+        let deterministic_days = (t.duration_days as f64 + bim_days).max(90.0);
+        let spread = (spread_pct as f64 / 100.0).clamp(0.05, 0.75);
+        let n_trials = trials.clamp(100, 5000);
+
+        let phases = [
+            ("02.10 Deep Foundation & Bored Piles", 0.24_f64, 0.85_f64),
+            ("03.20 RC Core Walls & Slabs", 0.26, 0.70),
+            ("05.12 Steel Erection & Torque", 0.30, 1.15),
+            ("08.40 Curtain Wall & MEP Riser Test", 0.20, 0.65),
+        ];
+
+        // Deterministic LCG + Latin Hypercube strata for reproducible PERT trials
+        let mut rng = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let mut next_u01 = || -> f64 {
+            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let bits = (rng >> 11) as f64;
+            (bits / ((1u64 << 53) as f64)).clamp(0.001, 0.999)
+        };
+
+        let mut totals = Vec::with_capacity(n_trials);
+        let mut phase_samples: Vec<Vec<f64>> = vec![Vec::with_capacity(n_trials); phases.len()];
+        for k in 0..n_trials {
+            let mut sum_days = 0.0_f64;
+            for (p_idx, (_, share, risk_mult)) in phases.iter().enumerate() {
+                let m = deterministic_days * share;
+                let o = m * (1.0 - 0.35 * spread * risk_mult);
+                let p = m * (1.0 + 1.05 * spread * risk_mult);
+                let stratum = ((k as f64 + next_u01()) / n_trials as f64).clamp(0.001, 0.999);
+                let bates = (stratum + next_u01() + next_u01()) / 3.0;
+                let pert_u = bates.powf(0.82);
+                let d_sample = o + pert_u * (p - o);
+                sum_days += d_sample;
+                phase_samples[p_idx].push(d_sample);
+            }
+            totals.push(sum_days);
+        }
+
+        let mut sorted = totals.clone();
+        sorted.sort_by(|a, b| a.total_cmp(b));
+        let pct = |q: f64| -> f64 {
+            let idx = ((sorted.len() - 1) as f64 * q).round() as usize;
+            sorted[idx.min(sorted.len() - 1)]
+        };
+        let p50_days = pct(0.50);
+        let p80_days = pct(0.80);
+        let p90_days = pct(0.90);
+
+        let mut cdf_points = Vec::with_capacity(21);
+        for step in 0..=20 {
+            let q = step as f64 / 20.0;
+            cdf_points.push((pct(q), q));
+        }
+
+        let mut drivers = Vec::with_capacity(phases.len());
+        let mean_total = totals.iter().sum::<f64>() / totals.len() as f64;
+        let var_total = totals
+            .iter()
+            .map(|&v| (v - mean_total).powi(2))
+            .sum::<f64>()
+            .max(1e-6);
+        for (p_idx, (name, share, risk_mult)) in phases.iter().enumerate() {
+            let mean_p = phase_samples[p_idx].iter().sum::<f64>() / n_trials as f64;
+            let cov: f64 = phase_samples[p_idx]
+                .iter()
+                .zip(totals.iter())
+                .map(|(&pi, &ti)| (pi - mean_p) * (ti - mean_total))
+                .sum();
+            let var_p = phase_samples[p_idx]
+                .iter()
+                .map(|&pi| (pi - mean_p).powi(2))
+                .sum::<f64>()
+                .max(1e-6);
+            let corr = (cov / (var_p * var_total).sqrt()).clamp(0.10, 0.99);
+            let swing = deterministic_days * share * spread * risk_mult * 0.7;
+            drivers.push(((*name).to_string(), corr, swing));
+        }
+        drivers.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+        MonteCarloScheduleResult {
+            deterministic_days,
+            p50_days,
+            p80_days,
+            p90_days,
+            cdf_points,
+            drivers,
+        }
+    }
+
+    pub fn compute_crew_leveling(
+        t: &Parametric5DTakeoff,
+        bim_project: &crate::core::BimProject,
+        crew_cap: u32,
+        within_float_only: bool,
+    ) -> CrewLevelingResult {
+        let shape = [
+            0.22_f32, 0.40, 0.62, 0.96, 1.00, 0.94, 0.78, 0.64, 0.50, 0.36, 0.24, 0.14,
+        ];
+        let shape_sum: f32 = shape.iter().sum();
+        let total_crew_months = ((t.total_man_days as f32 / 22.0)
+            + (bim_project.element_count() as f32 * 0.45))
+            .clamp(380.0, 2800.0);
+
+        let mut unleveled = [0.0_f32; 12];
+        for (i, w) in shape.iter().enumerate() {
+            unleveled[i] = (w / shape_sum) * total_crew_months;
+        }
+        let peak_unleveled = unleveled.iter().copied().fold(0.0_f32, f32::max);
+
+        let cap = (crew_cap as f32).clamp(30.0, 400.0);
+        let mut leveled = unleveled;
+        let max_shift_passes = if within_float_only { 6 } else { 18 };
+        let mut shifted_mass = 0.0_f32;
+        for _ in 0..max_shift_passes {
+            let mut moved = false;
+            for i in 0..11 {
+                if leveled[i] > cap {
+                    let excess = (leveled[i] - cap).min(if within_float_only { 14.0 } else { 30.0 });
+                    leveled[i] -= excess;
+                    leveled[i + 1] += excess * 0.75;
+                    if i + 2 < 12 {
+                        leveled[i + 2] += excess * 0.25;
+                    } else {
+                        leveled[i + 1] += excess * 0.25;
+                    }
+                    shifted_mass += excess;
+                    moved = true;
+                }
+            }
+            if !moved {
+                break;
+            }
+        }
+        let peak_leveled = leveled.iter().copied().fold(0.0_f32, f32::max);
+        let float_consumed_days = (shifted_mass as f64 * 0.18).clamp(0.0, if within_float_only { 12.0 } else { 28.0 });
+
+        CrewLevelingResult {
+            monthly_unleveled: unleveled,
+            monthly_leveled: leveled,
+            peak_unleveled,
+            peak_leveled,
+            float_consumed_days,
+        }
+    }
+
+    pub fn compute_evm_summary(
+        t: &Parametric5DTakeoff,
+        cutoff_month: usize,
+        retention_pct: f32,
+        cpi_factor: f32,
+    ) -> EvmMonthSummary {
+        let pv_vals = [
+            0.04_f64, 0.09, 0.17, 0.28, 0.42, 0.55, 0.66, 0.77, 0.87, 0.94, 0.98, 1.0,
+        ];
+        let m_idx = cutoff_month.clamp(1, 12) - 1;
+        let pv_ratio = pv_vals[m_idx];
+        let ev_ratio = (pv_ratio * 1.036).min(1.0);
+        let cpi = (cpi_factor as f64).clamp(0.75, 1.25);
+        let ac_ratio = (ev_ratio / cpi).clamp(0.01, 1.35);
+        let spi = ev_ratio / pv_ratio.max(1e-6);
+
+        let bac = t.grand_total_rab;
+        let ev_val = bac * ev_ratio;
+        let ac_val = bac * ac_ratio;
+        let eac_val = bac / cpi;
+        let vac_val = bac - eac_val;
+        let net_claim = ev_val * (1.0 - (retention_pct as f64 / 100.0).clamp(0.0, 0.15));
+
+        EvmMonthSummary {
+            month: m_idx + 1,
+            pv_ratio,
+            ev_ratio,
+            ac_ratio,
+            spi,
+            cpi,
+            ev_val,
+            ac_val,
+            eac_val,
+            vac_val,
+            net_claim,
+        }
+    }
+
     fn render_schedule_risk_monte_carlo(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        t: &Parametric5DTakeoff,
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
+        let res = Self::compute_monte_carlo_pert(
+            t,
+            bim_project,
+            self.mc_trial_count,
+            self.mc_pert_spread_pct,
+            self.mc_seed,
+        );
         ui_kit::feature_slot_card(
             ui,
             theme,
             features,
             FeatureId::MonteCarloScheduleRiskPert,
             |ui| {
+                let p50_delta = res.p50_days - res.deterministic_days;
+                let p80_delta = res.p80_days - res.deterministic_days;
+                let top = res.drivers.first().cloned().unwrap_or(("Critical Path".into(), 0.75, 15.0));
+                let cpm_str = format!("{:.0} Days", res.deterministic_days);
+                let p50_str = format!("{:.0}d ({:+.0}d)", res.p50_days, p50_delta);
+                let p80_str = format!("{:.0}d ({:+.0}d)", res.p80_days, p80_delta);
+                let top_str = format!("r={:.2} (±{:.0}d)", top.1, top.2);
+
                 ui_kit::responsive_grid_n(ui, 4, 185.0, |ui, idx| match idx {
                     0 => ui_kit::stat_card(
                         ui,
                         theme,
                         "DETERMINISTIC CPM",
-                        "360 Days",
+                        &cpm_str,
                         "Baseline Zero-Float Duration",
                         theme.text_primary,
                     ),
@@ -1364,7 +1625,7 @@ impl PlanningView {
                         ui,
                         theme,
                         "P50 MEDIAN COMPLETION",
-                        "374 Days (+14d)",
+                        &p50_str,
                         "50% Joint Confidence Forecast",
                         theme.accent_blue,
                     ),
@@ -1372,25 +1633,75 @@ impl PlanningView {
                         ui,
                         theme,
                         "P80 SCHEDULE BUFFER",
-                        "396 Days (+36d)",
-                        "Recommended Contingency Envelope",
+                        &p80_str,
+                        &format!("P90 = {:.0}d Contingency Envelope", res.p90_days),
                         theme.accent_orange,
                     ),
                     _ => ui_kit::stat_card(
                         ui,
                         theme,
                         "TOP SENSITIVITY DRIVER",
-                        "WBS 05.12 (r=0.78)",
-                        "Structural Steel Erection Criticality",
+                        &top_str,
+                        &top.0,
                         theme.accent_green,
                     ),
                 });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Sampling: 1,000 Latin Hypercube Trials");
-                    let _ = ui.selectable_label(false, "PERT Beta Distribution (O / M / P)");
-                    let _ = icons::icon_button(ui, AppIcon::ChartBar, "Run Monte Carlo Schedule Simulation", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    ui.label(RichText::new("LHS Trials:").size(11.0).color(theme.text_secondary));
+                    for &cnt in &[500usize, 1000, 2500] {
+                        if ui.selectable_label(self.mc_trial_count == cnt, format!("{cnt}")).clicked() {
+                            self.mc_trial_count = cnt;
+                        }
+                    }
+                    ui.separator();
+                    ui.label(RichText::new("PERT Spread (%):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.mc_pert_spread_pct, 10.0..=55.0).fixed_decimals(0));
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ChartBar,
+                        "Resample LHS Seed",
+                        11.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        self.mc_seed = self.mc_seed.wrapping_add(7);
+                        self.export_status = Some(format!(
+                            "PERT Monte Carlo ({} LHS trials): P50={:.0}d, P80={:.0}d, P90={:.0}d.",
+                            self.mc_trial_count, res.p50_days, res.p80_days, res.p90_days
+                        ));
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Document,
+                        "Export PERT CSV",
+                        11.0,
+                        theme.text_primary,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        let mut csv = String::from("Probability_q,Forecast_Days\n");
+                        for (d, q) in &res.cdf_points {
+                            csv.push_str(&format!("{q:.2},{d:.1}\n"));
+                        }
+                        if let Ok(dest) = crate::core::web_bridge::save_text_file(
+                            "EigenGraph_4D_MonteCarlo_PERT.csv",
+                            &csv,
+                            "text/csv",
+                        ) {
+                            self.export_status = Some(format!("Exported PERT CDF -> {dest}"));
+                        }
+                    }
                 });
                 ui.add_space(12.0);
 
@@ -1416,19 +1727,24 @@ impl PlanningView {
                                 Stroke::new(0.8, Color32::from_white_alpha(20)),
                             );
                         }
-                        let mut cdf_pts = Vec::with_capacity(25);
-                        for i in 0..=24 {
-                            let x_frac = i as f32 / 24.0;
-                            let z = (x_frac - 0.45) * 6.2;
-                            let sig = 1.0 / (1.0 + (-z).exp());
-                            let px = plot.left() + x_frac * plot.width();
-                            let py = plot.bottom() - sig * plot.height();
-                            cdf_pts.push(Pos2::new(px, py));
-                        }
+                        let min_d = res.cdf_points.first().map(|p| p.0).unwrap_or(100.0);
+                        let max_d = res.cdf_points.last().map(|p| p.0).unwrap_or(200.0).max(min_d + 1.0);
+                        let cdf_pts: Vec<Pos2> = res
+                            .cdf_points
+                            .iter()
+                            .map(|&(d, q)| {
+                                let x_frac = ((d - min_d) / (max_d - min_d)).clamp(0.0, 1.0) as f32;
+                                Pos2::new(
+                                    plot.left() + x_frac * plot.width(),
+                                    plot.bottom() - (q as f32) * plot.height(),
+                                )
+                            })
+                            .collect();
                         for w in cdf_pts.windows(2) {
                             painter.line_segment([w[0], w[1]], Stroke::new(2.2, theme.accent_green));
                         }
-                        let p80_x = plot.left() + 0.68 * plot.width();
+                        let p80_frac = ((res.p80_days - min_d) / (max_d - min_d)).clamp(0.0, 1.0) as f32;
+                        let p80_x = plot.left() + p80_frac * plot.width();
                         let p80_y = plot.bottom() - 0.80 * plot.height();
                         painter.line_segment(
                             [Pos2::new(p80_x, plot.bottom()), Pos2::new(p80_x, p80_y)],
@@ -1438,7 +1754,7 @@ impl PlanningView {
                         painter.text(
                             Pos2::new(p80_x + 6.0, p80_y - 4.0),
                             Align2::LEFT_BOTTOM,
-                            "P80 = 396d",
+                            format!("P80 = {:.0}d", res.p80_days),
                             egui::FontId::monospace(9.5),
                             theme.accent_orange,
                         );
@@ -1451,18 +1767,19 @@ impl PlanningView {
                                 .color(theme.accent_blue),
                         );
                         ui.add_space(6.0);
-                        let drivers = [
-                            ("05.12 Steel Erection & Torque", 0.78, "±18d", theme.accent_red),
-                            ("02.10 Deep Bored Pile Sockets", 0.64, "±14d", theme.accent_orange),
-                            ("08.40 Unitized Curtain Wall Hoist", 0.49, "±11d", theme.accent_blue),
-                            ("23.00 MEP Riser Testing Window", 0.31, "±6d", theme.accent_green),
+                        let palette = [
+                            theme.accent_red,
+                            theme.accent_orange,
+                            theme.accent_blue,
+                            theme.accent_green,
                         ];
-                        for (name, corr, swing, col) in drivers {
+                        for (idx, (name, corr, swing)) in res.drivers.iter().enumerate() {
+                            let col = palette[idx % palette.len()];
                             ui.horizontal_wrapped(|ui| {
                                 ui.label(RichText::new(name).size(11.0).color(theme.text_primary));
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                     ui.label(
-                                        RichText::new(format!("r={:.2} ({})", corr, swing))
+                                        RichText::new(format!("r={:.2} (±{:.0}d)", corr, swing))
                                             .size(10.5)
                                             .strong()
                                             .color(col),
@@ -1475,7 +1792,7 @@ impl PlanningView {
                             );
                             ui.painter().rect_filled(bar_r, CornerRadius::same(4), theme.bg_canvas);
                             ui.painter().rect_filled(
-                                Rect::from_min_size(bar_r.min, Vec2::new(bar_r.width() * corr, 8.0)),
+                                Rect::from_min_size(bar_r.min, Vec2::new(bar_r.width() * (*corr as f32), 8.0)),
                                 CornerRadius::same(4),
                                 col,
                             );
@@ -1488,42 +1805,61 @@ impl PlanningView {
     }
 
     // -------------------------------------------------------------
-    // SUB-TAB 7: CREW HISTOGRAM & RESOURCE LEVELING (4D-04 LOCKED)
+    // SUB-TAB 7: CREW HISTOGRAM & RESOURCE LEVELING (4D-04 ACTIVE)
     // -------------------------------------------------------------
     fn render_resource_leveling_4d(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        t: &Parametric5DTakeoff,
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
+        let lvl = Self::compute_crew_leveling(
+            t,
+            bim_project,
+            self.leveling_crew_cap,
+            self.leveling_within_float_only,
+        );
         ui_kit::feature_slot_card(
             ui,
             theme,
             features,
             FeatureId::ResourceLevelingCrewHistogram,
             |ui| {
+                let reduction_pct = if lvl.peak_unleveled > 0.1 {
+                    ((lvl.peak_unleveled - lvl.peak_leveled) / lvl.peak_unleveled) * 100.0
+                } else {
+                    0.0
+                };
+                let unlev_str = format!("{:.0} Workers/d", lvl.peak_unleveled);
+                let lev_str = format!("{:.0} Workers/d", lvl.peak_leveled);
+                let hoist_util = ((lvl.peak_leveled / (self.leveling_crew_cap as f32).max(1.0)) * 84.0).clamp(35.0, 99.0);
+                let hoist_str = format!("{hoist_util:.1}% Duty");
+                let float_str = format!("{:.1} Days avg", lvl.float_consumed_days);
+
                 ui_kit::responsive_grid_n(ui, 4, 185.0, |ui, idx| match idx {
                     0 => ui_kit::stat_card(
                         ui,
                         theme,
                         "UNSMOOTHED PEAK CREW",
-                        "112 Workers/d",
-                        "Months M05–M06 Concurrent Peaks",
+                        &unlev_str,
+                        "Baseline Concurrent Peak Demand",
                         theme.accent_red,
                     ),
                     1 => ui_kit::stat_card(
                         ui,
                         theme,
                         "LEVELED PEAK DEMAND",
-                        "82 Workers/d",
-                        "-26.8% Peak Smoothing (Within Float)",
+                        &lev_str,
+                        &format!("-{reduction_pct:.1}% Peak Smoothing"),
                         theme.accent_green,
                     ),
                     2 => ui_kit::stat_card(
                         ui,
                         theme,
                         "SITE HOIST & CRANE DUTY",
-                        "78.4% Utilization",
+                        &hoist_str,
                         "Zero Simultaneous Double-Pick Clashes",
                         theme.accent_blue,
                     ),
@@ -1531,17 +1867,57 @@ impl PlanningView {
                         ui,
                         theme,
                         "TOTAL FLOAT CONSUMED",
-                        "4.5 Days avg",
-                        "Critical Path Unchanged (360d)",
+                        &float_str,
+                        if self.leveling_within_float_only {
+                            "Critical Path Preserved (Free Float)"
+                        } else {
+                            "Aggressive Shaving Applied"
+                        },
                         theme.accent_orange,
                     ),
                 });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Policy: Level Within Free Float Only");
-                    let _ = ui.selectable_label(false, "Site Crew Cap = 85 Workers");
-                    let _ = icons::icon_button(ui, AppIcon::HardHat, "Recompute Leveled Manpower Histogram", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    if ui.selectable_label(self.leveling_within_float_only, "Level Within Free Float Only").clicked() {
+                        self.leveling_within_float_only = !self.leveling_within_float_only;
+                    }
+                    ui.separator();
+                    ui.label(RichText::new("Crew Cap:").size(11.0).color(theme.text_secondary));
+                    let mut cap_f = self.leveling_crew_cap as f32;
+                    if ui.add(egui::Slider::new(&mut cap_f, 45.0..=160.0).fixed_decimals(0)).changed() {
+                        self.leveling_crew_cap = cap_f.round() as u32;
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Document,
+                        "Export Manpower CSV",
+                        11.0,
+                        theme.text_primary,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        let mut csv = String::from("Month,Unleveled_Crew,Leveled_Crew\n");
+                        for i in 0..12 {
+                            csv.push_str(&format!(
+                                "M{},{:.1},{:.1}\n",
+                                i + 1,
+                                lvl.monthly_unleveled[i],
+                                lvl.monthly_leveled[i]
+                            ));
+                        }
+                        if let Ok(dest) = crate::core::web_bridge::save_text_file(
+                            "EigenGraph_4D_Crew_Leveling.csv",
+                            &csv,
+                            "text/csv",
+                        ) {
+                            self.export_status = Some(format!("Exported 4D Crew Histogram -> {dest}"));
+                        }
+                    }
                 });
                 ui.add_space(10.0);
 
@@ -1550,7 +1926,8 @@ impl PlanningView {
                 let painter = ui.painter_at(rect);
                 painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
                 let plot = rect.shrink(26.0);
-                let cap_y = plot.bottom() - (85.0 / 120.0) * plot.height();
+                let max_scale = lvl.peak_unleveled.max(self.leveling_crew_cap as f32).max(100.0) * 1.12;
+                let cap_y = plot.bottom() - ((self.leveling_crew_cap as f32) / max_scale) * plot.height();
                 painter.line_segment(
                     [Pos2::new(plot.left(), cap_y), Pos2::new(plot.right(), cap_y)],
                     Stroke::new(1.5, theme.accent_red),
@@ -1558,35 +1935,24 @@ impl PlanningView {
                 painter.text(
                     Pos2::new(plot.left() + 4.0, cap_y - 3.0),
                     Align2::LEFT_BOTTOM,
-                    "Site Crew Capacity Limit (85 Workers)",
+                    format!("Site Crew Capacity Limit ({} Workers)", self.leveling_crew_cap),
                     egui::FontId::monospace(9.0),
                     theme.accent_red,
                 );
 
-                let monthly_crews = [
-                    ("M1", 28.0_f32),
-                    ("M2", 42.0),
-                    ("M3", 58.0),
-                    ("M4", 72.0),
-                    ("M5", 82.0),
-                    ("M6", 81.0),
-                    ("M7", 79.0),
-                    ("M8", 74.0),
-                    ("M9", 68.0),
-                    ("M10", 54.0),
-                    ("M11", 38.0),
-                    ("M12", 22.0),
-                ];
-                let slot_w = plot.width() / monthly_crews.len() as f32;
+                let slot_w = plot.width() / 12.0;
                 let bar_w = (slot_w * 0.56).clamp(10.0, 28.0);
-                for (idx, (mo, workers)) in monthly_crews.iter().enumerate() {
+                for idx in 0..12 {
+                    let workers = lvl.monthly_leveled[idx];
                     let cx = plot.left() + slot_w * (idx as f32 + 0.5);
-                    let h = (*workers / 120.0) * plot.height();
+                    let h = (workers / max_scale) * plot.height();
                     let bar = Rect::from_min_max(
                         Pos2::new(cx - bar_w * 0.5, plot.bottom() - h),
                         Pos2::new(cx + bar_w * 0.5, plot.bottom()),
                     );
-                    let col = if *workers > 78.0 {
+                    let col = if workers > self.leveling_crew_cap as f32 {
+                        theme.accent_orange
+                    } else if workers > (self.leveling_crew_cap as f32 * 0.85) {
                         theme.accent_blue
                     } else {
                         theme.accent_green
@@ -1595,7 +1961,7 @@ impl PlanningView {
                     painter.text(
                         Pos2::new(cx, plot.bottom() + 4.0),
                         Align2::CENTER_TOP,
-                        *mo,
+                        format!("M{}", idx + 1),
                         egui::FontId::monospace(8.5),
                         theme.text_muted,
                     );
@@ -1605,15 +1971,21 @@ impl PlanningView {
     }
 
     // -------------------------------------------------------------
-    // SUB-TAB 8: EARNED VALUE EVM & PROGRESS CLAIM (5D-03 LOCKED)
+    // SUB-TAB 8: EARNED VALUE EVM & PROGRESS CLAIM (5D-03 ACTIVE)
     // -------------------------------------------------------------
     fn render_earned_value_evm(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         t: &Parametric5DTakeoff,
         features: &mut FeatureRegistry,
     ) {
+        let evm = Self::compute_evm_summary(
+            t,
+            self.evm_cutoff_month,
+            self.evm_retention_pct,
+            self.evm_cpi_factor,
+        );
         ui_kit::feature_slot_card(
             ui,
             theme,
@@ -1621,34 +1993,42 @@ impl PlanningView {
             FeatureId::EarnedValueEvmProgressClaim,
             |ui| {
                 let curr = self.active_currency;
-                let ev_val = t.grand_total_rab * 0.684;
-                let eac_val = t.grand_total_rab / 0.972;
-                let ev_str = curr.format_value(ev_val);
-                let eac_str = curr.format_value(eac_val);
+                let ev_str = curr.format_value(evm.ev_val);
+                let eac_str = curr.format_value(evm.eac_val);
+                let spi_str = format!(
+                    "{:.2} ({})",
+                    evm.spi,
+                    if evm.spi >= 1.0 { "Ahead" } else { "Behind" }
+                );
+                let cpi_str = format!(
+                    "{:.2} ({})",
+                    evm.cpi,
+                    if evm.cpi >= 1.0 { "Under" } else { "Watch" }
+                );
 
                 ui_kit::responsive_grid_n(ui, 4, 185.0, |ui, idx| match idx {
                     0 => ui_kit::stat_card(
                         ui,
                         theme,
                         "SCHEDULE PERF INDEX (SPI)",
-                        "1.04 (Ahead)",
-                        "EV / PV • +4.0% Early Erection Progress",
-                        theme.accent_green,
+                        &spi_str,
+                        &format!("EV / PV @ M{:02}", evm.month),
+                        if evm.spi >= 1.0 { theme.accent_green } else { theme.accent_orange },
                     ),
                     1 => ui_kit::stat_card(
                         ui,
                         theme,
                         "COST PERF INDEX (CPI)",
-                        "0.97 (Watch)",
-                        "EV / AC • Fabrication Price Escalation",
-                        theme.accent_orange,
+                        &cpi_str,
+                        "EV / AC Progress Efficiency",
+                        if evm.cpi >= 1.0 { theme.accent_green } else { theme.accent_orange },
                     ),
                     2 => ui_kit::stat_card(
                         ui,
                         theme,
-                        "EARNED VALUE (EV @ M07)",
+                        &format!("EARNED VALUE (EV @ M{:02})", evm.month),
                         &ev_str,
-                        "68.4% Cumulative Certified Progress",
+                        &format!("{:.1}% Cumulative Certified", evm.ev_ratio * 100.0),
                         theme.accent_blue,
                     ),
                     _ => ui_kit::stat_card(
@@ -1656,16 +2036,52 @@ impl PlanningView {
                         theme,
                         "ESTIMATE AT COMPLETION (EAC)",
                         &eac_str,
-                        "BAC / CPI Projection • 5% Retention Held",
+                        &format!(
+                            "Net IPC: {} ({:.0}% Ret)",
+                            curr.format_value(evm.net_claim),
+                            self.evm_retention_pct
+                        ),
                         theme.text_primary,
                     ),
                 });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Reporting Cutoff: Month 07 (IPC-07)");
-                    let _ = ui.selectable_label(false, "Contract Retention: 5.0%");
-                    let _ = icons::icon_button(ui, AppIcon::ChartLine, "Certify Monthly Progress Claim (.PDF / .CSV)", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    ui.label(RichText::new("Cutoff Month:").size(11.0).color(theme.text_secondary));
+                    let mut m_f = self.evm_cutoff_month as f32;
+                    if ui.add(egui::Slider::new(&mut m_f, 1.0..=12.0).fixed_decimals(0)).changed() {
+                        self.evm_cutoff_month = m_f.round() as usize;
+                    }
+                    ui.separator();
+                    ui.label(RichText::new("Retention (%):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.evm_retention_pct, 0.0..=10.0).fixed_decimals(1));
+                    ui.label(RichText::new("CPI Factor:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.evm_cpi_factor, 0.80..=1.15).fixed_decimals(2));
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ChartLine,
+                        "Export IPC Progress CSV",
+                        11.0,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        let csv = format!(
+                            "IPC_Month,PV_Ratio,EV_Ratio,AC_Ratio,SPI,CPI,EV_Val,EAC_Val,Net_Claim\nM{:02},{:.4},{:.4},{:.4},{:.3},{:.3},{:.2},{:.2},{:.2}\n",
+                            evm.month, evm.pv_ratio, evm.ev_ratio, evm.ac_ratio, evm.spi, evm.cpi, evm.ev_val, evm.eac_val, evm.net_claim
+                        );
+                        if let Ok(dest) = crate::core::web_bridge::save_text_file(
+                            &format!("EigenGraph_5D_IPC_M{:02}.csv", evm.month),
+                            &csv,
+                            "text/csv",
+                        ) {
+                            self.export_status = Some(format!("Certified IPC-M{:02} exported -> {dest}", evm.month));
+                        }
+                    }
                 });
                 ui.add_space(12.0);
 
@@ -1683,7 +2099,8 @@ impl PlanningView {
                         let painter = ui.painter_at(rect);
                         painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
                         let plot = rect.shrink(24.0);
-                        let cut_x = plot.left() + 0.58 * plot.width();
+                        let cut_frac = (evm.month.saturating_sub(1) as f32) / 11.0;
+                        let cut_x = plot.left() + cut_frac * plot.width();
                         painter.line_segment(
                             [Pos2::new(cut_x, plot.top()), Pos2::new(cut_x, plot.bottom())],
                             Stroke::new(1.2, theme.text_muted),
@@ -1691,11 +2108,10 @@ impl PlanningView {
                         painter.text(
                             Pos2::new(cut_x + 4.0, plot.top() + 2.0),
                             Align2::LEFT_TOP,
-                            "Data Date M07",
+                            format!("Data Date M{:02}", evm.month),
                             egui::FontId::monospace(8.5),
                             theme.text_muted,
                         );
-                        // Planned Value S-Curve (Full M01..M12)
                         let pv_vals = [0.04_f32, 0.09, 0.17, 0.28, 0.42, 0.55, 0.66, 0.77, 0.87, 0.94, 0.98, 1.0];
                         let pv_pts: Vec<Pos2> = pv_vals
                             .iter()
@@ -1710,30 +2126,24 @@ impl PlanningView {
                         for w in pv_pts.windows(2) {
                             painter.line_segment([w[0], w[1]], Stroke::new(1.8, theme.accent_blue));
                         }
-                        // Earned Value through M07
-                        let ev_vals = [0.04_f32, 0.10, 0.18, 0.30, 0.44, 0.58, 0.684];
-                        let ev_pts: Vec<Pos2> = ev_vals
-                            .iter()
-                            .enumerate()
-                            .map(|(i, v)| {
+                        let ev_pts: Vec<Pos2> = (0..evm.month)
+                            .map(|i| {
+                                let v = (pv_vals[i] * 1.036).min(1.0);
                                 Pos2::new(
                                     plot.left() + (i as f32 / 11.0) * plot.width(),
-                                    plot.bottom() - *v * plot.height(),
+                                    plot.bottom() - v * plot.height(),
                                 )
                             })
                             .collect();
                         for w in ev_pts.windows(2) {
                             painter.line_segment([w[0], w[1]], Stroke::new(2.4, theme.accent_green));
                         }
-                        // Actual Cost through M07
-                        let ac_vals = [0.05_f32, 0.11, 0.20, 0.32, 0.46, 0.60, 0.705];
-                        let ac_pts: Vec<Pos2> = ac_vals
-                            .iter()
-                            .enumerate()
-                            .map(|(i, v)| {
+                        let ac_pts: Vec<Pos2> = (0..evm.month)
+                            .map(|i| {
+                                let v = ((pv_vals[i] * 1.036).min(1.0) / self.evm_cpi_factor.clamp(0.75, 1.25)).min(1.05);
                                 Pos2::new(
                                     plot.left() + (i as f32 / 11.0) * plot.width(),
-                                    plot.bottom() - *v * plot.height(),
+                                    plot.bottom() - v * plot.height(),
                                 )
                             })
                             .collect();
@@ -1743,7 +2153,7 @@ impl PlanningView {
                     }
                     _ => {
                         ui.label(
-                            RichText::new("INTERIM PAYMENT CERTIFICATE (IPC-07) BY DIVISION")
+                            RichText::new(format!("INTERIM PAYMENT CERTIFICATE (IPC-{:02}) BY DIVISION", evm.month))
                                 .size(11.0)
                                 .strong()
                                 .color(theme.accent_blue),
@@ -1754,22 +2164,24 @@ impl PlanningView {
                                 .striped(true)
                                 .spacing(Vec2::new(12.0, 5.0))
                                 .show(ui, |ui| {
-                                    for h in ["Division", "BAC %", "Earned %", "CPI", "SPI", "Status"] {
+                                    for h in ["Division", "Weight", "Earned %", "CPI", "SPI", "Status"] {
                                         ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                                     }
                                     ui.end_row();
-                                    for (div, bac, ev, cpi, spi, st) in [
-                                        ("02 Substructure", "100%", "100.0%", "1.02", "1.00", "Settled"),
-                                        ("03 RC Cores & Slabs", "100%", "84.2%", "0.98", "1.05", "Certified"),
-                                        ("05 Structural Steel", "100%", "71.5%", "0.95", "1.06", "IPC-07 Ready"),
-                                        ("08 Unitized Glazing", "100%", "28.0%", "1.01", "0.96", "Fabricating"),
+                                    let ev_pct = evm.ev_ratio * 100.0;
+                                    for (div, wt, mult, status) in [
+                                        ("02 Substructure", "18%", 1.35, "Settled"),
+                                        ("03 RC Cores & Slabs", "28%", 1.15, "Certified"),
+                                        ("05 Structural Steel", "36%", 0.98, "IPC Ready"),
+                                        ("08 Unitized Glazing", "18%", 0.55, "Fabricating"),
                                     ] {
+                                        let div_ev = (ev_pct * mult).min(100.0);
                                         ui.label(RichText::new(div).size(10.5).strong().color(theme.text_primary));
-                                        ui.label(RichText::new(bac).size(10.5).color(theme.text_muted));
-                                        ui.label(RichText::new(ev).size(10.5).color(theme.accent_green));
-                                        ui.label(RichText::new(cpi).size(10.5).color(theme.text_secondary));
-                                        ui.label(RichText::new(spi).size(10.5).color(theme.accent_blue));
-                                        ui.label(RichText::new(st).size(10.5).color(theme.accent_green));
+                                        ui.label(RichText::new(wt).size(10.5).color(theme.text_muted));
+                                        ui.label(RichText::new(format!("{div_ev:.1}%")).size(10.5).color(theme.accent_green));
+                                        ui.label(RichText::new(format!("{:.2}", evm.cpi)).size(10.5).color(theme.text_secondary));
+                                        ui.label(RichText::new(format!("{:.2}", evm.spi)).size(10.5).color(theme.accent_blue));
+                                        ui.label(RichText::new(status).size(10.5).color(theme.accent_green));
                                         ui.end_row();
                                     }
                                 });
@@ -1926,5 +2338,31 @@ impl PlanningView {
             ui.add_space(2.0);
             ui.label(RichText::new(subtitle).size(10.5).color(theme.text_secondary));
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_planning_phase40_solvers() {
+        let pv = PlanningView::default();
+        let bim = crate::core::BimProject::sample_bimcraft_building();
+        let takeoff = pv.compute_takeoff(&[]);
+
+        let mc = PlanningView::compute_monte_carlo_pert(&takeoff, &bim, 1000, 25.0, 40);
+        assert!(mc.p50_days >= mc.deterministic_days * 0.9);
+        assert!(mc.p80_days >= mc.p50_days);
+        assert!(mc.p90_days >= mc.p80_days);
+        assert_eq!(mc.cdf_points.len(), 21);
+
+        let crew = PlanningView::compute_crew_leveling(&takeoff, &bim, 75, true);
+        assert!(crew.peak_leveled <= crew.peak_unleveled + 1e-3);
+
+        let evm = PlanningView::compute_evm_summary(&takeoff, 7, 5.0, 0.97);
+        assert!(evm.spi > 0.5 && evm.cpi > 0.5);
+        assert!(evm.eac_val >= takeoff.grand_total_rab);
+        assert!(evm.net_claim < evm.ev_val);
     }
 }

@@ -2,7 +2,7 @@
 //! Analysis of energy efficiency, carbon footprint, environmental impact, and green building certification requirements.
 
 use egui::{
-    Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Pos2, RichText,
+    Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, RichText,
     ScrollArea, Sense, Stroke, Ui, Vec2,
 };
 use crate::features::{FeatureId, FeatureRegistry};
@@ -30,6 +30,179 @@ pub struct SustainabilityView {
     pub green_credits: Vec<GreenBuildingCredit>,
     pub selected_credit_standard: Option<String>,
     pub lca_sync_status: Option<String>,
+    // Phase 40 (6D-03): Live Solar OTTV & Daylight Parameters
+    pub ottv_zone_idx: usize,
+    pub ottv_sunshade: bool,
+    pub ottv_double_low_e: bool,
+    pub ottv_u_wall: f64,
+    pub ottv_fallback_wwr: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FacadeOttvRow {
+    pub orientation: &'static str,
+    pub wall_count: usize,
+    pub gross_area_m2: f64,
+    pub window_area_m2: f64,
+    pub wwr: f64,
+    pub shgc_eff: f64,
+    pub solar_factor_wm2: f64,
+    pub ottv_wm2: f64,
+    pub pass_sni: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OttvSummary {
+    pub zone_label: &'static str,
+    pub facade_rows: Vec<FacadeOttvRow>,
+    pub total_facade_area_m2: f64,
+    pub overall_wwr: f64,
+    pub overall_ottv_wm2: f64,
+    pub pass_sni_35: bool,
+    pub sda_pct: f64,
+    pub peak_cooling_kw: f64,
+    pub annual_hvac_savings_mwh: f64,
+    pub modeled_windows: usize,
+}
+
+/// Evaluates SNI 6389 Overall Thermal Transfer Value (OTTV) across cardinal facades from live BIM walls & openings.
+pub fn compute_facade_ottv(
+    bim_project: &crate::core::BimProject,
+    u_wall: f64,
+    double_low_e: bool,
+    sunshade: bool,
+    zone_idx: usize,
+    fallback_wwr: f64,
+) -> OttvSummary {
+    use crate::core::bim::OpeningKind;
+
+    let (zone_label, td_ek, delta_t, sf_scale) = match zone_idx {
+        1 => ("Tropical Highland (-6.9° S)", 11.2, 3.5, 0.88),
+        2 => ("Equatorial Coastal (0.0°)", 15.6, 5.5, 1.06),
+        _ => ("Tropical Marine (-6.2° S)", 14.5, 5.0, 1.00),
+    };
+
+    let mut counts = [0usize; 4];
+    let mut gross_areas = [0.0f64; 4];
+    let mut win_areas = [0.0f64; 4];
+    let mut modeled_windows = 0usize;
+
+    for wall in &bim_project.walls {
+        let len_m = wall.length_mm() / 1000.0;
+        if len_m < 0.1 {
+            continue;
+        }
+        let h_m = (wall.unconnected_height_mm / 1000.0).max(2.6);
+        let dx = wall.end.0 - wall.start.0;
+        let dy = wall.end.1 - wall.start.1;
+        // Outward normal (dy, -dx) maps directly to cardinal quadrants
+        let nx = dy;
+        let ny = -dx;
+        let dir = if ny.abs() >= nx.abs() {
+            if ny >= 0.0 { 0 } else { 2 }
+        } else if nx >= 0.0 {
+            1
+        } else {
+            3
+        };
+        counts[dir] += 1;
+        gross_areas[dir] += len_m * h_m;
+
+        for op in &wall.openings {
+            if matches!(
+                op.kind,
+                OpeningKind::FixedWindow | OpeningKind::CasementWindow | OpeningKind::SlidingWindow
+            ) {
+                modeled_windows += 1;
+                win_areas[dir] += (op.width_mm / 1000.0) * (op.height_mm / 1000.0);
+            }
+        }
+    }
+
+    // Fallback analytical envelope if the BIM project has no modeled walls yet
+    let total_gross_existing: f64 = gross_areas.iter().sum();
+    if total_gross_existing < 1.0 {
+        let story_h = 3.6 * (bim_project.levels.len().max(1) as f64);
+        gross_areas = [42.0 * story_h, 28.0 * story_h, 42.0 * story_h, 28.0 * story_h];
+    }
+
+    let shgc_base = if double_low_e { 0.32 } else { 0.72 };
+    let shade_mult = if sunshade { 0.68 } else { 1.0 };
+    let shgc_eff = shgc_base * shade_mult;
+    let sc = shgc_eff / 0.87;
+    let u_fen = if double_low_e { 2.8 } else { 5.6 };
+    let alpha = 0.52; // Light-medium architectural facade solar absorptance (SNI 6389)
+    let base_sf = [130.0, 154.0, 118.0, 211.0];
+    let dir_names = ["North", "East", "South", "West"];
+
+    let mut rows = Vec::with_capacity(4);
+    let mut area_sum = 0.0f64;
+    let mut win_sum = 0.0f64;
+    let mut weighted_ottv = 0.0f64;
+
+    for i in 0..4 {
+        let g = gross_areas[i];
+        let (w_area, wwr) = if g <= 1e-6 {
+            (0.0, 0.0)
+        } else if modeled_windows > 0 && win_areas[i] > 0.0 {
+            let ratio = (win_areas[i] / g).clamp(0.05, 0.85);
+            (win_areas[i], ratio)
+        } else {
+            let ratio = fallback_wwr.clamp(0.10, 0.80);
+            (g * ratio, ratio)
+        };
+        let sf = base_sf[i] * sf_scale;
+        let ottv = if g <= 1e-6 {
+            0.0
+        } else {
+            alpha * u_wall * (1.0 - wwr) * td_ek + u_fen * wwr * delta_t + sc * wwr * sf
+        };
+        if g > 1e-6 {
+            area_sum += g;
+            win_sum += w_area;
+            weighted_ottv += ottv * g;
+        }
+        rows.push(FacadeOttvRow {
+            orientation: dir_names[i],
+            wall_count: counts[i],
+            gross_area_m2: g,
+            window_area_m2: w_area,
+            wwr,
+            shgc_eff,
+            solar_factor_wm2: sf,
+            ottv_wm2: ottv,
+            pass_sni: ottv <= 35.0,
+        });
+    }
+
+    let overall_wwr = if area_sum > 1e-6 { win_sum / area_sum } else { 0.0 };
+    let overall_ottv_wm2 = if area_sum > 1e-6 {
+        weighted_ottv / area_sum
+    } else {
+        0.0
+    };
+    let sda_pct = (42.0
+        + overall_wwr
+            * 68.0
+            * if double_low_e { 0.94 } else { 1.05 }
+            * if sunshade { 0.95 } else { 1.0 })
+        .clamp(25.0, 96.0);
+    let delta_wm2 = (48.0 - overall_ottv_wm2).max(0.0);
+    let peak_cooling_kw = (delta_wm2 * area_sum) / 1000.0;
+    let annual_hvac_savings_mwh = peak_cooling_kw * 1.32;
+
+    OttvSummary {
+        zone_label,
+        facade_rows: rows,
+        total_facade_area_m2: area_sum,
+        overall_wwr,
+        overall_ottv_wm2,
+        pass_sni_35: overall_ottv_wm2 <= 35.0,
+        sda_pct,
+        peak_cooling_kw,
+        annual_hvac_savings_mwh,
+        modeled_windows,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +230,11 @@ impl Default for SustainabilityView {
             green_credits: GreenBuildingCredit::default_credits(),
             selected_credit_standard: None,
             lca_sync_status: None,
+            ottv_zone_idx: 0,
+            ottv_sunshade: true,
+            ottv_double_low_e: true,
+            ottv_u_wall: 2.1,
+            ottv_fallback_wwr: 0.38,
         }
     }
 }
@@ -95,7 +273,7 @@ impl SustainabilityView {
                         self.render_energy_lifecycle(ui, theme)
                     }
                     SustainabilitySubTab::SolarOttvDaylight => {
-                        self.render_solar_ottv_daylight(ui, theme, features);
+                        self.render_solar_ottv_daylight(ui, theme, bim_project, features);
                     }
                     SustainabilitySubTab::CircularDfdPassport => {
                         self.render_circular_dfd_passport(ui, theme, features);
@@ -566,17 +744,59 @@ impl SustainabilityView {
     }
 
     fn render_solar_ottv_daylight(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
+        let summary = compute_facade_ottv(
+            bim_project,
+            self.ottv_u_wall,
+            self.ottv_double_low_e,
+            self.ottv_sunshade,
+            self.ottv_zone_idx,
+            self.ottv_fallback_wwr as f64,
+        );
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::SolarOttvThermalDaylight, |ui| {
+            let ottv_val = format!(
+                "{:.1} W/m² ({})",
+                summary.overall_ottv_wm2,
+                if summary.pass_sni_35 { "PASS" } else { "EXCEED" }
+            );
+            let ottv_col = if summary.pass_sni_35 {
+                theme.accent_green
+            } else {
+                theme.accent_red
+            };
+            let shgc_title = format!(
+                "{:.2} {}",
+                if self.ottv_double_low_e { 0.32 } else { 0.72 }
+                    * if self.ottv_sunshade { 0.74 } else { 1.0 },
+                if self.ottv_double_low_e { "Double Low-E" } else { "Single Clear" }
+            );
+            let shgc_sub = format!(
+                "WWR = {:.1}% ({} BIM win • {:.0} m²)",
+                summary.overall_wwr * 100.0,
+                summary.modeled_windows,
+                summary.total_facade_area_m2
+            );
+            let sda_val = format!("{:.1}% Floor Area", summary.sda_pct);
+            let sda_col = if summary.sda_pct >= 55.0 {
+                theme.accent_green
+            } else {
+                theme.accent_orange
+            };
+            let cool_val = format!("-{:.1} kW Peak Chiller", summary.peak_cooling_kw);
+            let cool_sub = format!(
+                "Annual HVAC Savings ≈ {:.0} MWh/yr",
+                summary.annual_hvac_savings_mwh
+            );
             let cards = [
-                ("OVERALL OTTV (SNI 6389)", "31.4 W/m² (PASS)", "Max Allowed Cap = 35.0 W/m²", theme.accent_green),
-                ("SOLAR HEAT GAIN (SHGC)", "0.32 Double Low-E", "WWR = 42% w/ External Louvers", theme.accent_blue),
-                ("DAYLIGHT AUTONOMY (sDA)", "68.5% Floor Area", "Target >= 55% @ 300 lux Occupied", theme.accent_green),
-                ("COOLING LOAD REDUCTION", "-184 kW Peak Chiller", "Annual HVAC Savings ≈ 240 MWh/yr", theme.accent_orange),
+                ("OVERALL OTTV (SNI 6389)", ottv_val.as_str(), "Max Allowed Cap = 35.0 W/m²", ottv_col),
+                ("EFFECTIVE SHGC & WWR", shgc_title.as_str(), shgc_sub.as_str(), theme.accent_blue),
+                ("DAYLIGHT AUTONOMY (sDA)", sda_val.as_str(), "Target >= 55% @ 300 lux Occupied", sda_col),
+                ("COOLING LOAD REDUCTION", cool_val.as_str(), cool_sub.as_str(), theme.accent_orange),
             ];
             ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
                 let (t, v, s, c) = cards[idx];
@@ -585,10 +805,68 @@ impl SustainabilityView {
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Climate Zone: Tropical Marine (-6.2° S)");
-                let _ = ui.selectable_label(false, "Include 600mm Horizontal Sunshades");
-                let _ = icons::icon_button(ui, AppIcon::Sun, "Compute N/E/S/W Facade OTTV & Glare Audit", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                for (z_idx, label) in [
+                    (0, "Tropical Marine (-6.2° S)"),
+                    (1, "Highland (-6.9° S)"),
+                    (2, "Equatorial Coastal (0.0°)"),
+                ] {
+                    if ui.selectable_label(self.ottv_zone_idx == z_idx, label).clicked() {
+                        self.ottv_zone_idx = z_idx;
+                    }
+                }
+                ui.checkbox(&mut self.ottv_sunshade, "600mm Horizontal Sunshades");
+                ui.checkbox(&mut self.ottv_double_low_e, "Double Low-E Glazing");
             });
+            ui.add_space(6.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new("Wall U-Value (W/m²·K):").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.ottv_u_wall, 0.6..=3.2).step_by(0.1));
+                ui.label(RichText::new("Baseline WWR:").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.ottv_fallback_wwr, 0.15..=0.75).step_by(0.01));
+
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Sun,
+                    "Export N/E/S/W OTTV Audit (.CSV)",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let mut csv = String::from("Orientation,Walls,Gross_m2,Window_m2,WWR_pct,SHGC_eff,SF_Wm2,OTTV_Wm2,SNI_6389\n");
+                    for r in &summary.facade_rows {
+                        csv.push_str(&format!(
+                            "{},{},{:.1},{:.1},{:.1},{:.2},{:.0},{:.2},{}\n",
+                            r.orientation,
+                            r.wall_count,
+                            r.gross_area_m2,
+                            r.window_area_m2,
+                            r.wwr * 100.0,
+                            r.shgc_eff,
+                            r.solar_factor_wm2,
+                            r.ottv_wm2,
+                            if r.pass_sni { "PASS" } else { "FAIL" }
+                        ));
+                    }
+                    self.lca_sync_status = Some(
+                        match crate::core::web_bridge::save_text_file("sni6389_ottv_audit.csv", &csv, "text/csv") {
+                            Ok(msg) => format!(
+                                "SNI 6389 OTTV ({}): {:.1} W/m² • {}",
+                                summary.zone_label, summary.overall_ottv_wm2, msg
+                            ),
+                            Err(e) => format!("OTTV CSV export failed: {e}"),
+                        },
+                    );
+                }
+            });
+            if let Some(ref st) = self.lca_sync_status {
+                ui.add_space(6.0);
+                ui.label(RichText::new(st).size(11.0).color(theme.accent_blue));
+            }
             ui.add_space(12.0);
 
             ui_kit::responsive_two_panes(ui, 640.0, |ui, pane| match pane {
@@ -609,25 +887,32 @@ impl SustainabilityView {
                     painter.circle_stroke(c, r_max, Stroke::new(1.0, theme.border_subtle));
                     painter.circle_stroke(c, r_max * 0.65, Stroke::new(0.8, theme.accent_green.gamma_multiply(0.5)));
 
-                    let dirs = [
-                        ("N: 24.8", 0.0_f32, -1.0_f32, 0.56_f32, theme.accent_green),
-                        ("E: 33.9", 1.0, 0.0, 0.85, theme.accent_orange),
-                        ("S: 27.1", 0.0, 1.0, 0.62, theme.accent_blue),
-                        ("W: 34.6", -1.0, 0.0, 0.88, theme.accent_red),
-                    ];
-                    let poly: Vec<Pos2> = dirs
-                        .iter()
-                        .map(|(_, dx, dy, frac, _)| c + Vec2::new(*dx * r_max * *frac, *dy * r_max * *frac))
-                        .collect();
+                    let vecs = [(0.0_f32, -1.0_f32), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0)];
+                    let mut poly = Vec::with_capacity(4);
+                    let mut compass_labels = Vec::with_capacity(4);
+                    for (idx, row) in summary.facade_rows.iter().enumerate() {
+                        let (dx, dy) = vecs[idx];
+                        let frac = ((row.ottv_wm2 / 42.0) as f32).clamp(0.18, 1.0);
+                        let col = if !row.pass_sni {
+                            theme.accent_red
+                        } else if row.ottv_wm2 > 31.5 {
+                            theme.accent_orange
+                        } else {
+                            theme.accent_green
+                        };
+                        poly.push(c + Vec2::new(dx * r_max * frac, dy * r_max * frac));
+                        let short = &row.orientation[..1];
+                        compass_labels.push((format!("{}: {:.1}", short, row.ottv_wm2), dx, dy, col));
+                    }
                     for i in 0..poly.len() {
                         painter.line_segment(
                             [poly[i], poly[(i + 1) % poly.len()]],
                             Stroke::new(2.0, theme.accent_orange),
                         );
                     }
-                    for (lbl, dx, dy, _, col) in dirs {
+                    for (lbl, dx, dy, col) in compass_labels {
                         painter.text(
-                            c + Vec2::new(dx * (r_max + 22.0), dy * (r_max + 12.0)),
+                            c + Vec2::new(dx * (r_max + 24.0), dy * (r_max + 12.0)),
                             Align2::CENTER_CENTER,
                             lbl,
                             egui::FontId::monospace(9.5),
@@ -648,20 +933,31 @@ impl SustainabilityView {
                             .striped(true)
                             .spacing(Vec2::new(12.0, 5.0))
                             .show(ui, |ui| {
-                                for h in ["Orientation", "WWR", "SHGC", "OTTV (W/m²)", "SNI 6389"] {
+                                for h in ["Orientation", "BIM Walls", "Gross (m²)", "WWR", "SHGC eff", "OTTV (W/m²)", "SNI 6389"] {
                                     ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                                 }
                                 ui.end_row();
-                                for (dir, wwr, shgc, ottv, st, col) in [
-                                    ("North Facade", "38%", "0.34", "24.8", "PASS", theme.accent_green),
-                                    ("East Facade", "44%", "0.32", "33.9", "PASS (Marginal)", theme.accent_orange),
-                                    ("South Facade", "40%", "0.34", "27.1", "PASS", theme.accent_green),
-                                    ("West Facade", "46%", "0.28 + Fin", "34.6", "PASS (<35.0)", theme.accent_orange),
-                                ] {
-                                    ui.label(RichText::new(dir).size(10.5).strong().color(theme.text_primary));
-                                    ui.label(RichText::new(wwr).size(10.5).color(theme.text_secondary));
-                                    ui.label(RichText::new(shgc).size(10.5).color(theme.text_secondary));
-                                    ui.label(RichText::new(ottv).size(10.5).strong().color(col));
+                                for row in &summary.facade_rows {
+                                    let col = if !row.pass_sni {
+                                        theme.accent_red
+                                    } else if row.ottv_wm2 > 31.5 {
+                                        theme.accent_orange
+                                    } else {
+                                        theme.accent_green
+                                    };
+                                    let st = if !row.pass_sni {
+                                        "EXCEED (>35)"
+                                    } else if row.ottv_wm2 > 31.5 {
+                                        "PASS (Tight)"
+                                    } else {
+                                        "PASS"
+                                    };
+                                    ui.label(RichText::new(row.orientation).size(10.5).strong().color(theme.text_primary));
+                                    ui.label(RichText::new(format!("{}", row.wall_count)).size(10.5).monospace().color(theme.text_secondary));
+                                    ui.label(RichText::new(format!("{:.1}", row.gross_area_m2)).size(10.5).monospace().color(theme.text_secondary));
+                                    ui.label(RichText::new(format!("{:.0}%", row.wwr * 100.0)).size(10.5).color(theme.accent_blue));
+                                    ui.label(RichText::new(format!("{:.2}", row.shgc_eff)).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(format!("{:.1}", row.ottv_wm2)).size(10.5).strong().color(col));
                                     ui.label(RichText::new(st).size(10.5).color(col));
                                     ui.end_row();
                                 }
@@ -736,5 +1032,23 @@ impl SustainabilityView {
         val_color: Color32,
     ) {
         ui_kit::stat_card(ui, theme, title, val, subtitle, val_color);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::compute_facade_ottv;
+    use crate::core::BimProject;
+
+    #[test]
+    fn test_solar_ottv_sunshade_and_low_e_reduce_transfer() {
+        let proj = BimProject::default();
+        let high_solar = compute_facade_ottv(&proj, 2.6, false, false, 0, 0.45);
+        let low_e_shaded = compute_facade_ottv(&proj, 2.1, true, true, 0, 0.45);
+
+        assert_eq!(low_e_shaded.facade_rows.len(), 4);
+        assert!(low_e_shaded.overall_ottv_wm2 < high_solar.overall_ottv_wm2);
+        assert!(low_e_shaded.pass_sni_35);
+        assert!(low_e_shaded.peak_cooling_kw > 0.0);
     }
 }
