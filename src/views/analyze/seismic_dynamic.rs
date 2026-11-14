@@ -3,9 +3,13 @@
 use super::*;
 
 impl AnalyzeView {
-    pub(super) fn render_nonlinear_pushover(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        let mut engine = crate::core::ParametricEngine::new();
-        let model = engine.generate_warren_truss().unwrap_or_else(|_| crate::core::StructuralModel::new("Pushover Model"));
+    pub(super) fn render_nonlinear_pushover(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        bim_project: &crate::core::BimProject,
+    ) {
+        let (model, is_live_bim) = Self::resolve_active_model(bim_project);
         let csm = crate::core::PushoverEngine::evaluate_csm(
             &model,
             self.site_class,
@@ -15,6 +19,16 @@ impl AnalyzeView {
             15,
         );
         let report = &csm.raw_pushover;
+
+        ui.horizontal_wrapped(|ui| {
+            icons::pill_badge(
+                ui,
+                if is_live_bim { AppIcon::CheckCircle } else { AppIcon::Info },
+                if is_live_bim { "Pushover Model: Live BIM Frame" } else { "Pushover Model: Reference Warren Truss" },
+                if is_live_bim { theme.accent_green } else { theme.accent_blue },
+            );
+        });
+        ui.add_space(8.0);
 
         // Top Summary Cards
         ui_kit::responsive_grid_n(ui, 4, 190.0, |ui, col_idx| match col_idx {
@@ -342,18 +356,29 @@ impl AnalyzeView {
             });
     }
 
-    pub(super) fn render_modal_dynamics(&mut self, ui: &mut Ui, theme: &MacTheme) {
+    pub(super) fn render_modal_dynamics(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        bim_project: &crate::core::BimProject,
+    ) {
+        let (model, is_live_bim) = Self::resolve_active_model(bim_project);
         Frame::new()
             .fill(theme.bg_card)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    icons::icon_label(ui, AppIcon::Pulse, 15.0, theme.accent_blue, "Dynamic Modal Analysis & Seismic Spectrum SNI 1726:2019 / ASCE 7-16", 14.0, theme.text_primary, true);
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("Eigenvalue Solution: K*phi = omega^2*M*phi").size(11.0).color(theme.accent_blue));
-                    });
+                ui.set_width(ui.available_width());
+                ui.horizontal_wrapped(|ui| {
+                    icons::icon_label(ui, AppIcon::Pulse, 15.0, theme.accent_blue, "Dynamic Modal Analysis & Seismic Spectrum (SNI 1726 / ASCE 7)", 13.5, theme.text_primary, true);
+                    icons::pill_badge(
+                        ui,
+                        if is_live_bim { AppIcon::CheckCircle } else { AppIcon::Info },
+                        if is_live_bim { "Live BIM Frame" } else { "Reference Warren Truss" },
+                        if is_live_bim { theme.accent_green } else { theme.accent_blue },
+                    );
+                    ui.label(RichText::new("Eigenvalue: K*phi = omega^2*M*phi").size(11.0).color(theme.accent_blue));
                 });
 
                 ui.add_space(10.0);
@@ -400,11 +425,13 @@ impl AnalyzeView {
                         CornerRadius::same(6),
                         Vec2::ZERO,
                     ).clicked() {
-                        let mut engine = crate::core::ParametricEngine::new();
-                        if let Ok(model) = engine.generate_warren_truss() {
-                            let spec = crate::core::modal::Sni1726Spectrum::new(self.site_class, self.ss_val as f64, self.s1_val as f64, self.r_val as f64, 1.0);
-                            self.modal_report = crate::core::modal::ModalEngine::analyze(&model, 4, spec).ok();
-                        }
+                        let spec = crate::core::modal::Sni1726Spectrum::new(self.site_class, self.ss_val as f64, self.s1_val as f64, self.r_val as f64, 1.0);
+                        let res = crate::core::modal::ModalEngine::analyze(&model, 4, spec.clone()).or_else(|_| {
+                            let mut eng = crate::core::ParametricEngine::new();
+                            let fb = eng.generate_warren_truss()?;
+                            crate::core::modal::ModalEngine::analyze(&fb, 4, spec)
+                        });
+                        self.modal_report = res.ok();
                     }
                 });
 
@@ -412,11 +439,13 @@ impl AnalyzeView {
 
                 // Auto-run if not yet computed
                 if self.modal_report.is_none() {
-                    let mut engine = crate::core::ParametricEngine::new();
-                    if let Ok(model) = engine.generate_warren_truss() {
-                        let spec = crate::core::modal::Sni1726Spectrum::new(self.site_class, self.ss_val as f64, self.s1_val as f64, self.r_val as f64, 1.0);
-                        self.modal_report = crate::core::modal::ModalEngine::analyze(&model, 4, spec).ok();
-                    }
+                    let spec = crate::core::modal::Sni1726Spectrum::new(self.site_class, self.ss_val as f64, self.s1_val as f64, self.r_val as f64, 1.0);
+                    let res = crate::core::modal::ModalEngine::analyze(&model, 4, spec.clone()).or_else(|_| {
+                        let mut eng = crate::core::ParametricEngine::new();
+                        let fb = eng.generate_warren_truss()?;
+                        crate::core::modal::ModalEngine::analyze(&fb, 4, spec)
+                    });
+                    self.modal_report = res.ok();
                 }
 
                 if let Some(ref report) = self.modal_report {
@@ -575,9 +604,23 @@ impl AnalyzeView {
     // -------------------------------------------------------------
     // SUB-TAB 9: Geotechnical Engineering, Deep Foundations & SSI
     // -------------------------------------------------------------
-    pub(super) fn render_geotech_ssi(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        let mut engine = crate::core::ParametricEngine::new();
-        let model = engine.generate_warren_truss().unwrap_or_else(|_| crate::core::StructuralModel::new("Geotech Foundation Model"));
+    pub(super) fn render_geotech_ssi(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        bim_project: &crate::core::BimProject,
+    ) {
+        let (model, is_live_bim) = Self::resolve_active_model(bim_project);
+
+        ui.horizontal_wrapped(|ui| {
+            icons::pill_badge(
+                ui,
+                if is_live_bim { AppIcon::CheckCircle } else { AppIcon::Info },
+                if is_live_bim { "Geotech SSI Model: Live BIM Frame" } else { "Geotech SSI Model: Reference Warren Truss" },
+                if is_live_bim { theme.accent_green } else { theme.accent_blue },
+            );
+        });
+        ui.add_space(8.0);
 
         let soil_layer = crate::core::SoilLayer::new_standard(self.geotech_soil_type, 0.0, 20.0);
         let audit = crate::core::GeotechEngine::run_geotech_ssi_audit(

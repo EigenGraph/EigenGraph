@@ -12,7 +12,7 @@ impl ParametricView {
         _active_pillar: &mut NavigationPillar,
         features: &mut FeatureRegistry,
         universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
-        _members: &[crate::models::StructuralMember],
+        members: &[crate::models::StructuralMember],
         _workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
         outer_avail_w: f32,
         sidebar_toggle_inset_px: f32,
@@ -143,6 +143,7 @@ impl ParametricView {
                         rect,
                         theme,
                         universal_canvas,
+                        members,
                         pointer_in_floating,
                     );
                 }
@@ -294,6 +295,7 @@ impl ParametricView {
         rect: Rect,
         theme: &MacTheme,
         universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
+        members: &[crate::models::StructuralMember],
         pointer_in_floating: bool,
     ) {
         let is_frozen_now =
@@ -486,13 +488,34 @@ impl ParametricView {
             }
         }
 
-        // 5. Structural Beams / Runs (Projected Dashed Axis + Outline)
-        for run in &self.bim_bus.project.runs {
+        let heat_color_for = |member_opt: Option<&crate::models::StructuralMember>, default_col: Color32| -> Color32 {
+            if !self.show_structural_heatmap_2d {
+                return default_col;
+            }
+            if let Some(m) = member_opt {
+                if m.utilization >= 0.85 || m.ari < 0.55 {
+                    Color32::from_rgb(239, 68, 68)
+                } else if m.utilization >= 0.65 || m.ari < 0.70 {
+                    Color32::from_rgb(245, 158, 11)
+                } else if m.ari >= 0.85 {
+                    Color32::from_rgb(26, 188, 120)
+                } else {
+                    Color32::from_rgb(56, 189, 248)
+                }
+            } else {
+                default_col
+            }
+        };
+
+        // 5. Structural Beams / Runs (Projected Axis + Optional 2D FEM/ARI Heatmap)
+        for (idx, run) in self.bim_bus.project.runs.iter().enumerate() {
             let p0 = to_screen(run.start);
             let p1 = to_screen(run.end);
+            let m_opt = members.iter().find(|m| m.name.contains("Beam")).or_else(|| members.get(idx % members.len().max(1)));
+            let col = heat_color_for(m_opt, Color32::from_rgba_premultiplied(52, 211, 153, 175));
             painter.line_segment(
                 [p0, p1],
-                Stroke::new(1.5, Color32::from_rgba_premultiplied(52, 211, 153, 175)),
+                Stroke::new(if self.show_structural_heatmap_2d && m_opt.is_some() { 2.8 } else { 1.5 }, col),
             );
         }
 
@@ -576,14 +599,44 @@ impl ParametricView {
             }
         }
 
-        // 7. Structural Columns in Solid Poché
-        for col in &self.bim_bus.project.columns {
+        // 7. Structural Columns in Solid Poché + Optional 2D ARI/DCR Heatmap Ring
+        for (idx, col) in self.bim_bus.project.columns.iter().enumerate() {
             let cpts: Vec<Pos2> = col.footprint_ring().into_iter().map(to_screen).collect();
+            let m_opt = members.get(idx);
+            let fill = if self.show_structural_heatmap_2d {
+                if let Some(m) = m_opt {
+                    if m.utilization >= 0.85 || m.ari < 0.55 {
+                        Color32::from_rgb(239, 68, 68)
+                    } else if m.utilization >= 0.65 || m.ari < 0.70 {
+                        Color32::from_rgb(245, 158, 11)
+                    } else if m.ari >= 0.85 {
+                        Color32::from_rgb(26, 188, 120)
+                    } else {
+                        Color32::from_rgb(56, 189, 248)
+                    }
+                } else {
+                    Color32::from_rgb(56, 189, 248)
+                }
+            } else {
+                Color32::from_rgb(56, 189, 248)
+            };
             painter.add(egui::Shape::convex_polygon(
                 cpts,
-                Color32::from_rgb(56, 189, 248),
+                fill,
                 Stroke::new(1.5, Color32::WHITE),
             ));
+            if self.show_structural_heatmap_2d {
+                if let Some(m) = m_opt {
+                    let s_center = to_screen(col.pos);
+                    painter.text(
+                        s_center - Vec2::new(0.0, 12.0),
+                        Align2::CENTER_BOTTOM,
+                        format!("ARI {:.2}", m.ari),
+                        egui::FontId::monospace(8.5),
+                        fill,
+                    );
+                }
+            }
         }
 
         // 8. Associative Linear Dimensions

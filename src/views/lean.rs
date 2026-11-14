@@ -338,6 +338,9 @@ impl LeanView {
             .inner_margin(Margin::same(6))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
+                let card_w = ui.available_width().max(140.0);
+                ui.set_width(card_w);
+                ui.set_max_width(card_w);
                 let lps_label = format!("Last Planner System (PPC {:.1}%)", live_ppc);
                 let tabs = [
                     (LeanSubTab::CuttingStock, crate::icons::AppIcon::Scissors, "1D/2D Cutting Stock Optimizer".to_string()),
@@ -508,41 +511,48 @@ impl LeanView {
             .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    crate::icons::icon_label(
-                        ui,
-                        crate::icons::AppIcon::SettingsGear,
-                        13.0,
-                        theme.accent_blue,
-                        "Cutting Optimization Parameters",
-                        13.0,
-                        theme.text_primary,
-                        true,
-                    );
-                    ui.add_space(12.0);
-
-                    // Profile selector
-                    ui.label(RichText::new("Profile Filter:").size(11.5).color(theme.text_secondary));
-                    egui::ComboBox::from_id_salt("cso_profile_filter")
-                        .selected_text(RichText::new(&self.selected_profile).size(11.5))
-                        .width(170.0)
-                        .show_ui(ui, |ui| {
-                            for p in &profiles {
-                                ui.selectable_value(&mut self.selected_profile, p.clone(), p);
-                            }
-                        });
-
-                    ui.add_space(8.0);
-                    ui.label(RichText::new("Stock Bar Length:").size(11.5).color(theme.text_secondary));
-                    ui.add(egui::Slider::new(&mut self.standard_bar_length_m, 6.0..=14.0).suffix(" m").step_by(0.5));
-
-                    ui.add_space(8.0);
-                    ui.label(RichText::new("Saw Kerf:").size(11.5).color(theme.text_secondary));
-                    ui.add(egui::Slider::new(&mut self.saw_kerf_mm, 0.0..=10.0).suffix(" mm").step_by(0.5));
-
-                    ui.add_space(8.0);
-                    ui.label(RichText::new("Min Reusable:").size(11.5).color(theme.text_secondary));
-                    ui.add(egui::Slider::new(&mut self.min_reusable_offcut_m, 0.5..=3.0).suffix(" m").step_by(0.25));
+                let card_w = ui.available_width().max(140.0);
+                ui.set_width(card_w);
+                ui.set_max_width(card_w);
+                crate::icons::icon_label(
+                    ui,
+                    crate::icons::AppIcon::SettingsGear,
+                    13.0,
+                    theme.accent_blue,
+                    "Cutting Optimization Parameters",
+                    13.0,
+                    theme.text_primary,
+                    true,
+                );
+                ui.add_space(10.0);
+                ui_kit::responsive_grid_n(ui, 4, 185.0, |ui, idx| {
+                    let cell_w = ui.available_width().max(110.0);
+                    ui.spacing_mut().slider_width = (cell_w - 72.0).clamp(56.0, 140.0);
+                    match idx {
+                        0 => {
+                            ui.label(RichText::new("Profile Filter:").size(11.0).color(theme.text_secondary));
+                            egui::ComboBox::from_id_salt("cso_profile_filter")
+                                .selected_text(RichText::new(&self.selected_profile).size(11.5))
+                                .width((cell_w - 8.0).clamp(100.0, 220.0))
+                                .show_ui(ui, |ui| {
+                                    for p in &profiles {
+                                        ui.selectable_value(&mut self.selected_profile, p.clone(), p);
+                                    }
+                                });
+                        }
+                        1 => {
+                            ui.label(RichText::new("Stock Bar Length:").size(11.0).color(theme.text_secondary));
+                            ui.add(egui::Slider::new(&mut self.standard_bar_length_m, 6.0..=14.0).suffix(" m").step_by(0.5));
+                        }
+                        2 => {
+                            ui.label(RichText::new("Saw Kerf:").size(11.0).color(theme.text_secondary));
+                            ui.add(egui::Slider::new(&mut self.saw_kerf_mm, 0.0..=10.0).suffix(" mm").step_by(0.5));
+                        }
+                        _ => {
+                            ui.label(RichText::new("Min Reusable:").size(11.0).color(theme.text_secondary));
+                            ui.add(egui::Slider::new(&mut self.min_reusable_offcut_m, 0.5..=3.0).suffix(" m").step_by(0.25));
+                        }
+                    }
                 });
             });
 
@@ -552,26 +562,53 @@ impl LeanView {
         Frame::new()
             .fill(theme.bg_card)
             .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(16))
+            .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
+                let card_w = ui.available_width().max(140.0);
+                ui.set_width(card_w);
+                ui.set_max_width(card_w);
+                if card_w >= 540.0 {
+                    ui.horizontal_wrapped(|ui| {
+                        crate::icons::icon_label(
+                            ui,
+                            crate::icons::AppIcon::Scissors,
+                            13.5,
+                            theme.accent_blue,
+                            "Optimized Steel Bar Cutting Patterns (Dynamic BFD)",
+                            13.5,
+                            theme.text_primary,
+                            true,
+                        );
+                        ui.label(RichText::new(format!("Algorithm: Best-Fit Decreasing • Total Cut Pieces: {} pcs", report.total_pieces_demanded))
+                            .size(11.0).color(theme.accent_blue));
+                    });
+                } else {
                     crate::icons::icon_label(
                         ui,
                         crate::icons::AppIcon::Scissors,
                         13.5,
                         theme.accent_blue,
-                        "Optimized Steel Bar Cutting Patterns (Dynamic BFD)",
-                        13.5,
+                        "Optimized Bar Cutting (Dynamic BFD)",
+                        13.0,
                         theme.text_primary,
                         true,
                     );
-                    ui.label(RichText::new(format!("Algorithm: Best-Fit Decreasing • Total Cut Pieces: {} pcs", report.total_pieces_demanded))
-                        .size(11.0).color(theme.accent_blue));
-                });
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(format!(
+                                "Algorithm: Best-Fit Decreasing • Total Cut Pieces: {} pcs",
+                                report.total_pieces_demanded
+                            ))
+                            .size(11.0)
+                            .color(theme.accent_blue),
+                        )
+                        .wrap(),
+                    );
+                }
                 ui.add_space(12.0);
 
-                let bar_width = (ui.available_width() - 10.0).max(240.0);
+                let bar_width = (ui.available_width() - 4.0).max(120.0);
                 let bar_height = 24.0;
                 let colors = [
                     Color32::from_rgb(16, 185, 129),  // emerald
@@ -701,13 +738,20 @@ impl LeanView {
                         CornerRadius::same(6),
                         Vec2::ZERO,
                     ).clicked() {
-                        if members.is_empty() {
-                            self.export_status = Some("No structural members loaded yet. Author elements on the canvas before exporting BBS.".to_string());
+                        let bbs = if !bim_project.rebars.is_empty() {
+                            CuttingStockOptimizer::extract_bbs_from_bim_rebar(bim_project)
+                        } else if !members.is_empty() {
+                            CuttingStockOptimizer::generate_sample_bbs(members.len())
                         } else {
-                            let bbs = CuttingStockOptimizer::generate_sample_bbs(members.len());
+                            Vec::new()
+                        };
+                        if bbs.is_empty() {
+                            self.export_status = Some("No BIM rebar or structural members loaded yet. Author elements on the canvas before exporting BBS.".to_string());
+                        } else {
                             let csv = CuttingStockOptimizer::export_bbs_csv(&bbs);
-                            if let Ok(path) = crate::core::DiskExporter::write_export_file("Bar_Bending_Schedule_SNI2847.csv", &csv) {
-                                self.export_status = Some(format!("BBS exported to: {}", path));
+                            match crate::core::web_bridge::save_text_file("Bar_Bending_Schedule_SNI2847.csv", &csv, "text/csv") {
+                                Ok(msg) => self.export_status = Some(format!("BBS exported ({} marks): {}", bbs.len(), msg)),
+                                Err(err) => self.export_status = Some(format!("BBS export error: {err}")),
                             }
                         }
                     }
@@ -724,14 +768,21 @@ impl LeanView {
                         Vec2::ZERO,
                     ).clicked() {
                         let csv = CuttingStockOptimizer::export_cutting_plan_csv(&report);
-                        if let Ok(path) = crate::core::DiskExporter::write_export_file("Cutting_Plan_Optimized.csv", &csv) {
-                            self.export_status = Some(format!("Cutting plan exported to: {}", path));
+                        match crate::core::web_bridge::save_text_file("Cutting_Plan_Optimized.csv", &csv, "text/csv") {
+                            Ok(msg) => self.export_status = Some(format!("Cutting plan exported: {}", msg)),
+                            Err(err) => self.export_status = Some(format!("Cutting plan export error: {err}")),
                         }
                     }
-
-                    ui.label(RichText::new("Standard format interoperable with Voortman CAM, Tekla FabTrol, and CNC Bar Benders.")
-                        .size(11.0).color(theme.text_secondary));
                 });
+                ui.add_space(4.0);
+                ui.add(
+                    egui::Label::new(
+                        RichText::new("Standard format interoperable with Voortman CAM, Tekla FabTrol, and CNC Bar Benders.")
+                            .size(11.0)
+                            .color(theme.text_secondary),
+                    )
+                    .wrap(),
+                );
             });
     }
 
@@ -788,13 +839,16 @@ impl LeanView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
+                let card_w = ui.available_width().max(140.0);
+                ui.set_width(card_w);
+                ui.set_max_width(card_w);
                 ui.horizontal_wrapped(|ui| {
                     crate::icons::icon_label(
                         ui,
                         crate::icons::AppIcon::Clipboard,
                         14.0,
                         theme.accent_blue,
-                        "6-Week Make-Ready Lookahead & Weekly Work Plan (WWP)",
+                        "6-Week Lookahead & WWP",
                         14.0,
                         theme.text_primary,
                         true,
@@ -1182,12 +1236,15 @@ impl LeanView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
+                let card_w = ui.available_width().max(140.0);
+                ui.set_width(card_w);
+                ui.set_max_width(card_w);
                 crate::icons::icon_label(
                     ui,
                     crate::icons::AppIcon::ChartLine,
                     13.5,
                     theme.accent_blue,
-                    "Value Stream Mapping: Eliminating 7 Construction Wastes",
+                    "Value Stream: 7 Construction Wastes",
                     13.5,
                     theme.text_primary,
                     true,
@@ -1205,10 +1262,14 @@ impl LeanView {
                 ];
 
                 for (name, action, result) in wastes {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.label(RichText::new(name).size(12.0).strong().color(theme.accent_blue));
-                        ui.label(RichText::new(format!("— {} ({})", action, result)).size(11.5).color(theme.text_secondary));
-                    });
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(format!("{name} — {action} ({result})"))
+                                .size(11.5)
+                                .color(theme.text_secondary),
+                        )
+                        .wrap(),
+                    );
                     ui.add_space(4.0);
                 }
             });
@@ -1221,12 +1282,15 @@ impl LeanView {
             .inner_margin(Margin::same(16))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
+                let card_w = ui.available_width().max(140.0);
+                ui.set_width(card_w);
+                ui.set_max_width(card_w);
                 crate::icons::icon_label(
                     ui,
                     crate::icons::AppIcon::Truck,
                     13.5,
                     theme.accent_blue,
-                    "Just-In-Time (JIT) Delivery Buffer Scheduling",
+                    "Just-In-Time (JIT) Delivery Buffer",
                     13.5,
                     theme.text_primary,
                     true,
@@ -1309,12 +1373,16 @@ impl LeanView {
             });
 
             ui.add_space(10.0);
+            ui.spacing_mut().slider_width = (ui.available_width() * 0.45).clamp(72.0, 140.0);
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("Takt Rhythm (Days/Zone):").size(11.0).color(theme.text_secondary));
+                ui_kit::wrap_before(ui, 160.0);
+                ui.label(RichText::new("Takt (d/zone):").size(11.0).color(theme.text_secondary));
                 ui.add(egui::Slider::new(&mut self.takt_days_per_zone, 2..=10));
-                ui.label(RichText::new("Batch Transit (min):").size(11.0).color(theme.text_secondary));
+                ui_kit::wrap_before(ui, 165.0);
+                ui.label(RichText::new("Transit (min):").size(11.0).color(theme.text_secondary));
                 ui.add(egui::Slider::new(&mut self.takt_transit_min, 15.0..=105.0).step_by(1.0));
-                ui.label(RichText::new("Mixer Cap (m³):").size(11.0).color(theme.text_secondary));
+                ui_kit::wrap_before(ui, 160.0);
+                ui.label(RichText::new("Mixer (m³):").size(11.0).color(theme.text_secondary));
                 ui.add(egui::Slider::new(&mut self.takt_mixer_cap_m3, 5.0..=10.0).step_by(0.5));
                 if ui
                     .selectable_label(
@@ -1448,8 +1516,10 @@ impl LeanView {
             });
 
             ui.add_space(10.0);
+            ui.spacing_mut().slider_width = (ui.available_width() * 0.45).clamp(72.0, 140.0);
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("Contractual SLA (Days):").size(11.0).color(theme.text_secondary));
+                ui_kit::wrap_before(ui, 170.0);
+                ui.label(RichText::new("Contractual SLA (d):").size(11.0).color(theme.text_secondary));
                 ui.add(egui::Slider::new(&mut self.rfi_sla_days, 2..=14).suffix(" d"));
                 ui.checkbox(&mut self.rfi_auto_flag_lps, "Auto-Clear LPS Lookahead Holds");
                 if crate::icons::icon_button(
@@ -1569,19 +1639,7 @@ impl LeanView {
     }
 
     fn render_stat_card(&self, ui: &mut Ui, theme: &MacTheme, title: &str, val: &str, subtitle: &str, val_color: Color32) {
-        Frame::new()
-            .fill(theme.bg_canvas)
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(14))
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.label(RichText::new(title).size(10.0).strong().color(theme.text_muted));
-                ui.add_space(4.0);
-                ui.label(RichText::new(val).size(18.0).strong().color(val_color));
-                ui.add_space(4.0);
-                ui.label(RichText::new(subtitle).size(10.5).color(theme.text_secondary));
-            });
+        ui_kit::stat_card(ui, theme, title, val, subtitle, val_color);
     }
 }
 

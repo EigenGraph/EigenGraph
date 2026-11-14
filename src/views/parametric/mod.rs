@@ -170,6 +170,7 @@ pub struct ParametricView {
     pub rebar_seismic_hooks_135: bool,
     pub elev_facade_idx: usize,
     pub elev_mep_system_idx: usize,
+    pub show_structural_heatmap_2d: bool,
 }
 
 impl Default for ParametricView {
@@ -229,6 +230,7 @@ impl Default for ParametricView {
             rebar_seismic_hooks_135: true,
             elev_facade_idx: 0,
             elev_mep_system_idx: 0,
+            show_structural_heatmap_2d: true,
         }
     }
 }
@@ -1221,10 +1223,13 @@ mod tests {
         for win_w in [1000.0_f32, 700.0, 390.0] {
             let mut analyze = crate::views::AnalyzeView::default();
             let mut sust = crate::views::SustainabilityView::default();
+            let mut planning = crate::views::PlanningView::default();
+            let mut pillar_cost = NavigationPillar::CostBudgeting;
             let ctx = egui::Context::default();
             let mut canvas_w = 0.0_f32;
             let mut analyze_w = 0.0_f32;
             let mut sust_w = 0.0_f32;
+            let mut plan_w = 0.0_f32;
 
             for _ in 0..2 {
                 let input = egui::RawInput {
@@ -1255,7 +1260,7 @@ mod tests {
                             canvas_w = c_resp.response.rect.width();
 
                             let a_resp = ui.vertical(|ui| {
-                                analyze.show(ui, &theme, &members, &mut features);
+                                analyze.show(ui, &theme, &members, &bim_proj, &mut features);
                             });
                             analyze_w = a_resp.response.rect.width();
 
@@ -1263,6 +1268,19 @@ mod tests {
                                 sust.show(ui, &theme, &members, &bim_proj, &mut features);
                             });
                             sust_w = s_resp.response.rect.width();
+
+                            let p_resp = ui.vertical(|ui| {
+                                planning.show(
+                                    ui,
+                                    &theme,
+                                    &vars,
+                                    &members,
+                                    &bim_proj,
+                                    &mut features,
+                                    &mut pillar_cost,
+                                );
+                            });
+                            plan_w = p_resp.response.rect.width();
                         });
                     });
                 });
@@ -1277,6 +1295,53 @@ mod tests {
                 (canvas_w - sust_w).abs() <= 2.0,
                 "Sustainability width mismatch @ {win_w}: canvas={canvas_w:.1}, sust={sust_w:.1}"
             );
+            assert!(
+                (canvas_w - plan_w).abs() <= 2.0,
+                "Planning width mismatch @ {win_w}: canvas={canvas_w:.1}, planning={plan_w:.1}"
+            );
+
+            // Verify all 6 Lean Construction subtabs (including CuttingStock "Cutting Optimization Parameters") match canvas_w without overflowing right edge
+            for tab in [
+                crate::views::lean::LeanSubTab::CuttingStock,
+                crate::views::lean::LeanSubTab::LastPlanner,
+                crate::views::lean::LeanSubTab::ValueStream,
+                crate::views::lean::LeanSubTab::JitDelivery,
+                crate::views::lean::LeanSubTab::TaktConcreteDispatch,
+                crate::views::lean::LeanSubTab::RfiSubmittalTracker,
+            ] {
+                let mut lean = crate::views::LeanView::default();
+                lean.active_subtab = tab;
+                let lean_ctx = egui::Context::default();
+                let mut lean_w = 0.0_f32;
+                let mut lean_max_x = 0.0_f32;
+                let mut lean_left = 0.0_f32;
+                for _ in 0..2 {
+                    let input = egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(win_w, 1200.0))),
+                        ..Default::default()
+                    };
+                    let mut output = lean_ctx.run_ui(input, |ui| {
+                        egui::CentralPanel::default().show(ui, |ui| {
+                            Frame::new().inner_margin(Margin::symmetric(14, 12)).show(ui, |ui| {
+                                let content_w = ui.available_width().max(160.0);
+                                ui.set_width(content_w);
+                                ui.set_max_width(content_w);
+                                let l_resp = ui.vertical(|ui| {
+                                    lean.show(ui, &theme, &members, &bim_proj, &mut features);
+                                });
+                                lean_w = l_resp.response.rect.width();
+                                lean_max_x = l_resp.response.rect.max.x;
+                                lean_left = l_resp.response.rect.min.x;
+                            });
+                        });
+                    });
+                    output.textures_delta.clear();
+                }
+                assert!(
+                    (canvas_w - lean_w).abs() <= 2.0,
+                    "Lean ({tab:?}) width mismatch @ {win_w}: canvas={canvas_w:.1}, lean={lean_w:.1}, span=[{lean_left:.1}..{lean_max_x:.1}]"
+                );
+            }
         }
     }
 }

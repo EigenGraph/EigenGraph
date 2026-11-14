@@ -7,6 +7,23 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.4.2] - 2026-11-14 — Phase 42: Live BIM-FEA Solvers, CAD OSNAP & Marquee Promotion, Reactive 4D/5D/9D Sync, Closed-Loop AI Repair & Lean Width Fix
+
+### Added & Changed
+- **Lean Construction Canvas Width Parity & Live BIM Rebar BBS (`src/views/lean.rs`, `src/core/cso.rs`, `src/views/parametric/mod.rs`)**:
+  - Fixed horizontal width overflow on `"Cutting Optimization Parameters"` and `"Optimized Steel Bar Cutting Patterns"` by constraining all card containers to canvas width (`ui.set_width` / `ui.set_max_width`), refactoring parameter controls into `ui_kit::responsive_grid_n` with clamped slider/combo widths, wrapping wide tables in horizontal `ScrollArea`, adding `CuttingStockOptimizer::extract_bbs_from_bim_rebar` + CSV downloads, and expanding `test_below_canvas_module_matches_canvas_width_parity` to assert width parity across all 6 `LeanSubTab` views and `PlanningView` at Mobile (`390px`), Tablet (`700px`), and Desktop (`1000px`).
+- **Live `BimProject` FEA Coupling & 3D/2D Structural Heatmaps (`src/views/analyze/`, `src/views/build/viewport_3d.rs`, `src/views/parametric/`, `src/core/bim.rs`)**:
+  - Connected `AnalyzeView` (`N-2` Woodbury perturbation, cascading collapse, pushover, modal dynamics, geotech SSI, and P-M-V interaction KPIs) directly to active `BimProject::to_structural_model()` with automatic BIM-signature invalidation and Warren Truss fallback when fewer than 2 elements exist.
+  - Scaled `BimProject::to_structural_model()` beam and column `CrossSection` stiffness directly from BIM element dimensions (`width_mm`, `depth_mm`) and added interactive 3D heatmap cycle (`Heat: ARI / DCR% / ±Force / Critical`) in `Build` plus `ARI Heat` 2D floor plan overlays in `Parametric`.
+- **Precision CAD OSNAP, Marquee Selection & BIM Promotion (`src/views/universal_canvas.rs`, `src/app.rs`)**:
+  - Added Object Snap (`OSNAP` `F4` toggle + reticle indicators for `END`, `MID`, `PERP`, and `INT` across sketch entities and BIM walls/beams/columns/grids), Window (left-to-right enclosed) & Crossing (right-to-left intersecting) `BoxSel` (`V`) multi-entity selection across Move/Copy/Offset/Mirror/Rotate/Delete, `GRID` and `ARRAY` generators, and `PROMOTE` (`To BIM`) converting 2D sketch lines and rectangles into native 3D BIM walls, beams, columns, and slabs.
+- **Reactive 4D/5D Scheduling & Closed-Loop EigenAI Auto-Repair + Installable Web PWA (`src/views/planning.rs`, `src/views/ai_assistant.rs`, `src/app.rs`, `manifest.webmanifest`, `sw.js`, `index.html`)**:
+  - Added reactive `PlanningView::sync_from_bim` & `compute_takeoff_with_bim` updating 4D stages, CSI WBS cost tables, concrete volumes, and rebar quantities whenever the active BIM model changes.
+  - Implemented deterministic transactional `BimCommandBus::repair_critical_members` with Undo/Redo support (`repair critical members` prompt & 1-click Copilot `"Auto-Repair ARI"` button) verifying before/after Min ARI & Max DCR deltas via `AriEngine`.
+  - Added PWA web app manifest (`manifest.webmanifest`) and WASM-safe offline shell service worker (`sw.js`) wired via Trunk copy links in `index.html`.
+
+---
+
 ## [v0.4.1] - 2026-11-14 — Phase 41: Canvas Width Parity, Precision CAD Tools & Full 74/74 Roadmap Unlock
 
 ### Added & Changed

@@ -125,6 +125,40 @@ impl CuttingStockOptimizer {
         items
     }
 
+    /// Generates an ISO 3766 / SNI 2847 Bar Bending Schedule directly from active `BimProject` rebar bars.
+    pub fn extract_bbs_from_bim_rebar(project: &crate::core::bim::BimProject) -> Vec<BbsScheduleItem> {
+        let mut bbs = Vec::with_capacity(project.rebars.len());
+        for bar in &project.rebars {
+            let cut_length_mm = bar.single_length_mm();
+            if cut_length_mm <= 50.0 {
+                continue;
+            }
+            let count = bar.count.max(1);
+            let total_length_m = (cut_length_mm * 0.001) * count as f64;
+            let unit_weight_kg_m = (0.006165 * bar.diameter_mm * bar.diameter_mm).max(0.22);
+            let shape_code = if bar.closed_stirrup {
+                "51 - Closed Stirrup 135° Hook"
+            } else if bar.points_3d.len() > 2 {
+                "21 - Standard 90° End Hook"
+            } else {
+                "00 - Straight Longitudinal Bar"
+            };
+            bbs.push(BbsScheduleItem {
+                mark: format!("{}#{}-B{:02}", bar.host_kind, bar.host_id, bar.id),
+                element: format!("{} #{}", bar.host_kind, bar.host_id),
+                bar_size_mm: bar.diameter_mm,
+                grade: bar.grade.clone(),
+                shape_code: shape_code.to_string(),
+                count,
+                cut_length_mm,
+                total_length_m,
+                unit_weight_kg_m,
+                total_weight_kg: total_length_m * unit_weight_kg_m,
+            });
+        }
+        bbs
+    }
+
     /// Extracts cut pieces from active structural members, inferring realistic lengths from element categories
     pub fn extract_items_from_members(members: &[StructuralMember]) -> Vec<CuttingItem> {
         let mut items = Vec::new();

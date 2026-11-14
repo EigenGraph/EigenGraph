@@ -193,6 +193,23 @@ impl ParametricView {
                             self.fit_view_to_project(universal_canvas);
                         }
 
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Palette,
+                            "ARI Heat",
+                            10.5,
+                            if self.show_structural_heatmap_2d { Color32::WHITE } else { theme.text_secondary },
+                            if self.show_structural_heatmap_2d { theme.accent_green } else { theme.bg_card },
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 26.0),
+                        )
+                        .on_hover_text("Toggle live FEM ARI / DCR utilization heatmap overlay on 2D columns and structural runs")
+                        .clicked()
+                        {
+                            self.show_structural_heatmap_2d = !self.show_structural_heatmap_2d;
+                        }
+
                         ui.separator();
 
                         // Shared World Map Basemap, Globe Reset, Ground 1:200 Zoom, Set Origin

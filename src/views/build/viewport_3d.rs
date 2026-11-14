@@ -1751,6 +1751,30 @@ impl BuildView {
                         }
                     }
 
+                    let (heat_lbl, next_heat) = match self.color_mode.as_str() {
+                        "ARI" => ("Heat: ARI", "DCR_Stress"),
+                        "DCR_Stress" => ("Heat: DCR%", "Tension_Compression"),
+                        "Tension_Compression" => ("Heat: ±Force", "Criticality"),
+                        _ => ("Heat: Critical", "ARI"),
+                    };
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Palette,
+                        heat_lbl,
+                        10.5,
+                        Color32::WHITE,
+                        Color32::from_rgb(30, 64, 115),
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Cycle 3D FEM Color Heatmap: ARI Redundancy -> DCR Utilization -> Axial Force -> Fracture Critical")
+                    .clicked()
+                    {
+                        self.color_mode = next_heat.to_string();
+                        self.modify_status_msg = Some(format!("3D Viewport heatmap switched to {}", next_heat));
+                    }
+
                     ui.separator();
 
                     // Phase 35: World Map Basemap, Globe Reset, Ground 1:200 & Site Origin Controls

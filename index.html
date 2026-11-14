@@ -5,8 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>EigenGraph — 10D BIM &amp; Structural Analytics</title>
   <meta name="description" content="EigenGraph 10D BIM, Adjusted Redundancy Index (ARI), SVD Kinematic Mechanism Guards, and Structural Graph Analytics Workstation running natively in WebAssembly." />
+  <meta name="theme-color" content="#0f1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.webmanifest" />
 
   <link data-trunk rel="icon" href="assets/icon.png" />
+  <link data-trunk rel="copy-file" href="manifest.webmanifest" />
+  <link data-trunk rel="copy-file" href="sw.js" />
+  <link data-trunk rel="copy-file" href="assets/icon.png" data-target-path="assets" />
   <link data-trunk rel="rust" data-bin="eigengraph" data-wasm-opt="0" />
 
   <script>
@@ -651,5 +658,13 @@
     <h1 class="eg-title">EigenGraph Workstation</h1>
     <p class="eg-subtitle">Loading 10D BIM &amp; Structural Analytics WebAssembly Engine...</p>
   </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function () {});
+      });
+    }
+  </script>
 </body>
 </html>

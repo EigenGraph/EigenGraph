@@ -80,6 +80,8 @@ pub struct PlanningView {
     pub ve_composite_deck_swap: bool,
     pub ve_ari_floor: f64,
     pub ve_selected_bidder_idx: usize,
+    // Phase 42: Reactive BIM 4D/5D auto-sync signature
+    pub last_bim_sync_sig: (usize, usize, usize),
 }
 
 impl Default for PlanningView {
@@ -112,6 +114,7 @@ impl Default for PlanningView {
             ve_composite_deck_swap: true,
             ve_ari_floor: 0.90,
             ve_selected_bidder_idx: 1,
+            last_bim_sync_sig: (usize::MAX, 0, 0),
         }
     }
 }
@@ -321,8 +324,201 @@ pub struct Parametric5DTakeoff {
 }
 
 impl PlanningView {
+    /// Synchronizes 4D construction staging phases and 5D CSI WBS cost catalog directly from active BIM + FEM state.
+    pub fn sync_from_bim(
+        &mut self,
+        bim_project: &crate::core::BimProject,
+        members: &[StructuralMember],
+    ) {
+        let sig = (
+            bim_project.element_count(),
+            bim_project.rebars.len(),
+            members.len(),
+        );
+        self.last_bim_sync_sig = sig;
+        if bim_project.is_empty() && members.is_empty() {
+            self.simulation_phases.clear();
+            self.wbs_catalog.clear();
+            return;
+        }
+
+        let conc_m3 = bim_project.total_concrete_volume_m3().max(12.0);
+        let rebar_kg = bim_project.total_rebar_weight_kg();
+        let structural_steel_kg: f64 = bim_project
+            .runs
+            .iter()
+            .filter(|r| r.is_wf_profile)
+            .map(|r| (r.start.dist(r.end) / 1000.0) * 48.0)
+            .sum::<f64>()
+            + bim_project
+                .columns
+                .iter()
+                .filter(|c| c.is_wf_profile)
+                .map(|_| 3.6 * 62.0)
+                .sum::<f64>();
+        let wall_area_m2: f64 = bim_project
+            .walls
+            .iter()
+            .map(|w| (w.length_mm() / 1000.0) * (w.unconnected_height_mm / 1000.0))
+            .sum();
+        let footing_cnt = bim_project.footings.len().max(1);
+        let levels_cnt = bim_project.levels.len().max(1);
+
+        if self.simulation_day == 0 {
+            self.simulation_day = 95;
+        }
+
+        self.simulation_phases = vec![
+            ConstructionSimulationPhase {
+                id: "4D-01".to_string(),
+                name: format!("Subsurface Pile Caps & {} BIM Footings", footing_cnt),
+                day_start: 1,
+                day_end: 45,
+                planned_progress_pct: 100.0,
+                actual_progress_pct: 100.0,
+                manpower_count: 24,
+                equipment_count: 3,
+                concrete_volume_m3: (conc_m3 * 0.25) as f32,
+                color_rgb: (245, 158, 11),
+                wbs_code: "02.30".to_string(),
+                is_critical: true,
+            },
+            ConstructionSimulationPhase {
+                id: "4D-02".to_string(),
+                name: format!(
+                    "Vertical Core ({} Cols, {} Walls across {} Levels)",
+                    bim_project.columns.len(),
+                    bim_project.walls.len(),
+                    levels_cnt
+                ),
+                day_start: 46,
+                day_end: 135,
+                planned_progress_pct: 88.0,
+                actual_progress_pct: 84.5,
+                manpower_count: 42,
+                equipment_count: 4,
+                concrete_volume_m3: (conc_m3 * 0.42) as f32,
+                color_rgb: (59, 130, 246),
+                wbs_code: "03.30".to_string(),
+                is_critical: true,
+            },
+            ConstructionSimulationPhase {
+                id: "4D-03".to_string(),
+                name: format!(
+                    "Primary Beam Grid & Deck Slabs ({} Runs, {} Slabs)",
+                    bim_project.runs.len(),
+                    bim_project.slabs.len()
+                ),
+                day_start: 136,
+                day_end: 235,
+                planned_progress_pct: 64.0,
+                actual_progress_pct: 61.0,
+                manpower_count: 38,
+                equipment_count: 3,
+                concrete_volume_m3: (conc_m3 * 0.33) as f32,
+                color_rgb: (16, 185, 129),
+                wbs_code: "05.12".to_string(),
+                is_critical: true,
+            },
+            ConstructionSimulationPhase {
+                id: "4D-04".to_string(),
+                name: format!(
+                    "Rebar Detailing & Envelope Cladding ({:.0} kg BBS)",
+                    rebar_kg
+                ),
+                day_start: 236,
+                day_end: 315,
+                planned_progress_pct: 32.0,
+                actual_progress_pct: 30.0,
+                manpower_count: 28,
+                equipment_count: 2,
+                concrete_volume_m3: 0.0,
+                color_rgb: (139, 92, 246),
+                wbs_code: "03.20".to_string(),
+                is_critical: false,
+            },
+            ConstructionSimulationPhase {
+                id: "4D-05".to_string(),
+                name: format!("Structural NDT, SHM Calibration & Handover ({} FEM)", members.len()),
+                day_start: 316,
+                day_end: 360,
+                planned_progress_pct: 10.0,
+                actual_progress_pct: 10.0,
+                manpower_count: 14,
+                equipment_count: 2,
+                concrete_volume_m3: 0.0,
+                color_rgb: (6, 182, 212),
+                wbs_code: "01.70".to_string(),
+                is_critical: false,
+            },
+        ];
+
+        self.wbs_catalog = vec![
+            WbsCostItem {
+                wbs_code: "02.31".to_string(),
+                description: format!("Isolated/Pile Cap Foundations ({} BIM footings)", footing_cnt),
+                division: "02 Substructure".to_string(),
+                unit: "pcs".to_string(),
+                quantity: footing_cnt as f64,
+                unit_price_idr: 14_500_000.0,
+                total_cost_idr: footing_cnt as f64 * 14_500_000.0,
+                progress_pct: 100.0,
+            },
+            WbsCostItem {
+                wbs_code: "03.30".to_string(),
+                description: "Cast-in-Place Concrete fc' 30 MPa (Columns, Beams, Slabs)".to_string(),
+                division: "03 Concrete".to_string(),
+                unit: "m³".to_string(),
+                quantity: conc_m3,
+                unit_price_idr: 1_950_000.0,
+                total_cost_idr: conc_m3 * 1_950_000.0,
+                progress_pct: 82.0,
+            },
+            WbsCostItem {
+                wbs_code: "03.20".to_string(),
+                description: format!("Deformed Rebar BBS ({} bar groups)", bim_project.rebars.len()),
+                division: "03 Concrete".to_string(),
+                unit: "kg".to_string(),
+                quantity: rebar_kg.max(100.0),
+                unit_price_idr: 18_800.0,
+                total_cost_idr: rebar_kg.max(100.0) * 18_800.0,
+                progress_pct: 74.0,
+            },
+            WbsCostItem {
+                wbs_code: "04.20".to_string(),
+                description: format!("Compound Architectural & Shear Walls ({} walls)", bim_project.walls.len()),
+                division: "04 Masonry & Walls".to_string(),
+                unit: "m²".to_string(),
+                quantity: wall_area_m2.max(10.0),
+                unit_price_idr: 685_000.0,
+                total_cost_idr: wall_area_m2.max(10.0) * 685_000.0,
+                progress_pct: 68.0,
+            },
+            WbsCostItem {
+                wbs_code: "05.12".to_string(),
+                description: format!("Structural Steel Frame WF ({} FEM members)", members.len()),
+                division: "05 Metals".to_string(),
+                unit: "kg".to_string(),
+                quantity: structural_steel_kg.max(500.0),
+                unit_price_idr: 26_500.0,
+                total_cost_idr: structural_steel_kg.max(500.0) * 26_500.0,
+                progress_pct: 60.0,
+            },
+        ];
+    }
+
     /// Extract parametric variables and evaluate full 5D quantities
     pub fn compute_takeoff(&self, variables: &[ParametricVariable]) -> Parametric5DTakeoff {
+        self.compute_takeoff_with_bim(variables, None, &[])
+    }
+
+    /// Extract parametric variables blended with live 3D BIM element volumes and FEM redundancy results.
+    pub fn compute_takeoff_with_bim(
+        &self,
+        variables: &[ParametricVariable],
+        bim_project: Option<&crate::core::BimProject>,
+        members: &[StructuralMember],
+    ) -> Parametric5DTakeoff {
         let get_val = |name: &str, default: f64| -> f64 {
             for v in variables {
                 if v.name.eq_ignore_ascii_case(name) || v.name.contains(name) {
@@ -333,11 +529,16 @@ impl PlanningView {
         };
 
         // Dimensions
-        let span_mm = get_val("L", 24000.0);
-        let span_m = span_mm / 1000.0;
-        let height_mm = get_val("H", 3200.0);
-        let height_m = height_mm / 1000.0;
+        let has_live_bim = bim_project.is_some_and(|p| !p.is_empty());
+        let mut span_m = get_val("L", 24000.0) / 1000.0;
+        let height_m = get_val("H", 3200.0) / 1000.0;
         let n_panels = get_val("n", 6.0).round().max(2.0) as usize;
+        if let Some(proj) = bim_project.filter(|p| !p.is_empty()) {
+            if let Some((a, b)) = proj.plan_extents_mm() {
+                let live_span = ((b[0] - a[0]).abs().max((b[1] - a[1]).abs()) / 1000.0).max(4.0);
+                span_m = live_span;
+            }
+        }
 
         // Material & Stiffness
         let density_kg_m3 = get_val("density", 7850.0);
@@ -362,14 +563,39 @@ impl PlanningView {
         let diag_vol = diagonal_length_m * 0.00929;
         let total_vol = (chord_vol + diag_vol) * 1.15;
         let total_steel_kg = total_vol * density_kg_m3;
-        let total_steel_ton = total_steel_kg / 1000.0;
 
         // Surface Area for Coating: AISC W14x90 perimeter ~1.45m, HSS8x8 ~0.80m
         let coating_surface_m2 = (chord_length_m * 1.45 + diagonal_length_m * 0.80) * 1.10;
 
-        // Bolts & Concrete
+        // Bolts & Concrete (blended with active BIM model when non-empty)
+        let mut total_steel_kg = total_steel_kg;
+        let mut concrete_footing_m3 = 2.0 * (15.0 + span_m * 0.75);
+        if has_live_bim {
+            if let Some(proj) = bim_project {
+                let bim_conc = proj.total_concrete_volume_m3();
+                if bim_conc > 0.1 {
+                    concrete_footing_m3 = bim_conc;
+                }
+                let bim_rebar = proj.total_rebar_weight_kg();
+                let bim_frame_steel: f64 = proj
+                    .runs
+                    .iter()
+                    .filter(|r| r.is_wf_profile)
+                    .map(|r| (r.start.dist(r.end) / 1000.0) * 48.0)
+                    .sum::<f64>()
+                    + proj
+                        .columns
+                        .iter()
+                        .filter(|c| c.is_wf_profile)
+                        .map(|_| 3.6 * 62.0)
+                        .sum::<f64>();
+                if bim_rebar + bim_frame_steel > 50.0 {
+                    total_steel_kg = bim_rebar + bim_frame_steel;
+                }
+            }
+        }
+        let total_steel_ton = total_steel_kg / 1000.0;
         let bolt_sets_count = (2 * n_panels + 1) * 16;
-        let concrete_footing_m3 = 2.0 * (15.0 + span_m * 0.75); // Substructure proportional to span
         let duration_days = 90 + (span_m * 2.0) as usize;
         let total_man_days = (total_steel_ton * 14.5) as usize;
 
@@ -398,8 +624,12 @@ impl PlanningView {
         let vat_cost = before_vat * (self.vat_percent as f64 / 100.0);
         let grand_total_rab = before_vat + vat_cost;
 
-        // System ARI indicator derived from stiffness and panel geometry
-        let predicted_system_ari = (0.75 + (height_m / span_m) * 1.25).min(0.965);
+        // System ARI indicator derived from live members when populated, else parametric geometry
+        let predicted_system_ari = if !members.is_empty() {
+            (members.iter().map(|m| m.ari).sum::<f64>() / members.len() as f64).clamp(0.0, 0.995)
+        } else {
+            (0.75 + (height_m / span_m) * 1.25).min(0.965)
+        };
 
         Parametric5DTakeoff {
             span_m,
@@ -448,7 +678,15 @@ impl PlanningView {
         features: &mut FeatureRegistry,
         active_pillar: &mut NavigationPillar,
     ) {
-        let takeoff = self.compute_takeoff(variables);
+        let cur_sig = (
+            bim_project.element_count(),
+            bim_project.rebars.len(),
+            members.len(),
+        );
+        if cur_sig != self.last_bim_sync_sig {
+            self.sync_from_bim(bim_project, members);
+        }
+        let takeoff = self.compute_takeoff_with_bim(variables, Some(bim_project), members);
 
         ui.vertical(|ui| {
             Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
@@ -2562,5 +2800,18 @@ mod tests {
         assert_eq!(tight.best_bidder_idx, 1);
         assert!(tight.ve_savings_val > 0.0);
         assert!(tight.ari_compliant);
+    }
+
+    #[test]
+    fn test_planning_live_bim_sync_and_takeoff() {
+        let mut pv = PlanningView::default();
+        let bim = crate::core::BimProject::sample_bimcraft_building();
+        pv.sync_from_bim(&bim, &[]);
+        assert_eq!(pv.simulation_phases.len(), 5);
+        assert_eq!(pv.wbs_catalog.len(), 5);
+
+        let live_takeoff = pv.compute_takeoff_with_bim(&[], Some(&bim), &[]);
+        assert!((live_takeoff.concrete_footing_m3 - bim.total_concrete_volume_m3()).abs() < 1e-3);
+        assert!(live_takeoff.grand_total_rab > 0.0);
     }
 }

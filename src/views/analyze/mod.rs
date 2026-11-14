@@ -359,6 +359,7 @@ pub struct AnalyzeView {
     pub request_bim_fem_sync: bool,
     pub last_bim_sync_label: String,
     pub synced_bim_element_count: usize,
+    pub last_modal_bim_sig: (usize, usize, usize),
 }
 
 impl Default for AnalyzeView {
@@ -558,18 +559,48 @@ impl Default for AnalyzeView {
             request_bim_fem_sync: false,
             last_bim_sync_label: "Auto-sync active".to_string(),
             synced_bim_element_count: 0,
+            last_modal_bim_sig: (usize::MAX, 0, 0),
         }
     }
 }
 
 impl AnalyzeView {
+    /// Resolves the active structural FEM model from the live `BimProject`, falling back to
+    /// the built-in Warren Truss reference model when no BIM frame elements exist yet.
+    pub fn resolve_active_model(
+        bim_project: &crate::core::BimProject,
+    ) -> (crate::core::StructuralModel, bool) {
+        if !bim_project.is_empty() {
+            let fem = bim_project.to_structural_model();
+            if fem.elements.len() >= 2 && fem.nodes.len() >= 2 {
+                return (fem, true);
+            }
+        }
+        let mut engine = crate::core::ParametricEngine::new();
+        let fallback = engine
+            .generate_warren_truss()
+            .unwrap_or_else(|_| crate::core::StructuralModel::new("Reference Model"));
+        (fallback, false)
+    }
+
     pub fn show(
         &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
+        let cur_sig = (
+            bim_project.element_count(),
+            bim_project.columns.len(),
+            bim_project.runs.len(),
+        );
+        if cur_sig != self.last_modal_bim_sig {
+            self.last_modal_bim_sig = cur_sig;
+            self.modal_report = None;
+            self.last_cascade_report = None;
+        }
         ui.vertical(|ui| {
             Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
                 let full_w = ui.available_width().max(160.0);
@@ -631,14 +662,14 @@ impl AnalyzeView {
                 // 3. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
                     AnalyzeSubTab::RedundancySvd => self.render_redundancy_and_svd(ui, theme, members),
-                    AnalyzeSubTab::MemberCriticality => self.render_member_criticality(ui, theme, members),
+                    AnalyzeSubTab::MemberCriticality => self.render_member_criticality(ui, theme, members, bim_project),
                     AnalyzeSubTab::DisplacementForces => self.render_displacement_and_forces(ui, theme, members),
                     AnalyzeSubTab::Frame3dInteraction => self.render_frame_3d_interaction(ui, theme, members),
                     AnalyzeSubTab::ConcretePmInteraction => self.render_concrete_pm_interaction(ui, theme),
-                    AnalyzeSubTab::CascadingCollapse => self.render_cascading_collapse(ui, theme),
-                    AnalyzeSubTab::NonlinearPushover => self.render_nonlinear_pushover(ui, theme),
-                    AnalyzeSubTab::ModalDynamics => self.render_modal_dynamics(ui, theme),
-                    AnalyzeSubTab::GeotechSsi => self.render_geotech_ssi(ui, theme),
+                    AnalyzeSubTab::CascadingCollapse => self.render_cascading_collapse(ui, theme, bim_project),
+                    AnalyzeSubTab::NonlinearPushover => self.render_nonlinear_pushover(ui, theme, bim_project),
+                    AnalyzeSubTab::ModalDynamics => self.render_modal_dynamics(ui, theme, bim_project),
+                    AnalyzeSubTab::GeotechSsi => self.render_geotech_ssi(ui, theme, bim_project),
                     AnalyzeSubTab::SteelConnection => self.render_steel_connection(ui, theme),
                     AnalyzeSubTab::WindEngineering => self.render_wind_engineering(ui, theme),
                     AnalyzeSubTab::CompositeDesign => self.render_composite_design(ui, theme),
@@ -657,5 +688,23 @@ impl AnalyzeView {
                 ui.add_space(64.0);
             });
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_analyze_view_live_bim_model_resolution() {
+        let empty = crate::core::BimProject::empty();
+        let (fallback_model, is_live_empty) = AnalyzeView::resolve_active_model(&empty);
+        assert!(!is_live_empty);
+        assert!(!fallback_model.elements.is_empty());
+
+        let sample = crate::core::BimProject::sample_bimcraft_building();
+        let (live_model, is_live) = AnalyzeView::resolve_active_model(&sample);
+        assert!(is_live);
+        assert!(live_model.elements.len() >= 4);
     }
 }

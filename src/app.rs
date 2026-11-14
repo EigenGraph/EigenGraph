@@ -461,14 +461,33 @@ impl App for EigenGraphApp {
 
         // Handle Text-to-BIM commands dispatched from Dynamic Island Copilot or AI Firm
         if let Some(cmd) = self.ai_assistant_view.pending_bim_nl_command.take() {
-            let result_msg = match self.build_view.bim_bus.execute_natural_language(&cmd) {
-                Ok(msg) => {
-                    self.parametric_view.bim_bus.project = self.build_view.bim_bus.project.clone();
-                    self.build_view.bim_console_logs.push(msg.clone());
-                    self.build_view.modify_status_msg = Some(msg.clone());
-                    msg
+            let result_msg = if cmd == "__repair_critical__" {
+                match self.build_view.bim_bus.repair_critical_members(&self.members) {
+                    Ok(rep) => {
+                        self.parametric_view.bim_bus.project = self.build_view.bim_bus.project.clone();
+                        self.build_view.bim_console_logs.push(rep.summary.clone());
+                        self.build_view.modify_status_msg = Some(format!(
+                            "Auto-Repaired: Min ARI {:.3}->{:.3}, Max DCR {:.0}%->{:.0}%",
+                            rep.before_min_ari,
+                            rep.after_min_ari,
+                            rep.before_max_dcr * 100.0,
+                            rep.after_max_dcr * 100.0
+                        ));
+                        self.sync_bim_to_fem();
+                        rep.summary
+                    }
+                    Err(err) => err,
                 }
-                Err(err) => err,
+            } else {
+                match self.build_view.bim_bus.execute_natural_language(&cmd) {
+                    Ok(msg) => {
+                        self.parametric_view.bim_bus.project = self.build_view.bim_bus.project.clone();
+                        self.build_view.bim_console_logs.push(msg.clone());
+                        self.build_view.modify_status_msg = Some(msg.clone());
+                        msg
+                    }
+                    Err(err) => err,
+                }
             };
             self.ai_assistant_view
                 .chat_history
@@ -882,6 +901,7 @@ impl App for EigenGraphApp {
                             ui,
                             &self.theme,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &mut self.feature_registry,
                         );
                     }
@@ -1302,10 +1322,10 @@ impl EigenGraphApp {
                     .show(ui, |ui| {
                         for (keys, desc) in [
                             ("Space", "Freeze / Unfreeze Canvas scroll lock"),
-                            ("L / R / C / D / T / E", "2D Line, Rectangle, Circle, Dimension, Callout, Eraser"),
+                            ("L / R / C / D / T / E / V", "2D Line, Rect, Circle, Dim, Callout, Eraser, Box Marquee"),
                             ("W / B / C / F", "3D Author Wall, Beam, Column, Footing"),
                             ("M / O / X / Del", "Move (+Step), Offset (+500mm), Mirror X, Delete"),
-                            ("F8 / F3 / Z / Esc", "Ortho lock, Grid Snap, Fit Model, Cancel / Select"),
+                            ("F8 / F3 / F4 / Z / Esc", "Ortho, Grid Snap, OSNAP, Fit Model, Cancel / Select"),
                             ("Ctrl+Z / Ctrl+Y", "Undo / Redo CAD or BIM command"),
                             ("Ctrl+K or F1", "Open or close this Shortcuts & Quick-Jump modal"),
                         ] {
@@ -1729,6 +1749,7 @@ impl EigenGraphApp {
             self.members.clear();
             self.analyze_view.synced_bim_element_count = 0;
             self.analyze_view.last_bim_sync_label = "Idle (0 BIM elements)".to_string();
+            self.planning_view.sync_from_bim(&self.build_view.bim_bus.project, &self.members);
             return;
         }
         let fem = proj.to_structural_model();
@@ -1736,6 +1757,7 @@ impl EigenGraphApp {
             self.members.clear();
             self.analyze_view.synced_bim_element_count = 0;
             self.analyze_view.last_bim_sync_label = "Waiting for frame/wall FEM elements".to_string();
+            self.planning_view.sync_from_bim(&self.build_view.bim_bus.project, &self.members);
             return;
         }
         let stamp = crate::core::web_bridge::unix_timestamp_label();
@@ -1795,6 +1817,8 @@ impl EigenGraphApp {
                 );
             }
         }
+        self.planning_view
+            .sync_from_bim(&self.build_view.bim_bus.project, &self.members);
     }
 
     fn apply_typology_template(&mut self, kind: crate::views::my_project::ProjectTemplateKind) {

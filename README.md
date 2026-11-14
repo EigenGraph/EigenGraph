@@ -23,7 +23,7 @@
 
 ## 🏛️ Overview
 
-**EigenGraph** (`EigenGraph/EigenGraph`) is a client-side **WebAssembly + WebGL2** 10D BIM and structural mechanics workstation compiled cleanly from Rust (`v0.4.1`, Phase 41 Full Canvas Width Parity & Zero Compiler Warnings, CAD Precision Tools, Polar/Relative CLI `@dist<deg` & `@dx,dy`, Global `Ctrl/Cmd+K` Shortcuts & Module Quick-Jump Modal, and All 12 Final Phase 35 Engineering Suites — 74/74 Complete Roadmap Active: NSGA-II Pareto Structural Optimizer, AISC DG-11 Vibration & EN 1993-1-9 Miner Fatigue, Point Cloud As-Built Deviation FF/FL, Bid Leveling & ARI-Guarded Value Engineering, Circular Material Passport DfD, UAV Crack & Spalling CMMS Mapper, Digital PTW Wind Interlock & Evacuation Drills, BIM-Pinned RFI SLA Tracker, Parametric 3DCP Concrete G-Code Slicer, Fick's 2nd Law Chloride/Carbonation Durability, ATC-20 Post-Earthquake Triage, and Pure-Rust SHA-256 Handover Manifest Packager) and deployed automatically to **Cloudflare Workers**.
+**EigenGraph** (`EigenGraph/EigenGraph`) is a client-side **WebAssembly + WebGL2** 10D BIM and structural mechanics workstation compiled cleanly from Rust (`v0.4.2`, Phase 42 Live `BimProject` FEA Binding & 3D/2D ARI Heatmaps, Advanced CAD Precision with OSNAP `F4` / Window+Crossing Marquee / `GRID` / `ARRAY` / `PROMOTE` to 3D BIM, Reactive 4D/5D/9D BIM Sync, Closed-Loop EigenAI Structural Auto-Repair with Undo, Installable Offline-First Web PWA, and Lean Construction Cutting Optimization Parameters Width Parity) and deployed automatically to **Cloudflare Workers**.
 
 ### 15 Engineering Modules
 1. **📁 My Library** — Project records, parametric component catalog, interactive HTML5 3D viewer & Markdown dossier browser downloads.

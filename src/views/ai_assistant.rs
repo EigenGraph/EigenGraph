@@ -289,6 +289,28 @@ impl AiAssistantView {
                         {
                             self.chat_history.clear();
                         }
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Wrench,
+                            "Auto-Repair ARI",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_green,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .on_hover_text("Automatically upsize critical columns/beams, inject stabilizer bracing, re-run FEM/ARI, and support Ctrl+Z undo")
+                        .clicked()
+                        {
+                            self.execute_prompt(
+                                "repair critical members",
+                                active_pillar,
+                                members,
+                                projects,
+                                db_components,
+                            );
+                        }
                     });
                 });
 
@@ -423,6 +445,7 @@ impl AiAssistantView {
                 (AppIcon::RulerSquare, "Warren Truss 24m", "Instantiate a 24m span Warren truss with 6 panels into workspace."),
             ],
             NavigationPillar::AnalysisSimulation => &[
+                (AppIcon::Wrench, "Auto-Repair ARI", "repair critical members"),
                 (AppIcon::Bolt, "SVD Kinematic Guard", "Check minimum singular value sigma_min and verify absence of nullspace mechanisms."),
                 (AppIcon::Pulse, "Seismic Shake Table", "Propagate dynamic ground motion accelerograms and record interstory drift."),
                 (AppIcon::Wind, "Wind Particle Streamlines", "Simulate MWFRS facade surface pressure and aerodynamic vortex suction."),
@@ -495,6 +518,17 @@ impl AiAssistantView {
         });
 
         let p_lower = prompt.to_lowercase();
+        let is_repair_cmd = p_lower.contains("repair critical")
+            || p_lower.contains("auto-repair")
+            || p_lower.contains("upgrade critical")
+            || p_lower.contains("optimize ari")
+            || p_lower.contains("fix dcr")
+            || p_lower.contains("auto-remedi")
+            || p_lower.contains("apply bracing")
+            || p_lower.contains("install bracing")
+            || p_lower.contains("perkuat struktur")
+            || p_lower.contains("perbaiki struktur")
+            || p_lower.trim() == "repair";
         let is_nl_bim = p_lower.starts_with("portal ")
             || p_lower.starts_with("frame ")
             || p_lower.starts_with("box ")
@@ -507,7 +541,11 @@ impl AiAssistantView {
             || p_lower.starts_with("level ")
             || p_lower.starts_with("create portal")
             || matches!(p_lower.trim(), "rebar" | "reinforce" | "clear" | "reset");
-        let response_msg = if is_nl_bim {
+        let response_msg = if is_repair_cmd {
+            self.pending_bim_nl_command = Some("__repair_critical__".to_string());
+            "[EigenAI Closed-Loop Structural Optimizer]: Auditing live BIM + FEM member utilization & ARI to execute transactional strengthening..."
+                .to_string()
+        } else if is_nl_bim {
             self.pending_bim_nl_command = Some(prompt.trim().to_string());
             format!(
                 "[EigenAI Text-to-BIM Bus]: Queued generative command '{}' for live BimCommandBus execution.",

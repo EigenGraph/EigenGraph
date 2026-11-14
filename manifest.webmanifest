@@ -1,0 +1,20 @@
+{
+  "name": "EigenGraph — 10D BIM & Structural Analytics",
+  "short_name": "EigenGraph",
+  "description": "10D BIM, Adjusted Redundancy Index (ARI), SVD Kinematic Mechanism Guards, 4D/5D Scheduling & FEA Workstation.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "orientation": "any",
+  "categories": ["productivity", "utilities", "education"],
+  "icons": [
+    {
+      "src": "/assets/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

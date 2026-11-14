@@ -15,10 +15,36 @@ use crate::models::{NavigationPillar, ParametricVariable, StructuralMember};
 use crate::theme::{MacTheme, ThemeMode};
 use crate::ui_kit;
 
+/// Object Snap geometry mode detected near cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum OsnapKind {
+    #[default]
+    None,
+    Grid,
+    Endpoint,
+    Midpoint,
+    Perpendicular,
+    Intersection,
+}
+
+impl OsnapKind {
+    pub fn short_tag(self) -> &'static str {
+        match self {
+            Self::None => "",
+            Self::Grid => "GRID",
+            Self::Endpoint => "END",
+            Self::Midpoint => "MID",
+            Self::Perpendicular => "PERP",
+            Self::Intersection => "INT",
+        }
+    }
+}
+
 /// Interactive drafting and markup tools available across every sidebar module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UniversalCanvasTool {
     SelectPan,
+    BoxSelect,
     Freehand,
     Line,
     Rectangle,
@@ -29,8 +55,9 @@ pub enum UniversalCanvasTool {
 }
 
 impl UniversalCanvasTool {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::SelectPan,
+        Self::BoxSelect,
         Self::Freehand,
         Self::Line,
         Self::Rectangle,
@@ -43,6 +70,7 @@ impl UniversalCanvasTool {
     pub fn app_icon(self) -> AppIcon {
         match self {
             Self::SelectPan => AppIcon::CursorPan,
+            Self::BoxSelect => AppIcon::SelectArrow,
             Self::Freehand => AppIcon::Pencil,
             Self::Line => AppIcon::LineSeg,
             Self::Rectangle => AppIcon::RectShape,
@@ -56,6 +84,7 @@ impl UniversalCanvasTool {
     pub fn short_label(self) -> &'static str {
         match self {
             Self::SelectPan => "Pan",
+            Self::BoxSelect => "BoxSel",
             Self::Freehand => "Draw",
             Self::Line => "Line",
             Self::Rectangle => "Rect",
@@ -68,7 +97,8 @@ impl UniversalCanvasTool {
 
     pub fn tooltip(self) -> &'static str {
         match self {
-            Self::SelectPan => "Pan canvas with primary drag (or right-drag in any tool)",
+            Self::SelectPan => "Pan canvas with primary drag (or right-drag in any tool); click to select 1 entity",
+            Self::BoxSelect => "Marquee select: drag Left->Right (Blue Window enclosed) or Right->Left (Green Crossing) [V]",
             Self::Freehand => "Freehand engineering sketch synced across all 15 modules",
             Self::Line => "Draw straight vector line segment (click-drag)",
             Self::Rectangle => "Draw rectangular zone / bay boundary (click-drag)",
@@ -223,6 +253,7 @@ pub struct CadShortcutFeedback {
     pub redo: bool,
     pub toggle_ortho: bool,
     pub toggle_snap: bool,
+    pub toggle_osnap: bool,
     pub fit_model: bool,
     pub letter_key: Option<char>,
 }
@@ -237,6 +268,9 @@ pub struct UniversalCanvasState {
     pub stroke_width: f32,
     pub show_grid: bool,
     pub snap_to_grid: bool,
+    pub osnap_enabled: bool,
+    pub last_osnap_kind: OsnapKind,
+    pub last_osnap_radius_mm: f64,
     pub ortho_mode: bool,
     pub grid_spacing_mm: f64,
     pub show_bim_base_layer: bool,
@@ -250,7 +284,10 @@ pub struct UniversalCanvasState {
     pub undo_stack: Vec<Vec<CanvasEntity>>,
     pub redo_stack: Vec<Vec<CanvasEntity>>,
     pub selected_entity_id: Option<usize>,
+    pub selected_entity_ids: Vec<usize>,
     pending_start_mm: Option<[f64; 2]>,
+    marquee_anchor_mm: Option<[f64; 2]>,
+    marquee_current_mm: Option<[f64; 2]>,
     active_freehand_mm: Vec<[f64; 2]>,
     pub cursor_world_mm: [f64; 2],
     pub cursor_lat_lon: (f64, f64),
@@ -288,6 +325,9 @@ impl Default for UniversalCanvasState {
             stroke_width: 2.2,
             show_grid: true,
             snap_to_grid: true,
+            osnap_enabled: true,
+            last_osnap_kind: OsnapKind::None,
+            last_osnap_radius_mm: 450.0,
             ortho_mode: false,
             grid_spacing_mm: 500.0,
             show_bim_base_layer: true,
@@ -301,7 +341,10 @@ impl Default for UniversalCanvasState {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             selected_entity_id: None,
+            selected_entity_ids: Vec::new(),
             pending_start_mm: None,
+            marquee_anchor_mm: None,
+            marquee_current_mm: None,
             active_freehand_mm: Vec::new(),
             cursor_world_mm: [0.0, 0.0],
             cursor_lat_lon: (15.0, 15.0),
@@ -683,6 +726,7 @@ impl UniversalCanvasState {
                 || (i.modifiers.command && i.modifiers.shift && i.key_pressed(egui::Key::Z));
             fb.toggle_ortho = i.key_pressed(egui::Key::F8);
             fb.toggle_snap = i.key_pressed(egui::Key::F3);
+            fb.toggle_osnap = i.key_pressed(egui::Key::F4);
 
             if !i.modifiers.command && !i.modifiers.ctrl && !i.modifiers.alt {
                 if i.key_pressed(egui::Key::Z) {
@@ -739,160 +783,39 @@ impl UniversalCanvasState {
         self.entities.len().checked_sub(1)
     }
 
-    /// Translates the selected (or latest) entity by `(dx_mm, dy_mm)` with undo support.
-    pub fn translate_selected_or_last(&mut self, dx_mm: f64, dy_mm: f64) -> bool {
-        let Some(idx) = self.target_entity_idx() else {
-            return false;
-        };
-        self.push_undo();
-        if let Some(ent) = self.entities.get_mut(idx) {
-            match &mut ent.kind {
-                CanvasShapeKind::Line { start_mm, end_mm }
-                | CanvasShapeKind::Dimension { start_mm, end_mm } => {
-                    start_mm[0] += dx_mm;
-                    start_mm[1] += dy_mm;
-                    end_mm[0] += dx_mm;
-                    end_mm[1] += dy_mm;
-                }
-                CanvasShapeKind::Rectangle { min_mm, max_mm } => {
-                    min_mm[0] += dx_mm;
-                    min_mm[1] += dy_mm;
-                    max_mm[0] += dx_mm;
-                    max_mm[1] += dy_mm;
-                }
-                CanvasShapeKind::Circle { center_mm, .. } => {
-                    center_mm[0] += dx_mm;
-                    center_mm[1] += dy_mm;
-                }
-                CanvasShapeKind::Freehand { points_mm } => {
-                    for p in points_mm {
-                        p[0] += dx_mm;
-                        p[1] += dy_mm;
-                    }
-                }
-                CanvasShapeKind::Callout { pos_mm, .. } => {
-                    pos_mm[0] += dx_mm;
-                    pos_mm[1] += dy_mm;
-                }
-            }
-            self.selected_entity_id = Some(ent.id);
-            true
+    fn target_entity_indices(&self) -> Vec<usize> {
+        let mut indices: Vec<usize> = if !self.selected_entity_ids.is_empty() {
+            self.entities
+                .iter()
+                .enumerate()
+                .filter(|(_, e)| self.selected_entity_ids.contains(&e.id))
+                .map(|(i, _)| i)
+                .collect()
         } else {
-            false
-        }
-    }
-
-    /// Creates a parallel/outward offset duplicate of the selected (or latest) entity.
-    pub fn offset_selected_or_last(&mut self, offset_mm: f64) -> bool {
-        let Some(idx) = self.target_entity_idx() else {
-            return false;
+            Vec::new()
         };
-        let mut cloned = self.entities[idx].clone();
-        match &mut cloned.kind {
-            CanvasShapeKind::Line { start_mm, end_mm }
-            | CanvasShapeKind::Dimension { start_mm, end_mm } => {
-                let vx = end_mm[0] - start_mm[0];
-                let vy = end_mm[1] - start_mm[1];
-                let len = vx.hypot(vy).max(1.0);
-                let nx = -vy / len * offset_mm;
-                let ny = vx / len * offset_mm;
-                start_mm[0] += nx;
-                start_mm[1] += ny;
-                end_mm[0] += nx;
-                end_mm[1] += ny;
-            }
-            CanvasShapeKind::Rectangle { min_mm, max_mm } => {
-                min_mm[0] -= offset_mm;
-                min_mm[1] -= offset_mm;
-                max_mm[0] += offset_mm;
-                max_mm[1] += offset_mm;
-            }
-            CanvasShapeKind::Circle { radius_mm, .. } => {
-                *radius_mm = (*radius_mm + offset_mm).max(100.0);
-            }
-            CanvasShapeKind::Freehand { points_mm } => {
-                for p in points_mm {
-                    p[0] += offset_mm;
-                    p[1] += offset_mm;
-                }
-            }
-            CanvasShapeKind::Callout { pos_mm, .. } => {
-                pos_mm[0] += offset_mm;
-                pos_mm[1] += offset_mm;
+        if indices.is_empty() {
+            if let Some(idx) = self.target_entity_idx() {
+                indices.push(idx);
             }
         }
-        self.push_undo();
-        let new_id = self.next_entity_id;
-        self.next_entity_id += 1;
-        cloned.id = new_id;
-        self.entities.push(cloned);
-        self.selected_entity_id = Some(new_id);
-        true
+        indices
     }
 
-    /// Creates a mirrored duplicate of the selected (or latest) entity across vertical axis `x = mirror_x_mm`.
-    pub fn mirror_selected_or_last(&mut self, mirror_x_mm: f64) -> bool {
-        let Some(idx) = self.target_entity_idx() else {
-            return false;
-        };
-        let mut cloned = self.entities[idx].clone();
-        let mx = |x: f64| 2.0 * mirror_x_mm - x;
-        match &mut cloned.kind {
-            CanvasShapeKind::Line { start_mm, end_mm }
-            | CanvasShapeKind::Dimension { start_mm, end_mm } => {
-                start_mm[0] = mx(start_mm[0]);
-                end_mm[0] = mx(end_mm[0]);
-            }
-            CanvasShapeKind::Rectangle { min_mm, max_mm } => {
-                let nx0 = mx(max_mm[0]);
-                let nx1 = mx(min_mm[0]);
-                min_mm[0] = nx0.min(nx1);
-                max_mm[0] = nx0.max(nx1);
-            }
-            CanvasShapeKind::Circle { center_mm, .. } => {
-                center_mm[0] = mx(center_mm[0]);
-            }
-            CanvasShapeKind::Freehand { points_mm } => {
-                for p in points_mm {
-                    p[0] = mx(p[0]);
-                }
-            }
-            CanvasShapeKind::Callout { pos_mm, .. } => {
-                pos_mm[0] = mx(pos_mm[0]);
-            }
-        }
-        self.push_undo();
-        let new_id = self.next_entity_id;
-        self.next_entity_id += 1;
-        cloned.id = new_id;
-        self.entities.push(cloned);
-        self.selected_entity_id = Some(new_id);
-        true
+    fn is_entity_selected(&self, id: usize) -> bool {
+        self.selected_entity_id == Some(id) || self.selected_entity_ids.contains(&id)
     }
 
-    /// Parses CAD Cartesian (`@dx,dy` or `dx,dy`) or polar (`@dist<deg` or `dist<deg`) coordinate vectors in mm.
-    pub fn parse_cad_delta_expr(raw: &str) -> Option<(f64, f64)> {
-        let s = raw.trim().trim_start_matches('@');
-        if let Some((d_str, a_str)) = s.split_once('<') {
-            let dist = d_str.trim().parse::<f64>().ok()?;
-            let rad = a_str.trim().parse::<f64>().ok()?.to_radians();
-            return Some((dist * rad.cos(), dist * rad.sin()));
+    fn set_single_selection(&mut self, id: Option<usize>) {
+        self.selected_entity_id = id;
+        self.selected_entity_ids.clear();
+        if let Some(eid) = id {
+            self.selected_entity_ids.push(eid);
         }
-        if let Some((x_str, y_str)) = s.split_once(',') {
-            let dx = x_str.trim().parse::<f64>().ok()?;
-            let dy = y_str.trim().parse::<f64>().ok()?;
-            return Some((dx, dy));
-        }
-        None
     }
 
-    /// Creates a displaced duplicate of the selected (or latest) entity by `(dx_mm, dy_mm)` with undo support.
-    pub fn duplicate_selected_or_last(&mut self, dx_mm: f64, dy_mm: f64) -> bool {
-        let Some(idx) = self.target_entity_idx() else {
-            return false;
-        };
-        let mut cloned = self.entities[idx].clone();
-        match &mut cloned.kind {
+    fn translate_kind(kind: &mut CanvasShapeKind, dx_mm: f64, dy_mm: f64) {
+        match kind {
             CanvasShapeKind::Line { start_mm, end_mm }
             | CanvasShapeKind::Dimension { start_mm, end_mm } => {
                 start_mm[0] += dx_mm;
@@ -921,20 +844,226 @@ impl UniversalCanvasState {
                 pos_mm[1] += dy_mm;
             }
         }
+    }
+
+    fn entity_aabb(kind: &CanvasShapeKind) -> ([f64; 2], [f64; 2]) {
+        match kind {
+            CanvasShapeKind::Line { start_mm, end_mm }
+            | CanvasShapeKind::Dimension { start_mm, end_mm } => (
+                [start_mm[0].min(end_mm[0]), start_mm[1].min(end_mm[1])],
+                [start_mm[0].max(end_mm[0]), start_mm[1].max(end_mm[1])],
+            ),
+            CanvasShapeKind::Rectangle { min_mm, max_mm } => (*min_mm, *max_mm),
+            CanvasShapeKind::Circle { center_mm, radius_mm } => (
+                [center_mm[0] - radius_mm, center_mm[1] - radius_mm],
+                [center_mm[0] + radius_mm, center_mm[1] + radius_mm],
+            ),
+            CanvasShapeKind::Freehand { points_mm } => {
+                if points_mm.is_empty() {
+                    ([0.0, 0.0], [0.0, 0.0])
+                } else {
+                    let mut mn = points_mm[0];
+                    let mut mx = points_mm[0];
+                    for p in points_mm {
+                        mn[0] = mn[0].min(p[0]);
+                        mn[1] = mn[1].min(p[1]);
+                        mx[0] = mx[0].max(p[0]);
+                        mx[1] = mx[1].max(p[1]);
+                    }
+                    (mn, mx)
+                }
+            }
+            CanvasShapeKind::Callout { pos_mm, .. } => (*pos_mm, *pos_mm),
+        }
+    }
+
+    /// Selects entities inside marquee `[a_mm, b_mm]`. Left->Right (`b_mm[0] >= a_mm[0]`) uses Window (fully enclosed); Right->Left (`b_mm[0] < a_mm[0]`) uses Crossing (intersecting/overlapping).
+    pub fn select_marquee(&mut self, a_mm: [f64; 2], b_mm: [f64; 2]) -> usize {
+        let min_x = a_mm[0].min(b_mm[0]);
+        let max_x = a_mm[0].max(b_mm[0]);
+        let min_y = a_mm[1].min(b_mm[1]);
+        let max_y = a_mm[1].max(b_mm[1]);
+        let is_window = b_mm[0] >= a_mm[0];
+
+        self.selected_entity_ids.clear();
+        for ent in &self.entities {
+            let (e_min, e_max) = Self::entity_aabb(&ent.kind);
+            let matched = if is_window {
+                e_min[0] >= min_x && e_max[0] <= max_x && e_min[1] >= min_y && e_max[1] <= max_y
+            } else {
+                e_max[0] >= min_x && e_min[0] <= max_x && e_max[1] >= min_y && e_min[1] <= max_y
+            };
+            if matched {
+                self.selected_entity_ids.push(ent.id);
+            }
+        }
+        self.selected_entity_id = self.selected_entity_ids.first().copied();
+        self.selected_entity_ids.len()
+    }
+
+    /// Translates the selected entities (or latest entity) by `(dx_mm, dy_mm)` with undo support.
+    pub fn translate_selected_or_last(&mut self, dx_mm: f64, dy_mm: f64) -> bool {
+        let indices = self.target_entity_indices();
+        if indices.is_empty() {
+            return false;
+        }
         self.push_undo();
-        let new_id = self.next_entity_id;
-        self.next_entity_id += 1;
-        cloned.id = new_id;
-        self.entities.push(cloned);
-        self.selected_entity_id = Some(new_id);
+        let mut moved_ids = Vec::with_capacity(indices.len());
+        for idx in indices {
+            if let Some(ent) = self.entities.get_mut(idx) {
+                Self::translate_kind(&mut ent.kind, dx_mm, dy_mm);
+                moved_ids.push(ent.id);
+            }
+        }
+        self.selected_entity_ids = moved_ids;
+        self.selected_entity_id = self.selected_entity_ids.first().copied();
         true
     }
 
-    /// Rotates the selected (or latest) entity around its centroid by `angle_deg` degrees with undo support.
-    pub fn rotate_selected_or_last(&mut self, angle_deg: f64) -> bool {
-        let Some(idx) = self.target_entity_idx() else {
+    /// Creates a parallel/outward offset duplicate of the selected entities (or latest entity).
+    pub fn offset_selected_or_last(&mut self, offset_mm: f64) -> bool {
+        let indices = self.target_entity_indices();
+        if indices.is_empty() {
             return false;
-        };
+        }
+        self.push_undo();
+        let mut new_ids = Vec::with_capacity(indices.len());
+        for idx in indices {
+            let mut cloned = self.entities[idx].clone();
+            match &mut cloned.kind {
+                CanvasShapeKind::Line { start_mm, end_mm }
+                | CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                    let vx = end_mm[0] - start_mm[0];
+                    let vy = end_mm[1] - start_mm[1];
+                    let len = vx.hypot(vy).max(1.0);
+                    let nx = -vy / len * offset_mm;
+                    let ny = vx / len * offset_mm;
+                    start_mm[0] += nx;
+                    start_mm[1] += ny;
+                    end_mm[0] += nx;
+                    end_mm[1] += ny;
+                }
+                CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                    min_mm[0] -= offset_mm;
+                    min_mm[1] -= offset_mm;
+                    max_mm[0] += offset_mm;
+                    max_mm[1] += offset_mm;
+                }
+                CanvasShapeKind::Circle { radius_mm, .. } => {
+                    *radius_mm = (*radius_mm + offset_mm).max(100.0);
+                }
+                CanvasShapeKind::Freehand { points_mm } => {
+                    for p in points_mm {
+                        p[0] += offset_mm;
+                        p[1] += offset_mm;
+                    }
+                }
+                CanvasShapeKind::Callout { pos_mm, .. } => {
+                    pos_mm[0] += offset_mm;
+                    pos_mm[1] += offset_mm;
+                }
+            }
+            let new_id = self.next_entity_id;
+            self.next_entity_id += 1;
+            cloned.id = new_id;
+            self.entities.push(cloned);
+            new_ids.push(new_id);
+        }
+        self.selected_entity_ids = new_ids;
+        self.selected_entity_id = self.selected_entity_ids.first().copied();
+        true
+    }
+
+    /// Creates a mirrored duplicate of the selected entities (or latest entity) across vertical axis `x = mirror_x_mm`.
+    pub fn mirror_selected_or_last(&mut self, mirror_x_mm: f64) -> bool {
+        let indices = self.target_entity_indices();
+        if indices.is_empty() {
+            return false;
+        }
+        self.push_undo();
+        let mx = |x: f64| 2.0 * mirror_x_mm - x;
+        let mut new_ids = Vec::with_capacity(indices.len());
+        for idx in indices {
+            let mut cloned = self.entities[idx].clone();
+            match &mut cloned.kind {
+                CanvasShapeKind::Line { start_mm, end_mm }
+                | CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                    start_mm[0] = mx(start_mm[0]);
+                    end_mm[0] = mx(end_mm[0]);
+                }
+                CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                    let nx0 = mx(max_mm[0]);
+                    let nx1 = mx(min_mm[0]);
+                    min_mm[0] = nx0.min(nx1);
+                    max_mm[0] = nx0.max(nx1);
+                }
+                CanvasShapeKind::Circle { center_mm, .. } => {
+                    center_mm[0] = mx(center_mm[0]);
+                }
+                CanvasShapeKind::Freehand { points_mm } => {
+                    for p in points_mm {
+                        p[0] = mx(p[0]);
+                    }
+                }
+                CanvasShapeKind::Callout { pos_mm, .. } => {
+                    pos_mm[0] = mx(pos_mm[0]);
+                }
+            }
+            let new_id = self.next_entity_id;
+            self.next_entity_id += 1;
+            cloned.id = new_id;
+            self.entities.push(cloned);
+            new_ids.push(new_id);
+        }
+        self.selected_entity_ids = new_ids;
+        self.selected_entity_id = self.selected_entity_ids.first().copied();
+        true
+    }
+
+    /// Parses CAD Cartesian (`@dx,dy` or `dx,dy`) or polar (`@dist<deg` or `dist<deg`) coordinate vectors in mm.
+    pub fn parse_cad_delta_expr(raw: &str) -> Option<(f64, f64)> {
+        let s = raw.trim().trim_start_matches('@');
+        if let Some((d_str, a_str)) = s.split_once('<') {
+            let dist = d_str.trim().parse::<f64>().ok()?;
+            let rad = a_str.trim().parse::<f64>().ok()?.to_radians();
+            return Some((dist * rad.cos(), dist * rad.sin()));
+        }
+        if let Some((x_str, y_str)) = s.split_once(',') {
+            let dx = x_str.trim().parse::<f64>().ok()?;
+            let dy = y_str.trim().parse::<f64>().ok()?;
+            return Some((dx, dy));
+        }
+        None
+    }
+
+    /// Creates a displaced duplicate of the selected entities (or latest entity) by `(dx_mm, dy_mm)` with undo support.
+    pub fn duplicate_selected_or_last(&mut self, dx_mm: f64, dy_mm: f64) -> bool {
+        let indices = self.target_entity_indices();
+        if indices.is_empty() {
+            return false;
+        }
+        self.push_undo();
+        let mut new_ids = Vec::with_capacity(indices.len());
+        for idx in indices {
+            let mut cloned = self.entities[idx].clone();
+            Self::translate_kind(&mut cloned.kind, dx_mm, dy_mm);
+            let new_id = self.next_entity_id;
+            self.next_entity_id += 1;
+            cloned.id = new_id;
+            self.entities.push(cloned);
+            new_ids.push(new_id);
+        }
+        self.selected_entity_ids = new_ids;
+        self.selected_entity_id = self.selected_entity_ids.first().copied();
+        true
+    }
+
+    /// Rotates the selected entities (or latest entity) around each entity centroid by `angle_deg` degrees with undo support.
+    pub fn rotate_selected_or_last(&mut self, angle_deg: f64) -> bool {
+        let indices = self.target_entity_indices();
+        if indices.is_empty() {
+            return false;
+        }
         self.push_undo();
         let rad = angle_deg.to_radians();
         let (c, s) = (rad.cos(), rad.sin());
@@ -943,59 +1072,337 @@ impl UniversalCanvasState {
             let ry = pt[1] - pivot[1];
             [pivot[0] + rx * c - ry * s, pivot[1] + rx * s + ry * c]
         };
-        if let Some(ent) = self.entities.get_mut(idx) {
-            match &mut ent.kind {
-                CanvasShapeKind::Line { start_mm, end_mm }
-                | CanvasShapeKind::Dimension { start_mm, end_mm } => {
-                    let pivot = [
-                        0.5 * (start_mm[0] + end_mm[0]),
-                        0.5 * (start_mm[1] + end_mm[1]),
-                    ];
-                    *start_mm = rot_pt(*start_mm, pivot);
-                    *end_mm = rot_pt(*end_mm, pivot);
-                }
-                CanvasShapeKind::Rectangle { min_mm, max_mm } => {
-                    let pivot = [0.5 * (min_mm[0] + max_mm[0]), 0.5 * (min_mm[1] + max_mm[1])];
-                    let corners = [
-                        rot_pt([min_mm[0], min_mm[1]], pivot),
-                        rot_pt([max_mm[0], min_mm[1]], pivot),
-                        rot_pt([max_mm[0], max_mm[1]], pivot),
-                        rot_pt([min_mm[0], max_mm[1]], pivot),
-                    ];
-                    let x0 = corners.iter().map(|p| p[0]).fold(f64::INFINITY, f64::min);
-                    let x1 = corners.iter().map(|p| p[0]).fold(f64::NEG_INFINITY, f64::max);
-                    let y0 = corners.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
-                    let y1 = corners.iter().map(|p| p[1]).fold(f64::NEG_INFINITY, f64::max);
-                    *min_mm = [x0, y0];
-                    *max_mm = [x1, y1];
-                }
-                CanvasShapeKind::Freehand { points_mm } if !points_mm.is_empty() => {
-                    let n = points_mm.len() as f64;
-                    let pivot = [
-                        points_mm.iter().map(|p| p[0]).sum::<f64>() / n,
-                        points_mm.iter().map(|p| p[1]).sum::<f64>() / n,
-                    ];
-                    for p in points_mm {
-                        *p = rot_pt(*p, pivot);
+        let mut rot_ids = Vec::with_capacity(indices.len());
+        for idx in indices {
+            if let Some(ent) = self.entities.get_mut(idx) {
+                match &mut ent.kind {
+                    CanvasShapeKind::Line { start_mm, end_mm }
+                    | CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                        let pivot = [
+                            0.5 * (start_mm[0] + end_mm[0]),
+                            0.5 * (start_mm[1] + end_mm[1]),
+                        ];
+                        *start_mm = rot_pt(*start_mm, pivot);
+                        *end_mm = rot_pt(*end_mm, pivot);
                     }
+                    CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                        let pivot = [0.5 * (min_mm[0] + max_mm[0]), 0.5 * (min_mm[1] + max_mm[1])];
+                        let corners = [
+                            rot_pt([min_mm[0], min_mm[1]], pivot),
+                            rot_pt([max_mm[0], min_mm[1]], pivot),
+                            rot_pt([max_mm[0], max_mm[1]], pivot),
+                            rot_pt([min_mm[0], max_mm[1]], pivot),
+                        ];
+                        let x0 = corners.iter().map(|p| p[0]).fold(f64::INFINITY, f64::min);
+                        let x1 = corners.iter().map(|p| p[0]).fold(f64::NEG_INFINITY, f64::max);
+                        let y0 = corners.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
+                        let y1 = corners.iter().map(|p| p[1]).fold(f64::NEG_INFINITY, f64::max);
+                        *min_mm = [x0, y0];
+                        *max_mm = [x1, y1];
+                    }
+                    CanvasShapeKind::Freehand { points_mm } if !points_mm.is_empty() => {
+                        let n = points_mm.len() as f64;
+                        let pivot = [
+                            points_mm.iter().map(|p| p[0]).sum::<f64>() / n,
+                            points_mm.iter().map(|p| p[1]).sum::<f64>() / n,
+                        ];
+                        for p in points_mm {
+                            *p = rot_pt(*p, pivot);
+                        }
+                    }
+                    CanvasShapeKind::Circle { .. }
+                    | CanvasShapeKind::Callout { .. }
+                    | CanvasShapeKind::Freehand { .. } => {}
                 }
-                CanvasShapeKind::Circle { .. }
-                | CanvasShapeKind::Callout { .. }
-                | CanvasShapeKind::Freehand { .. } => {}
+                rot_ids.push(ent.id);
             }
-            self.selected_entity_id = Some(ent.id);
-            true
-        } else {
-            false
         }
+        self.selected_entity_ids = rot_ids;
+        self.selected_entity_id = self.selected_entity_ids.first().copied();
+        true
     }
 
-    /// Executes a typed precision CAD command (`@dx,dy`, `@dist<deg`, `move`, `ro`, `cp`, `o`, tools).
+    /// Generates an orthogonal CAD structural grid (`nx` columns by `ny` rows at spacing `dx_mm`, `dy_mm`).
+    pub fn generate_structural_grid(
+        &mut self,
+        nx: usize,
+        ny: usize,
+        dx_mm: f64,
+        dy_mm: f64,
+        active_pillar: NavigationPillar,
+        origin_mm: [f64; 2],
+    ) -> usize {
+        let cols = nx.clamp(2, 16);
+        let rows = ny.clamp(2, 16);
+        let sx = dx_mm.clamp(500.0, 30_000.0);
+        let sy = dy_mm.clamp(500.0, 30_000.0);
+        self.push_undo();
+
+        let total_w = (cols - 1) as f64 * sx;
+        let total_h = (rows - 1) as f64 * sy;
+        let badge = active_pillar.badge().to_string();
+        let pname = active_pillar.clean_name().to_string();
+        let col = self.active_color_rgb();
+        let mut created_ids = Vec::with_capacity(cols + rows);
+
+        for ix in 0..cols {
+            let x = origin_mm[0] + ix as f64 * sx;
+            let id = self.next_entity_id;
+            self.next_entity_id += 1;
+            self.entities.push(CanvasEntity {
+                id,
+                pillar_badge: badge.clone(),
+                pillar_name: pname.clone(),
+                kind: CanvasShapeKind::Line {
+                    start_mm: [x, origin_mm[1]],
+                    end_mm: [x, origin_mm[1] + total_h],
+                },
+                color_rgb: col,
+                stroke_width: self.stroke_width,
+            });
+            created_ids.push(id);
+        }
+        for iy in 0..rows {
+            let y = origin_mm[1] + iy as f64 * sy;
+            let id = self.next_entity_id;
+            self.next_entity_id += 1;
+            self.entities.push(CanvasEntity {
+                id,
+                pillar_badge: badge.clone(),
+                pillar_name: pname.clone(),
+                kind: CanvasShapeKind::Line {
+                    start_mm: [origin_mm[0], y],
+                    end_mm: [origin_mm[0] + total_w, y],
+                },
+                color_rgb: col,
+                stroke_width: self.stroke_width,
+            });
+            created_ids.push(id);
+        }
+        let n = created_ids.len();
+        self.selected_entity_ids = created_ids;
+        self.selected_entity_id = self.selected_entity_ids.first().copied();
+        n
+    }
+
+    /// Creates a rectangular CAD `ARRAY` of `cols x rows` clones spaced by `(dx_mm, dy_mm)`.
+    pub fn array_selected_or_last(&mut self, cols: usize, rows: usize, dx_mm: f64, dy_mm: f64) -> usize {
+        let indices = self.target_entity_indices();
+        if indices.is_empty() {
+            return 0;
+        }
+        let c_cnt = cols.clamp(1, 12);
+        let r_cnt = rows.clamp(1, 12);
+        self.push_undo();
+        let mut new_ids = Vec::new();
+        for idx in indices {
+            let template = self.entities[idx].clone();
+            for r in 0..r_cnt {
+                for c in 0..c_cnt {
+                    if c == 0 && r == 0 {
+                        continue;
+                    }
+                    let mut cloned = template.clone();
+                    Self::translate_kind(&mut cloned.kind, c as f64 * dx_mm, r as f64 * dy_mm);
+                    let nid = self.next_entity_id;
+                    self.next_entity_id += 1;
+                    cloned.id = nid;
+                    self.entities.push(cloned);
+                    new_ids.push(nid);
+                }
+            }
+        }
+        let added = new_ids.len();
+        if added > 0 {
+            self.selected_entity_ids = new_ids;
+            self.selected_entity_id = self.selected_entity_ids.first().copied();
+        }
+        added
+    }
+
+    /// Promotes selected (or latest) 2D sketch lines, rectangles, and dimensions into native 3D BIM elements (`BimWall`, `BimRun`, `BimColumn`, `BimSlab`).
+    pub fn promote_selection_to_bim(&mut self, bim_project: &mut BimProject) -> (usize, usize, usize) {
+        let indices = self.target_entity_indices();
+        if indices.is_empty() {
+            return (0, 0, 0);
+        }
+        let base_lvl_id = bim_project.levels.first().map(|l| l.id).unwrap_or(1);
+        let top_lvl_id = bim_project.levels.get(1).map(|l| l.id).unwrap_or(base_lvl_id);
+        let mut walls_added = 0usize;
+        let mut runs_added = 0usize;
+        let mut slabs_added = 0usize;
+
+        for idx in indices {
+            if let Some(ent) = self.entities.get(idx) {
+                match &ent.kind {
+                    CanvasShapeKind::Line { start_mm, end_mm } => {
+                        let p0 = crate::core::P2(start_mm[0], start_mm[1]);
+                        let p1 = crate::core::P2(end_mm[0], end_mm[1]);
+                        if p0.dist(p1) >= 150.0 {
+                            let wid = bim_project.alloc_id();
+                            bim_project.walls.push(crate::core::BimWall {
+                                id: wid,
+                                name: format!("Sketch Wall W-{wid}"),
+                                base_level_id: base_lvl_id,
+                                top_level_id: Some(top_lvl_id).filter(|&t| t != base_lvl_id),
+                                unconnected_height_mm: 3600.0,
+                                start: p0,
+                                end: p1,
+                                thickness_mm: 200.0,
+                                is_structural: true,
+                                layers: crate::core::BimWall::default_compound_layers(200.0),
+                                openings: Vec::new(),
+                            });
+                            walls_added += 1;
+
+                            let rid = bim_project.alloc_id();
+                            bim_project.runs.push(crate::core::BimRun {
+                                id: rid,
+                                name: format!("Sketch Beam B-{rid}"),
+                                category: crate::core::RunCategory::StructuralBeam,
+                                level_id: top_lvl_id,
+                                start: p0,
+                                end: p1,
+                                start_offset_mm: 0.0,
+                                end_offset_mm: 0.0,
+                                justify: crate::core::RunJustify::Top,
+                                profile_name: "WF 250x125".to_string(),
+                                width_mm: 250.0,
+                                depth_mm: 400.0,
+                                is_round: false,
+                                is_wf_profile: true,
+                                system_name: "CAD Promote".to_string(),
+                            });
+                            runs_added += 1;
+
+                            // Ensure end columns exist near endpoints for full FEA continuity
+                            for pt in [p0, p1] {
+                                let exists = bim_project.columns.iter().any(|c| c.pos.dist(pt) < 120.0);
+                                if !exists {
+                                    let cid = bim_project.alloc_id();
+                                    bim_project.columns.push(crate::core::BimColumn {
+                                        id: cid,
+                                        name: format!("Col C-{cid}"),
+                                        base_level_id: base_lvl_id,
+                                        top_level_id: top_lvl_id,
+                                        pos: pt,
+                                        width_mm: 350.0,
+                                        depth_mm: 350.0,
+                                        rotation_deg: 0.0,
+                                        is_round: false,
+                                        is_wf_profile: false,
+                                        profile_name: "RC 350x350".to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                        let c0 = crate::core::P2(min_mm[0], min_mm[1]);
+                        let c1 = crate::core::P2(max_mm[0], min_mm[1]);
+                        let c2 = crate::core::P2(max_mm[0], max_mm[1]);
+                        let c3 = crate::core::P2(min_mm[0], max_mm[1]);
+                        if c0.dist(c1) >= 200.0 && c1.dist(c2) >= 200.0 {
+                            let sid = bim_project.alloc_id();
+                            bim_project.slabs.push(crate::core::BimSlab {
+                                id: sid,
+                                name: format!("Sketch Slab S-{sid}"),
+                                level_id: base_lvl_id,
+                                boundary: vec![c0, c1, c2, c3],
+                                openings: Vec::new(),
+                                thickness_mm: 160.0,
+                                is_roof: false,
+                                roof_slope_deg: 0.0,
+                            });
+                            slabs_added += 1;
+                            for (p0, p1) in [(c0, c1), (c1, c2), (c2, c3), (c3, c0)] {
+                                let wid = bim_project.alloc_id();
+                                bim_project.walls.push(crate::core::BimWall {
+                                    id: wid,
+                                    name: format!("Perimeter Wall W-{wid}"),
+                                    base_level_id: base_lvl_id,
+                                    top_level_id: Some(top_lvl_id).filter(|&t| t != base_lvl_id),
+                                    unconnected_height_mm: 3600.0,
+                                    start: p0,
+                                    end: p1,
+                                    thickness_mm: 200.0,
+                                    is_structural: true,
+                                    layers: crate::core::BimWall::default_compound_layers(200.0),
+                                    openings: Vec::new(),
+                                });
+                                walls_added += 1;
+                            }
+                            for pt in [c0, c1, c2, c3] {
+                                let exists = bim_project.columns.iter().any(|c| c.pos.dist(pt) < 120.0);
+                                if !exists {
+                                    let cid = bim_project.alloc_id();
+                                    bim_project.columns.push(crate::core::BimColumn {
+                                        id: cid,
+                                        name: format!("Col C-{cid}"),
+                                        base_level_id: base_lvl_id,
+                                        top_level_id: top_lvl_id,
+                                        pos: pt,
+                                        width_mm: 400.0,
+                                        depth_mm: 400.0,
+                                        rotation_deg: 0.0,
+                                        is_round: false,
+                                        is_wf_profile: false,
+                                        profile_name: "RC 400x400".to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                        let did = bim_project.alloc_id();
+                        bim_project.dimensions.push(crate::core::BimDimension {
+                            id: did,
+                            start: crate::core::P2(start_mm[0], start_mm[1]),
+                            end: crate::core::P2(end_mm[0], end_mm[1]),
+                            offset_mm: 350.0,
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if walls_added > 0 {
+            bim_project.detect_rooms_on_level(base_lvl_id);
+        }
+        (walls_added, runs_added, slabs_added)
+    }
+
+    fn parse_nx_ny_spacing(args: &str, default_n: (usize, usize), default_s: (f64, f64)) -> ((usize, usize), (f64, f64)) {
+        let mut toks = args.split_whitespace();
+        let (nx, ny) = if let Some(first) = toks.next() {
+            if let Some((a, b)) = first.split_once('x') {
+                (
+                    a.trim().parse::<usize>().unwrap_or(default_n.0),
+                    b.trim().parse::<usize>().unwrap_or(default_n.1),
+                )
+            } else {
+                default_n
+            }
+        } else {
+            default_n
+        };
+        let dx = toks
+            .next()
+            .and_then(|s| s.trim_end_matches("mm").parse::<f64>().ok())
+            .unwrap_or(default_s.0);
+        let dy = toks
+            .next()
+            .and_then(|s| s.trim_end_matches("mm").parse::<f64>().ok())
+            .unwrap_or(dx);
+        ((nx, ny), (dx, dy))
+    }
+
+    /// Executes a typed precision CAD command (`@dx,dy`, `@dist<deg`, `move`, `ro`, `cp`, `o`, `grid`, `array`, `promote`, tools).
     pub fn execute_precision_command(
         &mut self,
         raw: &str,
         active_pillar: NavigationPillar,
-        bim_project: &BimProject,
+        bim_project: &mut BimProject,
     ) -> String {
         let trimmed = raw.trim();
         let lower = trimmed.to_lowercase();
@@ -1027,7 +1434,7 @@ impl UniversalCanvasState {
                     color_rgb: self.active_color_rgb(),
                     stroke_width: self.stroke_width,
                 });
-                self.selected_entity_id = Some(id);
+                self.set_single_selection(Some(id));
                 return format!(
                     "Drew relative segment ({:.0}, {:.0}) -> ({:.0}, {:.0}) mm",
                     anchor[0], anchor[1], end[0], end[1]
@@ -1038,7 +1445,7 @@ impl UniversalCanvasState {
         if let Some(rest) = lower.strip_prefix("move ") {
             if let Some((dx, dy)) = Self::parse_cad_delta_expr(rest) {
                 return if self.translate_selected_or_last(dx, dy) {
-                    format!("Moved entity by ({dx:.0}, {dy:.0}) mm")
+                    format!("Moved selection by ({dx:.0}, {dy:.0}) mm")
                 } else {
                     "No entity selected or present to move".to_string()
                 };
@@ -1046,7 +1453,7 @@ impl UniversalCanvasState {
         } else if let Some(rest) = lower.strip_prefix("cp ").or_else(|| lower.strip_prefix("copy ")) {
             if let Some((dx, dy)) = Self::parse_cad_delta_expr(rest) {
                 return if self.duplicate_selected_or_last(dx, dy) {
-                    format!("Duplicated entity by ({dx:.0}, {dy:.0}) mm")
+                    format!("Duplicated selection by ({dx:.0}, {dy:.0}) mm")
                 } else {
                     "No entity selected or present to duplicate".to_string()
                 };
@@ -1054,7 +1461,7 @@ impl UniversalCanvasState {
         } else if let Some(rest) = lower.strip_prefix("ro ").or_else(|| lower.strip_prefix("rotate ")) {
             if let Ok(deg) = rest.trim().parse::<f64>() {
                 return if self.rotate_selected_or_last(deg) {
-                    format!("Rotated entity {deg:.1}°")
+                    format!("Rotated selection {deg:.1}°")
                 } else {
                     "No entity selected or present to rotate".to_string()
                 };
@@ -1067,9 +1474,39 @@ impl UniversalCanvasState {
                     "No entity selected or present to offset".to_string()
                 };
             }
+        } else if lower == "grid" || lower.starts_with("grid ") {
+            let args = lower.strip_prefix("grid").unwrap_or("").trim();
+            let ((nx, ny), (dx, dy)) = Self::parse_nx_ny_spacing(args, (4, 3), (6000.0, 5000.0));
+            let lines = self.generate_structural_grid(nx, ny, dx, dy, active_pillar, [0.0, 0.0]);
+            return format!("Generated {nx}x{ny} structural grid ({lines} axes @ {dx:.0}x{dy:.0} mm)");
+        } else if lower == "array" || lower.starts_with("array ") {
+            let args = lower.strip_prefix("array").unwrap_or("").trim();
+            let ((c, r), (dx, dy)) = Self::parse_nx_ny_spacing(args, (3, 2), (self.cad_step_mm.max(1000.0), self.cad_step_mm.max(1000.0)));
+            let added = self.array_selected_or_last(c, r, dx, dy);
+            return if added > 0 {
+                format!("Arrayed {c}x{r} (+{added} clones @ {dx:.0}x{dy:.0} mm)")
+            } else {
+                "Select or draw an entity before running ARRAY".to_string()
+            };
         }
 
         match lower.as_str() {
+            "v" | "box" | "marquee" => {
+                self.active_tool = UniversalCanvasTool::BoxSelect;
+                "Active tool: Box Marquee Select (V) — Window L->R | Crossing R->L".to_string()
+            }
+            "osnap" | "f4" => {
+                self.osnap_enabled = !self.osnap_enabled;
+                format!("Object Snap (OSNAP F4) = {}", if self.osnap_enabled { "ON" } else { "OFF" })
+            }
+            "promote" | "tobim" | "bim" => {
+                let (w, r, s) = self.promote_selection_to_bim(bim_project);
+                if w + r + s > 0 {
+                    format!("Promoted CAD selection -> +{w} Walls, +{r} Beams, +{s} Slabs in 3D BIM")
+                } else {
+                    "Select Lines or Rectangles first to promote into 3D BIM".to_string()
+                }
+            }
             "l" | "line" => {
                 self.active_tool = UniversalCanvasTool::Line;
                 "Active tool: Line (L)".to_string()
@@ -1096,21 +1533,21 @@ impl UniversalCanvasState {
             }
             "ro" | "rotate" => {
                 if self.rotate_selected_or_last(self.cad_rotate_deg) {
-                    format!("Rotated entity {:.1}°", self.cad_rotate_deg)
+                    format!("Rotated selection {:.1}°", self.cad_rotate_deg)
                 } else {
                     "No entity to rotate".to_string()
                 }
             }
             "cp" | "copy" | "dup" => {
                 if self.duplicate_selected_or_last(self.cad_step_mm, 0.0) {
-                    format!("Copied entity +{:.0} mm East", self.cad_step_mm)
+                    format!("Copied selection +{:.0} mm East", self.cad_step_mm)
                 } else {
                     "No entity to duplicate".to_string()
                 }
             }
             "m" | "move" => {
                 if self.translate_selected_or_last(self.cad_step_mm, 0.0) {
-                    format!("Moved entity +{:.0} mm East", self.cad_step_mm)
+                    format!("Moved selection +{:.0} mm East", self.cad_step_mm)
                 } else {
                     "No entity to move".to_string()
                 }
@@ -1147,18 +1584,25 @@ impl UniversalCanvasState {
                 self.is_frozen = !self.is_frozen;
                 format!("Canvas Frozen = {}", self.is_frozen)
             }
-            _ => format!("Unknown CAD command '{}' — try @5000,0 | @4500<45 | move @1000,0 | ro 90", trimmed),
+            _ => format!("Unknown CAD command '{}' — try @5000,0 | grid 4x3 6000 | array 3x2 | promote", trimmed),
         }
     }
 
-    /// Deletes the selected (or latest) entity with undo support.
+    /// Deletes the selected entities (or latest entity) with undo support.
     pub fn delete_selected_or_last(&mut self) -> bool {
-        let Some(idx) = self.target_entity_idx() else {
+        let mut indices = self.target_entity_indices();
+        if indices.is_empty() {
             return false;
-        };
+        }
         self.push_undo();
-        self.entities.remove(idx);
-        self.selected_entity_id = None;
+        indices.sort_unstable_by(|a, b| b.cmp(a));
+        indices.dedup();
+        for idx in indices {
+            if idx < self.entities.len() {
+                self.entities.remove(idx);
+            }
+        }
+        self.set_single_selection(None);
         true
     }
 
@@ -1461,6 +1905,7 @@ impl UniversalCanvasState {
                     &response,
                     rect,
                     active_pillar,
+                    bim_project,
                     pointer_in_freeze_pill,
                 );
 
@@ -1600,9 +2045,11 @@ impl UniversalCanvasState {
         }
         if fb.escape {
             self.pending_start_mm = None;
+            self.marquee_anchor_mm = None;
+            self.marquee_current_mm = None;
             self.active_freehand_mm.clear();
             self.measure_active = false;
-            self.selected_entity_id = None;
+            self.set_single_selection(None);
             self.active_tool = UniversalCanvasTool::SelectPan;
         }
         if fb.undo && self.undo() {
@@ -1620,6 +2067,13 @@ impl UniversalCanvasState {
         if fb.toggle_snap {
             self.snap_to_grid = !self.snap_to_grid;
         }
+        if fb.toggle_osnap {
+            self.osnap_enabled = !self.osnap_enabled;
+            self.status_message = Some(format!(
+                "Object Snap (OSNAP F4): {}",
+                if self.osnap_enabled { "ON" } else { "OFF" }
+            ));
+        }
         if fb.fit_model {
             if let Some(extents) = bim_project.plan_extents_mm() {
                 self.fit_world_to_bim_extents(Some(extents));
@@ -1632,6 +2086,7 @@ impl UniversalCanvasState {
                 .plan_extents_mm()
                 .map_or(0.0, |(a, b)| 0.5 * (a[0] + b[0]));
             match ch {
+                'V' => self.active_tool = UniversalCanvasTool::BoxSelect,
                 'L' => self.active_tool = UniversalCanvasTool::Line,
                 'R' => self.active_tool = UniversalCanvasTool::Rectangle,
                 'C' => self.active_tool = UniversalCanvasTool::Circle,
@@ -1667,7 +2122,7 @@ impl UniversalCanvasState {
         ui: &mut Ui,
         theme: &MacTheme,
         active_pillar: NavigationPillar,
-        bim_project: &BimProject,
+        bim_project: &mut BimProject,
         members: &[StructuralMember],
         variables: &[ParametricVariable],
         workspace_settings: WorkspaceCanvasSettings,
@@ -1819,6 +2274,31 @@ impl UniversalCanvasState {
                     .clicked()
                     {
                         self.snap_to_grid = !self.snap_to_grid;
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Target,
+                        "OSNAP",
+                        10.5,
+                        if self.osnap_enabled {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.osnap_enabled {
+                            theme.accent_green.gamma_multiply(0.85)
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Object Snap (Endpoint, Midpoint, Perpendicular, Intersection) [F4]")
+                    .clicked()
+                    {
+                        self.osnap_enabled = !self.osnap_enabled;
                     }
 
                     if icons::icon_button(
@@ -1980,7 +2460,7 @@ impl UniversalCanvasState {
                         }
                     }
 
-                    if self.selected_entity_id.is_some()
+                    if (!self.selected_entity_ids.is_empty() || self.selected_entity_id.is_some())
                         && icons::icon_button(
                             ui,
                             AppIcon::Close,
@@ -1992,10 +2472,59 @@ impl UniversalCanvasState {
                             CornerRadius::same(6),
                             Vec2::new(0.0, 26.0),
                         )
-                        .on_hover_text("Deselect active entity (Esc)")
+                        .on_hover_text("Deselect active entities (Esc)")
                         .clicked()
                     {
-                        self.selected_entity_id = None;
+                        self.set_single_selection(None);
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Grid,
+                        "Grid 4x3",
+                        10.5,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Generate parametric 4x3 structural grid (@ 6000x5000 mm)")
+                    .clicked()
+                    {
+                        let lines = self.generate_structural_grid(
+                            4,
+                            3,
+                            6000.0,
+                            5000.0,
+                            active_pillar,
+                            [0.0, 0.0],
+                        );
+                        self.status_message = Some(format!(
+                            "Generated 4x3 structural grid ({lines} axes @ 6000x5000 mm)"
+                        ));
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Building,
+                        "To BIM",
+                        10.5,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Promote selected 2D sketch lines/rectangles into native 3D BIM walls, beams, columns & slabs (PROMOTE)")
+                    .clicked()
+                    {
+                        let (w, r, s) = self.promote_selection_to_bim(bim_project);
+                        self.status_message = Some(if w + r + s > 0 {
+                            format!("Promoted selection -> +{w} Walls, +{r} Beams, +{s} Slabs in 3D BIM")
+                        } else {
+                            "Draw or select Lines/Rectangles first to promote to 3D BIM".to_string()
+                        });
                     }
 
                     ui.separator();
@@ -2066,7 +2595,7 @@ impl UniversalCanvasState {
                     let cmd_resp = ui.add(
                         egui::TextEdit::singleline(&mut self.cad_cmd_input)
                             .desired_width(cmd_w)
-                            .hint_text("@dx,dy | @d<deg | ro 90"),
+                            .hint_text("@dx,dy | grid | array | promote"),
                     );
                     let run_cad = icons::icon_button(
                         ui,
@@ -2455,15 +2984,154 @@ impl UniversalCanvasState {
             .screen_to_world_mm(self.ground_origin_lat_lon, screen, rect)
     }
 
+    /// Snaps `raw_mm` using Object Snap (OSNAP: Endpoint, Midpoint, Perpendicular, Intersection) and grid snap fallback.
     pub fn snap_point(&self, raw_mm: [f64; 2]) -> [f64; 2] {
+        self.snap_point_with_osnap(
+            raw_mm,
+            self.pending_start_mm,
+            None,
+            self.last_osnap_radius_mm.max(350.0),
+        )
+        .0
+    }
+
+    /// Resolves exact CAD OSNAP (`Endpoint`, `Midpoint`, `Perpendicular`, `Intersection`) against entities and optional `BimProject`, falling back to grid snap.
+    pub fn snap_point_with_osnap(
+        &self,
+        raw_mm: [f64; 2],
+        anchor_mm: Option<[f64; 2]>,
+        bim_project: Option<&BimProject>,
+        tol_mm: f64,
+    ) -> ([f64; 2], OsnapKind) {
+        if self.osnap_enabled && tol_mm > 1.0 {
+            let mut endpoints: Vec<[f64; 2]> = Vec::new();
+            let mut segments: Vec<([f64; 2], [f64; 2])> = Vec::new();
+
+            for ent in &self.entities {
+                match &ent.kind {
+                    CanvasShapeKind::Line { start_mm, end_mm }
+                    | CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                        endpoints.push(*start_mm);
+                        endpoints.push(*end_mm);
+                        segments.push((*start_mm, *end_mm));
+                    }
+                    CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                        let c0 = *min_mm;
+                        let c1 = [max_mm[0], min_mm[1]];
+                        let c2 = *max_mm;
+                        let c3 = [min_mm[0], max_mm[1]];
+                        endpoints.extend([c0, c1, c2, c3]);
+                        segments.extend([(c0, c1), (c1, c2), (c2, c3), (c3, c0)]);
+                    }
+                    CanvasShapeKind::Circle {
+                        center_mm,
+                        radius_mm,
+                    } => {
+                        endpoints.push(*center_mm);
+                        endpoints.push([center_mm[0] + radius_mm, center_mm[1]]);
+                        endpoints.push([center_mm[0] - radius_mm, center_mm[1]]);
+                        endpoints.push([center_mm[0], center_mm[1] + radius_mm]);
+                        endpoints.push([center_mm[0], center_mm[1] - radius_mm]);
+                    }
+                    CanvasShapeKind::Freehand { points_mm } => {
+                        if let (Some(&first), Some(&last)) = (points_mm.first(), points_mm.last()) {
+                            endpoints.push(first);
+                            endpoints.push(last);
+                        }
+                    }
+                    CanvasShapeKind::Callout { pos_mm, .. } => {
+                        endpoints.push(*pos_mm);
+                    }
+                }
+            }
+
+            if let Some(bim) = bim_project {
+                for w in &bim.walls {
+                    let s = [w.start.0, w.start.1];
+                    let e = [w.end.0, w.end.1];
+                    endpoints.push(s);
+                    endpoints.push(e);
+                    segments.push((s, e));
+                }
+                for r in &bim.runs {
+                    let s = [r.start.0, r.start.1];
+                    let e = [r.end.0, r.end.1];
+                    endpoints.push(s);
+                    endpoints.push(e);
+                    segments.push((s, e));
+                }
+                for g in &bim.grids {
+                    segments.push(([g.start.0, g.start.1], [g.end.0, g.end.1]));
+                }
+                for c in &bim.columns {
+                    endpoints.push([c.pos.0, c.pos.1]);
+                }
+            }
+
+            let mut best: Option<([f64; 2], OsnapKind, f64)> = None;
+            let consider = |best: &mut Option<([f64; 2], OsnapKind, f64)>,
+                            pt: [f64; 2],
+                            kind: OsnapKind,
+                            score_bias: f64| {
+                let d = (pt[0] - raw_mm[0]).hypot(pt[1] - raw_mm[1]);
+                if d <= tol_mm {
+                    let ranked = d * score_bias;
+                    if best.is_none_or(|(_, _, bd)| ranked < bd) {
+                        *best = Some((pt, kind, ranked));
+                    }
+                }
+            };
+
+            // 1. Endpoint snaps (highest priority right on vertex)
+            for &ep in &endpoints {
+                consider(&mut best, ep, OsnapKind::Endpoint, 0.90);
+            }
+
+            // 2. Segment intersection snaps (cap pairwise checks for responsiveness)
+            let seg_cap = segments.len().min(64);
+            for i in 0..seg_cap {
+                for j in (i + 1)..seg_cap {
+                    if let Some(ix) = segment_intersection_2d(segments[i].0, segments[i].1, segments[j].0, segments[j].1) {
+                        consider(&mut best, ix, OsnapKind::Intersection, 0.88);
+                    }
+                }
+            }
+
+            // 3. Midpoint & true Perpendicular (from active anchor) snaps
+            for &(a, b) in &segments {
+                let mid = [0.5 * (a[0] + b[0]), 0.5 * (a[1] + b[1])];
+                consider(&mut best, mid, OsnapKind::Midpoint, 0.98);
+
+                if let Some(perp_ref) = anchor_mm {
+                    let vx = b[0] - a[0];
+                    let vy = b[1] - a[1];
+                    let len_sq = vx * vx + vy * vy;
+                    if len_sq > 1e-6 {
+                        let t = ((perp_ref[0] - a[0]) * vx + (perp_ref[1] - a[1]) * vy) / len_sq;
+                        if (0.02..=0.98).contains(&t) {
+                            let foot = [a[0] + t * vx, a[1] + t * vy];
+                            consider(&mut best, foot, OsnapKind::Perpendicular, 1.04);
+                        }
+                    }
+                }
+            }
+
+            if let Some((pt, kind, _)) = best {
+                return (pt, kind);
+            }
+        }
+
         if !self.snap_to_grid || self.grid_spacing_mm <= 1.0 {
-            return raw_mm;
+            return (raw_mm, OsnapKind::None);
         }
         let step = self.grid_spacing_mm;
-        [
-            (raw_mm[0] / step).round() * step,
-            (raw_mm[1] / step).round() * step,
-        ]
+        (
+            [
+                (raw_mm[0] / step).round() * step,
+                (raw_mm[1] / step).round() * step,
+            ],
+            OsnapKind::Grid,
+        )
     }
 
     fn handle_canvas_interaction(
@@ -2472,10 +3140,13 @@ impl UniversalCanvasState {
         response: &egui::Response,
         rect: Rect,
         active_pillar: NavigationPillar,
+        bim_project: &BimProject,
         pointer_in_inspector: bool,
     ) {
         if self.is_frozen || pointer_in_inspector {
             self.pending_start_mm = None;
+            self.marquee_anchor_mm = None;
+            self.marquee_current_mm = None;
             self.active_freehand_mm.clear();
             return;
         }
@@ -2489,9 +3160,21 @@ impl UniversalCanvasState {
             }
         }
 
+        let scale = self.world_map.pixels_per_mm_at_origin(self.ground_origin_lat_lon);
+        let hit_radius_mm = (18.0 / scale.max(1e-9)) as f64;
+        self.last_osnap_radius_mm = hit_radius_mm.clamp(250.0, 2500.0);
+
         if let Some(hover) = response.hover_pos() {
             self.cursor_lat_lon = self.world_map.screen_to_lat_lon(hover, rect);
-            self.cursor_world_mm = self.snap_point(self.screen_to_world(rect, hover));
+            let raw_mm = self.screen_to_world(rect, hover);
+            let (snapped, kind) = self.snap_point_with_osnap(
+                raw_mm,
+                self.pending_start_mm,
+                Some(bim_project),
+                self.last_osnap_radius_mm,
+            );
+            self.cursor_world_mm = snapped;
+            self.last_osnap_kind = kind;
         }
 
         // Right-drag, Middle-drag, or Shift-drag pans Earth map in any tool
@@ -2512,8 +3195,6 @@ impl UniversalCanvasState {
             return;
         }
 
-        let scale = self.world_map.pixels_per_mm_at_origin(self.ground_origin_lat_lon);
-        let hit_radius_mm = (16.0 / scale.max(1e-9)) as f64;
         let world_map_snapshot = self.world_map.clone();
         let origin_lat_lon = self.ground_origin_lat_lon;
         let to_world = |pos: Pos2| -> [f64; 2] {
@@ -2527,9 +3208,10 @@ impl UniversalCanvasState {
             } else if response.clicked_by(egui::PointerButton::Primary) {
                 if let Some(pos) = response.interact_pointer_pos() {
                     let w = to_world(pos);
-                    self.selected_entity_id = self
+                    let picked = self
                         .find_nearest_entity_idx(w, hit_radius_mm)
                         .and_then(|i| self.entities.get(i).map(|e| e.id));
+                    self.set_single_selection(picked);
                 }
             }
             return;
@@ -2654,8 +3336,16 @@ impl UniversalCanvasState {
         hit_radius_mm: f64,
         screen_to_world: &impl Fn(Pos2) -> [f64; 2],
     ) {
+        self.last_osnap_radius_mm = hit_radius_mm.clamp(250.0, 2500.0);
         if let Some(hover) = response.hover_pos() {
-            self.cursor_world_mm = self.snap_point(screen_to_world(hover));
+            let (snapped, kind) = self.snap_point_with_osnap(
+                screen_to_world(hover),
+                self.pending_start_mm,
+                None,
+                self.last_osnap_radius_mm,
+            );
+            self.cursor_world_mm = snapped;
+            self.last_osnap_kind = kind;
         }
 
         let badge = active_pillar.badge().to_string();
@@ -2668,9 +3358,45 @@ impl UniversalCanvasState {
                 if response.clicked_by(egui::PointerButton::Primary) {
                     if let Some(pos) = response.interact_pointer_pos() {
                         let w = screen_to_world(pos);
-                        self.selected_entity_id = self
+                        let picked = self
                             .find_nearest_entity_idx(w, hit_radius_mm)
                             .and_then(|i| self.entities.get(i).map(|e| e.id));
+                        self.set_single_selection(picked);
+                    }
+                }
+            }
+            UniversalCanvasTool::BoxSelect => {
+                if response.drag_started_by(egui::PointerButton::Primary) {
+                    if let Some(pos) = response.interact_pointer_pos() {
+                        let w = screen_to_world(pos);
+                        self.marquee_anchor_mm = Some(w);
+                        self.marquee_current_mm = Some(w);
+                    }
+                }
+                if response.dragged_by(egui::PointerButton::Primary) {
+                    if let Some(pos) = response.interact_pointer_pos() {
+                        self.marquee_current_mm = Some(screen_to_world(pos));
+                    }
+                }
+                if response.drag_stopped_by(egui::PointerButton::Primary) {
+                    if let (Some(anchor), Some(pos)) =
+                        (self.marquee_anchor_mm.take(), response.interact_pointer_pos())
+                    {
+                        let end_mm = screen_to_world(pos);
+                        let count = self.select_marquee(anchor, end_mm);
+                        let mode = if end_mm[0] >= anchor[0] { "Window" } else { "Crossing" };
+                        self.status_message = Some(format!(
+                            "{mode} marquee selected {count} entities"
+                        ));
+                    }
+                    self.marquee_current_mm = None;
+                } else if response.clicked_by(egui::PointerButton::Primary) {
+                    if let Some(pos) = response.interact_pointer_pos() {
+                        let w = screen_to_world(pos);
+                        let picked = self
+                            .find_nearest_entity_idx(w, hit_radius_mm)
+                            .and_then(|i| self.entities.get(i).map(|e| e.id));
+                        self.set_single_selection(picked);
                     }
                 }
             }
@@ -2756,7 +3482,7 @@ impl UniversalCanvasState {
                             self.push_undo();
                             let id = self.next_entity_id;
                             self.next_entity_id += 1;
-                            self.selected_entity_id = Some(id);
+                            self.set_single_selection(Some(id));
                             self.entities.push(CanvasEntity {
                                 id,
                                 pillar_badge: badge,
@@ -3332,7 +4058,7 @@ impl UniversalCanvasState {
                 continue;
             }
             let base_col = Color32::from_rgb(ent.color_rgb[0], ent.color_rgb[1], ent.color_rgb[2]);
-            let is_selected = self.selected_entity_id == Some(ent.id);
+            let is_selected = self.is_entity_selected(ent.id);
             let col = if is_selected {
                 theme.accent_orange
             } else if ent.pillar_badge == active_badge {
@@ -3490,6 +4216,79 @@ impl UniversalCanvasState {
                 egui::FontId::monospace(10.0),
                 theme.accent_orange,
             );
+        }
+
+        // Window (blue L->R) vs Crossing (green R->L) Marquee Box Preview
+        if let (Some(anchor), Some(cur)) = (self.marquee_anchor_mm, self.marquee_current_mm) {
+            let s0 = to_screen(anchor);
+            let s1 = to_screen(cur);
+            let mrect = Rect::from_two_pos(s0, s1);
+            let is_window = cur[0] >= anchor[0];
+            let (mcol, lbl) = if is_window {
+                (theme.accent_blue, "Window (Enclosed)")
+            } else {
+                (theme.accent_green, "Crossing (Touch)")
+            };
+            clip_painter.rect_filled(mrect, CornerRadius::ZERO, mcol.gamma_multiply(0.14));
+            clip_painter.rect_stroke(mrect, CornerRadius::ZERO, Stroke::new(1.5, mcol), StrokeKind::Inside);
+            clip_painter.text(
+                mrect.left_top() + Vec2::new(4.0, -4.0),
+                Align2::LEFT_BOTTOM,
+                lbl,
+                egui::FontId::monospace(9.5),
+                mcol,
+            );
+        }
+
+        // OSNAP Active Reticle Glyph (outside idle Grid)
+        if self.osnap_enabled
+            && !matches!(self.last_osnap_kind, OsnapKind::None | OsnapKind::Grid)
+        {
+            let sp = to_screen(self.cursor_world_mm);
+            if rect.expand(10.0).contains(sp) {
+                let col = match self.last_osnap_kind {
+                    OsnapKind::Endpoint => theme.accent_green,
+                    OsnapKind::Midpoint => theme.accent_blue,
+                    OsnapKind::Perpendicular => theme.accent_orange,
+                    OsnapKind::Intersection => theme.accent_red,
+                    OsnapKind::None | OsnapKind::Grid => theme.text_muted,
+                };
+                let st = Stroke::new(1.6, col);
+                match self.last_osnap_kind {
+                    OsnapKind::Endpoint => {
+                        clip_painter.rect_stroke(
+                            Rect::from_center_size(sp, Vec2::splat(9.0)),
+                            CornerRadius::ZERO,
+                            st,
+                            StrokeKind::Middle,
+                        );
+                    }
+                    OsnapKind::Midpoint => {
+                        let tri = vec![
+                            sp + Vec2::new(0.0, -5.5),
+                            sp + Vec2::new(5.5, 4.5),
+                            sp + Vec2::new(-5.5, 4.5),
+                        ];
+                        clip_painter.add(egui::Shape::closed_line(tri, st));
+                    }
+                    OsnapKind::Perpendicular => {
+                        clip_painter.line_segment([sp + Vec2::new(-5.0, -5.0), sp + Vec2::new(-5.0, 5.0)], st);
+                        clip_painter.line_segment([sp + Vec2::new(-5.0, 5.0), sp + Vec2::new(5.0, 5.0)], st);
+                    }
+                    OsnapKind::Intersection => {
+                        clip_painter.line_segment([sp + Vec2::new(-5.0, -5.0), sp + Vec2::new(5.0, 5.0)], st);
+                        clip_painter.line_segment([sp + Vec2::new(-5.0, 5.0), sp + Vec2::new(5.0, -5.0)], st);
+                    }
+                    OsnapKind::None | OsnapKind::Grid => {}
+                }
+                clip_painter.text(
+                    sp + Vec2::new(9.0, -7.0),
+                    Align2::LEFT_BOTTOM,
+                    self.last_osnap_kind.short_tag(),
+                    egui::FontId::monospace(9.0),
+                    col,
+                );
+            }
         }
     }
 
@@ -3754,13 +4553,26 @@ impl UniversalCanvasState {
                     "X: {:.0}  Y: {:.0} mm",
                     self.cursor_world_mm[0], self.cursor_world_mm[1],
                 );
+                let sel_tag = if self.selected_entity_ids.len() > 1 {
+                    format!(" • Sel {} objs", self.selected_entity_ids.len())
+                } else {
+                    self.selected_entity_id
+                        .map_or(String::new(), |id| format!(" • Sel #{id}"))
+                };
+                let osnap_tag = if !self.osnap_enabled {
+                    "OFF".to_string()
+                } else if matches!(self.last_osnap_kind, OsnapKind::None | OsnapKind::Grid) {
+                    "ON".to_string()
+                } else {
+                    format!("ON [{}]", self.last_osnap_kind.short_tag())
+                };
                 let mode_txt = format!(
-                    "Tool: {} • Ortho(F8): {} • Snap(F3): {}{}",
+                    "Tool: {} • Ortho(F8): {} • Snap(F3): {} • OSNAP(F4): {}{}",
                     self.active_tool.short_label(),
                     if self.ortho_mode { "ON" } else { "OFF" },
                     if self.snap_to_grid { "ON" } else { "OFF" },
-                    self.selected_entity_id
-                        .map_or(String::new(), |id| format!(" • Sel #{id}"))
+                    osnap_tag,
+                    sel_tag,
                 );
                 let counts_txt = format!(
                     "{} Draw ({} {}) • {} BIM",
@@ -3950,6 +4762,31 @@ fn point_to_segment_dist(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
     (p[0] - proj[0]).hypot(p[1] - proj[1])
 }
 
+fn segment_intersection_2d(
+    p: [f64; 2],
+    r_end: [f64; 2],
+    q: [f64; 2],
+    s_end: [f64; 2],
+) -> Option<[f64; 2]> {
+    let rx = r_end[0] - p[0];
+    let ry = r_end[1] - p[1];
+    let sx = s_end[0] - q[0];
+    let sy = s_end[1] - q[1];
+    let denom = rx * sy - ry * sx;
+    if denom.abs() < 1e-6 {
+        return None;
+    }
+    let qpx = q[0] - p[0];
+    let qpy = q[1] - p[1];
+    let t = (qpx * sy - qpy * sx) / denom;
+    let u = (qpx * ry - qpy * rx) / denom;
+    if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u) {
+        Some([p[0] + t * rx, p[1] + t * ry])
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4081,7 +4918,7 @@ mod tests {
     #[test]
     fn test_canvas_precision_polar_relative_duplicate_and_rotate() {
         let mut canvas = UniversalCanvasState::default();
-        let bim = BimProject::sample_bimcraft_building();
+        let mut bim = BimProject::sample_bimcraft_building();
 
         let (dx, dy) = UniversalCanvasState::parse_cad_delta_expr("@5000<0").expect("polar 0 deg");
         assert!((dx - 5000.0).abs() < 1e-6);
@@ -4094,7 +4931,7 @@ mod tests {
         let msg = canvas.execute_precision_command(
             "@4000<0",
             NavigationPillar::ResearchConcept,
-            &bim,
+            &mut bim,
         );
         assert!(msg.contains("Drew relative segment"));
         assert_eq!(canvas.entities.len(), 1);
@@ -4109,5 +4946,111 @@ mod tests {
 
         assert!(canvas.duplicate_selected_or_last(1500.0, 0.0));
         assert_eq!(canvas.entities.len(), 2);
+    }
+
+    #[test]
+    fn test_canvas_osnap_marquee_grid_array_and_promote_to_bim() {
+        let mut canvas = UniversalCanvasState::default();
+        let mut bim = BimProject::empty();
+
+        // 1. Structural Grid Generation & OSNAP Intersection + Endpoint
+        let created = canvas.generate_structural_grid(
+            3,
+            2,
+            6000.0,
+            5000.0,
+            NavigationPillar::ParametricDED,
+            [0.0, 0.0],
+        );
+        assert_eq!(created, 5); // 3 vertical + 2 horizontal axes
+
+        let (ix0_pt, ix0_kind) =
+            canvas.snap_point_with_osnap([40.0, 35.0], None, None, 200.0);
+        assert!((ix0_pt[0]).abs() < 1e-3 && (ix0_pt[1]).abs() < 1e-3);
+        assert_eq!(ix0_kind, OsnapKind::Intersection);
+
+        let (mid_pt, mid_kind) =
+            canvas.snap_point_with_osnap([25.0, 2520.0], None, None, 200.0);
+        assert!(mid_pt[0].abs() < 1e-3 && (mid_pt[1] - 2500.0).abs() < 1e-3);
+        assert_eq!(mid_kind, OsnapKind::Midpoint);
+
+        let (perp_pt, perp_kind) = canvas.snap_point_with_osnap(
+            [35.0, 1210.0],
+            Some([3000.0, 1200.0]),
+            None,
+            200.0,
+        );
+        assert!(perp_pt[0].abs() < 1e-3 && (perp_pt[1] - 1200.0).abs() < 1e-3);
+        assert_eq!(perp_kind, OsnapKind::Perpendicular);
+
+        let (ix_pt, ix_kind) =
+            canvas.snap_point_with_osnap([6030.0, 4985.0], None, None, 200.0);
+        assert!((ix_pt[0] - 6000.0).abs() < 1e-3 && (ix_pt[1] - 5000.0).abs() < 1e-3);
+        assert!(matches!(ix_kind, OsnapKind::Endpoint | OsnapKind::Intersection));
+
+        // Standalone segment endpoint verifies pure Endpoint OSNAP without crossing axes
+        canvas.entities.push(CanvasEntity {
+            id: 89,
+            pillar_badge: "P4".to_string(),
+            pillar_name: "Parametric".to_string(),
+            kind: CanvasShapeKind::Line {
+                start_mm: [20000.0, 0.0],
+                end_mm: [24000.0, 0.0],
+            },
+            color_rgb: [56, 189, 248],
+            stroke_width: 2.0,
+        });
+        let (pure_end_pt, pure_end_kind) =
+            canvas.snap_point_with_osnap([23980.0, 15.0], None, None, 200.0);
+        assert!((pure_end_pt[0] - 24000.0).abs() < 1e-3 && pure_end_pt[1].abs() < 1e-3);
+        assert_eq!(pure_end_kind, OsnapKind::Endpoint);
+        canvas.entities.pop();
+
+        // 2. Marquee Window (L->R) vs Crossing (R->L) selection + Multi-entity Array & Promote
+        canvas.entities.push(CanvasEntity {
+            id: 90,
+            pillar_badge: "P4".to_string(),
+            pillar_name: "Parametric".to_string(),
+            kind: CanvasShapeKind::Rectangle {
+                min_mm: [0.0, 0.0],
+                max_mm: [6000.0, 5000.0],
+            },
+            color_rgb: [56, 189, 248],
+            stroke_width: 2.0,
+        });
+        canvas.next_entity_id = 91;
+
+        // Small Window marquee excluding the 6000x5000 rectangle should find 0 full-enclosed boxes inside [100,100]->[1000,1000]
+        let win_cnt = canvas.select_marquee([100.0, 100.0], [1000.0, 1000.0]);
+        assert_eq!(win_cnt, 0);
+
+        // Crossing (Right->Left) over the edge intersects rectangle & lines
+        let cross_cnt = canvas.select_marquee([1000.0, 1000.0], [-50.0, -50.0]);
+        assert!(cross_cnt >= 3);
+
+        // Window selection enclosing [0,0]->[6000,5000] excludes 12m horizontal axes (3 enclosed)
+        assert_eq!(canvas.select_marquee([-50.0, -50.0], [6050.0, 5050.0]), 3);
+        // Full Window selection enclosing all 5 grid axes + rectangle (6 entities)
+        let full_win = canvas.select_marquee([-50.0, -50.0], [12050.0, 5050.0]);
+        assert_eq!(full_win, 6);
+
+        // Promote selection into 3D BIM Walls, Beams, Columns & Slabs
+        let msg = canvas.execute_precision_command(
+            "promote",
+            NavigationPillar::GeometryAssembly,
+            &mut bim,
+        );
+        assert!(msg.contains("Walls"));
+        assert!(!bim.walls.is_empty());
+        assert!(!bim.slabs.is_empty());
+        assert!(!bim.columns.is_empty());
+
+        // Rectangular ARRAY command
+        let arr_msg = canvas.execute_precision_command(
+            "array 2x2 7000 6000",
+            NavigationPillar::GeometryAssembly,
+            &mut bim,
+        );
+        assert!(arr_msg.contains("Arrayed 2x2"));
     }
 }
