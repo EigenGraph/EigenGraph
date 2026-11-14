@@ -11,9 +11,13 @@ impl BuildView {
     ) {
         Frame::new()
             .fill(theme.bg_sidebar)
+            .corner_radius(CornerRadius::same(8))
             .inner_margin(Margin::symmetric(10, 6))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
+                let inner_w = ui.available_width().max(120.0);
+                ui.set_width(inner_w);
+                ui.set_max_width(inner_w);
                 // Tier 1: Ribbon Tab Selector Chips (indented when sidebar is collapsed)
                 ScrollArea::horizontal()
                     .id_salt("bim_ribbon_tabs_scroll")

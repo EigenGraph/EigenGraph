@@ -7,6 +7,26 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.4.1] - 2026-11-14 — Phase 41: Canvas Width Parity, Precision CAD Tools & Full 74/74 Roadmap Unlock
+
+### Added & Changed
+- **Below-Canvas Width Parity & Zero Compiler Warnings (`src/app.rs`, `src/ui_kit.rs`, all 12 pillar views, `src/core/gis/map_widget.rs`)**:
+  - Unified central workspace column width (`ui.set_width` / `ui.set_max_width`), removed redundant outer horizontal margins across all 12 below-canvas views, aligned docked inspectors and subtab bars directly with the drawing canvas width across Mobile, Tablet, and Desktop breakpoints, and added unit test coverage (`test_below_canvas_module_matches_canvas_width_parity`, `test_world_tile_cache_decode_and_ready_state`) leaving zero warnings across targets.
+- **Outside-Viewport CAD Precision Controls & Global Quick-Jump (`src/views/universal_canvas.rs`, `src/views/parametric/`, `src/views/build/viewport_3d.rs`, `src/app.rs`)**:
+  - Kept drawing viewports completely uncluttered while expanding bottom toolbars with configurable numeric `Step (mm)`, `Copy/Duplicate`, `Rotate 90°`, `@dx,dy` relative and `@dist<deg` polar CLI expressions, and a `? Shortcuts` / `Ctrl/Cmd+K` / `F1` global CAD shortcut reference and module quick-jump modal.
+- **Complete Phase 35 Engineering Capability Suite Unlocked (74/74 Active, 0 Locked across `src/features.rs`)**:
+  - `AI-05` (`src/core/parametric.rs`, `src/views/ai_firm.rs`): NSGA-II multi-objective structural Pareto frontier solver (weight, cost, embodied CO2e, ARI) with interactive scatter frontier and one-click `"Apply Selected -> BIM"`.
+  - `SIM-08` (`src/views/analyze/extended_mechanics.rs`, `src/views/analyze/mod.rs`): AISC Design Guide 11 floor footfall vibration and EN 1993-1-9 / AISC 360 bilinear S-N Miner cumulative fatigue solver with interactive S-N plot.
+  - `3D-06` (`src/views/build/bottom_deck.rs`, `src/views/build/mod.rs`): Point cloud as-built deviation auditor with ACI 117 column plumbness, ASTM E1155 FF/FL calculation, XYZ cloud ingestion, and deviation CSV export.
+  - `5D-04` (`src/views/planning.rs`): Normalized bid-leveling tender matrix with front-loading outlier detection, composite deck VE swap, ARI guardrail check, CSV and award memo export.
+  - `6D-04` (`src/views/sustainability.rs`): ISO 20887 / EN 15978 Module D circular material passport and MCI calculator tied to live BIM quantities and steel production routes with JSON passport export.
+  - `7D-04` (`src/views/facility.rs`): Interactive UAV photogrammetry crack & spalling inspector against ACI 224R limits, CSV ingestion, clickable orthomosaic defect pins, and CMMS work order dispatch.
+  - `8D-04` (`src/views/safety.rs`): Digital Permit-to-Work (PTW) workflow with automated crane wind-speed lockdown interlock (`>= 55 km/h`), confined-space gas test gates, and NFPA 101 evacuation drill logger.
+  - `9D-04` (`src/views/lean.rs`): BIM-pinned RFI & submittal SLA countdown tracker coupled directly to Lean Last Planner System constraint clearing and CSV export.
+  - `10D-05` (`src/views/industrialized/mod.rs`, `src/views/industrialized/automation_slots.rs`): Parametric 3D concrete printing (3DCP) perimeter slicer with thermal cold-joint open-time window validation and `.gcode` toolpath export.
+  - `PRED-03` & `PRED-04` (`src/views/prediction.rs`): Fick's 2nd Law `erfc()` chloride ingress & carbonation depassivation service-life curve solver + ATC-20 post-earthquake Green/Yellow/Red wing placard triage coupled to live PGA and 7D SHM strain.
+  - `PUB-05` (`src/views/results.rs`): Pure-Rust FIPS 180-4 SHA-256 As-Built handover completeness auditor and tamper-evident custody manifest JSON packager.
+
 ## [v0.4.0] - 2026-11-14 — Phase 40: Clean Viewports, Aligned Coordinate Bar, Full CAD Shortcuts & Complete Phase 34 Capability Suite
 
 ### Added & Changed

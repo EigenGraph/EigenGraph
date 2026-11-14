@@ -124,6 +124,112 @@ pub struct SafetyView {
     pub shoring_slab_thickness_mm: f32,
     pub shoring_pt_transfer_slab: bool,
     pub shoring_audit_status: Option<String>,
+    // Phase 41 (8D-04): Digital Permit-to-Work & Evacuation Drill Logger
+    pub ptw_permits: Vec<SafetyPermitItem>,
+    pub ptw_wind_speed_kmh: f32,
+    pub ptw_wind_lockdown_kmh: f32,
+    pub ptw_enforce_gas_test: bool,
+    pub ptw_new_location: String,
+    pub ptw_new_hazard_idx: usize,
+    pub ptw_drill_time_sec: u32,
+    pub ptw_muster_headcount: u32,
+    pub ptw_muster_target: u32,
+    pub ptw_status_banner: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SafetyPermitItem {
+    pub permit_id: String,
+    pub hazard_class: String,
+    pub location: String,
+    pub supervisor: String,
+    pub valid_until: String,
+    pub height_sensitive: bool,
+    pub gas_tested: bool,
+    pub expired_min_left: i32,
+}
+
+impl SafetyPermitItem {
+    pub fn default_ledger() -> Vec<Self> {
+        vec![
+            Self {
+                permit_id: "PTW-HW-09".to_string(),
+                hazard_class: "Hot-Work Welding".to_string(),
+                location: "Level 08 Truss Splice".to_string(),
+                supervisor: "R. Pratama (HSE L3)".to_string(),
+                valid_until: "Until 17:00".to_string(),
+                height_sensitive: false,
+                gas_tested: true,
+                expired_min_left: 75,
+            },
+            Self {
+                permit_id: "PTW-WH-14".to_string(),
+                hazard_class: "Work-at-Height / Lift".to_string(),
+                location: "Perimeter Facade West".to_string(),
+                supervisor: "S. Wijaya (Rigging)".to_string(),
+                valid_until: "Until 18:00".to_string(),
+                height_sensitive: true,
+                gas_tested: true,
+                expired_min_left: 190,
+            },
+            Self {
+                permit_id: "PTW-CS-03".to_string(),
+                hazard_class: "Confined Space".to_string(),
+                location: "Sump Pit B2 (O2 20.9%)".to_string(),
+                supervisor: "H. Kusuma (Gas Tech)".to_string(),
+                valid_until: "Until 16:30".to_string(),
+                height_sensitive: false,
+                gas_tested: true,
+                expired_min_left: 140,
+            },
+        ]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PtwSafetyAudit {
+    pub active_count: usize,
+    pub crane_wind_locked: bool,
+    pub height_hold_count: usize,
+    pub expiring_count: usize,
+    pub blocked_confined_count: usize,
+}
+
+/// Evaluates Digital Permit-to-Work (PTW) wind interlock, gas testing compliance, and expiry alerts.
+pub fn evaluate_ptw_safety_gate(
+    permits: &[SafetyPermitItem],
+    wind_speed_kmh: f32,
+    wind_lockdown_kmh: f32,
+    enforce_gas_test: bool,
+) -> PtwSafetyAudit {
+    let crane_wind_locked = wind_speed_kmh >= wind_lockdown_kmh;
+    let mut active_count = 0usize;
+    let mut height_hold_count = 0usize;
+    let mut expiring_count = 0usize;
+    let mut blocked_confined_count = 0usize;
+
+    for p in permits {
+        let gas_block = enforce_gas_test && p.hazard_class.contains("Confined") && !p.gas_tested;
+        let wind_block = crane_wind_locked && p.height_sensitive;
+        if gas_block {
+            blocked_confined_count += 1;
+        } else if wind_block {
+            height_hold_count += 1;
+        } else {
+            active_count += 1;
+        }
+        if p.expired_min_left <= 90 {
+            expiring_count += 1;
+        }
+    }
+
+    PtwSafetyAudit {
+        active_count,
+        crane_wind_locked,
+        height_hold_count,
+        expiring_count,
+        blocked_confined_count,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -274,6 +380,16 @@ impl Default for SafetyView {
             shoring_slab_thickness_mm: 220.0,
             shoring_pt_transfer_slab: false,
             shoring_audit_status: None,
+            ptw_permits: SafetyPermitItem::default_ledger(),
+            ptw_wind_speed_kmh: 38.0,
+            ptw_wind_lockdown_kmh: 55.0,
+            ptw_enforce_gas_test: true,
+            ptw_new_location: "Level 09 Composite Deck".to_string(),
+            ptw_new_hazard_idx: 0,
+            ptw_drill_time_sec: 222,
+            ptw_muster_headcount: 186,
+            ptw_muster_target: 186,
+            ptw_status_banner: None,
         }
     }
 }
@@ -287,11 +403,11 @@ impl SafetyView {
         bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
-        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
-        let pad = if is_mobile { 12 } else { 24 };
-
         ui.vertical(|ui| {
-            Frame::new().inner_margin(Margin::symmetric(pad, 16)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // 1. Top Subtabs Bar
                 self.render_header_bar(ui, theme);
                 ui.add_space(16.0);
@@ -1083,11 +1199,36 @@ impl SafetyView {
     }
 
     fn render_permit_to_work_drills(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
+        let audit = evaluate_ptw_safety_gate(
+            &self.ptw_permits,
+            self.ptw_wind_speed_kmh,
+            self.ptw_wind_lockdown_kmh,
+            self.ptw_enforce_gas_test,
+        );
+        let wind_col = if audit.crane_wind_locked {
+            theme.accent_red
+        } else {
+            theme.accent_green
+        };
+        let drill_min = self.ptw_drill_time_sec / 60;
+        let drill_rem = self.ptw_drill_time_sec % 60;
+        let muster_ok = self.ptw_muster_headcount >= self.ptw_muster_target && self.ptw_drill_time_sec <= 300;
+        let muster_col = if muster_ok {
+            theme.accent_green
+        } else {
+            theme.accent_orange
+        };
+        let exp_col = if audit.expiring_count == 0 && audit.blocked_confined_count == 0 {
+            theme.accent_green
+        } else {
+            theme.accent_orange
+        };
+
         ui_kit::feature_slot_card(
             ui,
             theme,
@@ -1095,61 +1236,206 @@ impl SafetyView {
             FeatureId::PermitToWorkEvacuationDrill,
             |ui| {
                 let cards = [
-                    ("ACTIVE SITE PERMITS (PTW)", "7 Valid Today", "3 Hot-Work • 2 Height • 2 Confined", theme.accent_blue),
-                    ("CRANE WIND LOCKDOWN CAP", "38 km/h Current", "Auto-Hold Threshold = 55 km/h", theme.accent_green),
-                    ("LAST EVACUATION DRILL", "3m 42s @ Muster E", "186/186 Crew RFID Accounted", theme.accent_green),
-                    ("EXPIRING SIGN-OFFS", "1 Pending Renewal", "PTW-HW-09 Expires in 90 min", theme.accent_orange),
+                    (
+                        "ACTIVE SITE PERMITS (PTW)",
+                        format!("{} Valid / {} Total", audit.active_count, self.ptw_permits.len()),
+                        format!("{} Height-Hold • {} Gas-Blocked", audit.height_hold_count, audit.blocked_confined_count),
+                        theme.accent_blue,
+                    ),
+                    (
+                        "CRANE WIND LOCKDOWN CAP",
+                        format!("{:.0} km/h Current", self.ptw_wind_speed_kmh),
+                        if audit.crane_wind_locked {
+                            format!("WIND INTERLOCK TRIPPED (>= {:.0} km/h)", self.ptw_wind_lockdown_kmh)
+                        } else {
+                            format!("Auto-Hold Threshold = {:.0} km/h", self.ptw_wind_lockdown_kmh)
+                        },
+                        wind_col,
+                    ),
+                    (
+                        "EVACUATION MUSTER DRILL",
+                        format!("{}m {:02}s @ Muster E", drill_min, drill_rem),
+                        format!("{}/{} Crew RFID Accounted (NFPA <= 5m)", self.ptw_muster_headcount, self.ptw_muster_target),
+                        muster_col,
+                    ),
+                    (
+                        "EXPIRING & RENEWAL QUEUE",
+                        format!("{} Expiring <= 90m", audit.expiring_count),
+                        "Real-Time HSE Competent Sign-Off Gate".to_string(),
+                        exp_col,
+                    ),
                 ];
                 ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
-                    let (t, v, s, c) = cards[idx];
-                    ui_kit::stat_card(ui, theme, t, v, s, c);
+                    let (t, v, s, c) = &cards[idx];
+                    ui_kit::stat_card(ui, theme, t, v, s, *c);
                 });
+
+                if let Some(msg) = &self.ptw_status_banner {
+                    ui.add_space(6.0);
+                    ui.label(RichText::new(msg).size(11.0).strong().color(theme.accent_green));
+                }
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Enforce Gas Test for Confined Spaces");
-                    let _ = ui.selectable_label(false, "Auto-Suspend Lift PTW @ Wind >= 55 km/h");
-                    let _ = icons::icon_button(
+                    ui.label(RichText::new("Site Wind (km/h):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.ptw_wind_speed_kmh, 10.0..=85.0).suffix(" km/h"));
+                    ui.add_space(6.0);
+                    ui.label(RichText::new("Auto-Hold Cap:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.ptw_wind_lockdown_kmh, 40.0..=75.0).suffix(" km/h"));
+                    ui.checkbox(&mut self.ptw_enforce_gas_test, "Enforce Gas Test (Confined Space)");
+                });
+                ui.add_space(6.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Drill Sec:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.ptw_drill_time_sec, 90..=420).suffix(" s"));
+                    ui.label(RichText::new("Muster Headcount:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.ptw_muster_headcount, 120..=186));
+                });
+                ui.add_space(6.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.ptw_new_location)
+                            .desired_width(175.0)
+                            .hint_text("Permit zone / grid..."),
+                    );
+                    ui.selectable_value(&mut self.ptw_new_hazard_idx, 0, "Hot-Work");
+                    ui.selectable_value(&mut self.ptw_new_hazard_idx, 1, "Work-at-Height");
+                    ui.selectable_value(&mut self.ptw_new_hazard_idx, 2, "Confined Space");
+                    if icons::icon_button(
                         ui,
                         AppIcon::Shield,
-                        "Issue Digital Permit-to-Work & Log Drill Time",
+                        "Issue Digital PTW",
                         12.0,
                         theme.text_primary,
                         theme.bg_card,
                         Stroke::new(1.0, theme.border_subtle),
                         CornerRadius::same(6),
                         Vec2::ZERO,
-                    );
+                    )
+                    .clicked()
+                    {
+                        let next_n = 15 + self.ptw_permits.len();
+                        let (pfx, cls, height_sens, gas_ok) = match self.ptw_new_hazard_idx {
+                            1 => ("WH", "Work-at-Height / Lift", true, true),
+                            2 => ("CS", "Confined Space", false, !self.ptw_enforce_gas_test),
+                            _ => ("HW", "Hot-Work Welding", false, true),
+                        };
+                        let id = format!("PTW-{}-{:02}", pfx, next_n);
+                        self.ptw_permits.insert(
+                            0,
+                            SafetyPermitItem {
+                                permit_id: id.clone(),
+                                hazard_class: cls.to_string(),
+                                location: if self.ptw_new_location.trim().is_empty() {
+                                    "Zone B Structural Bay".to_string()
+                                } else {
+                                    self.ptw_new_location.trim().to_string()
+                                },
+                                supervisor: "Site HSE Officer".to_string(),
+                                valid_until: "Until 19:00".to_string(),
+                                height_sensitive: height_sens,
+                                gas_tested: gas_ok,
+                                expired_min_left: 240,
+                            },
+                        );
+                        self.ptw_status_banner = Some(format!("Issued Digital PTW {id} ({cls})"));
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Document,
+                        "Export PTW & Drill Log CSV",
+                        11.5,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        let mut csv = String::from("PermitID,HazardClass,Location,Supervisor,Validity,HeightSensitive,GasTested,MinLeft\n");
+                        for p in &self.ptw_permits {
+                            csv.push_str(&format!(
+                                "{},\"{}\",\"{}\",\"{}\",\"{}\",{},{},{}\n",
+                                p.permit_id, p.hazard_class, p.location, p.supervisor, p.valid_until, p.height_sensitive, p.gas_tested, p.expired_min_left
+                            ));
+                        }
+                        csv.push_str(&format!(
+                            "# EVACUATION DRILL LOG: {}m{:02}s, Muster {}/{}\n",
+                            drill_min, drill_rem, self.ptw_muster_headcount, self.ptw_muster_target
+                        ));
+                        match crate::core::web_bridge::save_text_file("EigenGraph_HSE_PTW_Drill_Log.csv", &csv, "text/csv") {
+                            Ok(msg) => self.ptw_status_banner = Some(format!("HSE PTW CSV exported ({msg})")),
+                            Err(err) => self.ptw_status_banner = Some(format!("PTW export error: {err}")),
+                        }
+                    }
                 });
                 ui.add_space(10.0);
 
+                let mut toggle_gas_idx: Option<usize> = None;
+                let mut renew_idx: Option<usize> = None;
                 ScrollArea::horizontal().id_salt("ptw_ledger_scroll").show(ui, |ui| {
                     egui::Grid::new("ptw_ledger_grid")
                         .striped(true)
-                        .min_col_width(90.0)
-                        .spacing(Vec2::new(14.0, 6.0))
+                        .min_col_width(82.0)
+                        .spacing(Vec2::new(12.0, 6.0))
                         .show(ui, |ui| {
-                            for h in ["Permit ID", "Hazard Class", "Location", "Competent Sign-Off", "Validity", "Status"] {
+                            for h in ["Permit ID", "Hazard Class", "Location", "Competent Sign-Off", "Status", "Action"] {
                                 ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                             }
                             ui.end_row();
-                            for (id, icon, cls, loc, sup, val, st, col) in [
-                                ("PTW-HW-09", AppIcon::Flame, "Hot-Work Welding", "Level 08 Truss Splice", "R. Pratama (HSE L3)", "Until 17:00", "RENEW SOON", theme.accent_orange),
-                                ("PTW-WH-14", AppIcon::HardHat, "Work-at-Height", "Perimeter Facade West", "S. Wijaya (Rigging)", "Until 18:00", "ACTIVE", theme.accent_green),
-                                ("PTW-CS-03", AppIcon::AlertTriangle, "Confined Space", "Sump Pit B2 (O₂ 20.9%)", "H. Kusuma (Gas Tech)", "Until 16:30", "ACTIVE", theme.accent_green),
-                            ] {
-                                ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
+                            for (idx, p) in self.ptw_permits.iter().enumerate() {
+                                let icon = if p.hazard_class.contains("Hot") {
+                                    AppIcon::Flame
+                                } else if p.hazard_class.contains("Confined") {
+                                    AppIcon::AlertTriangle
+                                } else {
+                                    AppIcon::HardHat
+                                };
+                                let (st, col) = if self.ptw_enforce_gas_test && p.hazard_class.contains("Confined") && !p.gas_tested {
+                                    ("GAS TEST REQ", theme.accent_red)
+                                } else if audit.crane_wind_locked && p.height_sensitive {
+                                    ("WIND HOLD", theme.accent_red)
+                                } else if p.expired_min_left <= 90 {
+                                    ("RENEW SOON", theme.accent_orange)
+                                } else {
+                                    ("ACTIVE", theme.accent_green)
+                                };
+                                ui.label(RichText::new(&p.permit_id).size(10.5).monospace().color(theme.accent_blue));
                                 ui.horizontal(|ui| {
-                                    icons::icon_label(ui, icon, 12.0, col, cls, 10.5, theme.text_primary, true);
+                                    icons::icon_label(ui, icon, 12.0, col, &p.hazard_class, 10.5, theme.text_primary, true);
                                 });
-                                ui.label(RichText::new(loc).size(10.5).color(theme.text_secondary));
-                                ui.label(RichText::new(sup).size(10.5).color(theme.text_secondary));
-                                ui.label(RichText::new(val).size(10.5).color(theme.text_muted));
+                                ui.label(RichText::new(&p.location).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(&p.supervisor).size(10.5).color(theme.text_secondary));
                                 ui.label(RichText::new(st).size(10.5).strong().color(col));
+                                if !p.gas_tested && p.hazard_class.contains("Confined") {
+                                    if ui.small_button("Log Gas OK").clicked() {
+                                        toggle_gas_idx = Some(idx);
+                                    }
+                                } else if p.expired_min_left <= 90 {
+                                    if ui.small_button("Renew +4h").clicked() {
+                                        renew_idx = Some(idx);
+                                    }
+                                } else {
+                                    ui.label(RichText::new(&p.valid_until).size(10.0).color(theme.text_muted));
+                                }
                                 ui.end_row();
                             }
                         });
                 });
+                if let Some(i) = toggle_gas_idx {
+                    if let Some(item) = self.ptw_permits.get_mut(i) {
+                        item.gas_tested = true;
+                        self.ptw_status_banner = Some(format!("Logged O2/LEL gas clearance for {}", item.permit_id));
+                    }
+                }
+                if let Some(i) = renew_idx {
+                    if let Some(item) = self.ptw_permits.get_mut(i) {
+                        item.expired_min_left = 240;
+                        item.valid_until = "Extended +4h".to_string();
+                        self.ptw_status_banner = Some(format!("Renewed permit {} for +4 hours", item.permit_id));
+                    }
+                }
             },
         );
     }
@@ -1182,5 +1468,27 @@ mod tests {
         assert!(day10.strike_ready);
         assert!(day10.peak_prop_load_kn < day3.peak_prop_load_kn);
         assert!(day10.euler_fs > day3.euler_fs);
+    }
+
+    #[test]
+    fn test_ptw_crane_wind_interlock_and_gas_gate() {
+        let mut ledger = SafetyPermitItem::default_ledger();
+        ledger.push(SafetyPermitItem {
+            permit_id: "PTW-CS-99".to_string(),
+            hazard_class: "Confined Space".to_string(),
+            location: "Tank B3".to_string(),
+            supervisor: "Tech".to_string(),
+            valid_until: "18:00".to_string(),
+            height_sensitive: false,
+            gas_tested: false,
+            expired_min_left: 180,
+        });
+        let calm = evaluate_ptw_safety_gate(&ledger, 35.0, 55.0, true);
+        let gale = evaluate_ptw_safety_gate(&ledger, 62.0, 55.0, true);
+        assert!(!calm.crane_wind_locked);
+        assert_eq!(calm.height_hold_count, 0);
+        assert_eq!(calm.blocked_confined_count, 1);
+        assert!(gale.crane_wind_locked);
+        assert_eq!(gale.height_hold_count, 1);
     }
 }

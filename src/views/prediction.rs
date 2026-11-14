@@ -153,6 +153,249 @@ pub struct PredictionView {
     // Phase 40 (PRED-02): Live SHM Anomaly & Drift Threshold Controls
     pub shm_drift_alert_beta: f32,
     pub shm_include_freq_shift: bool,
+    // Phase 41 (PRED-03): Fick's 2nd Law Chloride & Carbonation Service-Life
+    pub dur_cover_mm: f64,
+    pub dur_wb_ratio: f64,
+    pub dur_exposure_idx: usize,
+    pub dur_silica_fume: bool,
+    pub dur_c_crit_pct: f64,
+    // Phase 41 (PRED-04): Post-Earthquake ATC-20 Placard Triage
+    pub atc_pga_g: f32,
+    pub atc_ingest_shm: bool,
+    pub atc_auto_placard: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DurabilityZoneRow {
+    pub zone_name: &'static str,
+    pub cover_mm: f64,
+    pub d_app: f64,
+    pub depassivation_yr: f64,
+    pub status: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChlorideDurabilityReport {
+    pub exposure_label: &'static str,
+    pub d_app_m2_s: f64,
+    pub cs_pct: f64,
+    pub depassivation_years: f64,
+    pub carbonation_50yr_mm: f64,
+    pub section_loss_50yr_pct: f64,
+    pub curve_years_0_to_100: Vec<(f32, f32, f32)>, // (yr, chl_front_mm, carb_front_mm)
+    pub zones: Vec<DurabilityZoneRow>,
+}
+
+/// Complementary error function `erfc(x) = 1 - erf(x)` via Abramowitz & Stegun 7.1.26.
+fn erfc_approx(x: f64) -> f64 {
+    if x <= 0.0 {
+        return 1.0;
+    }
+    let p = 0.3275911;
+    let a1 = 0.254829592;
+    let a2 = -0.284496736;
+    let a3 = 1.421413741;
+    let a4 = -1.453152027;
+    let a5 = 1.061405429;
+    let t = 1.0 / (1.0 + p * x);
+    let poly = (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t;
+    (poly * (-x * x).exp()).clamp(0.0, 1.0)
+}
+
+/// Inverts `erfc(z) = target` cleanly via bisection for `t_i = x^2 / (4 D z^2)`.
+fn inverse_erfc_z(target: f64) -> f64 {
+    let tgt = target.clamp(0.005, 0.99);
+    let mut lo = 0.0_f64;
+    let mut hi = 3.5_f64;
+    for _ in 0..32 {
+        let mid = 0.5 * (lo + hi);
+        if erfc_approx(mid) > tgt {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    0.5 * (lo + hi)
+}
+
+/// Computes concrete service life under EN 206 / Fib Bulletin 34 Fick's 2nd Law chloride ingress and carbonation.
+pub fn compute_chloride_carbonation_durability(
+    cover_mm: f64,
+    wb_ratio: f64,
+    exposure_idx: usize,
+    silica_fume_ggbfs: bool,
+    c_crit_pct: f64,
+) -> ChlorideDurabilityReport {
+    let cov = cover_mm.clamp(20.0, 110.0);
+    let wb = wb_ratio.clamp(0.28, 0.65);
+    let c_crit = c_crit_pct.clamp(0.02, 0.25);
+
+    let (exposure_label, cs_pct, exp_mult) = match exposure_idx {
+        1 => ("XS3 Marine Tidal / Splash", 0.52_f64, 1.35),
+        2 => ("XC3 Sheltered Urban CO2", 0.14_f64, 0.45),
+        _ => ("XS2 Marine Submerged", 0.38_f64, 1.00),
+    };
+    let wb_scale = ((wb - 0.30) * 6.8).exp() * 1.1e-12;
+    let mineral_mult = if silica_fume_ggbfs { 0.48 } else { 1.0 };
+    let d_app_m2_s = (wb_scale * exp_mult * mineral_mult).clamp(0.4e-12, 2.5e-11);
+
+    let ratio = (c_crit / cs_pct).clamp(0.01, 0.98);
+    let z = inverse_erfc_z(ratio).max(0.18);
+    let sec_per_year = 365.25 * 86400.0;
+    let cov_m = cov / 1000.0;
+    let depassivation_years = ((cov_m * cov_m) / (4.0 * d_app_m2_s * z * z) / sec_per_year).clamp(4.0, 250.0);
+
+    let k_carb_mm_sqrt_yr = (2.8 + (wb - 0.35).max(0.0) * 14.0)
+        * if exposure_idx == 2 { 1.45 } else { 0.88 }
+        * if silica_fume_ggbfs { 0.85 } else { 1.0 };
+    let carbonation_50yr_mm = k_carb_mm_sqrt_yr * 50.0_f64.sqrt();
+
+    let active_corrosion_yr = (50.0 - depassivation_years).max(0.0);
+    let section_loss_50yr_pct = (0.35 + active_corrosion_yr * 0.28).clamp(0.2, 18.0);
+
+    let mut curve_years_0_to_100 = Vec::with_capacity(41);
+    for i in 0..=40 {
+        let yr = (i as f64) * 2.5;
+        let t_sec = yr * sec_per_year;
+        let x_crit_mm = 2.0 * z * (d_app_m2_s * t_sec).sqrt() * 1000.0;
+        let x_carb_mm = k_carb_mm_sqrt_yr * yr.sqrt();
+        curve_years_0_to_100.push((yr as f32, x_crit_mm as f32, x_carb_mm as f32));
+    }
+
+    let zones = [
+        ("Splash Pile Cap", (cov + 10.0).min(100.0), 0.78),
+        ("Submerged Pier", cov, 1.00),
+        ("Podium Soffit", (cov - 20.0).max(25.0), 1.45),
+        ("Tower Core Wall", (cov - 10.0).max(30.0), 0.62),
+    ]
+    .into_iter()
+    .map(|(zn, zc, dm)| {
+        let zd = d_app_m2_s * dm;
+        let zc_m = zc / 1000.0;
+        let ti = ((zc_m * zc_m) / (4.0 * zd * z * z) / sec_per_year).clamp(3.0, 250.0);
+        let status = if ti >= 65.0 {
+            "SAFE >= 50"
+        } else if ti >= 45.0 {
+            "MONITOR"
+        } else {
+            "COAT EPOXY"
+        };
+        DurabilityZoneRow {
+            zone_name: zn,
+            cover_mm: zc,
+            d_app: zd,
+            depassivation_yr: ti,
+            status,
+        }
+    })
+    .collect();
+
+    ChlorideDurabilityReport {
+        exposure_label,
+        d_app_m2_s,
+        cs_pct,
+        depassivation_years,
+        carbonation_50yr_mm,
+        section_loss_50yr_pct,
+        curve_years_0_to_100,
+        zones,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Atc20WingTriage {
+    pub sector: &'static str,
+    pub peak_drift_pct: f32,
+    pub residual_strain_pct: f32,
+    pub placard: &'static str, // GREEN | YELLOW | RED
+    pub action: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Atc20TriageSummary {
+    pub wings: Vec<Atc20WingTriage>,
+    pub peak_drift_pct: f32,
+    pub max_residual_pct: f32,
+    pub green_count: usize,
+    pub yellow_count: usize,
+    pub red_count: usize,
+}
+
+/// Computes ATC-20 rapid post-earthquake wing tagging (Green/Yellow/Red) from PGA, SHM strain, and member DCR.
+pub fn compute_atc20_post_quake_triage(
+    members: &[StructuralMember],
+    shm_feed: ShmPredictionFeed,
+    pga_g: f32,
+    couple_shm: bool,
+) -> Atc20TriageSummary {
+    let pga = pga_g.clamp(0.05, 1.00);
+    let mean_dcr = if members.is_empty() {
+        0.62
+    } else {
+        (members.iter().map(|m| m.utilization as f32).sum::<f32>() / members.len() as f32).clamp(0.2, 1.35)
+    };
+    let shm_mult = if couple_shm {
+        1.0 + ((shm_feed.strain_micro - 300.0).max(0.0) / 1400.0) + (shm_feed.degradation_pct / 40.0)
+    } else {
+        1.0
+    };
+
+    let base_sectors = [
+        ("Wing A (East)", 0.62_f32),
+        ("Wing B (North)", 0.69),
+        ("Podium West", 0.96),
+        ("Tower L01-L05", 0.82),
+        ("Tower L06-L10", 1.06),
+        ("Roof Penthouse", 0.76),
+    ];
+
+    let mut wings = Vec::with_capacity(base_sectors.len());
+    let mut peak_drift_pct = 0.0_f32;
+    let mut max_residual_pct = 0.0_f32;
+    let mut green_count = 0usize;
+    let mut yellow_count = 0usize;
+    let mut red_count = 0usize;
+
+    for (sec, fac) in base_sectors {
+        let drift = (pga * 2.85 * fac * (0.70 + 0.45 * mean_dcr) * shm_mult).clamp(0.08, 4.5);
+        let residual = if drift > 0.85 {
+            ((drift - 0.85) * 0.48).clamp(0.02, 1.60)
+        } else {
+            (drift * 0.03).clamp(0.0, 0.04)
+        };
+        let (placard, action) = if drift >= 1.50 || residual >= 0.45 {
+            red_count += 1;
+            ("RED", "Unsafe — Evacuate")
+        } else if drift >= 0.95 || residual >= 0.14 {
+            yellow_count += 1;
+            ("YELLOW", "Restricted — Shore")
+        } else {
+            green_count += 1;
+            ("GREEN", "Safe Occupancy")
+        };
+        if drift > peak_drift_pct {
+            peak_drift_pct = drift;
+        }
+        if residual > max_residual_pct {
+            max_residual_pct = residual;
+        }
+        wings.push(Atc20WingTriage {
+            sector: sec,
+            peak_drift_pct: drift,
+            residual_strain_pct: residual,
+            placard,
+            action,
+        });
+    }
+
+    Atc20TriageSummary {
+        wings,
+        peak_drift_pct,
+        max_residual_pct,
+        green_count,
+        yellow_count,
+        red_count,
+    }
 }
 
 impl Default for PredictionView {
@@ -169,6 +412,14 @@ impl Default for PredictionView {
             transient_report: None,
             shm_drift_alert_beta: 3.80,
             shm_include_freq_shift: true,
+            dur_cover_mm: 65.0,
+            dur_wb_ratio: 0.38,
+            dur_exposure_idx: 0,
+            dur_silica_fume: true,
+            dur_c_crit_pct: 0.05,
+            atc_pga_g: 0.34,
+            atc_ingest_shm: true,
+            atc_auto_placard: true,
         }
     }
 }
@@ -183,11 +434,11 @@ impl PredictionView {
         shm_feed: ShmPredictionFeed,
         features: &mut FeatureRegistry,
     ) {
-        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
-        let pad = if is_mobile { 12 } else { 20 };
-
         ui.vertical(|ui| {
-            Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // 1. TOP SUBTABS SELECTOR
                 self.render_header_bar(ui, theme);
 
@@ -233,7 +484,7 @@ impl PredictionView {
                         self.render_chloride_carbonation(ui, theme, features)
                     }
                     PredictionSubTab::PostQuakeAtc20 => {
-                        self.render_post_quake_atc20(ui, theme, features)
+                        self.render_post_quake_atc20(ui, theme, members, shm_feed, features)
                     }
                 }
 
@@ -837,11 +1088,29 @@ impl PredictionView {
     }
 
     fn render_chloride_carbonation(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
+        let rep = compute_chloride_carbonation_durability(
+            self.dur_cover_mm,
+            self.dur_wb_ratio,
+            self.dur_exposure_idx,
+            self.dur_silica_fume,
+            self.dur_c_crit_pct,
+        );
+        let life_col = if rep.depassivation_years >= 50.0 {
+            theme.accent_green
+        } else {
+            theme.accent_orange
+        };
+        let loss_col = if rep.section_loss_50yr_pct <= 5.0 {
+            theme.accent_green
+        } else {
+            theme.accent_red
+        };
+        let blend_txt = if self.dur_silica_fume { "w/ 30% GGBFS+SF" } else { "OPC Plain Mix" };
         ui_kit::feature_slot_card(
             ui,
             theme,
@@ -853,48 +1122,81 @@ impl PredictionView {
                         ui,
                         theme,
                         "EXPOSURE CLASS (EN 206)",
-                        "XS2 Marine Submerged",
-                        "w/b = 0.38 • 30% GGBFS Blend",
+                        rep.exposure_label,
+                        &format!("w/b = {:.2} • {}", self.dur_wb_ratio, blend_txt),
                         theme.accent_blue,
                     ),
                     1 => ui_kit::stat_card(
                         ui,
                         theme,
-                        "TIME TO DEPASSIVATION",
-                        "58.4 Years (t_i)",
-                        "65 mm Clear Cover -> C_crit = 0.05%",
-                        theme.accent_green,
+                        "TIME TO DEPASSIVATION (t_i)",
+                        &format!("{:.1} Years", rep.depassivation_years),
+                        &format!("{:.0} mm Clear Cover -> C_crit = {:.2}%", self.dur_cover_mm, self.dur_c_crit_pct),
+                        life_col,
                     ),
                     2 => ui_kit::stat_card(
                         ui,
                         theme,
                         "50-YR REBAR SECTION LOSS",
-                        "1.85% Diameter Loss",
-                        "Fib Bulletin 34 Limit <= 5.0%",
-                        theme.accent_green,
+                        &format!("{:.2}% Diameter Loss", rep.section_loss_50yr_pct),
+                        &format!("D_app = {:.2e} m²/s (Fib Limit <= 5%)", rep.d_app_m2_s),
+                        loss_col,
                     ),
                     _ => ui_kit::stat_card(
                         ui,
                         theme,
                         "CARBONATION FRONT (50 YR)",
-                        "19.4 mm Depth",
-                        "+45.6 mm Passivation Margin Left",
+                        &format!("{:.1} mm Depth", rep.carbonation_50yr_mm),
+                        &format!("{:+.1} mm Passivation Margin Left", self.dur_cover_mm - rep.carbonation_50yr_mm),
                         theme.accent_blue,
                     ),
                 });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Fick's 2nd Law erfc() Profile");
-                    let _ = ui.selectable_label(false, "Couple Silica Fume Cover Diffusivity");
-                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Pulse, "Run Chloride Ingress & Service-Life Curve", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    ui.label(RichText::new("Cover (mm):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.dur_cover_mm, 30.0..=105.0).suffix(" mm"));
+                    ui.label(RichText::new("w/b Ratio:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.dur_wb_ratio, 0.30..=0.58).fixed_decimals(2));
+                    ui.checkbox(&mut self.dur_silica_fume, "Silica Fume / GGBFS Blend");
+                });
+                ui.add_space(6.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.selectable_value(&mut self.dur_exposure_idx, 0, "XS2 Marine Submerged");
+                    ui.selectable_value(&mut self.dur_exposure_idx, 1, "XS3 Tidal Splash");
+                    ui.selectable_value(&mut self.dur_exposure_idx, 2, "XC3 Urban Carbonation");
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Pulse,
+                        "Export Fick Durability Spec (.csv)",
+                        12.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        let mut csv = String::from("Zone,Cover_mm,D_app_m2_s,Depassivation_yr,Status\n");
+                        for z in &rep.zones {
+                            csv.push_str(&format!(
+                                "\"{}\",{:.0},{:.2e},{:.1},{}\n",
+                                z.zone_name, z.cover_mm, z.d_app, z.depassivation_yr, z.status
+                            ));
+                        }
+                        match crate::core::web_bridge::save_text_file("EigenGraph_Chloride_Durability.csv", &csv, "text/csv") {
+                            Ok(msg) => self.simulation_status = Some(format!("Durability Spec CSV exported ({msg})")),
+                            Err(err) => self.simulation_status = Some(format!("Durability export error: {err}")),
+                        }
+                    }
                 });
                 ui.add_space(12.0);
 
                 ui_kit::responsive_two_panes(ui, 660.0, |ui, pane| match pane {
                     0 => {
                         ui.label(
-                            RichText::new("FICK'S 2ND LAW DIFFUSION & REBAR PASSIVATION DEPTH CURVE")
+                            RichText::new("FICK'S 2ND LAW erfc() DIFFUSION & PASSIVATION CURVE")
                                 .size(11.0)
                                 .strong()
                                 .color(theme.accent_blue),
@@ -909,8 +1211,8 @@ impl PredictionView {
                             Pos2::new(rect.left() + 36.0, rect.top() + 18.0),
                             Pos2::new(rect.right() - 16.0, rect.bottom() - 26.0),
                         );
-                        // Cover depth threshold line (65 mm mapped at 0.72 height)
-                        let cover_y = plot.bottom() - 0.72 * plot.height();
+                        let cover_frac = (self.dur_cover_mm as f32 / 110.0).clamp(0.15, 0.94);
+                        let cover_y = plot.bottom() - cover_frac * plot.height();
                         painter.line_segment(
                             [Pos2::new(plot.left(), cover_y), Pos2::new(plot.right(), cover_y)],
                             Stroke::new(1.3, theme.accent_orange),
@@ -918,21 +1220,18 @@ impl PredictionView {
                         painter.text(
                             Pos2::new(plot.left() + 6.0, cover_y - 9.0),
                             Align2::LEFT_CENTER,
-                            "Rebar Cover Depth = 65 mm",
+                            format!("Rebar Cover Depth = {:.0} mm", self.dur_cover_mm),
                             FontId::proportional(9.5),
                             theme.accent_orange,
                         );
 
-                        // Chloride front progression sqrt(t) from year 0 to 100
-                        let mut chl_pts = Vec::with_capacity(41);
-                        let mut carb_pts = Vec::with_capacity(41);
-                        for i in 0..=40 {
-                            let frac = i as f32 / 40.0;
+                        let mut chl_pts = Vec::with_capacity(rep.curve_years_0_to_100.len());
+                        let mut carb_pts = Vec::with_capacity(rep.curve_years_0_to_100.len());
+                        for (yr, chl_mm, carb_mm) in &rep.curve_years_0_to_100 {
+                            let frac = (*yr / 100.0).clamp(0.0, 1.0);
                             let px = plot.left() + frac * plot.width();
-                            let chl_mm = 78.0 * frac.sqrt();
-                            let carb_mm = 27.5 * frac.sqrt();
-                            let py_c = plot.bottom() - (chl_mm / 90.0).clamp(0.0, 0.98) * plot.height();
-                            let py_k = plot.bottom() - (carb_mm / 90.0).clamp(0.0, 0.98) * plot.height();
+                            let py_c = plot.bottom() - (*chl_mm / 110.0).clamp(0.0, 0.98) * plot.height();
+                            let py_k = plot.bottom() - (*carb_mm / 110.0).clamp(0.0, 0.98) * plot.height();
                             chl_pts.push(Pos2::new(px, py_c));
                             carb_pts.push(Pos2::new(px, py_k));
                         }
@@ -945,7 +1244,7 @@ impl PredictionView {
                         painter.text(
                             Pos2::new(rect.center().x, rect.bottom() - 10.0),
                             Align2::CENTER_CENTER,
-                            "Blue: Chloride Front x_crit(t) • Green: Carbonation Front x_c(t) [0–100 Years]",
+                            format!("Blue: Chloride erfc Front (t_i={:.1}y) • Green: CO2 Front [0-100 Yr]", rep.depassivation_years),
                             FontId::monospace(8.5),
                             theme.text_secondary,
                         );
@@ -970,17 +1269,19 @@ impl PredictionView {
                                             ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                                         }
                                         ui.end_row();
-                                        for (zn, cov, d, yr, st, col) in [
-                                            ("Splash Pile Cap", "75 mm", "3.1e-12", "68 yrs", "SAFE >= 50", theme.accent_green),
-                                            ("Submerged Pier", "65 mm", "4.0e-12", "58 yrs", "SAFE >= 50", theme.accent_green),
-                                            ("Podium Soffit", "40 mm", "6.2e-12", "34 yrs", "COAT EPOXY", theme.accent_orange),
-                                            ("Tower Core Wall", "50 mm", "2.4e-12", "92 yrs", "SAFE >= 50", theme.accent_green),
-                                        ] {
-                                            ui.label(RichText::new(zn).size(10.5).strong().color(theme.text_primary));
-                                            ui.label(RichText::new(cov).size(10.5).color(theme.text_secondary));
-                                            ui.label(RichText::new(d).size(10.5).monospace().color(theme.text_muted));
-                                            ui.label(RichText::new(yr).size(10.5).color(theme.accent_blue));
-                                            ui.label(RichText::new(st).size(10.5).strong().color(col));
+                                        for z in &rep.zones {
+                                            let col = if z.status.starts_with("SAFE") {
+                                                theme.accent_green
+                                            } else if z.status == "MONITOR" {
+                                                theme.accent_orange
+                                            } else {
+                                                theme.accent_red
+                                            };
+                                            ui.label(RichText::new(z.zone_name).size(10.5).strong().color(theme.text_primary));
+                                            ui.label(RichText::new(format!("{:.0} mm", z.cover_mm)).size(10.5).color(theme.text_secondary));
+                                            ui.label(RichText::new(format!("{:.1e}", z.d_app)).size(10.5).monospace().color(theme.text_muted));
+                                            ui.label(RichText::new(format!("{:.0} yrs", z.depassivation_yr)).size(10.5).color(theme.accent_blue));
+                                            ui.label(RichText::new(z.status).size(10.5).strong().color(col));
                                             ui.end_row();
                                         }
                                     });
@@ -992,11 +1293,31 @@ impl PredictionView {
     }
 
     fn render_post_quake_atc20(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        members: &[StructuralMember],
+        shm_feed: ShmPredictionFeed,
         features: &mut FeatureRegistry,
     ) {
+        let rep = compute_atc20_post_quake_triage(
+            members,
+            shm_feed,
+            self.atc_pga_g,
+            self.atc_ingest_shm,
+        );
+        let red_col = if rep.red_count > 0 {
+            theme.accent_red
+        } else if rep.yellow_count > 0 {
+            theme.accent_orange
+        } else {
+            theme.accent_green
+        };
+        let green_col = if rep.green_count == rep.wings.len() {
+            theme.accent_green
+        } else {
+            theme.accent_orange
+        };
         ui_kit::feature_slot_card(
             ui,
             theme,
@@ -1007,42 +1328,75 @@ impl PredictionView {
                     0 => ui_kit::stat_card(
                         ui,
                         theme,
-                        "TRIGGERED EVENT",
-                        "Mw 6.8 • 0.34g PGA",
-                        "7D Accelerometer Peak Capture",
+                        "TRIGGERED EVENT (PGA)",
+                        &format!("{:.2} g Peak Accel", self.atc_pga_g),
+                        &format!("7D SHM Strain = {:.0} ue", shm_feed.strain_micro),
                         theme.accent_orange,
                     ),
                     1 => ui_kit::stat_card(
                         ui,
                         theme,
                         "PEAK INTERSTOREY DRIFT",
-                        "1.12% @ L06 Core",
-                        "Residual Drift = 0.14% (< 0.50%)",
+                        &format!("{:.2}% Critical Wing", rep.peak_drift_pct),
+                        &format!("Max Residual Drift = {:.2}% (< 0.50%)", rep.max_residual_pct),
                         theme.accent_blue,
                     ),
                     2 => ui_kit::stat_card(
                         ui,
                         theme,
                         "GREEN PLACARDS",
-                        "4 / 6 Wings Clear",
-                        "Safe for Immediate Occupancy",
-                        theme.accent_green,
+                        &format!("{} / {} Wings Clear", rep.green_count, rep.wings.len()),
+                        "Safe for Immediate Re-Occupancy",
+                        green_col,
                     ),
                     _ => ui_kit::stat_card(
                         ui,
                         theme,
                         "RESTRICTED / RED WINGS",
-                        "2 Yellow • 0 Red",
-                        "Podium West & L06 Shoring Check",
-                        theme.accent_orange,
+                        &format!("{} Yellow • {} Red", rep.yellow_count, rep.red_count),
+                        if rep.red_count > 0 {
+                            "EVACUATE RED SECTORS IMMEDIATELY"
+                        } else {
+                            "Targeted Post-Quake Inspection"
+                        },
+                        red_col,
                     ),
                 });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Ingest Peak Sensor Drift + Strain");
-                    let _ = ui.selectable_label(false, "Auto-Generate ATC-20 Field Placards");
-                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Shield, "Classify Building Wings & Dispatch Rapid Evaluation", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    ui.label(RichText::new("Event PGA (g):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.atc_pga_g, 0.10..=0.75).suffix(" g"));
+                    ui.checkbox(&mut self.atc_ingest_shm, "Ingest Live 7D SHM Strain");
+                    ui.checkbox(&mut self.atc_auto_placard, "Auto-Generate ATC-20 Placards");
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Shield,
+                        "Export ATC-20 Rapid Triage Report (.md)",
+                        12.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        let mut md = format!(
+                            "# ATC-20 Post-Earthquake Rapid Evaluation Report\n\n- PGA Trigger: {:.2} g\n- Peak Interstorey Drift: {:.2}%\n- Summary: {} GREEN / {} YELLOW / {} RED\n\n| Sector | Peak Drift | Residual | Placard | Action |\n|---|---:|---:|---|---|\n",
+                            self.atc_pga_g, rep.peak_drift_pct, rep.green_count, rep.yellow_count, rep.red_count
+                        );
+                        for w in &rep.wings {
+                            md.push_str(&format!(
+                                "| {} | {:.2}% | {:.2}% | {} | {} |\n",
+                                w.sector, w.peak_drift_pct, w.residual_strain_pct, w.placard, w.action
+                            ));
+                        }
+                        match crate::core::web_bridge::save_text_file("EigenGraph_ATC20_PostQuake_Placards.md", &md, "text/markdown") {
+                            Ok(msg) => self.simulation_status = Some(format!("ATC-20 Triage Report exported ({msg})")),
+                            Err(err) => self.simulation_status = Some(format!("ATC-20 export error: {err}")),
+                        }
+                    }
                 });
                 ui.add_space(12.0);
 
@@ -1065,35 +1419,32 @@ impl PredictionView {
                         let pad = 12.0;
                         let cell_w = ((rect.width() - pad * (cols as f32 + 1.0)) / cols as f32).max(50.0);
                         let cell_h = ((rect.height() - pad * (rows as f32 + 1.0)) / rows as f32).max(40.0);
-                        let wings = [
-                            ("WING A (East)", "GREEN • 0.68%", theme.accent_green),
-                            ("WING B (North)", "GREEN • 0.74%", theme.accent_green),
-                            ("PODIUM WEST", "YELLOW • 1.05%", theme.accent_orange),
-                            ("TOWER L01-L05", "GREEN • 0.88%", theme.accent_green),
-                            ("TOWER L06-L10", "YELLOW • 1.12%", theme.accent_orange),
-                            ("ROOF PENTHOUSE", "GREEN • 0.81%", theme.accent_green),
-                        ];
-                        for (idx, (name, tag, col)) in wings.iter().enumerate() {
+                        for (idx, w) in rep.wings.iter().enumerate() {
+                            let col = match w.placard {
+                                "RED" => theme.accent_red,
+                                "YELLOW" => theme.accent_orange,
+                                _ => theme.accent_green,
+                            };
                             let c = idx % cols;
                             let r = idx / cols;
                             let x = rect.left() + pad + c as f32 * (cell_w + pad);
                             let y = rect.top() + pad + r as f32 * (cell_h + pad);
                             let box_rect = Rect::from_min_size(Pos2::new(x, y), Vec2::new(cell_w, cell_h));
                             painter.rect_filled(box_rect, CornerRadius::same(6), col.gamma_multiply(0.18));
-                            painter.rect_stroke(box_rect, CornerRadius::same(6), Stroke::new(1.3, *col), StrokeKind::Inside);
+                            painter.rect_stroke(box_rect, CornerRadius::same(6), Stroke::new(1.3, col), StrokeKind::Inside);
                             painter.text(
                                 box_rect.center() - Vec2::new(0.0, 7.0),
                                 Align2::CENTER_CENTER,
-                                *name,
+                                w.sector,
                                 FontId::proportional(10.0),
                                 theme.text_primary,
                             );
                             painter.text(
                                 box_rect.center() + Vec2::new(0.0, 9.0),
                                 Align2::CENTER_CENTER,
-                                *tag,
+                                format!("{} • {:.2}%", w.placard, w.peak_drift_pct),
                                 FontId::monospace(9.5),
-                                *col,
+                                col,
                             );
                         }
                     }
@@ -1117,17 +1468,17 @@ impl PredictionView {
                                             ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                                         }
                                         ui.end_row();
-                                        for (sec, dr, st, plc, act, col) in [
-                                            ("Wing A East", "0.68%", "0.02% Elastic", "GREEN", "Re-occupy", theme.accent_green),
-                                            ("Podium West", "1.05%", "0.18% Yield", "YELLOW", "Barricade Bay 4", theme.accent_orange),
-                                            ("Tower L06-L10", "1.12%", "0.14% Drift", "YELLOW", "Detailed Eval", theme.accent_orange),
-                                            ("Basement B2", "0.21%", "0.00% Elastic", "GREEN", "Nominal", theme.accent_green),
-                                        ] {
-                                            ui.label(RichText::new(sec).size(10.5).strong().color(theme.text_primary));
-                                            ui.label(RichText::new(dr).size(10.5).color(theme.text_secondary));
-                                            ui.label(RichText::new(st).size(10.5).color(theme.text_muted));
-                                            ui.label(RichText::new(plc).size(10.5).strong().color(col));
-                                            ui.label(RichText::new(act).size(10.5).color(theme.text_secondary));
+                                        for w in &rep.wings {
+                                            let col = match w.placard {
+                                                "RED" => theme.accent_red,
+                                                "YELLOW" => theme.accent_orange,
+                                                _ => theme.accent_green,
+                                            };
+                                            ui.label(RichText::new(w.sector).size(10.5).strong().color(theme.text_primary));
+                                            ui.label(RichText::new(format!("{:.2}%", w.peak_drift_pct)).size(10.5).color(theme.text_secondary));
+                                            ui.label(RichText::new(format!("{:.2}%", w.residual_strain_pct)).size(10.5).color(theme.text_muted));
+                                            ui.label(RichText::new(w.placard).size(10.5).strong().color(col));
+                                            ui.label(RichText::new(w.action).size(10.5).color(theme.text_secondary));
                                             ui.end_row();
                                         }
                                     });
@@ -1141,7 +1492,10 @@ impl PredictionView {
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_live_shm_anomaly_forecast, ShmPredictionFeed};
+    use super::{
+        compute_atc20_post_quake_triage, compute_chloride_carbonation_durability,
+        compute_live_shm_anomaly_forecast, ShmPredictionFeed,
+    };
     use crate::core::BimProject;
     use crate::models::StructuralMember;
 
@@ -1193,5 +1547,44 @@ mod tests {
         assert!(damaged.live_beta < nominal.live_beta);
         assert!(damaged.drift_alert_triggered);
         assert!(damaged.remaining_useful_life_yrs < nominal.remaining_useful_life_yrs);
+    }
+
+    #[test]
+    fn test_chloride_fick_erfc_cover_and_silica_fume_life() {
+        let thin_opc = compute_chloride_carbonation_durability(35.0, 0.48, 1, false, 0.05);
+        let thick_sf = compute_chloride_carbonation_durability(75.0, 0.36, 0, true, 0.05);
+        assert!(thick_sf.depassivation_years > thin_opc.depassivation_years * 2.5);
+        assert!(thick_sf.d_app_m2_s < thin_opc.d_app_m2_s);
+        assert_eq!(thick_sf.zones.len(), 4);
+    }
+
+    #[test]
+    fn test_atc20_seismic_triage_scales_with_pga_and_shm() {
+        let calm = compute_atc20_post_quake_triage(
+            &[],
+            ShmPredictionFeed {
+                strain_micro: 220.0,
+                freq_hz: 3.6,
+                degradation_pct: 0.0,
+                live_packets: 4,
+            },
+            0.18,
+            true,
+        );
+        let severe = compute_atc20_post_quake_triage(
+            &[],
+            ShmPredictionFeed {
+                strain_micro: 890.0,
+                freq_hz: 2.7,
+                degradation_pct: 15.0,
+                live_packets: 12,
+            },
+            0.55,
+            true,
+        );
+        assert_eq!(calm.red_count, 0);
+        assert_eq!(calm.green_count, 6);
+        assert!(severe.red_count >= 1);
+        assert!(severe.peak_drift_pct > calm.peak_drift_pct);
     }
 }

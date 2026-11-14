@@ -567,43 +567,137 @@ impl AnalyzeView {
             );
         });
     }
+}
 
+#[derive(Clone, Debug)]
+pub struct FloorVibrationFatigueReport {
+    pub fn_hz: f32,
+    pub ap_over_g_pct: f32,
+    pub accel_limit_pct: f32,
+    pub pass_vibration: bool,
+    pub detail_label: &'static str,
+    pub cafl_mpa: f32,
+    pub n_allowable_millions: f32,
+    pub miner_damage: f32,
+    pub residual_life_pct: f32,
+}
+
+/// Computes AISC Design Guide 11 composite floor footfall vibration and EN 1993-1-9 / AISC 360 Miner steel fatigue.
+pub fn compute_floor_vibration_and_fatigue(
+    span_m: f32,
+    spacing_m: f32,
+    slab_mm: f32,
+    damping_beta: f32,
+    occupancy_idx: usize,
+    fatigue_cat_idx: usize,
+    stress_range_mpa: f32,
+    cycles_millions: f32,
+) -> FloorVibrationFatigueReport {
+    let l = span_m.clamp(3.0, 24.0);
+    let s = spacing_m.clamp(1.5, 6.0);
+    let t = slab_mm.clamp(80.0, 300.0);
+    let beta = damping_beta.clamp(0.01, 0.08);
+
+    // Effective beam+slab stiffness scaling for WF composite bay
+    let slab_kpa = 2.40 * (t / 100.0) + 1.50; // DL + sustained walking LL
+    let w_eff_kn = slab_kpa * l * s * 1.45;
+    let delta_mm = 1.65 * (l / 9.0).powi(3) * (130.0 / t).powf(0.45);
+    let fn_hz = (0.18 * (9810.0 / delta_mm.max(0.25)).sqrt()).clamp(2.2, 18.0);
+
+    let p0 = match occupancy_idx {
+        1 => 0.29, // Sensitive Lab (quiet step)
+        2 => 0.41, // Footbridge / Crane aisle
+        _ => 0.29, // Office / Residential
+    };
+    let accel_limit_pct = match occupancy_idx {
+        1 => 0.15,
+        2 => 1.50,
+        _ => 0.50,
+    };
+    let ap_over_g_pct = ((p0 * (-0.35 * fn_hz).exp()) / (beta * w_eff_kn.max(20.0)) * 100.0)
+        .clamp(0.02, 5.0);
+    let pass_vibration = ap_over_g_pct <= accel_limit_pct;
+
+    let (detail_label, cafl_mpa, c_const) = match fatigue_cat_idx {
+        0 => ("Cat B (Welded Plate Girder)", 110.0_f32, 3.93e12_f32),
+        1 => ("Cat C' (Transverse Stiffener)", 82.7_f32, 1.44e12_f32),
+        _ => ("Cat D/E (Cover Plate End)", 48.3_f32, 7.21e11_f32),
+    };
+    let dsig = stress_range_mpa.clamp(10.0, 350.0);
+    let n_cap = if dsig < cafl_mpa * 0.55 {
+        200.0e6
+    } else if dsig < cafl_mpa {
+        // EN 1993-1-9 Haibach slope m2 = 5 below CAFL
+        (2.0e6 * (cafl_mpa / dsig).powf(5.0)).clamp(1.0e5, 2.0e8)
+    } else {
+        (c_const / dsig.powi(3)).clamp(1.0e3, 2.0e8)
+    };
+    let n_allowable_millions = n_cap / 1.0e6;
+    let miner_damage = (cycles_millions.max(0.01) / n_allowable_millions.max(1e-3)).clamp(0.001, 5.0);
+    let residual_life_pct = ((1.0 - miner_damage).max(0.0)) * 100.0;
+
+    FloorVibrationFatigueReport {
+        fn_hz,
+        ap_over_g_pct,
+        accel_limit_pct,
+        pass_vibration,
+        detail_label,
+        cafl_mpa,
+        n_allowable_millions,
+        miner_damage,
+        residual_life_pct,
+    }
+}
+
+impl super::AnalyzeView {
     pub(super) fn render_floor_vibration_fatigue(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
+        let rep = compute_floor_vibration_and_fatigue(
+            self.vib_span_m,
+            self.vib_spacing_m,
+            self.vib_slab_mm,
+            self.vib_damping_beta,
+            self.vib_occupancy_idx,
+            self.fatigue_cat_idx,
+            self.fatigue_stress_range_mpa,
+            self.fatigue_cycles_millions,
+        );
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::FloorVibrationSteelFatigue, |ui| {
+            let vib_col = if rep.pass_vibration { theme.accent_green } else { theme.accent_red };
+            let miner_col = if rep.miner_damage <= 1.0 { theme.accent_green } else { theme.accent_red };
             let cards = [
-                ("FLOOR NATURAL FREQ (fn)", "6.84 Hz", "Above 3.0 Hz Walking Resonance Band", theme.accent_green),
-                ("PEAK WALKING ACCEL (ap/g)", "0.34% g <= 0.50% g", "AISC Design Guide 11 Office Criteria", theme.accent_green),
-                ("S-N DETAIL CATEGORY", "Category C' Stiffener", "sigma_TH = 82.7 MPa Threshold", theme.accent_blue),
-                ("MINER FATIGUE DAMAGE (D)", "Σ(n_i/N_i) = 0.24", "76% Residual Fatigue Life @ 50 Yrs", theme.accent_green),
+                ("FLOOR NATURAL FREQ (fn)", format!("{:.2} Hz", rep.fn_hz), (if rep.fn_hz >= 4.0 { "Above 3.0 Hz Walking Resonance" } else { "Low-Frequency Sway Band (<4Hz)" }).to_string(), vib_col),
+                ("PEAK WALKING ACCEL (ap/g)", format!("{:.2}% g <= {:.2}% g", rep.ap_over_g_pct, rep.accel_limit_pct), (if rep.pass_vibration { "PASS AISC DG-11" } else { "EXCEEDS DG-11 LIMIT" }).to_string(), vib_col),
+                ("S-N DETAIL CATEGORY", rep.detail_label.to_string(), format!("CAFL sigma_TH = {:.1} MPa • Ncap {:.2}M", rep.cafl_mpa, rep.n_allowable_millions), theme.accent_blue),
+                ("MINER FATIGUE DAMAGE (D)", format!("Sum(n_i/N_i) = {:.3}", rep.miner_damage), format!("{:.0}% Residual Fatigue Life", rep.residual_life_pct), miner_col),
             ];
             ui_kit::responsive_grid_n(ui, cards.len(), 175.0, |ui, idx| {
-                let (t, v, s, c) = cards[idx];
-                ui_kit::stat_card(ui, theme, t, v, s, c);
+                let (t, v, s, c) = &cards[idx];
+                ui_kit::stat_card(ui, theme, *t, v, s, *c);
             });
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "AISC DG-11 Office (0.5% g)");
-                let _ = ui.selectable_label(false, "Sensitive Lab / MRI (0.1% g)");
-                let _ = ui.selectable_label(false, "Crane Girder Fatigue Class C");
-                let _ = icons::icon_button(
-                    ui,
-                    AppIcon::Pulse,
-                    "Compute Modal Footfall Response & S-N Curves",
-                    11.0,
-                    Color32::WHITE,
-                    theme.accent_blue,
-                    Stroke::NONE,
-                    CornerRadius::same(6),
-                    Vec2::ZERO,
-                );
+                ui.selectable_value(&mut self.vib_occupancy_idx, 0, "AISC DG-11 Office (0.50% g)");
+                ui.selectable_value(&mut self.vib_occupancy_idx, 1, "Sensitive Lab / MRI (0.15% g)");
+                ui.selectable_value(&mut self.vib_occupancy_idx, 2, "Crane / Indoor Walkway (1.50% g)");
+                ui.separator();
+                ui.selectable_value(&mut self.fatigue_cat_idx, 0, "Cat B (110 MPa)");
+                ui.selectable_value(&mut self.fatigue_cat_idx, 1, "Cat C' (82.7 MPa)");
+                ui.selectable_value(&mut self.fatigue_cat_idx, 2, "Cat D/E (48.3 MPa)");
             });
-            ui.add_space(10.0);
+            ui.add_space(6.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.add(egui::Slider::new(&mut self.vib_span_m, 4.0..=20.0).text("Bay Span (m)"));
+                ui.add(egui::Slider::new(&mut self.vib_slab_mm, 90.0..=250.0).text("Slab (mm)"));
+                ui.add(egui::Slider::new(&mut self.fatigue_stress_range_mpa, 20.0..=220.0).text("Cyclic dSigma (MPa)"));
+                ui.add(egui::Slider::new(&mut self.fatigue_cycles_millions, 0.2..=25.0).text("Design Cycles (M)"));
+            });
+            ui.add_space(8.0);
 
             let desired = Vec2::new(ui.available_width(), 145.0);
             let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
@@ -618,21 +712,29 @@ impl AnalyzeView {
                 [Pos2::new(plot.left(), plot.bottom()), Pos2::new(plot.left(), plot.top())],
                 Stroke::new(1.0, theme.text_muted),
             );
-            // Log-log bilinear S-N curve + CAFL plateau
-            let p0 = Pos2::new(plot.left() + 10.0, plot.top() + 18.0);
-            let p1 = Pos2::new(plot.left() + plot.width() * 0.62, plot.top() + plot.height() * 0.64);
+            // Log-log bilinear S-N curve + CAFL plateau + operating point
+            let cafl_frac = (1.0_f32 - (rep.cafl_mpa / 300.0_f32)).clamp(0.35, 0.80);
+            let p0 = Pos2::new(plot.left() + 10.0, plot.top() + 16.0);
+            let p1 = Pos2::new(plot.left() + plot.width() * 0.62, plot.top() + plot.height() * cafl_frac);
             let p2 = Pos2::new(plot.right() - 10.0, p1.y);
             painter.line_segment([p0, p1], Stroke::new(2.2, theme.accent_orange));
             painter.line_segment([p1, p2], Stroke::new(2.2, theme.accent_green));
-            painter.circle_filled(
-                Pos2::new(plot.left() + plot.width() * 0.48, plot.top() + plot.height() * 0.56),
-                5.0,
-                theme.accent_blue,
+
+            let op_x = ((self.fatigue_cycles_millions.max(0.01).log10() + 1.0) / 3.0).clamp(0.08, 0.92);
+            let op_y = (self.fatigue_stress_range_mpa / 240.0).clamp(0.10, 0.92);
+            let op_pt = Pos2::new(plot.left() + op_x * plot.width(), plot.bottom() - op_y * plot.height());
+            painter.circle_filled(op_pt, 5.5, miner_col);
+            painter.text(
+                op_pt + Vec2::new(8.0, -4.0),
+                Align2::LEFT_BOTTOM,
+                format!("{:.0} MPa @ {:.1}M (D={:.2})", self.fatigue_stress_range_mpa, self.fatigue_cycles_millions, rep.miner_damage),
+                FontId::proportional(10.0),
+                miner_col,
             );
             painter.text(
                 Pos2::new(plot.center().x, rect.bottom() - 8.0),
                 Align2::CENTER_CENTER,
-                "Log Cycles N (10⁴ -> 10⁸ Cycles) • S-N Constant Amplitude Fatigue Limit",
+                format!("Log Cycles N (10^4 -> 10^8) • {} (CAFL {:.1} MPa)", rep.detail_label, rep.cafl_mpa),
                 FontId::proportional(9.5),
                 theme.text_muted,
             );
@@ -669,5 +771,21 @@ mod tests {
         assert!(with_key.ka < with_key.kae);
         assert!(with_key.fs_sliding > no_key.fs_sliding);
         assert!(with_key.bishop_fs_static > with_key.bishop_fs_seismic);
+    }
+
+    #[test]
+    fn test_aisc_dg11_vibration_and_miner_fatigue() {
+        let ok = super::compute_floor_vibration_and_fatigue(
+            8.0, 3.0, 140.0, 0.03, 0, 1, 55.0, 1.5,
+        );
+        assert!(ok.fn_hz > 5.0);
+        assert!(ok.pass_vibration);
+        assert!(ok.miner_damage < 1.0);
+
+        let severe = super::compute_floor_vibration_and_fatigue(
+            14.0, 4.0, 110.0, 0.015, 1, 2, 165.0, 12.0,
+        );
+        assert!(severe.miner_damage > 1.0);
+        assert!(severe.ap_over_g_pct > ok.ap_over_g_pct);
     }
 }

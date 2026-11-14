@@ -41,6 +41,115 @@ pub struct FacilityView {
     pub shm_packets_received: usize,
     pub mep_selected_system_idx: usize,
     pub mep_isolated_valve_tags: Vec<String>,
+    // Phase 41 (7D-04): UAV Crack & Spalling Defect Mapper + CMMS Dispatch
+    pub uav_defects: Vec<UavStructuralDefect>,
+    pub uav_aci_limit_mm: f32,
+    pub uav_csv_input: String,
+    pub uav_show_thermal_spall: bool,
+    pub uav_selected_defect_idx: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UavStructuralDefect {
+    pub id: String,
+    pub member: String,
+    pub crack_width_mm: f32,
+    pub spall_area_m2: f32,
+    pub norm_x: f32,
+    pub norm_y: f32,
+    pub work_order: Option<String>,
+}
+
+impl UavStructuralDefect {
+    pub fn default_ledger() -> Vec<Self> {
+        vec![
+            Self {
+                id: "UAV-CRK-01".to_string(),
+                member: "Shear Wall Core L04".to_string(),
+                crack_width_mm: 0.28,
+                spall_area_m2: 0.0,
+                norm_x: 0.32,
+                norm_y: 0.48,
+                work_order: Some("WO-2026-102".to_string()),
+            },
+            Self {
+                id: "UAV-SPL-02".to_string(),
+                member: "Pier Cap P-03 West".to_string(),
+                crack_width_mm: 0.36,
+                spall_area_m2: 0.40,
+                norm_x: 0.72,
+                norm_y: 0.76,
+                work_order: Some("WO-2026-105".to_string()),
+            },
+            Self {
+                id: "UAV-CRK-03".to_string(),
+                member: "Parapet Beam R-12".to_string(),
+                crack_width_mm: 0.12,
+                spall_area_m2: 0.0,
+                norm_x: 0.52,
+                norm_y: 0.24,
+                work_order: None,
+            },
+        ]
+    }
+}
+
+/// Parses UAV photogrammetry defect CSV rows (`ID,Member,Crack_mm,Spall_m2,NormX,NormY[,WO]`).
+pub fn parse_uav_defects_csv(raw: &str) -> Vec<UavStructuralDefect> {
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.to_ascii_lowercase().starts_with("id,") {
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.split(',').map(|s| s.trim()).collect();
+        if parts.len() < 4 {
+            continue;
+        }
+        let crack_width_mm = parts[2].parse::<f32>().unwrap_or(0.15).clamp(0.0, 5.0);
+        let spall_area_m2 = parts[3].parse::<f32>().unwrap_or(0.0).clamp(0.0, 25.0);
+        let norm_x = parts.get(4).and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.50).clamp(0.08, 0.92);
+        let norm_y = parts.get(5).and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.50).clamp(0.10, 0.90);
+        let work_order = parts
+            .get(6)
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty() && *s != "None" && *s != "-")
+            .map(|s| s.to_string());
+        out.push(UavStructuralDefect {
+            id: parts[0].to_string(),
+            member: parts[1].to_string(),
+            crack_width_mm,
+            spall_area_m2,
+            norm_x,
+            norm_y,
+            work_order,
+        });
+    }
+    out
+}
+
+/// Summarizes UAV crack & spalling ledger against ACI 224R allowable crack width.
+pub fn compute_uav_defect_kpis(
+    defects: &[UavStructuralDefect],
+    aci_limit_mm: f32,
+) -> (f32, usize, f32, usize) {
+    let mut max_crack = 0.0_f32;
+    let mut exceeding = 0usize;
+    let mut total_spall = 0.0_f32;
+    let mut wo_count = 0usize;
+    for d in defects {
+        if d.crack_width_mm > max_crack {
+            max_crack = d.crack_width_mm;
+        }
+        if d.crack_width_mm > aci_limit_mm || d.spall_area_m2 > 0.05 {
+            exceeding += 1;
+        }
+        total_spall += d.spall_area_m2;
+        if d.work_order.is_some() {
+            wo_count += 1;
+        }
+    }
+    (max_crack, exceeding, total_spall, wo_count)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -198,6 +307,11 @@ impl Default for FacilityView {
             shm_packets_received: 0,
             mep_selected_system_idx: 0,
             mep_isolated_valve_tags: vec!["VLV-SPR-02".to_string()],
+            uav_defects: UavStructuralDefect::default_ledger(),
+            uav_aci_limit_mm: 0.30,
+            uav_csv_input: "UAV-CRK-04,Transfer Girder B-02,0.34,0.12,0.44,0.62,\nUAV-CRK-05,Core Coupling Beam L08,0.18,0.00,0.60,0.34,".to_string(),
+            uav_show_thermal_spall: true,
+            uav_selected_defect_idx: Some(1),
         }
     }
 }
@@ -211,11 +325,11 @@ impl FacilityView {
         bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
-        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
-        let pad = if is_mobile { 12 } else { 20 };
-
         ui.vertical(|ui| {
-            Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // 1. TOP SUBTABS SELECTOR
                 self.render_header_bar(ui, theme);
 
@@ -257,7 +371,7 @@ impl FacilityView {
                         self.render_mep_isolation_space(ui, theme, bim_project, features);
                     }
                     FacilitySubTab::DroneInspectionMapper => {
-                        self.render_drone_inspection_mapper(ui, theme, features);
+                        self.render_drone_inspection_mapper(ui, theme, bim_project, features);
                     }
                 }
 
@@ -1100,42 +1214,173 @@ impl FacilityView {
     }
 
     fn render_drone_inspection_mapper(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
+        let (max_crack, exceeding_cnt, total_spall, wo_cnt) =
+            compute_uav_defect_kpis(&self.uav_defects, self.uav_aci_limit_mm);
+        let crack_col = if max_crack <= self.uav_aci_limit_mm {
+            theme.accent_green
+        } else {
+            theme.accent_orange
+        };
+        let spall_col = if exceeding_cnt == 0 {
+            theme.accent_green
+        } else {
+            theme.accent_red
+        };
+        let linked_elements = bim_project.walls.len() + bim_project.columns.len() + bim_project.runs.len();
+
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::DroneDefectCrackMapper, |ui| {
             let cards = [
-                ("UAV CAPTURED FRAMES", "418 Ortho Tiles", "RTK Accuracy ±4 mm @ 6m Standoff", theme.accent_blue),
-                ("MAX CRACK WIDTH FOUND", "0.28 mm (ACI 224R)", "Allowable Coastal Exposure <= 0.30 mm", theme.accent_orange),
-                ("DELAMINATION / SPALLING", "2 Minor Patches", "Pier Cap P-03 West Face (< 0.4 m²)", theme.accent_red),
-                ("CMMS TICKETS SYNCED", "2 Auto-Logged", "Linked to COBie Asset GUIDs", theme.accent_green),
+                (
+                    "UAV CAPTURED FRAMES",
+                    format!("{} Ortho Tiles", (linked_elements.max(8) * 24)),
+                    format!("Linked to {} BIM Structural Elements", linked_elements),
+                    theme.accent_blue,
+                ),
+                (
+                    "MAX CRACK WIDTH FOUND",
+                    format!("{:.2} mm (ACI 224R)", max_crack),
+                    format!("Allowable Exposure Limit <= {:.2} mm", self.uav_aci_limit_mm),
+                    crack_col,
+                ),
+                (
+                    "ACTIONABLE / SPALL ZONES",
+                    format!("{} Flagged ({:.2} m²)", exceeding_cnt, total_spall),
+                    if self.uav_show_thermal_spall {
+                        "Thermal Delamination Overlay Active".to_string()
+                    } else {
+                        "RGB Ortho Crack Detection Only".to_string()
+                    },
+                    spall_col,
+                ),
+                (
+                    "CMMS TICKETS SYNCED",
+                    format!("{} / {} Ticketed", wo_cnt, self.uav_defects.len()),
+                    "Linked to COBie Asset GUIDs & WO Ledger".to_string(),
+                    theme.accent_green,
+                ),
             ];
             ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
-                let (t, v, s, c) = cards[idx];
-                self.render_sensor_card(ui, theme, t, v, s, c);
+                let (t, v, s, c) = &cards[idx];
+                self.render_sensor_card(ui, theme, t, v, s, *c);
             });
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "AI Vision: ACI 224R Crack Thresholds");
-                let _ = ui.selectable_label(false, "Thermal Spall Overlay");
-                let _ = icons::icon_button(ui, AppIcon::Camera, "Import UAV Defect CSV & Auto-Pin 3D Markers", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                ui.label(RichText::new("ACI 224R Crack Limit:").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.uav_aci_limit_mm, 0.10..=0.50).suffix(" mm"));
+                ui.checkbox(&mut self.uav_show_thermal_spall, "Thermal Spall Overlay");
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Camera,
+                    "Dispatch Open Defects -> CMMS",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let mut created = 0usize;
+                    let base = 200 + wo_cnt;
+                    for d in &mut self.uav_defects {
+                        if d.work_order.is_none()
+                            && (d.crack_width_mm > self.uav_aci_limit_mm || d.spall_area_m2 > 0.05)
+                        {
+                            created += 1;
+                            d.work_order = Some(format!("WO-2026-{}", base + created));
+                        }
+                    }
+                    self.maintenance_dispatch_status = Some(format!(
+                        "CMMS Sync Complete: Dispatched {} new Work Order(s) for defects > {:.2} mm.",
+                        created, self.uav_aci_limit_mm
+                    ));
+                }
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Document,
+                    "Export ACI 224R Defect CSV",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let mut csv = String::from("ID,Member,Crack_mm,Spall_m2,NormX,NormY,WorkOrder\n");
+                    for d in &self.uav_defects {
+                        csv.push_str(&format!(
+                            "{},{},{:.2},{:.2},{:.2},{:.2},{}\n",
+                            d.id,
+                            d.member,
+                            d.crack_width_mm,
+                            d.spall_area_m2,
+                            d.norm_x,
+                            d.norm_y,
+                            d.work_order.as_deref().unwrap_or("None")
+                        ));
+                    }
+                    match crate::core::web_bridge::save_text_file("EigenGraph_UAV_Defects_ACI224R.csv", &csv, "text/csv") {
+                        Ok(msg) => self.maintenance_dispatch_status = Some(format!("UAV Defect CSV exported ({msg})")),
+                        Err(err) => self.maintenance_dispatch_status = Some(format!("UAV export error: {err}")),
+                    }
+                }
+            });
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.uav_csv_input)
+                        .desired_rows(2)
+                        .desired_width((ui.available_width() - 165.0).max(160.0)),
+                );
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Plus,
+                    "Ingest UAV CSV Batch",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let parsed = parse_uav_defects_csv(&self.uav_csv_input);
+                    let mut added = 0usize;
+                    for item in parsed {
+                        if !self.uav_defects.iter().any(|existing| existing.id == item.id) {
+                            self.uav_defects.push(item);
+                            added += 1;
+                        }
+                    }
+                    self.maintenance_dispatch_status = Some(format!(
+                        "Ingested {added} new UAV defect telemetry row(s) into ACI 224R inspector."
+                    ));
+                }
             });
             ui.add_space(10.0);
 
             ui_kit::responsive_two_panes(ui, 640.0, |ui, pane| match pane {
                 0 => {
                     ui.label(
-                        RichText::new("FACADE & PIER ORTHOMOSAIC DEFECT OVERLAY")
+                        RichText::new("FACADE & PIER ORTHOMOSAIC DEFECT OVERLAY (CLICK PIN)")
                             .size(11.0)
                             .strong()
                             .color(theme.accent_blue),
                     );
                     ui.add_space(6.0);
-                    let desired = Vec2::new(ui.available_width(), 155.0);
-                    let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+                    let desired = Vec2::new(ui.available_width(), 165.0);
+                    let (rect, resp) = ui.allocate_exact_size(desired, Sense::click());
                     let painter = ui.painter_at(rect);
                     painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
                     let elev = rect.shrink(22.0);
@@ -1152,18 +1397,32 @@ impl FacilityView {
                             Stroke::new(0.8, theme.border_subtle),
                         );
                     }
-                    let defects = [
-                        (0.32_f32, 0.48_f32, "CRK-01 (0.28mm)", theme.accent_orange),
-                        (0.72, 0.76, "SPL-02 (0.4 m²)", theme.accent_red),
-                    ];
-                    for (fx, fy, tag, col) in defects {
-                        let p = Pos2::new(elev.left() + fx * elev.width(), elev.top() + fy * elev.height());
-                        painter.circle_stroke(p, 8.0, Stroke::new(1.8, col));
-                        painter.circle_filled(p, 3.0, col);
+                    for (idx, d) in self.uav_defects.iter().enumerate() {
+                        let p = Pos2::new(elev.left() + d.norm_x * elev.width(), elev.top() + d.norm_y * elev.height());
+                        let col = if d.spall_area_m2 > 0.05 {
+                            theme.accent_red
+                        } else if d.crack_width_mm > self.uav_aci_limit_mm {
+                            theme.accent_orange
+                        } else {
+                            theme.accent_green
+                        };
+                        if self.uav_show_thermal_spall && d.spall_area_m2 > 0.0 {
+                            painter.circle_filled(p, 16.0, theme.accent_red.gamma_multiply(0.18));
+                        }
+                        if resp.clicked() {
+                            if let Some(click_pos) = resp.interact_pointer_pos() {
+                                if click_pos.distance(p) <= 14.0 {
+                                    self.uav_selected_defect_idx = Some(idx);
+                                }
+                            }
+                        }
+                        let is_sel = self.uav_selected_defect_idx == Some(idx);
+                        painter.circle_stroke(p, if is_sel { 11.0 } else { 8.0 }, Stroke::new(if is_sel { 2.4 } else { 1.6 }, col));
+                        painter.circle_filled(p, 3.5, col);
                         painter.text(
                             p + Vec2::new(10.0, -4.0),
                             egui::Align2::LEFT_CENTER,
-                            tag,
+                            format!("{} ({:.2}mm)", d.id, d.crack_width_mm),
                             egui::FontId::monospace(9.5),
                             col,
                         );
@@ -1177,29 +1436,51 @@ impl FacilityView {
                             .color(theme.accent_blue),
                     );
                     ui.add_space(6.0);
+                    let mut issue_wo_idx: Option<usize> = None;
                     ScrollArea::horizontal().id_salt("uav_defect_scroll").show(ui, |ui| {
                         egui::Grid::new("uav_defect_grid")
                             .striped(true)
-                            .spacing(Vec2::new(12.0, 5.0))
+                            .spacing(Vec2::new(10.0, 5.0))
                             .show(ui, |ui| {
-                                for h in ["Defect ID", "Member", "Width / Area", "Severity", "CMMS WO"] {
+                                for h in ["Defect ID", "Member", "Width / Spall", "Severity", "CMMS WO"] {
                                     ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                                 }
                                 ui.end_row();
-                                for (id, mem, meas, sev, wo, col) in [
-                                    ("UAV-CRK-01", "Shear Wall Core L04", "0.28 mm Flexural", "Monitor", "WO-2026-102", theme.accent_orange),
-                                    ("UAV-SPL-02", "Pier Cap P-03 West", "0.40 m² Cover Spall", "Epoxy Patch", "WO-2026-105", theme.accent_red),
-                                    ("UAV-CRK-03", "Parapet Beam R-12", "0.12 mm Shrinkage", "Nominal", "No Action", theme.accent_green),
-                                ] {
-                                    ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
-                                    ui.label(RichText::new(mem).size(10.5).strong().color(theme.text_primary));
-                                    ui.label(RichText::new(meas).size(10.5).color(theme.text_secondary));
+                                for (idx, d) in self.uav_defects.iter().enumerate() {
+                                    let (sev, col) = if d.spall_area_m2 > 0.05 {
+                                        ("Epoxy Patch", theme.accent_red)
+                                    } else if d.crack_width_mm > self.uav_aci_limit_mm {
+                                        ("Exceeds ACI", theme.accent_orange)
+                                    } else {
+                                        ("Nominal", theme.accent_green)
+                                    };
+                                    let selected = self.uav_selected_defect_idx == Some(idx);
+                                    if ui.selectable_label(selected, RichText::new(&d.id).size(10.5).monospace().color(theme.accent_blue)).clicked() {
+                                        self.uav_selected_defect_idx = Some(idx);
+                                    }
+                                    ui.label(RichText::new(&d.member).size(10.5).strong().color(theme.text_primary));
+                                    ui.label(RichText::new(format!("{:.2}mm / {:.2}m²", d.crack_width_mm, d.spall_area_m2)).size(10.5).color(theme.text_secondary));
                                     ui.label(RichText::new(sev).size(10.5).strong().color(col));
-                                    ui.label(RichText::new(wo).size(10.5).color(theme.text_muted));
+                                    if let Some(wo) = &d.work_order {
+                                        ui.label(RichText::new(wo).size(10.5).color(theme.accent_green));
+                                    } else if ui.small_button("Create WO").clicked() {
+                                        issue_wo_idx = Some(idx);
+                                    }
                                     ui.end_row();
                                 }
                             });
                     });
+                    if let Some(idx) = issue_wo_idx {
+                        let next_num = 200 + self.uav_defects.iter().filter(|d| d.work_order.is_some()).count() + 1;
+                        if let Some(item) = self.uav_defects.get_mut(idx) {
+                            let wo = format!("WO-2026-{}", next_num);
+                            item.work_order = Some(wo.clone());
+                            self.maintenance_dispatch_status = Some(format!(
+                                "Issued CMMS Work Order {} for {} ({}).",
+                                wo, item.id, item.member
+                            ));
+                        }
+                    }
                 }
             });
         });
@@ -1220,7 +1501,7 @@ impl FacilityView {
 
 #[cfg(test)]
 mod tests {
-    use super::compute_mep_isolation_and_space;
+    use super::{compute_mep_isolation_and_space, compute_uav_defect_kpis, parse_uav_defects_csv};
     use crate::core::BimProject;
 
     #[test]
@@ -1235,5 +1516,17 @@ mod tests {
         assert_eq!(rep_iso.isolated_valves, 2);
         assert!(rep_iso.impacted_area_m2 > 0.0);
         assert!(rep_iso.efficiency_pct > 10.0);
+    }
+
+    #[test]
+    fn test_uav_defect_csv_parser_and_aci224r_threshold() {
+        let csv = "ID,Member,Crack_mm,Spall_m2,NormX,NormY,WO\nUAV-01,Col C1,0.38,0.10,0.4,0.6,\nUAV-02,Beam G2,0.14,0.00,0.7,0.3,WO-2026-99";
+        let rows = parse_uav_defects_csv(csv);
+        assert_eq!(rows.len(), 2);
+        let (max_c, exc, spall, wo) = compute_uav_defect_kpis(&rows, 0.30);
+        assert!((max_c - 0.38).abs() < 1e-4);
+        assert_eq!(exc, 1);
+        assert!((spall - 0.10).abs() < 1e-4);
+        assert_eq!(wo, 1);
     }
 }

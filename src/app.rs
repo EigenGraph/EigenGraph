@@ -449,6 +449,16 @@ impl App for EigenGraphApp {
             }
         }
 
+        // Global Ctrl/Cmd+K or F1 toggles CAD Shortcuts & Module Quick-Jump Palette
+        if !ctx.egui_wants_keyboard_input()
+            && ctx.input(|i| {
+                (i.modifiers.command && i.key_pressed(egui::Key::K))
+                    || i.key_pressed(egui::Key::F1)
+            })
+        {
+            self.universal_canvas.shortcuts_modal_open = !self.universal_canvas.shortcuts_modal_open;
+        }
+
         // Handle Text-to-BIM commands dispatched from Dynamic Island Copilot or AI Firm
         if let Some(cmd) = self.ai_assistant_view.pending_bim_nl_command.take() {
             let result_msg = match self.build_view.bim_bus.execute_natural_language(&cmd) {
@@ -645,6 +655,9 @@ impl App for EigenGraphApp {
                     .scroll_source(scroll_source)
                     .show(ui, |ui| {
                         Frame::new().inner_margin(outer_margin).show(ui, |ui| {
+                            let content_w = ui.available_width().max(160.0);
+                            ui.set_width(content_w);
+                            ui.set_max_width(content_w);
                             if !uses_native_single_canvas {
                                 self.universal_canvas.show(
                                     ui,
@@ -1163,6 +1176,9 @@ impl App for EigenGraphApp {
             );
         }
 
+        // 7. CAD SHORTCUTS, CLI SYNTAX & MODULE QUICK-JUMP PALETTE (Ctrl/Cmd+K or ? Shortcuts)
+        self.render_shortcuts_quick_jump_modal_if_open(&ctx);
+
         // 8. SCREENSHOT HOOK (AUTOMATED QA & PREVIEWS)
         #[cfg(not(target_arch = "wasm32"))]
         if let Ok(path) = std::env::var("EIGENGRAPH_SCREENSHOT_PATH") {
@@ -1208,6 +1224,132 @@ impl App for EigenGraphApp {
 }
 
 impl EigenGraphApp {
+    fn render_shortcuts_quick_jump_modal_if_open(&mut self, ctx: &egui::Context) {
+        if !self.universal_canvas.shortcuts_modal_open {
+            return;
+        }
+        let mut open = self.universal_canvas.shortcuts_modal_open;
+        let mut jump_to: Option<NavigationPillar> = None;
+        egui::Window::new("CAD Shortcuts, Precision CLI & Quick-Jump (Ctrl/Cmd+K)")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(true)
+            .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
+            .default_size(MacTheme::clamp_modal_size(ctx, Vec2::new(640.0, 500.0)))
+            .max_size(MacTheme::modal_max_size(ctx))
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new("Quick-Jump Module:")
+                            .size(12.0)
+                            .strong()
+                            .color(self.theme.accent_blue),
+                    );
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.universal_canvas.quick_jump_query)
+                            .desired_width((ui.available_width() - 160.0).max(120.0))
+                            .hint_text("Filter any of 15 engineering modules..."),
+                    );
+                });
+                ui.add_space(6.0);
+                let q = self.universal_canvas.quick_jump_query.trim().to_lowercase();
+                ui.horizontal_wrapped(|ui| {
+                    for pillar in ALL_PILLARS {
+                        let label = format!("{} ({})", pillar.clean_name(), pillar.badge());
+                        if !q.is_empty() && !label.to_lowercase().contains(&q) {
+                            continue;
+                        }
+                        let is_active = self.active_pillar == pillar;
+                        if icons::icon_button(
+                            ui,
+                            pillar.app_icon(),
+                            label,
+                            10.5,
+                            if is_active {
+                                Color32::WHITE
+                            } else {
+                                self.theme.text_primary
+                            },
+                            if is_active {
+                                self.theme.accent_blue
+                            } else {
+                                self.theme.bg_sidebar
+                            },
+                            Stroke::new(1.0, self.theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .clicked()
+                        {
+                            jump_to = Some(pillar);
+                        }
+                    }
+                });
+
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(6.0);
+                ui.label(
+                    RichText::new("Keyboard Shortcuts (Outside Text Focus)")
+                        .size(12.0)
+                        .strong()
+                        .color(self.theme.text_primary),
+                );
+                ui.add_space(4.0);
+                egui::Grid::new("cad_shortcuts_grid")
+                    .num_columns(2)
+                    .spacing([18.0, 5.0])
+                    .show(ui, |ui| {
+                        for (keys, desc) in [
+                            ("Space", "Freeze / Unfreeze Canvas scroll lock"),
+                            ("L / R / C / D / T / E", "2D Line, Rectangle, Circle, Dimension, Callout, Eraser"),
+                            ("W / B / C / F", "3D Author Wall, Beam, Column, Footing"),
+                            ("M / O / X / Del", "Move (+Step), Offset (+500mm), Mirror X, Delete"),
+                            ("F8 / F3 / Z / Esc", "Ortho lock, Grid Snap, Fit Model, Cancel / Select"),
+                            ("Ctrl+Z / Ctrl+Y", "Undo / Redo CAD or BIM command"),
+                            ("Ctrl+K or F1", "Open or close this Shortcuts & Quick-Jump modal"),
+                        ] {
+                            ui.label(
+                                RichText::new(keys)
+                                    .size(11.0)
+                                    .monospace()
+                                    .strong()
+                                    .color(self.theme.accent_blue),
+                            );
+                            ui.label(
+                                RichText::new(desc)
+                                    .size(11.0)
+                                    .color(self.theme.text_secondary),
+                            );
+                            ui.end_row();
+                        }
+                    });
+
+                ui.add_space(10.0);
+                ui.label(
+                    RichText::new("Precision CAD Command Line Syntax")
+                        .size(12.0)
+                        .strong()
+                        .color(self.theme.text_primary),
+                );
+                ui.label(
+                    RichText::new(
+                        "• Relative Cartesian: @6000,0  |  Polar Vector: @4500<45  |  Move: move @0,1200\n\
+                         • Rotate: ro 90  |  Copy: cp @1500,0  |  Offset: o 250  |  3D Wall: wall 0,0->6000,0",
+                    )
+                    .size(10.5)
+                    .monospace()
+                    .color(self.theme.text_muted),
+                );
+            });
+        if let Some(p) = jump_to {
+            self.active_pillar = p;
+            self.universal_canvas.request_scroll_to_workbench = true;
+            open = false;
+        }
+        self.universal_canvas.shortcuts_modal_open = open;
+    }
+
     fn render_vault_startup_modal_if_open(&mut self, ctx: &egui::Context, is_mobile: bool) {
         if !self.show_vault_startup_modal {
             return;

@@ -168,7 +168,7 @@ impl Default for FeatureRegistry {
 
 impl FeatureRegistry {
     pub fn new() -> Self {
-        use FeatureStatus::{Active, Locked};
+        use FeatureStatus::Active;
         let entries = vec![
             // =================================================================
             // 1. My Library & Vault (2 Active + 3 Locked = 5)
@@ -273,7 +273,7 @@ impl FeatureRegistry {
                 code: "AI-05",
                 title: "NSGA-II Multi-Objective Pareto Optimizer",
                 description: "Simultaneous trade-off optimization across 5D Capex, A1–A3 Embodied Carbon, and global ARI redundancy.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/ai_firm.rs + src/core/parametric.rs",
                 prioritized: false,
             },
@@ -465,7 +465,7 @@ impl FeatureRegistry {
                 code: "3D-06",
                 title: "E57/LAS LiDAR Point-Cloud vs BIM Deviation Inspector",
                 description: "3D ICP scan-to-BIM overlay measuring structural plumbness, slab FF/FL flatness, and millimeter tolerances.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/build/bottom_deck.rs",
                 prioritized: false,
             },
@@ -549,7 +549,7 @@ impl FeatureRegistry {
                 code: "SIM-08",
                 title: "AISC DG-11 Floor Vibration & EN 1993-1-9 Steel Fatigue",
                 description: "Checks footfall resonance peak acceleration (%g) and cyclic Miner cumulative S-N fatigue life.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/analyze/extended_mechanics.rs",
                 prioritized: false,
             },
@@ -637,7 +637,7 @@ impl FeatureRegistry {
                 code: "5D-04",
                 title: "Value Engineering Trade Study & Tender Bid Leveling",
                 description: "Compares Owner Engineer Estimate vs vendor unit rates and quantifies structural system VE savings.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/planning.rs",
                 prioritized: false,
             },
@@ -681,7 +681,7 @@ impl FeatureRegistry {
                 code: "6D-04",
                 title: "Circular Material Bank Passport & Design-for-Disassembly",
                 description: "Tracks reversible bolted steel share, EN 15978 Module D reuse credit, and QR circular material tags.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/sustainability.rs",
                 prioritized: false,
             },
@@ -725,7 +725,7 @@ impl FeatureRegistry {
                 code: "7D-04",
                 title: "UAV Orthomosaic Crack Width & Concrete Spalling Mapper",
                 description: "Log-pinned facade & bridge pier crack widths vs ACI 224R limits, spalling severities, and repair triggers.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/facility.rs",
                 prioritized: false,
             },
@@ -769,7 +769,7 @@ impl FeatureRegistry {
                 code: "8D-04",
                 title: "Digital Permit-to-Work (PTW) & NFPA 101 Muster Telemetry",
                 description: "Hot-work/confined-space/height permit ledger, wind lockdown thresholds, and timed evacuation drill logs.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/safety.rs",
                 prioritized: false,
             },
@@ -813,7 +813,7 @@ impl FeatureRegistry {
                 code: "9D-04",
                 title: "BIM-Pinned RFI & Shop-Drawing SLA Turnaround Tracker",
                 description: "Links engineering RFIs and shop drawing submittals to lookahead constraints with SLA escalation timers.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/lean.rs",
                 prioritized: false,
             },
@@ -867,7 +867,7 @@ impl FeatureRegistry {
                 code: "10D-05",
                 title: "3D Concrete Printing (3DCP) Contour Slicer & G-Code",
                 description: "Continuous print path preview, extrusion bead velocity sync, open-time cold-joint guard, and G-Code output.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/industrialized/automation_slots.rs",
                 prioritized: false,
             },
@@ -901,7 +901,7 @@ impl FeatureRegistry {
                 code: "PRED-03",
                 title: "Fick's 2nd Law Chloride & Carbonation Service-Life Forecaster",
                 description: "Models marine chloride penetration, cover depassivation year, and rebar cross-section area decay curves.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/prediction.rs",
                 prioritized: false,
             },
@@ -911,7 +911,7 @@ impl FeatureRegistry {
                 code: "PRED-04",
                 title: "Post-Earthquake Rapid ATC-20 Placard Triage Matrix",
                 description: "Maps peak accelerometer drift & residual strain into automated Inspected / Restricted / Unsafe wing tags.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/prediction.rs",
                 prioritized: false,
             },
@@ -965,7 +965,7 @@ impl FeatureRegistry {
                 code: "PUB-05",
                 title: "As-Built BIM Digital Handover & SHA-256 Archive Packager",
                 description: "Audits completeness across IFC4, COBie 3.0, record drawings, mill certificates, and O&M warranty manuals.",
-                status: Locked { target_phase: "Phase 35" },
+                status: Active,
                 module_hint: "src/views/results.rs",
                 prioritized: false,
             },
@@ -1069,7 +1069,11 @@ impl FeatureRegistry {
             self.prioritized_count()
         ));
         out.push_str("## Locked Capabilities\n\n");
-        for e in self.entries.iter().filter(|e| !e.status.is_active()) {
+        let locked_items: Vec<_> = self.entries.iter().filter(|e| !e.status.is_active()).collect();
+        if locked_items.is_empty() {
+            out.push_str("- All 74 registered capabilities are active (`0` locked backlog items).\n");
+        }
+        for e in locked_items {
             let mark = if e.prioritized { "[PRIORITIZED]" } else { "[QUEUED]" };
             out.push_str(&format!(
                 "- {} **{} — {}** (`{}`) | {} | `{}`\n  - {}\n",
@@ -1136,8 +1140,8 @@ mod tests {
             );
         }
         assert_eq!(reg.total_count(), 74);
-        assert_eq!(reg.active_count(), 62);
-        assert_eq!(reg.locked_count(), 12);
+        assert_eq!(reg.active_count(), 74);
+        assert_eq!(reg.locked_count(), 0);
     }
 
     #[test]
@@ -1146,24 +1150,26 @@ mod tests {
         assert_eq!(reg.locked_by_phase_count("Phase 32"), 0);
         assert_eq!(reg.locked_by_phase_count("Phase 33"), 0);
         assert_eq!(reg.locked_by_phase_count("Phase 34"), 0);
-        assert_eq!(reg.locked_by_phase_count("Phase 35"), 12);
+        assert_eq!(reg.locked_by_phase_count("Phase 35"), 0);
 
-        let before = reg
+        let entry = reg
             .entry(FeatureId::ParetoMultiObjectiveOptimizer)
-            .expect("entry exists")
-            .prioritized;
+            .expect("entry exists");
+        assert!(entry.status.is_active());
         reg.toggle_prioritized(FeatureId::ParetoMultiObjectiveOptimizer);
-        let after = reg
-            .entry(FeatureId::ParetoMultiObjectiveOptimizer)
-            .expect("entry exists")
-            .prioritized;
-        assert_ne!(before, after);
+        assert!(
+            !reg.entry(FeatureId::ParetoMultiObjectiveOptimizer)
+                .expect("entry exists")
+                .prioritized
+        );
 
         let md = reg.export_unlock_backlog_markdown();
-        assert!(md.contains("AI-05"));
-        assert!(md.contains("10D-05"));
+        assert!(md.contains("Active Capabilities: 74"));
+        assert!(md.contains("Locked Workspace Slots: 0"));
 
         let json_str = reg.export_unlock_roadmap_json();
+        assert!(json_str.contains("AI-05"));
+        assert!(json_str.contains("10D-05"));
         let parsed: serde_json::Value =
             serde_json::from_str(&json_str).expect("roadmap json parses cleanly");
         assert_eq!(parsed["summary"]["total"], 74);

@@ -335,20 +335,100 @@ impl ParametricView {
         &mut self,
         universal_canvas: &mut UniversalCanvasState,
     ) {
+        let step = universal_canvas.cad_step_mm;
         if self.sketch_draw_mode {
-            if universal_canvas.translate_selected_or_last(1000.0, 0.0) {
+            if universal_canvas.translate_selected_or_last(step, 0.0) {
                 self.save_notification =
-                    Some("Moved selected/last sketch entity +1000 mm (M)".to_string());
+                    Some(format!("Moved selected/last sketch entity +{step:.0} mm (M)"));
             }
             return;
         }
         if let Some(id) = self.bim_bus.project.latest_element_id() {
             match self.bim_bus.execute(BimCommand::MoveElement {
                 element_id: id,
-                delta: P2(1000.0, 0.0),
+                delta: P2(step, 0.0),
             }) {
                 Ok(msg) => {
                     self.save_notification = Some(msg.clone());
+                    self.command_history.push(msg);
+                    self.refresh_live_ari();
+                }
+                Err(e) => self.save_notification = Some(e),
+            }
+        }
+    }
+
+    pub(super) fn apply_parametric_rotate_90(
+        &mut self,
+        universal_canvas: &mut UniversalCanvasState,
+    ) {
+        if self.sketch_draw_mode {
+            if universal_canvas.rotate_selected_or_last(90.0) {
+                self.save_notification = Some("Rotated sketch entity +90°".to_string());
+            }
+            return;
+        }
+        if let Some(id) = self.bim_bus.project.latest_element_id() {
+            match self.bim_bus.execute(BimCommand::RotateElement {
+                element_id: id,
+                angle_deg: 90.0,
+            }) {
+                Ok(msg) => {
+                    self.save_notification = Some(msg.clone());
+                    self.command_history.push(msg);
+                    self.refresh_live_ari();
+                }
+                Err(e) => self.save_notification = Some(e),
+            }
+        }
+    }
+
+    pub(super) fn apply_parametric_duplicate(
+        &mut self,
+        universal_canvas: &mut UniversalCanvasState,
+    ) {
+        let step = universal_canvas.cad_step_mm;
+        if self.sketch_draw_mode {
+            if universal_canvas.duplicate_selected_or_last(step, 0.0) {
+                self.save_notification =
+                    Some(format!("Duplicated sketch entity +{step:.0} mm East"));
+            }
+            return;
+        }
+        let lvl_id = self
+            .bim_bus
+            .project
+            .levels
+            .get(self.active_level_idx)
+            .map(|l| l.id)
+            .unwrap_or(1);
+        if let Some(w) = self.bim_bus.project.walls.last().cloned() {
+            match self.bim_bus.execute(BimCommand::AddWall {
+                base_level_id: w.base_level_id,
+                start: P2(w.start.0 + step, w.start.1),
+                end: P2(w.end.0 + step, w.end.1),
+                thickness_mm: w.thickness_mm,
+                is_structural: w.is_structural,
+            }) {
+                Ok(msg) => {
+                    self.save_notification = Some(format!("Copied wall +{step:.0} mm: {msg}"));
+                    self.command_history.push(msg);
+                    self.refresh_live_ari();
+                }
+                Err(e) => self.save_notification = Some(e),
+            }
+        } else if let Some(c) = self.bim_bus.project.columns.last().cloned() {
+            match self.bim_bus.execute(BimCommand::AddColumn {
+                base_level_id: lvl_id,
+                top_level_id: c.top_level_id,
+                pos: P2(c.pos.0 + step, c.pos.1),
+                width_mm: c.width_mm,
+                depth_mm: c.depth_mm,
+                is_round: c.is_round,
+                profile_name: c.profile_name,
+            }) {
+                Ok(msg) => {
+                    self.save_notification = Some(format!("Copied column +{step:.0} mm: {msg}"));
                     self.command_history.push(msg);
                     self.refresh_live_ari();
                 }
@@ -585,6 +665,56 @@ impl ParametricView {
                 Err(e) => self.command_history.push(format!("JSON Error: {e}")),
             }
             return;
+        }
+
+        if trimmed.starts_with('@') {
+            if let Some((dx, dy)) = UniversalCanvasState::parse_cad_delta_expr(trimmed) {
+                let start = self
+                    .pending_start_pt
+                    .or_else(|| self.bim_bus.project.walls.last().map(|w| w.end))
+                    .unwrap_or(P2(0.0, 0.0));
+                let end = P2(start.0 + dx, start.1 + dy);
+                let lvl_id = self
+                    .bim_bus
+                    .project
+                    .levels
+                    .get(self.active_level_idx)
+                    .map(|l| l.id)
+                    .unwrap_or(1);
+                if let Ok(msg) = self.bim_bus.execute(BimCommand::AddWall {
+                    base_level_id: lvl_id,
+                    start,
+                    end,
+                    thickness_mm: 200.0,
+                    is_structural: true,
+                }) {
+                    self.pending_start_pt = Some(end);
+                    self.command_history.push(msg.clone());
+                    self.save_notification = Some(msg);
+                    self.refresh_live_ari();
+                }
+                return;
+            }
+        }
+
+        let cmd_upper = trimmed.to_uppercase();
+        if let Some(deg_str) = cmd_upper
+            .strip_prefix("RO ")
+            .or_else(|| cmd_upper.strip_prefix("ROTATE "))
+        {
+            if let Ok(deg) = deg_str.trim().parse::<f64>() {
+                if let Some(id) = self.bim_bus.project.latest_element_id() {
+                    if let Ok(msg) = self.bim_bus.execute(BimCommand::RotateElement {
+                        element_id: id,
+                        angle_deg: deg,
+                    }) {
+                        self.command_history.push(msg.clone());
+                        self.save_notification = Some(msg);
+                        self.refresh_live_ari();
+                    }
+                }
+                return;
+            }
         }
 
         let cmd = trimmed.to_uppercase();
@@ -1059,5 +1189,94 @@ mod tests {
             }
         }
         assert!(failures.is_empty(), "Canvas layout overflows: {:?}", failures);
+    }
+
+    #[test]
+    fn test_below_canvas_module_matches_canvas_width_parity() {
+        let theme = MacTheme::for_mode(crate::theme::ThemeMode::ProDark);
+        let mut features = FeatureRegistry::default();
+        let mut universal = UniversalCanvasState::default();
+        let members = Vec::new();
+        let mut vars = Vec::new();
+        let ws = WorkspaceCanvasSettings {
+            theme_mode: crate::theme::ThemeMode::ProDark,
+            canvas_height_ratio: 0.74,
+            freeze_by_default: true,
+            show_grid: true,
+            snap_to_grid: true,
+            grid_spacing_mm: 500.0,
+            show_bim_base_layer: true,
+            show_domain_overlay: true,
+            sync_all_layers: true,
+            show_floating_inspector: false,
+            show_ai_copilot: true,
+            unit_system: "Metric".to_string(),
+            design_standard: "SNI".to_string(),
+            solver_threads: 4,
+            enable_svd_guard: true,
+            enable_anti_leakage: true,
+        };
+        let bim_proj = crate::core::BimProject::sample_bimcraft_building();
+
+        for win_w in [1000.0_f32, 700.0, 390.0] {
+            let mut analyze = crate::views::AnalyzeView::default();
+            let mut sust = crate::views::SustainabilityView::default();
+            let ctx = egui::Context::default();
+            let mut canvas_w = 0.0_f32;
+            let mut analyze_w = 0.0_f32;
+            let mut sust_w = 0.0_f32;
+
+            for _ in 0..2 {
+                let input = egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(win_w, 1200.0))),
+                    ..Default::default()
+                };
+                let mut output = ctx.run_ui(input, |ui| {
+                    egui::CentralPanel::default().show(ui, |ui| {
+                        Frame::new().inner_margin(Margin::symmetric(14, 12)).show(ui, |ui| {
+                            let content_w = ui.available_width().max(160.0);
+                            ui.set_width(content_w);
+                            ui.set_max_width(content_w);
+
+                            let c_resp = ui.vertical(|ui| {
+                                let mut m_clone = members.clone();
+                                let mut b_clone = bim_proj.clone();
+                                universal.show(
+                                    ui,
+                                    &theme,
+                                    NavigationPillar::AnalysisSimulation,
+                                    &mut b_clone,
+                                    &mut m_clone,
+                                    &mut vars,
+                                    ws.clone(),
+                                    0.0,
+                                );
+                            });
+                            canvas_w = c_resp.response.rect.width();
+
+                            let a_resp = ui.vertical(|ui| {
+                                analyze.show(ui, &theme, &members, &mut features);
+                            });
+                            analyze_w = a_resp.response.rect.width();
+
+                            let s_resp = ui.vertical(|ui| {
+                                sust.show(ui, &theme, &members, &bim_proj, &mut features);
+                            });
+                            sust_w = s_resp.response.rect.width();
+                        });
+                    });
+                });
+                output.textures_delta.clear();
+            }
+
+            assert!(
+                (canvas_w - analyze_w).abs() <= 2.0,
+                "Analyze width mismatch @ {win_w}: canvas={canvas_w:.1}, analyze={analyze_w:.1}"
+            );
+            assert!(
+                (canvas_w - sust_w).abs() <= 2.0,
+                "Sustainability width mismatch @ {win_w}: canvas={canvas_w:.1}, sust={sust_w:.1}"
+            );
+        }
     }
 }

@@ -47,6 +47,200 @@ pub struct ResultsView {
     pub pbg_include_sni_spectrum: bool,
     pub pbg_include_drift_checks: bool,
     pub pbg_jurisdiction_idx: usize,
+    // Phase 41: As-Built Handover Dossier & SHA-256 Manifest Packager (PUB-05)
+    pub handover_include_ifc_cobie: bool,
+    pub handover_verify_sha256: bool,
+    pub handover_ndt_signed_off: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HandoverDeliverableItem {
+    pub packet_id: &'static str,
+    pub group: &'static str,
+    pub format: &'static str,
+    pub custodian: &'static str,
+    pub sha256_prefix: String,
+    pub verified: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HandoverManifestSummary {
+    pub items: Vec<HandoverDeliverableItem>,
+    pub completeness_pct: f32,
+    pub signed_count: usize,
+    pub total_count: usize,
+    pub manifest_sha256: String,
+}
+
+/// Pure-Rust FIPS 180-4 SHA-256 hex digest (deterministic across native and WASM32).
+pub fn compute_sha256_hex(data: &[u8]) -> String {
+    const K: [u32; 64] = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+    ];
+    let mut h: [u32; 8] = [
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+    ];
+    let bit_len = (data.len() as u64) * 8;
+    let mut padded = data.to_vec();
+    padded.push(0x80);
+    while (padded.len() % 64) != 56 {
+        padded.push(0x00);
+    }
+    padded.extend_from_slice(&bit_len.to_be_bytes());
+
+    for chunk in padded.chunks_exact(64) {
+        let mut w = [0u32; 64];
+        for i in 0..16 {
+            w[i] = u32::from_be_bytes([
+                chunk[i * 4],
+                chunk[i * 4 + 1],
+                chunk[i * 4 + 2],
+                chunk[i * 4 + 3],
+            ]);
+        }
+        for i in 16..64 {
+            let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
+            let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
+            w[i] = w[i - 16].wrapping_add(s0).wrapping_add(w[i - 7]).wrapping_add(s1);
+        }
+        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh] = h;
+        for i in 0..64 {
+            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let ch = (e & f) ^ ((!e) & g);
+            let temp1 = hh
+                .wrapping_add(s1)
+                .wrapping_add(ch)
+                .wrapping_add(K[i])
+                .wrapping_add(w[i]);
+            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let maj = (a & b) ^ (a & c) ^ (b & c);
+            let temp2 = s0.wrapping_add(maj);
+            hh = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temp1);
+            d = c;
+            c = b;
+            b = a;
+            a = temp1.wrapping_add(temp2);
+        }
+        h[0] = h[0].wrapping_add(a);
+        h[1] = h[1].wrapping_add(b);
+        h[2] = h[2].wrapping_add(c);
+        h[3] = h[3].wrapping_add(d);
+        h[4] = h[4].wrapping_add(e);
+        h[5] = h[5].wrapping_add(f);
+        h[6] = h[6].wrapping_add(g);
+        h[7] = h[7].wrapping_add(hh);
+    }
+
+    h.iter().map(|word| format!("{word:08x}")).collect()
+}
+
+/// Evaluates ISO 19650 As-Built Handover completeness and computes deterministic SHA-256 custody hashes.
+pub fn compute_handover_manifest(
+    project: &crate::core::BimProject,
+    members: &[StructuralMember],
+    include_ifc_cobie: bool,
+    ndt_signed_off: bool,
+    doc_no: &str,
+    engineer_name: &str,
+) -> HandoverManifestSummary {
+    let bim_payload = format!(
+        "IFC43:{}:W={}:C={}:R={}",
+        project.project_name,
+        project.walls.len(),
+        project.columns.len(),
+        project.runs.len()
+    );
+    let cobie_payload = format!(
+        "COBIE30:{}:Spaces={}:Footings={}",
+        project.project_name,
+        project.rooms.len(),
+        project.footings.len()
+    );
+    let ded_payload = format!(
+        "DED:{}:{}:Members={}",
+        doc_no,
+        engineer_name,
+        members.len()
+    );
+    let qa_payload = format!(
+        "QA-EN10204:{}:Rebar={:.1}:Conc={:.2}:Signed={}",
+        project.project_name,
+        project.total_rebar_weight_kg(),
+        project.total_concrete_volume_m3(),
+        ndt_signed_off
+    );
+
+    let items = vec![
+        HandoverDeliverableItem {
+            packet_id: "HND-01",
+            group: "As-Built Federated BIM",
+            format: "IFC 4.3 STEP + BCF 2.1",
+            custodian: "BIM Manager",
+            sha256_prefix: format!("{}...", &compute_sha256_hex(bim_payload.as_bytes())[..12]),
+            verified: include_ifc_cobie,
+        },
+        HandoverDeliverableItem {
+            packet_id: "HND-02",
+            group: "Asset Register & O&M Spaces",
+            format: "COBie 3.0 Spreadsheet",
+            custodian: "FM Lead (7D)",
+            sha256_prefix: format!("{}...", &compute_sha256_hex(cobie_payload.as_bytes())[..12]),
+            verified: include_ifc_cobie,
+        },
+        HandoverDeliverableItem {
+            packet_id: "HND-03",
+            group: "Red-Line Record Drawing Set",
+            format: "ISO A1 PDF + DXF",
+            custodian: engineer_name_static(engineer_name),
+            sha256_prefix: format!("{}...", &compute_sha256_hex(ded_payload.as_bytes())[..12]),
+            verified: true,
+        },
+        HandoverDeliverableItem {
+            packet_id: "HND-04",
+            group: "Rebar Mill & Ultrasonic NDT Logs",
+            format: "EN 10204 3.1 + CSV",
+            custodian: "QA/QC Inspector",
+            sha256_prefix: if ndt_signed_off {
+                format!("{}...", &compute_sha256_hex(qa_payload.as_bytes())[..12])
+            } else {
+                "Pending Final Sign-Off".to_string()
+            },
+            verified: ndt_signed_off,
+        },
+    ];
+
+    let total_count = items.len();
+    let signed_count = items.iter().filter(|i| i.verified).count();
+    let completeness_pct = (signed_count as f32 / total_count as f32) * 100.0;
+    let combined = format!("{bim_payload}|{cobie_payload}|{ded_payload}|{qa_payload}");
+    let manifest_sha256 = compute_sha256_hex(combined.as_bytes());
+
+    HandoverManifestSummary {
+        items,
+        completeness_pct,
+        signed_count,
+        total_count,
+        manifest_sha256,
+    }
+}
+
+fn engineer_name_static(name: &str) -> &'static str {
+    if name.trim().is_empty() {
+        "Structural PE (Unassigned)"
+    } else {
+        "Lead Structural PE"
+    }
 }
 
 /// Assembles a formatted multi-chapter PBG/SIMBG or IBC Structural Calculation Book HTML dossier.
@@ -91,7 +285,7 @@ table{{width:100%;border-collapse:collapse;margin:12px 0}}th,td{{border:1px soli
 <p>Spectrum Inclusion: {} | Drift Audit Embedded: {} | Peak DCR: {:.1}% | Min ARI: {:.3}</p>\
 <h2>CH-06 Member Capacity & ARI Ledger ({} members)</h2>\
 <table><thead><tr><th>Member</th><th>Section</th><th>Pu</th><th>PhiPn</th><th>DCR</th><th>ARI</th></tr></thead><tbody>{}</tbody></table>\
-<h2>CH-12 Engineer Affidavit</h2><p>Prepared by {} • Generated by EigenGraph v0.3.9.</p></body></html>",
+<h2>CH-12 Engineer Affidavit</h2><p>Prepared by {} • Generated by EigenGraph v{}.</p></body></html>",
         project.project_name,
         std_label,
         project.project_name,
@@ -111,6 +305,7 @@ table{{width:100%;border-collapse:collapse;margin:12px 0}}th,td{{border:1px soli
         members.len(),
         member_rows,
         engineer_name,
+        env!("CARGO_PKG_VERSION"),
     )
 }
 
@@ -137,6 +332,9 @@ impl Default for ResultsView {
             pbg_include_sni_spectrum: true,
             pbg_include_drift_checks: true,
             pbg_jurisdiction_idx: 0,
+            handover_include_ifc_cobie: true,
+            handover_verify_sha256: true,
+            handover_ndt_signed_off: false,
         }
     }
 }
@@ -150,11 +348,11 @@ impl ResultsView {
         bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
-        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
-        let pad = if is_mobile { 10 } else { 20 };
-
         ui.vertical(|ui| {
-            Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // 1. TOP SUBTABS SELECTOR
                 self.render_header_bar(ui, theme);
 
@@ -199,7 +397,9 @@ impl ResultsView {
                     ResultsSubTab::DeformationsAndForces => self.render_deformations_and_forces(ui, theme, members),
                     ResultsSubTab::CertificationExport => self.render_certification_export(ui, theme, members),
                     ResultsSubTab::PbgCalcBookComposer => self.render_pbg_calc_book_composer(ui, theme, members, bim_project, features),
-                    ResultsSubTab::AsBuiltHandoverPackager => self.render_as_built_handover_packager(ui, theme, features),
+                    ResultsSubTab::AsBuiltHandoverPackager => {
+                        self.render_as_built_handover_packager(ui, theme, members, bim_project, features)
+                    }
                 }
 
                 ui.add_space(24.0);
@@ -1891,11 +2091,27 @@ impl ResultsView {
     }
 
     fn render_as_built_handover_packager(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
+        let rep = compute_handover_manifest(
+            bim_project,
+            members,
+            self.handover_include_ifc_cobie,
+            self.handover_ndt_signed_off,
+            &self.doc_drawing_no,
+            &self.doc_engineer_name,
+        );
+        let pct_col = if rep.signed_count == rep.total_count {
+            theme.accent_green
+        } else {
+            theme.accent_orange
+        };
+        let total_batches = (bim_project.walls.len() + bim_project.columns.len() + bim_project.runs.len()).max(24) * 3;
         ui_kit::feature_slot_card(
             ui,
             theme,
@@ -1907,41 +2123,90 @@ impl ResultsView {
                         ui,
                         theme,
                         "HANDOVER COMPLETENESS",
-                        "94.2% Verified",
-                        "18 / 19 Contractual Deliverables Signed",
-                        theme.accent_green,
+                        &format!("{:.1}% Verified", rep.completeness_pct),
+                        &format!("{} / {} Deliverable Packets Signed", rep.signed_count, rep.total_count),
+                        pct_col,
                     ),
                     1 => ui_kit::stat_card(
                         ui,
                         theme,
                         "OPENBIM TWIN SCHEMA",
                         "IFC 4.3 + COBie 3.0",
-                        "Georeferenced Asset Tag Lineage",
+                        if self.handover_include_ifc_cobie {
+                            "Included in Owner O&M Vault"
+                        } else {
+                            "Record Drawings Only"
+                        },
                         theme.accent_blue,
                     ),
                     2 => ui_kit::stat_card(
                         ui,
                         theme,
                         "QA MILL & CUBE CERTS",
-                        "142 Batches Indexed",
-                        "28-Day Concrete & Steel EN 10204 3.1",
-                        theme.accent_green,
+                        &format!("{} Batches Indexed", total_batches),
+                        if self.handover_ndt_signed_off {
+                            "EN 10204 3.1 + NDT Signed Off"
+                        } else {
+                            "Awaiting Final Ultrasonic Lot Sign-Off"
+                        },
+                        pct_col,
                     ),
                     _ => ui_kit::stat_card(
                         ui,
                         theme,
-                        "ARCHIVE SEAL",
-                        "SHA-256 Manifest",
-                        "Tamper-Evident Owner O&M Vault",
+                        "ARCHIVE SEAL (SHA-256)",
+                        &format!("{}...", &rep.manifest_sha256[..12]),
+                        if self.handover_verify_sha256 {
+                            "FIPS 180-4 Custody Digest Valid"
+                        } else {
+                            "Digest Generation Paused"
+                        },
                         theme.accent_blue,
                     ),
                 });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Include IFC4 Record Model + COBie.xlsx");
-                    let _ = ui.selectable_label(true, "Verify SHA-256 Custody Tree");
-                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::BoxPackage, "Package As-Built Handover Dossier & Checksum Ledger", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    ui.checkbox(&mut self.handover_include_ifc_cobie, "Include IFC 4.3 Model + COBie 3.0");
+                    ui.checkbox(&mut self.handover_verify_sha256, "Verify SHA-256 Custody Tree");
+                    ui.checkbox(&mut self.handover_ndt_signed_off, "Sign Off EN 10204 & Ultrasonic NDT Lot");
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::BoxPackage,
+                        "Package Handover Manifest (.json)",
+                        12.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        let packets_json: Vec<String> = rep
+                            .items
+                            .iter()
+                            .map(|item| {
+                                format!(
+                                    "    {{\"id\":\"{}\",\"group\":\"{}\",\"format\":\"{}\",\"sha256_prefix\":\"{}\",\"verified\":{}}}",
+                                    item.packet_id, item.group, item.format, item.sha256_prefix, item.verified
+                                )
+                            })
+                            .collect();
+                        let json = format!(
+                            "{{\n  \"project\": \"{}\",\n  \"completeness_pct\": {:.1},\n  \"manifest_sha256\": \"{}\",\n  \"lead_engineer\": \"{}\",\n  \"packets\": [\n{}\n  ]\n}}\n",
+                            bim_project.project_name.replace('"', "'"),
+                            rep.completeness_pct,
+                            rep.manifest_sha256,
+                            self.doc_engineer_name.replace('"', "'"),
+                            packets_json.join(",\n"),
+                        );
+                        self.export_status = Some(dispatch_ded_export(
+                            "EigenGraph_AsBuilt_Handover_Manifest.json",
+                            json.as_bytes(),
+                            "application/json",
+                        ));
+                    }
                 });
                 ui.add_space(10.0);
 
@@ -1964,17 +2229,17 @@ impl ResultsView {
                                     ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                                 }
                                 ui.end_row();
-                                for (id, grp, fmt, own, hash, st, col) in [
-                                    ("HND-01", "As-Built Federated BIM", "IFC 4.3 STEP + BCF 2.1", "BIM Manager", "9f4b82e1...", "VERIFIED", theme.accent_green),
-                                    ("HND-02", "Asset Register & O&M Spaces", "COBie 3.0 Spreadsheet", "FM Lead (7D)", "41c7d09a...", "VERIFIED", theme.accent_green),
-                                    ("HND-03", "Red-Line Record Drawing Set", "ISO A1 PDF + DXF", "Lead Structural PE", "c8e12a04...", "VERIFIED", theme.accent_green),
-                                    ("HND-04", "Rebar Mill & Ultrasonic NDT Logs", "EN 10204 3.1 + CSV", "QA/QC Inspector", "Pending Final Lot", "1 PENDING", theme.accent_orange),
-                                ] {
-                                    ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
-                                    ui.label(RichText::new(grp).size(10.5).strong().color(theme.text_primary));
-                                    ui.label(RichText::new(fmt).size(10.5).color(theme.text_secondary));
-                                    ui.label(RichText::new(own).size(10.5).color(theme.text_secondary));
-                                    ui.label(RichText::new(hash).size(10.5).monospace().color(theme.text_muted));
+                                for item in &rep.items {
+                                    let (st, col) = if item.verified {
+                                        ("VERIFIED", theme.accent_green)
+                                    } else {
+                                        ("PENDING", theme.accent_orange)
+                                    };
+                                    ui.label(RichText::new(item.packet_id).size(10.5).monospace().color(theme.accent_blue));
+                                    ui.label(RichText::new(item.group).size(10.5).strong().color(theme.text_primary));
+                                    ui.label(RichText::new(item.format).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(item.custodian).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(&item.sha256_prefix).size(10.5).monospace().color(theme.text_muted));
                                     ui.label(RichText::new(st).size(10.5).strong().color(col));
                                     ui.end_row();
                                 }
@@ -2032,6 +2297,21 @@ mod tests {
         assert!(html.contains("PBG / SIMBG"));
         assert!(html.contains(&proj.project_name));
         assert!(html.contains("EG-PBG-001"));
+    }
+
+    #[test]
+    fn test_handover_sha256_manifest_completeness_and_digest() {
+        assert_eq!(
+            compute_sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        let proj = crate::core::BimProject::sample_bimcraft_building();
+        let partial = compute_handover_manifest(&proj, &[], true, false, "S-101", "Ir. PE");
+        let full = compute_handover_manifest(&proj, &[], true, true, "S-101", "Ir. PE");
+        assert_eq!(partial.signed_count, 3);
+        assert_eq!(full.signed_count, 4);
+        assert!((full.completeness_pct - 100.0).abs() < 1e-4);
+        assert_ne!(partial.manifest_sha256, full.manifest_sha256);
     }
 }
 

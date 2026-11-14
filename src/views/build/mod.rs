@@ -292,6 +292,11 @@ pub struct BuildView {
     pub show_layer_mep: bool,
     pub show_layer_geo: bool,
     pub highlight_4d_erection: bool,
+    // Phase 41: Point Cloud & As-Built Deviation Analyzer (3D-06)
+    pub point_cloud_tol_mm: f64,
+    pub point_cloud_overlay_enabled: bool,
+    pub point_cloud_raw_ascii: String,
+    pub point_cloud_status: Option<String>,
 }
 
 impl Default for BuildView {
@@ -401,6 +406,10 @@ impl Default for BuildView {
             show_layer_mep: true,
             show_layer_geo: true,
             highlight_4d_erection: false,
+            point_cloud_tol_mm: 10.0,
+            point_cloud_overlay_enabled: true,
+            point_cloud_raw_ascii: "0.0,0.0,0.0,+2.8\n6000.0,0.0,3200.0,-4.1\n3000.0,4500.0,0.0,+11.4\n9000.0,2000.0,3500.0,+3.2\n12000.0,6000.0,0.0,-12.6".to_string(),
+            point_cloud_status: None,
         }
     }
 }

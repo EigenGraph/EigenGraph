@@ -27,12 +27,11 @@ impl AnalyzeView {
 
         // SVD Kinematic Guard & Sherman-Morrison Engine Banner
         theme.card_frame().show(ui, |ui| {
+            ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
                 icons::icon_label(ui, AppIcon::Shield, 14.0, theme.accent_blue, "SVD Kinematic Guard & Sherman-Morrison Engine:", 13.0, theme.text_primary, true);
                 ui.label(RichText::new("rank(K) = ndof - nrigid. Fast perturbation m_e(λ) = 1 - (1-λ)h_e via Sherman-Morrison Rank-1 O(N²) verified safe.").size(12.0).color(theme.text_secondary));
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    icons::pill_badge(ui, AppIcon::CheckCircle, "Gate 1 SVD & ARI v2 Certified", theme.accent_green);
-                });
+                icons::pill_badge(ui, AppIcon::CheckCircle, "Gate 1 SVD & ARI v2 Certified", theme.accent_green);
             });
 
             ui.add_space(8.0);
@@ -43,21 +42,19 @@ impl AnalyzeView {
             ui.horizontal_wrapped(|ui| {
                 icons::icon_label(ui, AppIcon::Play, 13.0, theme.accent_blue, "SVD Kinematic Mechanism Mode Player:", 12.0, theme.accent_blue, true);
                 ui.label(RichText::new("Spectral Condition: kappa(K) = 1.42e4  |  dim(Null(K)) = 0 (Zero Singular Mechanisms)").size(11.5).color(theme.text_secondary));
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::Play,
-                        "Animate Rigid Swing Mode",
-                        11.0,
-                        Color32::WHITE,
-                        theme.accent_blue,
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        Vec2::ZERO,
-                    ).clicked() {
-                        // Triggers visual swing oscillation
-                    }
-                });
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Play,
+                    "Animate Rigid Swing Mode",
+                    11.0,
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                ).clicked() {
+                    // Triggers visual swing oscillation
+                }
             });
         });
 
@@ -76,18 +73,14 @@ impl AnalyzeView {
             ];
 
             for (title, route, len, cost, cap, col) in paths {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     let (dot_r, _) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
                     ui.painter().circle_filled(dot_r.center(), 4.0, col);
                     ui.label(RichText::new(title).size(12.0).strong().color(col));
                     ui.label(RichText::new(route).size(11.5).color(theme.text_primary));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new(cap).size(11.0).strong().color(col));
-                        ui.add_space(12.0);
-                        ui.label(RichText::new(cost).size(11.0).color(theme.text_muted));
-                        ui.add_space(12.0);
-                        ui.label(RichText::new(len).size(11.0).color(theme.text_secondary));
-                    });
+                    ui.label(RichText::new(len).size(11.0).color(theme.text_secondary));
+                    ui.label(RichText::new(cost).size(11.0).color(theme.text_muted));
+                    ui.label(RichText::new(cap).size(11.0).strong().color(col));
                 });
                 ui.add_space(4.0);
             }
@@ -100,49 +93,54 @@ impl AnalyzeView {
         ui.add_space(8.0);
 
         theme.card_frame().show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("ID").strong().size(12.0).color(theme.text_muted));
-                ui.add_space(20.0);
-                ui.label(RichText::new("Member Name").strong().size(12.0).color(theme.text_muted));
-                ui.add_space(80.0);
-                ui.label(RichText::new("Force N_e [kN]").strong().size(12.0).color(theme.text_muted));
-                ui.add_space(30.0);
-                ui.label(RichText::new("Capacity [kN]").strong().size(12.0).color(theme.text_muted));
-                ui.add_space(30.0);
-                ui.label(RichText::new("Util U*").strong().size(12.0).color(theme.text_muted));
-                ui.add_space(30.0);
-                ui.label(RichText::new("Redundancy (RR)").strong().size(12.0).color(theme.text_muted));
-                ui.add_space(30.0);
-                ui.label(RichText::new("ARI Score").strong().size(12.0).color(theme.text_muted));
-                ui.add_space(30.0);
-                ui.label(RichText::new("Criticality (CI)").strong().size(12.0).color(theme.text_muted));
-                ui.add_space(30.0);
-                ui.label(RichText::new("SVD Margin m_e").strong().size(12.0).color(theme.text_muted));
-            });
-            ui.separator();
+            ui.set_width(ui.available_width());
+            ScrollArea::horizontal()
+                .id_salt("core_fea_screening_table_scroll")
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("ID").strong().size(12.0).color(theme.text_muted));
+                        ui.add_space(20.0);
+                        ui.label(RichText::new("Member Name").strong().size(12.0).color(theme.text_muted));
+                        ui.add_space(80.0);
+                        ui.label(RichText::new("Force N_e [kN]").strong().size(12.0).color(theme.text_muted));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new("Capacity [kN]").strong().size(12.0).color(theme.text_muted));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new("Util U*").strong().size(12.0).color(theme.text_muted));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new("Redundancy (RR)").strong().size(12.0).color(theme.text_muted));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new("ARI Score").strong().size(12.0).color(theme.text_muted));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new("Criticality (CI)").strong().size(12.0).color(theme.text_muted));
+                        ui.add_space(30.0);
+                        ui.label(RichText::new("SVD Margin m_e").strong().size(12.0).color(theme.text_muted));
+                    });
+                    ui.separator();
 
-            for m in members {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(format!("E{}", m.id)).size(12.0).color(theme.text_secondary));
-                    ui.add_space(24.0);
-                    ui.label(RichText::new(&m.name).size(12.0).strong().color(theme.text_primary));
-                    ui.add_space(60.0);
-                    ui.label(RichText::new(format!("{:+.2}", m.force_kn)).size(12.0).color(theme.text_secondary));
-                    ui.add_space(50.0);
-                    ui.label(RichText::new(format!("{:.1}", m.capacity_kn)).size(12.0).color(theme.text_secondary));
-                    ui.add_space(50.0);
-                    ui.label(RichText::new(format!("{:.2}%", m.utilization * 100.0)).size(12.0).color(theme.text_secondary));
-                    ui.add_space(50.0);
-                    ui.label(RichText::new(format!("{:.4}", m.rr)).size(12.0).color(theme.accent_blue));
-                    ui.add_space(60.0);
-                    ui.label(RichText::new(format!("{:.4}", m.ari)).size(12.0).strong().color(theme.accent_green));
-                    ui.add_space(60.0);
-                    ui.label(RichText::new(format!("{:.4}", m.ci)).size(12.0).color(if m.is_critical { theme.accent_red } else { theme.text_secondary }));
-                    ui.add_space(60.0);
-                    ui.label(RichText::new(format!("{:.6}", m.svd_margin)).size(12.0).color(theme.accent_orange));
+                    for m in members {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(format!("E{}", m.id)).size(12.0).color(theme.text_secondary));
+                            ui.add_space(24.0);
+                            ui.label(RichText::new(&m.name).size(12.0).strong().color(theme.text_primary));
+                            ui.add_space(60.0);
+                            ui.label(RichText::new(format!("{:+.2}", m.force_kn)).size(12.0).color(theme.text_secondary));
+                            ui.add_space(50.0);
+                            ui.label(RichText::new(format!("{:.1}", m.capacity_kn)).size(12.0).color(theme.text_secondary));
+                            ui.add_space(50.0);
+                            ui.label(RichText::new(format!("{:.2}%", m.utilization * 100.0)).size(12.0).color(theme.text_secondary));
+                            ui.add_space(50.0);
+                            ui.label(RichText::new(format!("{:.4}", m.rr)).size(12.0).color(theme.accent_blue));
+                            ui.add_space(60.0);
+                            ui.label(RichText::new(format!("{:.4}", m.ari)).size(12.0).strong().color(theme.accent_green));
+                            ui.add_space(60.0);
+                            ui.label(RichText::new(format!("{:.4}", m.ci)).size(12.0).color(if m.is_critical { theme.accent_red } else { theme.text_secondary }));
+                            ui.add_space(60.0);
+                            ui.label(RichText::new(format!("{:.6}", m.svd_margin)).size(12.0).color(theme.accent_orange));
+                        });
+                        ui.add_space(4.0);
+                    }
                 });
-                ui.add_space(4.0);
-            }
         });
     }
 

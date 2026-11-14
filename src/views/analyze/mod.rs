@@ -347,6 +347,15 @@ pub struct AnalyzeView {
     pub rw_kh_seismic: f32,
     pub rw_shear_key: bool,
     pub rw_surcharge_kpa: f32,
+    // Phase 41: Floor Vibration & Steel S-N Fatigue (SIM-08)
+    pub vib_span_m: f32,
+    pub vib_spacing_m: f32,
+    pub vib_slab_mm: f32,
+    pub vib_damping_beta: f32,
+    pub vib_occupancy_idx: usize,
+    pub fatigue_cat_idx: usize,
+    pub fatigue_stress_range_mpa: f32,
+    pub fatigue_cycles_millions: f32,
     pub request_bim_fem_sync: bool,
     pub last_bim_sync_label: String,
     pub synced_bim_element_count: usize,
@@ -538,6 +547,14 @@ impl Default for AnalyzeView {
             rw_kh_seismic: 0.18,
             rw_shear_key: true,
             rw_surcharge_kpa: 15.0,
+            vib_span_m: 9.0,
+            vib_spacing_m: 3.0,
+            vib_slab_mm: 130.0,
+            vib_damping_beta: 0.03,
+            vib_occupancy_idx: 0,
+            fatigue_cat_idx: 1,
+            fatigue_stress_range_mpa: 68.0,
+            fatigue_cycles_millions: 2.5,
             request_bim_fem_sync: false,
             last_bim_sync_label: "Auto-sync active".to_string(),
             synced_bim_element_count: 0,
@@ -553,15 +570,11 @@ impl AnalyzeView {
         members: &[StructuralMember],
         features: &mut FeatureRegistry,
     ) {
-        let is_mobile = ui.available_width() < 640.0;
-        let outer_margin = if is_mobile {
-            Margin::symmetric(10, 8)
-        } else {
-            Margin::symmetric(20, 12)
-        };
-
         ui.vertical(|ui| {
-            Frame::new().inner_margin(outer_margin).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // 1. TWO-TIER GROUPED ANALYSIS NAVIGATION & EXPORT HEADER
                 self.render_subtabs_header(ui, theme);
 

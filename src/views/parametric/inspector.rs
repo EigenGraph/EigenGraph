@@ -641,8 +641,8 @@ impl ParametricView {
                 );
                 let resp = ui.add(
                     egui::TextEdit::singleline(&mut self.command_line_input)
-                        .desired_width((ui.available_width() - 62.0).max(80.0))
-                        .hint_text("Type WA, BM, CL, DR, WN, RM, RF..."),
+                        .desired_width((ui.available_width() - 125.0).max(60.0))
+                        .hint_text("Type WA, BM, CL, DR, WN, RM, RF, @dx,dy, @d<deg..."),
                 );
                 if ((resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))
                     || ui.button("Run").clicked())

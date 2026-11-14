@@ -44,6 +44,109 @@ pub struct LeanView {
     pub takt_transit_min: f32,
     pub takt_mixer_cap_m3: f32,
     pub takt_alert_threshold_min: f32,
+    // Phase 41 (9D-04): BIM-Pinned RFI & Submittal SLA Tracker coupled to LPS
+    pub rfi_items: Vec<RfiSubmittalItem>,
+    pub rfi_sla_days: u32,
+    pub rfi_auto_flag_lps: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RfiSubmittalItem {
+    pub ref_id: String,
+    pub subject: String,
+    pub owner: String,
+    pub age_days: u32,
+    pub linked_lps_task: String,
+    pub approved: bool,
+}
+
+impl RfiSubmittalItem {
+    pub fn default_ledger() -> Vec<Self> {
+        vec![
+            Self {
+                ref_id: "RFI-042".to_string(),
+                subject: "Shear Wall Core Coupling Rebar Congestion (L07)".to_string(),
+                owner: "Lead EOR".to_string(),
+                age_days: 7,
+                linked_lps_task: "05.08 Hold".to_string(),
+                approved: false,
+            },
+            Self {
+                ref_id: "SUB-118".to_string(),
+                subject: "W14x90 Bolted Splice Slip-Critical Fab Drawings".to_string(),
+                owner: "QA Reviewer".to_string(),
+                age_days: 3,
+                linked_lps_task: "05.12 Hold".to_string(),
+                approved: false,
+            },
+            Self {
+                ref_id: "RFI-045".to_string(),
+                subject: "Roof Tuned Mass Damper Pocket Embedded Plate Offset".to_string(),
+                owner: "Arch Lead".to_string(),
+                age_days: 2,
+                linked_lps_task: "08.02 Clear".to_string(),
+                approved: false,
+            },
+            Self {
+                ref_id: "SUB-109".to_string(),
+                subject: "Base Plate Grout Non-Shrink High-Strength Submittal".to_string(),
+                owner: "Structural PE".to_string(),
+                age_days: 4,
+                linked_lps_task: "02.04 Clear".to_string(),
+                approved: true,
+            },
+        ]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RfiSlaSummary {
+    pub open_count: usize,
+    pub overdue_count: usize,
+    pub approval_pct: f32,
+    pub lps_holds_count: usize,
+    pub avg_age_days: f32,
+}
+
+/// Evaluates open structural RFIs & shop drawing submittals against contractual SLA and LPS constraint holds.
+pub fn evaluate_rfi_sla_status(items: &[RfiSubmittalItem], sla_days: u32) -> RfiSlaSummary {
+    let sla = sla_days.max(1);
+    let mut open_count = 0usize;
+    let mut overdue_count = 0usize;
+    let mut approved_count = 0usize;
+    let mut lps_holds_count = 0usize;
+    let mut age_sum = 0u32;
+
+    for r in items {
+        if r.approved {
+            approved_count += 1;
+        } else {
+            open_count += 1;
+            age_sum += r.age_days;
+            if r.age_days > sla {
+                overdue_count += 1;
+            }
+            if r.linked_lps_task.contains("Hold") {
+                lps_holds_count += 1;
+            }
+        }
+    }
+
+    let total = items.len().max(1);
+    let approval_pct = (approved_count as f32 / total as f32) * 100.0;
+    let avg_age_days = if open_count > 0 {
+        age_sum as f32 / open_count as f32
+    } else {
+        0.0
+    };
+
+    RfiSlaSummary {
+        open_count,
+        overdue_count,
+        approval_pct,
+        lps_holds_count,
+        avg_age_days,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -151,6 +254,9 @@ impl Default for LeanView {
             takt_transit_min: 38.0,
             takt_mixer_cap_m3: 7.0,
             takt_alert_threshold_min: 75.0,
+            rfi_items: RfiSubmittalItem::default_ledger(),
+            rfi_sla_days: 5,
+            rfi_auto_flag_lps: true,
         }
     }
 }
@@ -164,9 +270,11 @@ impl LeanView {
         bim_project: &crate::core::bim::BimProject,
         features: &mut FeatureRegistry,
     ) {
-        let margin_x = if MacTheme::is_mobile(ui.ctx()) { 12 } else { 20 };
         ui.vertical(|ui| {
-            Frame::new().inner_margin(Margin::symmetric(margin_x, 12)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // Toast notification if export triggered
                 let mut dismiss_toast = false;
                 if let Some(ref status) = self.export_status {
@@ -1287,66 +1395,176 @@ impl LeanView {
     }
 
     fn render_rfi_submittal_tracker(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
+        let sum = evaluate_rfi_sla_status(&self.rfi_items, self.rfi_sla_days);
+        let overdue_col = if sum.overdue_count == 0 {
+            theme.accent_green
+        } else {
+            theme.accent_red
+        };
+        let hold_col = if sum.lps_holds_count == 0 {
+            theme.accent_green
+        } else {
+            theme.accent_orange
+        };
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::RfiSubmittalSlaTracker, |ui| {
             let cards = [
-                ("OPEN STRUCTURAL RFIs", "4 Active RFIs", "Avg Turnaround = 3.2 Business Days", theme.accent_blue),
-                ("SLA ESCALATION BREACH", "1 Overdue (+2d)", "RFI-042 Holding LPS Task 05.08", theme.accent_red),
-                ("SHOP DRAWING APPROVAL", "92% Approved", "Steel Splice Plates & Rebar BBS", theme.accent_green),
-                ("LPS CONSTRAINT COUPLING", "2 Linked Holds", "Auto-Clears Lookahead Task on Sign-Off", theme.accent_orange),
+                (
+                    "OPEN STRUCTURAL RFIs",
+                    format!("{} Open RFIs/Sub", sum.open_count),
+                    format!("Avg Age = {:.1} Business Days", sum.avg_age_days),
+                    theme.accent_blue,
+                ),
+                (
+                    "SLA ESCALATION BREACH",
+                    format!("{} Overdue (> {}d)", sum.overdue_count, self.rfi_sla_days),
+                    "Contractual EOR / Consultant Turnaround Gate".to_string(),
+                    overdue_col,
+                ),
+                (
+                    "SHOP DRAWING APPROVAL",
+                    format!("{:.0}% Approved", sum.approval_pct),
+                    "Steel Splice Plates & Rebar BBS Packages".to_string(),
+                    theme.accent_green,
+                ),
+                (
+                    "LPS CONSTRAINT COUPLING",
+                    format!("{} Linked Holds", sum.lps_holds_count),
+                    if self.rfi_auto_flag_lps {
+                        "Auto-Clears Lookahead Task on Sign-Off".to_string()
+                    } else {
+                        "Manual Lookahead Unlock Mode".to_string()
+                    },
+                    hold_col,
+                ),
             ];
             ui_kit::responsive_grid_n(ui, cards.len(), 200.0, |ui, idx| {
-                let (t, v, s, c) = cards[idx];
-                self.render_stat_card(ui, theme, t, v, s, c);
+                let (t, v, s, c) = &cards[idx];
+                self.render_stat_card(ui, theme, t, v, s, *c);
             });
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "5-Day Contractual Consultant SLA");
-                let _ = ui.selectable_label(false, "Auto-Flag LPS Make-Ready Holds");
-                let _ = crate::icons::icon_button(
+                ui.label(RichText::new("Contractual SLA (Days):").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.rfi_sla_days, 2..=14).suffix(" d"));
+                ui.checkbox(&mut self.rfi_auto_flag_lps, "Auto-Clear LPS Lookahead Holds");
+                if crate::icons::icon_button(
                     ui,
-                    crate::icons::AppIcon::Document,
-                    "Escalate Overdue RFI & Clear Lookahead Hold",
-                    12.0,
+                    crate::icons::AppIcon::Play,
+                    "Advance +1 Day",
+                    11.5,
                     theme.text_primary,
                     theme.bg_card,
                     egui::Stroke::new(1.0, theme.border_subtle),
                     CornerRadius::same(6),
                     Vec2::ZERO,
-                );
+                )
+                .clicked()
+                {
+                    for item in &mut self.rfi_items {
+                        if !item.approved {
+                            item.age_days += 1;
+                        }
+                    }
+                    self.export_status = Some("Simulated +1 business day across all open RFIs & Submittals.".to_string());
+                }
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Document,
+                    "Export RFI SLA Ledger (.csv)",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_card,
+                    egui::Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let mut csv = String::from("RefID,Subject,Owner,AgeDays,SLA_Days,LinkedLPS,Status\n");
+                    for r in &self.rfi_items {
+                        let st = if r.approved {
+                            "APPROVED"
+                        } else if r.age_days > self.rfi_sla_days {
+                            "CRITICAL"
+                        } else {
+                            "OPEN"
+                        };
+                        csv.push_str(&format!(
+                            "{},\"{}\",\"{}\",{},{},\"{}\",{}\n",
+                            r.ref_id, r.subject, r.owner, r.age_days, self.rfi_sla_days, r.linked_lps_task, st
+                        ));
+                    }
+                    match crate::core::web_bridge::save_text_file("EigenGraph_RFI_Submittal_SLA.csv", &csv, "text/csv") {
+                        Ok(msg) => self.export_status = Some(format!("RFI SLA CSV exported ({msg})")),
+                        Err(err) => self.export_status = Some(format!("RFI export error: {err}")),
+                    }
+                }
             });
             ui.add_space(10.0);
 
+            let mut approve_idx: Option<usize> = None;
             ScrollArea::horizontal().id_salt("rfi_sla_scroll").show(ui, |ui| {
                 egui::Grid::new("rfi_sla_grid")
                     .striped(true)
-                    .min_col_width(90.0)
-                    .spacing(Vec2::new(14.0, 6.0))
+                    .min_col_width(82.0)
+                    .spacing(Vec2::new(12.0, 6.0))
                     .show(ui, |ui| {
-                        for h in ["Ref ID", "Subject & BIM Element", "Ball-in-Court", "Age / SLA", "Linked LPS Task", "Priority"] {
+                        for h in ["Ref ID", "Subject & BIM Element", "Ball-in-Court", "Age / SLA", "Linked LPS Task", "Priority", "Action"] {
                             ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                         }
                         ui.end_row();
-                        for (id, subj, owner, sla, lps, st, col) in [
-                            ("RFI-042", "Shear Wall Core Coupling Rebar Congestion (L07)", "Lead EOR", "7d / 5d (+2d)", "05.08 Hold", "CRITICAL", theme.accent_red),
-                            ("SUB-118", "W14x90 Bolted Splice Slip-Critical Fab Drawings", "QA Reviewer", "3d / 5d", "05.12 Hold", "ON TRACK", theme.accent_green),
-                            ("RFI-045", "Roof Tuned Mass Damper Pocket Embedded Plate Offset", "Arch Lead", "2d / 5d", "08.02 Clear", "OPEN", theme.accent_orange),
-                        ] {
-                            ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
-                            ui.label(RichText::new(subj).size(10.5).strong().color(theme.text_primary));
-                            ui.label(RichText::new(owner).size(10.5).color(theme.text_secondary));
-                            ui.label(RichText::new(sla).size(10.5).color(col));
-                            ui.label(RichText::new(lps).size(10.5).color(theme.text_muted));
+                        for (idx, r) in self.rfi_items.iter().enumerate() {
+                            let (st, col) = if r.approved {
+                                ("APPROVED".to_string(), theme.accent_green)
+                            } else if r.age_days > self.rfi_sla_days {
+                                ("CRITICAL".to_string(), theme.accent_red)
+                            } else {
+                                ("OPEN".to_string(), theme.accent_orange)
+                            };
+                            let sla_txt = if r.approved {
+                                format!("Closed @ {}d", r.age_days)
+                            } else if r.age_days > self.rfi_sla_days {
+                                format!("{}d / {}d (+{}d)", r.age_days, self.rfi_sla_days, r.age_days - self.rfi_sla_days)
+                            } else {
+                                format!("{}d / {}d", r.age_days, self.rfi_sla_days)
+                            };
+                            ui.label(RichText::new(&r.ref_id).size(10.5).monospace().color(theme.accent_blue));
+                            ui.label(RichText::new(&r.subject).size(10.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(&r.owner).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(sla_txt).size(10.5).color(col));
+                            ui.label(RichText::new(&r.linked_lps_task).size(10.5).color(theme.text_muted));
                             ui.label(RichText::new(st).size(10.5).strong().color(col));
+                            if !r.approved {
+                                if ui.small_button("Sign-Off & Clear").clicked() {
+                                    approve_idx = Some(idx);
+                                }
+                            } else {
+                                ui.label(RichText::new("Verified").size(10.0).color(theme.accent_green));
+                            }
                             ui.end_row();
                         }
                     });
             });
+            if let Some(i) = approve_idx {
+                if let Some(item) = self.rfi_items.get_mut(i) {
+                    item.approved = true;
+                    if self.rfi_auto_flag_lps && item.linked_lps_task.contains("Hold") {
+                        item.linked_lps_task = item.linked_lps_task.replace("Hold", "Clear");
+                    }
+                    if let Some(first_blocked) = self.lps_tasks.iter_mut().find(|t| !t.is_sound) {
+                        first_blocked.is_sound = true;
+                    }
+                    self.export_status = Some(format!(
+                        "Approved {} — Lookahead constraint '{}' cleared in Lean LPS board.",
+                        item.ref_id, item.linked_lps_task
+                    ));
+                }
+            }
         });
     }
 
@@ -1369,7 +1587,7 @@ impl LeanView {
 
 #[cfg(test)]
 mod tests {
-    use super::compute_takt_concrete_dispatch;
+    use super::{compute_takt_concrete_dispatch, evaluate_rfi_sla_status, RfiSubmittalItem};
     use crate::core::bim::BimProject;
 
     #[test]
@@ -1380,5 +1598,19 @@ mod tests {
         assert_eq!(on_time.delayed_trucks, 0);
         assert!(delayed.delayed_trucks >= 1);
         assert!(on_time.total_trucks_shift >= 1);
+    }
+
+    #[test]
+    fn test_rfi_sla_tracker_overdue_escalation_and_approval() {
+        let mut ledger = RfiSubmittalItem::default_ledger();
+        let init = evaluate_rfi_sla_status(&ledger, 5);
+        assert_eq!(init.open_count, 3);
+        assert_eq!(init.overdue_count, 1);
+        assert_eq!(init.lps_holds_count, 2);
+
+        ledger[0].approved = true;
+        let cleared = evaluate_rfi_sla_status(&ledger, 5);
+        assert_eq!(cleared.overdue_count, 0);
+        assert!(cleared.approval_pct > init.approval_pct);
     }
 }

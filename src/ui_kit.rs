@@ -188,7 +188,10 @@ pub fn subtab_bar<T: Copy + PartialEq>(
         .inner_margin(Margin::same(6))
         .stroke(Stroke::new(1.0, theme.border_subtle))
         .show(ui, |ui| {
-            let is_narrow = ui.available_width() < 540.0;
+            let full_w = ui.available_width().max(120.0);
+            ui.set_width(full_w);
+            ui.set_max_width(full_w);
+            let is_narrow = full_w < 540.0;
             let render_buttons = |ui: &mut Ui, active: &mut T| {
                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
                 for &(tab, label) in tabs {

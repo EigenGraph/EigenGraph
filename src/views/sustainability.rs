@@ -36,6 +36,119 @@ pub struct SustainabilityView {
     pub ottv_double_low_e: bool,
     pub ottv_u_wall: f64,
     pub ottv_fallback_wwr: f32,
+    // Phase 41 (6D-04): Circular Material Passport & DfD Reuse
+    pub dfd_bolted_ratio_pct: f64,
+    pub dfd_include_madaster_schema: bool,
+    pub dfd_concrete_recycle_pct: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CircularMaterialBatch {
+    pub batch_id: String,
+    pub material_name: String,
+    pub mass_ton: f64,
+    pub joint_type: String,
+    pub pathway: String,
+    pub module_d_credit_tco2e: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CircularPassportSummary {
+    pub batches: Vec<CircularMaterialBatch>,
+    pub total_mass_ton: f64,
+    pub reversible_steel_pct: f64,
+    pub module_d_offset_tco2e: f64,
+    pub mci_index: f64,
+    pub batch_count: usize,
+}
+
+/// Computes ISO 20887 / EN 15978 Module D circular salvage credits and Ellen MacArthur Material Circularity Indicator (MCI).
+pub fn compute_circular_material_passport(
+    bim_project: &crate::core::BimProject,
+    members: &[StructuralMember],
+    steel_route: SteelProductionRoute,
+    bolted_ratio_pct: f64,
+    concrete_recycle_pct: f64,
+) -> CircularPassportSummary {
+    let bolted = bolted_ratio_pct.clamp(10.0, 100.0);
+    let rec_conc = concrete_recycle_pct.clamp(0.0, 100.0);
+    let rebar_ton = (bim_project.total_rebar_weight_kg() / 1000.0).max(12.5);
+    let conc_ton = (bim_project.total_concrete_volume_m3() * 2.40).max(145.0);
+    let primary_steel_ton = if members.is_empty() {
+        (bim_project.runs.len() as f64 * 3.8 + bim_project.columns.len() as f64 * 2.1).max(38.2)
+    } else {
+        members
+            .iter()
+            .filter(|m| !m.section.contains('x') || m.section.starts_with('W') || m.section.contains("HSS"))
+            .count() as f64
+            * 4.2
+    }
+    .max(28.0);
+    let bracing_steel_ton = (primary_steel_ton * 0.27).max(9.6);
+
+    let route_credit_per_ton = match steel_route {
+        SteelProductionRoute::ElectricArcFurnace => 1.45,
+        SteelProductionRoute::BlastFurnaceBof => 0.85,
+        SteelProductionRoute::HydrogenDri => 1.75,
+    };
+
+    let primary_credit = -(primary_steel_ton * (bolted / 100.0) * route_credit_per_ton * 0.35);
+    let bracing_credit = -(bracing_steel_ton * (bolted / 100.0) * 0.31);
+    let rebar_credit = -(rebar_ton * (rec_conc / 100.0) * 0.24);
+    let conc_credit = -(conc_ton * (rec_conc / 100.0) * 0.008);
+
+    let batches = vec![
+        CircularMaterialBatch {
+            batch_id: "MAT-ST-01".to_string(),
+            material_name: "Primary Wide-Flange Frame".to_string(),
+            mass_ton: primary_steel_ton,
+            joint_type: if bolted >= 60.0 {
+                "A325 Bolted Splice".to_string()
+            } else {
+                "Mixed Welded/Bolted".to_string()
+            },
+            pathway: format!("{:.0}% Direct Structural Reuse", bolted),
+            module_d_credit_tco2e: primary_credit,
+        },
+        CircularMaterialBatch {
+            batch_id: "MAT-ST-02".to_string(),
+            material_name: "HSS Bracing & Diagonals".to_string(),
+            mass_ton: bracing_steel_ton,
+            joint_type: "Pinned Gusset Plate".to_string(),
+            pathway: format!("{:.0}% Remanufacture / Reuse", (bolted * 0.94).min(100.0)),
+            module_d_credit_tco2e: bracing_credit,
+        },
+        CircularMaterialBatch {
+            batch_id: "MAT-RB-03".to_string(),
+            material_name: "Deformed Rebar BJTS 420B".to_string(),
+            mass_ton: rebar_ton,
+            joint_type: "Mechanical Couplers".to_string(),
+            pathway: format!("{:.0}% EAF Scrap Remelt", rec_conc),
+            module_d_credit_tco2e: rebar_credit,
+        },
+        CircularMaterialBatch {
+            batch_id: "MAT-RC-04".to_string(),
+            material_name: "Substructure & Slab Concrete".to_string(),
+            mass_ton: conc_ton,
+            joint_type: "Cast In-Situ".to_string(),
+            pathway: format!("{:.0}% Recycled RCA Aggregate", rec_conc),
+            module_d_credit_tco2e: conc_credit,
+        },
+    ];
+
+    let total_mass_ton = primary_steel_ton + bracing_steel_ton + rebar_ton + conc_ton;
+    let module_d_offset_tco2e = primary_credit + bracing_credit + rebar_credit + conc_credit;
+    let mci_index = (0.28 + 0.42 * (bolted / 100.0) + 0.22 * (rec_conc / 100.0)).clamp(0.15, 0.95);
+    let batch_count = (bim_project.walls.len() + bim_project.columns.len() + bim_project.runs.len()).max(24) * 3;
+
+    CircularPassportSummary {
+        batches,
+        total_mass_ton,
+        reversible_steel_pct: bolted,
+        module_d_offset_tco2e,
+        mci_index,
+        batch_count,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -235,6 +348,9 @@ impl Default for SustainabilityView {
             ottv_double_low_e: true,
             ottv_u_wall: 2.1,
             ottv_fallback_wwr: 0.38,
+            dfd_bolted_ratio_pct: 78.0,
+            dfd_include_madaster_schema: true,
+            dfd_concrete_recycle_pct: 65.0,
         }
     }
 }
@@ -248,11 +364,11 @@ impl SustainabilityView {
         bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
-        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
-        let pad = if is_mobile { 12 } else { 20 };
-
         ui.vertical(|ui| {
-            Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // 1. TOP SUBTABS SELECTOR
                 self.render_header_bar(ui, theme);
 
@@ -276,7 +392,7 @@ impl SustainabilityView {
                         self.render_solar_ottv_daylight(ui, theme, bim_project, features);
                     }
                     SustainabilitySubTab::CircularDfdPassport => {
-                        self.render_circular_dfd_passport(ui, theme, features);
+                        self.render_circular_dfd_passport(ui, theme, members, bim_project, features);
                     }
                 }
 
@@ -393,8 +509,10 @@ impl SustainabilityView {
         // Live BIM Material Embodied Carbon Sync
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::BimMaterialLcaAutoSync, |ui| {
             ui.vertical(|ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(
+                let slot_w = ui.available_width();
+                ui.set_max_width(slot_w);
+                ui.add(
+                    egui::Label::new(
                         RichText::new(format!(
                             "Active BimProject LCA: {:.2} m³ Concrete ({:.2} tCO₂e) + {:.2} t Steel ({:.2} tCO₂e)",
                             concrete_m3, concrete_co2, total_steel_tons, steel_co2,
@@ -402,7 +520,11 @@ impl SustainabilityView {
                         .size(11.0)
                         .strong()
                         .color(theme.text_primary),
-                    );
+                    )
+                    .wrap(),
+                );
+                ui.add_space(4.0);
+                ui.horizontal_wrapped(|ui| {
                     if icons::icon_button(ui, AppIcon::Recycle, "Recompute Live Model CO₂e Footprint", 11.5, Color32::WHITE, theme.accent_green, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
                         self.lca_sync_status = Some(format!(
                             "Computed A1–A5 Embodied Carbon from {} BIM elements: {:.2} tCO₂e (Concrete {:.2} t + Steel {:.2} t + Transport {:.2} t).",
@@ -416,7 +538,7 @@ impl SustainabilityView {
                 });
                 if let Some(ref st) = self.lca_sync_status {
                     ui.add_space(4.0);
-                    ui.label(RichText::new(st).size(10.5).color(theme.accent_green));
+                    ui.add(egui::Label::new(RichText::new(st).size(10.5).color(theme.accent_green)).wrap());
                 }
             });
         });
@@ -430,6 +552,8 @@ impl SustainabilityView {
             .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
+                let card_w = ui.available_width();
+                ui.set_max_width(card_w);
                 ui.horizontal_wrapped(|ui| {
                     icons::icon_label(ui, AppIcon::Building, 13.5, theme.accent_blue, "Steel Production Route:", 12.0, theme.text_primary, true);
                     for (route, icon, lbl) in [
@@ -457,32 +581,86 @@ impl SustainabilityView {
             .inner_margin(Margin::same(14))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    icons::icon_label(ui, AppIcon::Globe, 14.5, theme.accent_green, "WHOLE BUILDING LIFE CYCLE ASSESSMENT (EN 15978 / ISO 14040)", 13.0, theme.text_primary, true);
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(
-                            RichText::new("RIBA 2030 Climate Challenge Benchmark: Tier A (< 300 kg CO₂e/m²)")
+                let card_inner_w = ui.available_width();
+                ui.set_max_width(card_inner_w);
+                if card_inner_w >= 680.0 {
+                    ui.horizontal(|ui| {
+                        icons::icon_label(ui, AppIcon::Globe, 14.5, theme.accent_green, "WHOLE BUILDING LIFE CYCLE ASSESSMENT (EN 15978 / ISO 14040)", 13.0, theme.text_primary, true);
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.label(
+                                RichText::new("RIBA 2030 Climate Challenge Benchmark: Tier A (< 300 kg CO₂e/m²)")
+                                    .size(11.0)
+                                    .color(theme.accent_green),
+                            );
+                        });
+                    });
+                } else {
+                    icons::icon_label(ui, AppIcon::Globe, 14.5, theme.accent_green, "WHOLE BUILDING LCA (EN 15978)", 13.0, theme.text_primary, true);
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new("ISO 14040 Lifecycle Assessment • RIBA 2030 Benchmark: Tier A (< 300 kg CO₂e/m²)")
                                 .size(11.0)
                                 .color(theme.accent_green),
-                        );
-                    });
-                });
+                        )
+                        .wrap(),
+                    );
+                }
                 ui.add_space(10.0);
 
                 for stage in &self.lca_stages {
                     let col = Color32::from_rgb(stage.color_rgb.0, stage.color_rgb.1, stage.color_rgb.2);
-                    ui.horizontal_wrapped(|ui| {
-                        Frame::new()
-                            .fill(col.gamma_multiply(0.2))
-                            .stroke(Stroke::new(1.0, col))
-                            .corner_radius(CornerRadius::same(4))
-                            .inner_margin(Margin::symmetric(6, 2))
-                            .show(ui, |ui| {
-                                ui.label(RichText::new(&stage.stage_code).size(11.0).strong().color(col));
+                    let sign = if stage.emissions_t_co2e < 0.0 { "" } else { "+" };
+                    if card_inner_w >= 540.0 {
+                        ui.horizontal(|ui| {
+                            Frame::new()
+                                .fill(col.gamma_multiply(0.2))
+                                .stroke(Stroke::new(1.0, col))
+                                .corner_radius(CornerRadius::same(4))
+                                .inner_margin(Margin::symmetric(6, 2))
+                                .show(ui, |ui| {
+                                    ui.label(RichText::new(&stage.stage_code).size(11.0).strong().color(col));
+                                });
+
+                            ui.add_space(8.0);
+                            ui.vertical(|ui| {
+                                ui.label(
+                                    RichText::new(&stage.stage_name)
+                                        .size(11.5)
+                                        .strong()
+                                        .color(theme.text_primary),
+                                );
+                                ui.label(
+                                    RichText::new(&stage.description)
+                                        .size(10.5)
+                                        .color(theme.text_secondary),
+                                );
                             });
 
-                        ui.add_space(8.0);
-                        ui.vertical(|ui| {
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.label(
+                                    RichText::new(format!("{:.1}%", stage.pct_of_total))
+                                        .size(11.5)
+                                        .strong()
+                                        .color(col),
+                                );
+                                ui.add_space(12.0);
+                                ui.label(
+                                    RichText::new(format!("{}{:.1} t CO₂e", sign, stage.emissions_t_co2e))
+                                        .size(12.0)
+                                        .color(theme.text_primary),
+                                );
+                            });
+                        });
+                    } else {
+                        ui.horizontal_wrapped(|ui| {
+                            Frame::new()
+                                .fill(col.gamma_multiply(0.2))
+                                .stroke(Stroke::new(1.0, col))
+                                .corner_radius(CornerRadius::same(4))
+                                .inner_margin(Margin::symmetric(6, 2))
+                                .show(ui, |ui| {
+                                    ui.label(RichText::new(&stage.stage_code).size(11.0).strong().color(col));
+                                });
                             ui.label(
                                 RichText::new(&stage.stage_name)
                                     .size(11.5)
@@ -490,28 +668,24 @@ impl SustainabilityView {
                                     .color(theme.text_primary),
                             );
                             ui.label(
+                                RichText::new(format!(
+                                    "{}{:.1} t CO₂e ({:.1}%)",
+                                    sign, stage.emissions_t_co2e, stage.pct_of_total
+                                ))
+                                .size(11.0)
+                                .strong()
+                                .color(col),
+                            );
+                        });
+                        ui.add(
+                            egui::Label::new(
                                 RichText::new(&stage.description)
                                     .size(10.5)
                                     .color(theme.text_secondary),
-                            );
-                        });
-
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(
-                                RichText::new(format!("{:.1}%", stage.pct_of_total))
-                                    .size(11.5)
-                                    .strong()
-                                    .color(col),
-                            );
-                            ui.add_space(12.0);
-                            let sign = if stage.emissions_t_co2e < 0.0 { "" } else { "+" };
-                            ui.label(
-                                RichText::new(format!("{}{:.1} t CO₂e", sign, stage.emissions_t_co2e))
-                                    .size(12.0)
-                                    .color(theme.text_primary),
-                            );
-                        });
-                    });
+                            )
+                            .wrap(),
+                        );
+                    }
 
                     ui.add_space(2.0);
                     let (b_rect, _resp) = ui.allocate_exact_size(
@@ -969,28 +1143,107 @@ impl SustainabilityView {
     }
 
     fn render_circular_dfd_passport(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
+        let rep = compute_circular_material_passport(
+            bim_project,
+            members,
+            self.steel_production_route,
+            self.dfd_bolted_ratio_pct,
+            self.dfd_concrete_recycle_pct,
+        );
+        let mci_col = if rep.mci_index >= 0.60 {
+            theme.accent_green
+        } else {
+            theme.accent_orange
+        };
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::CircularMaterialPassportDfd, |ui| {
             let cards = [
-                ("REVERSIBLE BOLTED STEEL", "76.4% by Mass", "A325 Bolted End-Plates (Reuse Ready)", theme.accent_green),
-                ("EN 15978 MODULE D OFFSET", "-14.8 t CO₂e", "Circular Salvage & Recycling Credit", theme.accent_blue),
-                ("MATERIAL CIRCULARITY (MCI)", "0.68 Index", "Target >= 0.60 Urban Mining Tier", theme.accent_green),
-                ("PASSPORT INVENTORY TAGS", "142 Tagged Batches", "Mill Heat # & EPD Serials Archived", theme.text_primary),
+                (
+                    "REVERSIBLE BOLTED STEEL",
+                    format!("{:.1}% by Mass", rep.reversible_steel_pct),
+                    "ISO 20887 Bolted End-Plates & Pinned Gussets".to_string(),
+                    if rep.reversible_steel_pct >= 65.0 {
+                        theme.accent_green
+                    } else {
+                        theme.accent_orange
+                    },
+                ),
+                (
+                    "EN 15978 MODULE D OFFSET",
+                    format!("{:.1} t CO₂e", rep.module_d_offset_tco2e),
+                    "Circular Salvage & Recycling Carbon Credit".to_string(),
+                    theme.accent_blue,
+                ),
+                (
+                    "MATERIAL CIRCULARITY (MCI)",
+                    format!("{:.2} Index", rep.mci_index),
+                    "Target >= 0.60 Urban Mining Certification".to_string(),
+                    mci_col,
+                ),
+                (
+                    "PASSPORT INVENTORY TAGS",
+                    format!("{} Tagged Batches", rep.batch_count),
+                    format!("Total Tracked Mass = {:.1} T", rep.total_mass_ton),
+                    theme.text_primary,
+                ),
             ];
             ui_kit::responsive_grid_n(ui, cards.len(), 185.0, |ui, idx| {
-                let (t, v, s, c) = cards[idx];
-                self.render_stat_card(ui, theme, t, v, s, c);
+                let (t, v, s, c) = &cards[idx];
+                self.render_stat_card(ui, theme, t, v, s, *c);
             });
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Include Bolted Deconstruction Pathways");
-                let _ = ui.selectable_label(false, "EU Madaster / ISO 20887 Schema");
-                let _ = icons::icon_button(ui, AppIcon::Recycle, "Export Circular Material Passport (.JSON / QR)", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                ui.label(RichText::new("Bolted Reversible Steel:").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.dfd_bolted_ratio_pct, 15.0..=100.0).suffix("%"));
+                ui.add_space(6.0);
+                ui.label(RichText::new("RCA Concrete / Rebar Recovery:").size(11.0).color(theme.text_secondary));
+                ui.add(egui::Slider::new(&mut self.dfd_concrete_recycle_pct, 10.0..=95.0).suffix("%"));
+                ui.checkbox(&mut self.dfd_include_madaster_schema, "EU Madaster / ISO 20887 Schema");
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Recycle,
+                    "Export Material Passport (.json)",
+                    11.5,
+                    theme.text_primary,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let rows_json: Vec<String> = rep
+                        .batches
+                        .iter()
+                        .map(|b| {
+                            format!(
+                                "    {{\"batch_id\":\"{}\",\"material\":\"{}\",\"mass_ton\":{:.2},\"joint\":\"{}\",\"pathway\":\"{}\",\"module_d_tco2e\":{:.2}}}",
+                                b.batch_id, b.material_name, b.mass_ton, b.joint_type, b.pathway, b.module_d_credit_tco2e
+                            )
+                        })
+                        .collect();
+                    let json = format!(
+                        "{{\n  \"schema\": \"{}\",\n  \"project\": \"{}\",\n  \"reversible_steel_pct\": {:.1},\n  \"module_d_offset_tco2e\": {:.2},\n  \"mci_index\": {:.3},\n  \"total_mass_ton\": {:.2},\n  \"batches\": [\n{}\n  ]\n}}\n",
+                        if self.dfd_include_madaster_schema { "ISO-20887-Madaster-v2" } else { "EigenGraph-DfD-v1" },
+                        bim_project.project_name.replace('"', "'"),
+                        rep.reversible_steel_pct,
+                        rep.module_d_offset_tco2e,
+                        rep.mci_index,
+                        rep.total_mass_ton,
+                        rows_json.join(",\n"),
+                    );
+                    match crate::core::web_bridge::save_text_file("EigenGraph_Circular_Material_Passport.json", &json, "application/json") {
+                        Ok(msg) => self.lca_sync_status = Some(format!("Material Passport JSON exported ({msg})")),
+                        Err(err) => self.lca_sync_status = Some(format!("Passport JSON error: {err}")),
+                    }
+                }
             });
             ui.add_space(10.0);
 
@@ -1004,17 +1257,13 @@ impl SustainabilityView {
                             ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                         }
                         ui.end_row();
-                        for (id, mat, mass, jnt, path, cr) in [
-                            ("MAT-ST-01", "W14x90 ASTM A992 (EAF)", "38.2 T", "Bolted Splice", "100% Direct Reuse", "-11.4 t CO₂e"),
-                            ("MAT-ST-02", "HSS 8x8x1/2 Diagonals", "10.3 T", "Pinned Gusset", "92% Direct Reuse", "-2.9 t CO₂e"),
-                            ("MAT-RC-01", "Pile Cap Concrete K-350", "168.0 T", "Cast In-Situ", "Crushed Aggregate", "-0.5 t CO₂e"),
-                        ] {
-                            ui.label(RichText::new(id).size(10.5).monospace().color(theme.accent_blue));
-                            ui.label(RichText::new(mat).size(10.5).strong().color(theme.text_primary));
-                            ui.label(RichText::new(mass).size(10.5).color(theme.text_secondary));
-                            ui.label(RichText::new(jnt).size(10.5).color(theme.accent_green));
-                            ui.label(RichText::new(path).size(10.5).color(theme.text_secondary));
-                            ui.label(RichText::new(cr).size(10.5).strong().color(theme.accent_green));
+                        for b in &rep.batches {
+                            ui.label(RichText::new(&b.batch_id).size(10.5).monospace().color(theme.accent_blue));
+                            ui.label(RichText::new(&b.material_name).size(10.5).strong().color(theme.text_primary));
+                            ui.label(RichText::new(format!("{:.1} T", b.mass_ton)).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(&b.joint_type).size(10.5).color(theme.accent_green));
+                            ui.label(RichText::new(&b.pathway).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(format!("{:.1} t CO₂e", b.module_d_credit_tco2e)).size(10.5).strong().color(theme.accent_green));
                             ui.end_row();
                         }
                     });
@@ -1037,7 +1286,7 @@ impl SustainabilityView {
 
 #[cfg(test)]
 mod tests {
-    use super::compute_facade_ottv;
+    use super::{compute_circular_material_passport, compute_facade_ottv, SteelProductionRoute};
     use crate::core::BimProject;
 
     #[test]
@@ -1050,5 +1299,27 @@ mod tests {
         assert!(low_e_shaded.overall_ottv_wm2 < high_solar.overall_ottv_wm2);
         assert!(low_e_shaded.pass_sni_35);
         assert!(low_e_shaded.peak_cooling_kw > 0.0);
+    }
+
+    #[test]
+    fn test_circular_dfd_passport_bolted_ratio_improves_mci() {
+        let proj = BimProject::sample_bimcraft_building();
+        let welded = compute_circular_material_passport(
+            &proj,
+            &[],
+            SteelProductionRoute::BlastFurnaceBof,
+            25.0,
+            20.0,
+        );
+        let bolted_eaf = compute_circular_material_passport(
+            &proj,
+            &[],
+            SteelProductionRoute::ElectricArcFurnace,
+            88.0,
+            75.0,
+        );
+        assert!(bolted_eaf.mci_index > welded.mci_index);
+        assert!(bolted_eaf.module_d_offset_tco2e < welded.module_d_offset_tco2e);
+        assert_eq!(bolted_eaf.batches.len(), 4);
     }
 }

@@ -5,8 +5,10 @@ use super::*;
 impl AnalyzeView {
     pub(super) fn render_subtabs_header(&mut self, ui: &mut Ui, theme: &MacTheme) {
         theme.card_frame().show(ui, |ui| {
-            // Top Row: Suite Title & Interop / Dossier Export Actions
+            ui.set_width(ui.available_width());
+            // Top Row: Suite Title & Interop / Dossier Export Actions (wraps cleanly across phone/tablet/desktop)
             ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
                 icons::icon_label(
                     ui,
                     AppIcon::Shield,
@@ -17,121 +19,122 @@ impl AnalyzeView {
                     theme.accent_blue,
                     true,
                 );
+            });
+            ui.add_space(6.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
+                let (publish_icon, publish_text) = if self.published_to_dossier {
+                    (AppIcon::CheckCircle, "Synced to MY PROJECT")
+                } else {
+                    (AppIcon::UploadImport, "Publish to MY PROJECT Dossier")
+                };
+                let publish_bg = if self.published_to_dossier {
+                    theme.accent_green
+                } else {
+                    theme.accent_blue.gamma_multiply(0.85)
+                };
 
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let (publish_icon, publish_text) = if self.published_to_dossier {
-                        (AppIcon::CheckCircle, "Synced to MY PROJECT")
-                    } else {
-                        (AppIcon::UploadImport, "Publish to MY PROJECT Dossier")
-                    };
-                    let publish_bg = if self.published_to_dossier {
-                        theme.accent_green
-                    } else {
-                        theme.accent_blue.gamma_multiply(0.85)
-                    };
+                if icons::icon_button(
+                    ui,
+                    publish_icon,
+                    publish_text,
+                    11.5,
+                    Color32::WHITE,
+                    publish_bg,
+                    Stroke::NONE,
+                    CornerRadius::same(7),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    self.published_to_dossier = true;
+                    self.export_status =
+                        Some("Model & ARI Analytics synced to MY PROJECT Dossier".to_string());
+                }
 
-                    if icons::icon_button(
-                        ui,
-                        publish_icon,
-                        publish_text,
-                        11.5,
-                        Color32::WHITE,
-                        publish_bg,
-                        Stroke::NONE,
-                        CornerRadius::same(7),
-                        Vec2::ZERO,
-                    )
-                    .clicked()
-                    {
-                        self.published_to_dossier = true;
-                        self.export_status =
-                            Some("Model & ARI Analytics synced to MY PROJECT Dossier".to_string());
-                    }
-
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::SaveDisk,
-                        "SAP2000 (.s2k)",
-                        11.0,
-                        Color32::WHITE,
-                        theme.bg_canvas,
-                        Stroke::new(1.0, theme.accent_blue),
-                        CornerRadius::same(7),
-                        Vec2::ZERO,
-                    )
-                    .clicked()
-                    {
-                        let mut engine = crate::core::ParametricEngine::new();
-                        if let Ok(model) = engine.generate_warren_truss() {
-                            let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
-                            let s2k =
-                                crate::core::Sap2000Exporter::export_to_s2k(&model, ari.as_ref());
-                            if let Ok(path) = crate::core::DiskExporter::write_export_file(
-                                "EigenGraph_SAP2000.s2k",
-                                &s2k,
-                            ) {
-                                self.export_status =
-                                    Some(format!("CSI SAP2000 .s2k saved to: {}", path));
-                            }
+                if icons::icon_button(
+                    ui,
+                    AppIcon::SaveDisk,
+                    "SAP2000 (.s2k)",
+                    11.0,
+                    Color32::WHITE,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.accent_blue),
+                    CornerRadius::same(7),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let mut engine = crate::core::ParametricEngine::new();
+                    if let Ok(model) = engine.generate_warren_truss() {
+                        let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
+                        let s2k =
+                            crate::core::Sap2000Exporter::export_to_s2k(&model, ari.as_ref());
+                        if let Ok(path) = crate::core::DiskExporter::write_export_file(
+                            "EigenGraph_SAP2000.s2k",
+                            &s2k,
+                        ) {
+                            self.export_status =
+                                Some(format!("CSI SAP2000 .s2k saved to: {}", path));
                         }
                     }
+                }
 
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::SaveDisk,
-                        "DXF 3D (.dxf)",
-                        11.0,
-                        Color32::WHITE,
-                        theme.bg_canvas,
-                        Stroke::new(1.0, theme.accent_green),
-                        CornerRadius::same(7),
-                        Vec2::ZERO,
-                    )
-                    .clicked()
-                    {
-                        let mut engine = crate::core::ParametricEngine::new();
-                        if let Ok(model) = engine.generate_warren_truss() {
-                            let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
-                            let dxf =
-                                crate::core::DxfExporter::export_to_dxf(&model, ari.as_ref());
-                            if let Ok(path) = crate::core::DiskExporter::write_export_file(
-                                "EigenGraph_3D.dxf",
-                                &dxf,
-                            ) {
-                                self.export_status =
-                                    Some(format!("AutoCAD 3D DXF saved to: {}", path));
-                            }
+                if icons::icon_button(
+                    ui,
+                    AppIcon::SaveDisk,
+                    "DXF 3D (.dxf)",
+                    11.0,
+                    Color32::WHITE,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, theme.accent_green),
+                    CornerRadius::same(7),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let mut engine = crate::core::ParametricEngine::new();
+                    if let Ok(model) = engine.generate_warren_truss() {
+                        let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
+                        let dxf =
+                            crate::core::DxfExporter::export_to_dxf(&model, ari.as_ref());
+                        if let Ok(path) = crate::core::DiskExporter::write_export_file(
+                            "EigenGraph_3D.dxf",
+                            &dxf,
+                        ) {
+                            self.export_status =
+                                Some(format!("AutoCAD 3D DXF saved to: {}", path));
                         }
                     }
+                }
 
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::Globe,
-                        "OpenBIM (.ifc)",
-                        11.0,
-                        Color32::WHITE,
-                        theme.bg_canvas,
-                        Stroke::new(1.0, Color32::from_rgb(180, 100, 255)),
-                        CornerRadius::same(7),
-                        Vec2::ZERO,
-                    )
-                    .clicked()
-                    {
-                        let mut engine = crate::core::ParametricEngine::new();
-                        if let Ok(model) = engine.generate_warren_truss() {
-                            let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
-                            let ifc =
-                                crate::core::IfcExporter::export_to_ifc(&model, ari.as_ref());
-                            if let Ok(path) = crate::core::DiskExporter::write_export_file(
-                                "EigenGraph_OpenBIM.ifc",
-                                &ifc,
-                            ) {
-                                self.export_status =
-                                    Some(format!("OpenBIM IFC 4.3 saved to: {}", path));
-                            }
+                if icons::icon_button(
+                    ui,
+                    AppIcon::Globe,
+                    "OpenBIM (.ifc)",
+                    11.0,
+                    Color32::WHITE,
+                    theme.bg_canvas,
+                    Stroke::new(1.0, Color32::from_rgb(180, 100, 255)),
+                    CornerRadius::same(7),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                {
+                    let mut engine = crate::core::ParametricEngine::new();
+                    if let Ok(model) = engine.generate_warren_truss() {
+                        let ari = crate::core::AriEngine::evaluate_redundancy(&model).ok();
+                        let ifc =
+                            crate::core::IfcExporter::export_to_ifc(&model, ari.as_ref());
+                        if let Ok(path) = crate::core::DiskExporter::write_export_file(
+                            "EigenGraph_OpenBIM.ifc",
+                            &ifc,
+                        ) {
+                            self.export_status =
+                                Some(format!("OpenBIM IFC 4.3 saved to: {}", path));
                         }
                     }
-                });
+                }
             });
 
             ui.add_space(8.0);

@@ -513,10 +513,18 @@ impl ParametricView {
                                     self.refresh_live_ari();
                                 }
                             }
+                            ui.label(RichText::new("Step:").size(10.0).color(theme.text_muted));
+                            ui.add(
+                                egui::DragValue::new(&mut universal_canvas.cad_step_mm)
+                                    .range(10.0..=50_000.0)
+                                    .speed(50.0)
+                                    .suffix(" mm"),
+                            )
+                            .on_hover_text("Precision step distance for Move & Copy");
                             if icons::icon_button(
                                 ui,
                                 AppIcon::ArrowRight,
-                                "Move +1m",
+                                "Move",
                                 10.0,
                                 theme.text_primary,
                                 theme.bg_card,
@@ -524,10 +532,42 @@ impl ParametricView {
                                 CornerRadius::same(5),
                                 Vec2::new(0.0, 23.0),
                             )
-                            .on_hover_text("Translate latest element +1000 mm East (M)")
+                            .on_hover_text("Translate latest element East by Step mm (M)")
                             .clicked()
                             {
                                 self.apply_parametric_move_1m(universal_canvas);
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Layers,
+                                "Copy",
+                                10.0,
+                                theme.text_primary,
+                                theme.bg_card,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 23.0),
+                            )
+                            .on_hover_text("Duplicate latest wall/column/sketch East by Step mm")
+                            .clicked()
+                            {
+                                self.apply_parametric_duplicate(universal_canvas);
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Compass,
+                                "Rot 90°",
+                                10.0,
+                                theme.text_primary,
+                                theme.bg_card,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 23.0),
+                            )
+                            .on_hover_text("Rotate latest element or sketch +90°")
+                            .clicked()
+                            {
+                                self.apply_parametric_rotate_90(universal_canvas);
                             }
                             if icons::icon_button(
                                 ui,
@@ -802,7 +842,7 @@ impl ParametricView {
                         let cli_resp = ui.add(
                             egui::TextEdit::singleline(&mut self.command_line_input)
                                 .desired_width(cli_w)
-                                .hint_text("wall 0,0->6000,0 | col 0,0 | move | offset | mirror | del | undo"),
+                                .hint_text("@dx,dy | @d<deg | ro 90 | wall 0,0->6000,0"),
                         );
                         if ((cli_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))
                             || ui
@@ -820,6 +860,30 @@ impl ParametricView {
                             self.execute_cad_command(&raw);
                             self.command_line_input.clear();
                             cli_resp.request_focus();
+                        }
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Shield,
+                            "? Shortcuts",
+                            10.0,
+                            if universal_canvas.shortcuts_modal_open {
+                                Color32::WHITE
+                            } else {
+                                theme.text_secondary
+                            },
+                            if universal_canvas.shortcuts_modal_open {
+                                theme.accent_blue
+                            } else {
+                                theme.bg_card
+                            },
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(5),
+                            Vec2::new(0.0, 22.0),
+                        )
+                        .on_hover_text("Open CAD Shortcuts, Relative/Polar CLI & Quick-Jump Palette (Ctrl/Cmd+K)")
+                        .clicked()
+                        {
+                            universal_canvas.shortcuts_modal_open = !universal_canvas.shortcuts_modal_open;
                         }
                     });
                     if let Some(last_log) = self.command_history.last() {

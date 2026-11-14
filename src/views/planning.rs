@@ -75,6 +75,11 @@ pub struct PlanningView {
     pub evm_cutoff_month: usize,
     pub evm_retention_pct: f32,
     pub evm_cpi_factor: f32,
+    // Phase 41 (5D-04): Live Bid Leveling & Value Engineering Tender Matrix
+    pub ve_outlier_pct: f64,
+    pub ve_composite_deck_swap: bool,
+    pub ve_ari_floor: f64,
+    pub ve_selected_bidder_idx: usize,
 }
 
 impl Default for PlanningView {
@@ -103,7 +108,134 @@ impl Default for PlanningView {
             evm_cutoff_month: 7,
             evm_retention_pct: 5.0,
             evm_cpi_factor: 0.97,
+            ve_outlier_pct: 15.0,
+            ve_composite_deck_swap: true,
+            ve_ari_floor: 0.90,
+            ve_selected_bidder_idx: 1,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BidLevelingLine {
+    pub package: &'static str,
+    pub owner_est: f64,
+    pub bidder_a: f64,
+    pub bidder_b: f64,
+    pub bidder_c: f64,
+    pub outlier_note: String,
+    pub balanced: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct BidLevelingSummary {
+    pub lines: Vec<BidLevelingLine>,
+    pub total_oe: f64,
+    pub total_a: f64,
+    pub total_b: f64,
+    pub total_c: f64,
+    pub best_bidder_idx: usize,
+    pub best_bid_total: f64,
+    pub outlier_count: usize,
+    pub ve_savings_val: f64,
+    pub projected_ari: f64,
+    pub ari_compliant: bool,
+}
+
+/// Computes normalized bid leveling across three tenderers, front-loading outlier flags, and ARI-guarded VE savings.
+pub fn compute_bid_leveling_matrix(
+    t: &Parametric5DTakeoff,
+    outlier_threshold_pct: f64,
+    ve_composite_deck_swap: bool,
+    ari_floor: f64,
+) -> BidLevelingSummary {
+    let thresh = outlier_threshold_pct.clamp(5.0, 40.0);
+    let balance_pkg = (t.grand_total_rab - (t.cost_substructure + t.cost_steel_material + t.cost_workshop_fab + t.cost_erection_crane)).max(0.0);
+    let raw = [
+        ("02 Bored Piles & Pile Caps", t.cost_substructure, 0.98, 0.95, 1.28),
+        ("05 Steel Supply BJ41 / A992", t.cost_steel_material, 0.97, 0.92, 0.99),
+        ("05 Workshop Fab + UT/NDT", t.cost_workshop_fab, 1.18, 0.94, 0.96),
+        ("05 Crane Erection & Rigging", t.cost_erection_crane, 1.02, 0.91, 0.95),
+        ("09 Fireproofing, OH & contingency", balance_pkg, 1.00, 0.95, 0.98),
+    ];
+
+    let mut lines = Vec::with_capacity(raw.len());
+    let mut outlier_count = 0usize;
+    let mut total_oe = 0.0;
+    let mut total_a = 0.0;
+    let mut total_b = 0.0;
+    let mut total_c = 0.0;
+
+    for (pkg, oe, ma, mb, mc) in raw {
+        let a = oe * ma;
+        let b = oe * mb;
+        let c = oe * mc;
+        total_oe += oe;
+        total_a += a;
+        total_b += b;
+        total_c += c;
+
+        let da = (ma - 1.0) * 100.0;
+        let db = (mb - 1.0) * 100.0;
+        let dc = (mc - 1.0) * 100.0;
+        let mut flags = Vec::new();
+        if da.abs() > thresh {
+            flags.push(format!("Bidder A {:+.0}%", da));
+        }
+        if db.abs() > thresh {
+            flags.push(format!("Bidder B {:+.0}%", db));
+        }
+        if dc.abs() > thresh {
+            flags.push(format!("Bidder C {:+.0}%", dc));
+        }
+        let balanced = flags.is_empty();
+        if !balanced {
+            outlier_count += 1;
+        }
+        let outlier_note = if balanced {
+            "Balanced Rate".to_string()
+        } else {
+            flags.join(" / ")
+        };
+        lines.push(BidLevelingLine {
+            package: pkg,
+            owner_est: oe,
+            bidder_a: a,
+            bidder_b: b,
+            bidder_c: c,
+            outlier_note,
+            balanced,
+        });
+    }
+
+    let totals = [total_a, total_b, total_c];
+    let (best_bidder_idx, best_bid_total) = totals
+        .iter()
+        .enumerate()
+        .min_by(|(_, x), (_, y)| x.total_cmp(y))
+        .map(|(i, v)| (i, *v))
+        .unwrap_or((1, total_b));
+
+    let ve_savings_val = if ve_composite_deck_swap {
+        t.cost_steel_material * 0.082 + t.cost_erection_crane * 0.055
+    } else {
+        0.0
+    };
+    let projected_ari = if ve_composite_deck_swap { 0.935 } else { 0.978 };
+    let ari_compliant = projected_ari >= ari_floor;
+
+    BidLevelingSummary {
+        lines,
+        total_oe,
+        total_a,
+        total_b,
+        total_c,
+        best_bidder_idx,
+        best_bid_total,
+        outlier_count,
+        ve_savings_val,
+        projected_ari,
+        ari_compliant,
     }
 }
 
@@ -317,14 +449,12 @@ impl PlanningView {
         active_pillar: &mut NavigationPillar,
     ) {
         let takeoff = self.compute_takeoff(variables);
-        let pad = if ui.available_width() < MacTheme::MOBILE_BREAKPOINT {
-            10
-        } else {
-            20
-        };
 
         ui.vertical(|ui| {
-            Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // 1. TOP SUB-TABS SELECTOR & EXPORT BAR
                 self.render_header_bar(ui, theme, &takeoff, active_pillar);
 
@@ -2196,12 +2326,18 @@ impl PlanningView {
     // SUB-TAB 9: VALUE ENGINEERING & BID LEVELING (5D-04 LOCKED)
     // -------------------------------------------------------------
     fn render_value_engineering_bid(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         t: &Parametric5DTakeoff,
         features: &mut FeatureRegistry,
     ) {
+        let sum = compute_bid_leveling_matrix(
+            t,
+            self.ve_outlier_pct,
+            self.ve_composite_deck_swap,
+            self.ve_ari_floor,
+        );
         ui_kit::feature_slot_card(
             ui,
             theme,
@@ -2209,9 +2345,23 @@ impl PlanningView {
             FeatureId::ValueEngineeringTenderMatrix,
             |ui| {
                 let curr = self.active_currency;
-                let oe_str = curr.format_value(t.grand_total_rab);
-                let low_bid_str = curr.format_value(t.grand_total_rab * 0.936);
-                let ve_save_str = curr.format_value(t.grand_total_rab * 0.042);
+                let oe_str = curr.format_value(sum.total_oe);
+                let sel_total = match self.ve_selected_bidder_idx {
+                    0 => sum.total_a,
+                    1 => sum.total_b,
+                    _ => sum.total_c,
+                };
+                let net_award = (sel_total - sum.ve_savings_val).max(0.0);
+                let bidder_name = ["Bidder A (SteelFab)", "Bidder B (Nusantara)", "Bidder C (GlobalTruss)"][self.ve_selected_bidder_idx.min(2)];
+                let delta_pct = if sum.total_oe > 0.0 {
+                    ((sel_total - sum.total_oe) / sum.total_oe) * 100.0
+                } else {
+                    0.0
+                };
+                let ve_save_str = curr.format_value(sum.ve_savings_val);
+                let award_str = curr.format_value(net_award);
+                let ari_col = if sum.ari_compliant { theme.accent_green } else { theme.accent_red };
+                let outlier_col = if sum.outlier_count == 0 { theme.accent_green } else { theme.accent_orange };
 
                 ui_kit::responsive_grid_n(ui, 4, 185.0, |ui, idx| match idx {
                     0 => ui_kit::stat_card(
@@ -2225,34 +2375,105 @@ impl PlanningView {
                     1 => ui_kit::stat_card(
                         ui,
                         theme,
-                        "LOWEST COMPLIANT BID",
-                        &low_bid_str,
-                        "Bidder B (-6.4% Below Owner Est.)",
+                        "SELECTED / AWARD VALUE",
+                        &award_str,
+                        &format!("{} ({:+.1}% vs OE, Post-VE)", bidder_name, delta_pct),
                         theme.accent_green,
                     ),
                     2 => ui_kit::stat_card(
                         ui,
                         theme,
                         "UNBALANCED RATE ALERTS",
-                        "1 Flagged Line",
-                        "Bidder C Earthwork +28% Front-Loaded",
-                        theme.accent_orange,
+                        &format!("{} Flagged Line(s)", sum.outlier_count),
+                        &format!("Threshold ±{:.0}% vs Owner Estimate", self.ve_outlier_pct),
+                        outlier_col,
                     ),
                     _ => ui_kit::stat_card(
                         ui,
                         theme,
-                        "VE REDESIGN POTENTIAL",
+                        "VE REDESIGN & ARI GUARD",
                         &format!("-{}", ve_save_str),
-                        "Composite Metal Deck Swap (ARI Safe)",
-                        theme.accent_blue,
+                        &format!(
+                            "ARI = {:.3} (Floor {:.2} — {})",
+                            sum.projected_ari,
+                            self.ve_ari_floor,
+                            if sum.ari_compliant { "PASS" } else { "BREACH" }
+                        ),
+                        ari_col,
                     ),
                 });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Outlier Threshold: ±15% vs Owner Est");
-                    let _ = ui.selectable_label(false, "Preserve ARI >= 0.90 Constraint");
-                    let _ = icons::icon_button(ui, AppIcon::SlidersPanel, "Export Normalized Bid Leveling Matrix (.XLSX/.MD)", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    ui.label(RichText::new("Outlier ±%:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.ve_outlier_pct, 8.0..=30.0).suffix("%"));
+                    ui.add_space(6.0);
+                    ui.label(RichText::new("ARI Floor:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.ve_ari_floor, 0.85..=0.98).fixed_decimals(2));
+                    ui.add_space(6.0);
+                    ui.checkbox(&mut self.ve_composite_deck_swap, "Composite Metal Deck VE Swap");
+                });
+                ui.add_space(6.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.selectable_value(&mut self.ve_selected_bidder_idx, 0, "Bidder A (SteelFab)");
+                    ui.selectable_value(&mut self.ve_selected_bidder_idx, 1, "Bidder B (Nusantara)");
+                    ui.selectable_value(&mut self.ve_selected_bidder_idx, 2, "Bidder C (GlobalTruss)");
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SlidersPanel,
+                        "Export Bid Leveling CSV",
+                        11.5,
+                        theme.text_primary,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        let mut csv = String::from("Trade_Package,Owner_Est,Bidder_A,Bidder_B,Bidder_C,Outlier_Audit\n");
+                        for line in &sum.lines {
+                            csv.push_str(&format!(
+                                "\"{}\",{:.2},{:.2},{:.2},{:.2},\"{}\"\n",
+                                line.package, line.owner_est, line.bidder_a, line.bidder_b, line.bidder_c, line.outlier_note
+                            ));
+                        }
+                        match crate::core::web_bridge::save_text_file("EigenGraph_Bid_Leveling_Matrix.csv", &csv, "text/csv") {
+                            Ok(msg) => self.export_status = Some(format!("Bid Leveling CSV exported ({msg})")),
+                            Err(err) => self.export_status = Some(format!("Bid CSV error: {err}")),
+                        }
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Document,
+                        "Export VE Award Memo (.md)",
+                        11.5,
+                        theme.text_primary,
+                        theme.bg_canvas,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        let md = format!(
+                            "# Tender Evaluation & Value Engineering Award Memo\n\n- Selected Tenderer: **{}**\n- Owner Estimate: {}\n- Lowest Compliant Bid: {}\n- Composite Deck VE Savings: -{}\n- Net Contract Award: {}\n- Structural Redundancy Index (ARI): {:.3} (Min {:.2}, {})\n- Flagged Front-Loaded Packages (±{:.0}%): {}\n",
+                            bidder_name,
+                            oe_str,
+                            curr.format_value(sum.best_bid_total),
+                            ve_save_str,
+                            award_str,
+                            sum.projected_ari,
+                            self.ve_ari_floor,
+                            if sum.ari_compliant { "COMPLIANT" } else { "NON-COMPLIANT" },
+                            self.ve_outlier_pct,
+                            sum.outlier_count,
+                        );
+                        match crate::core::web_bridge::save_text_file("EigenGraph_VE_Tender_Award.md", &md, "text/markdown") {
+                            Ok(msg) => self.export_status = Some(format!("VE Award Memo exported ({msg})")),
+                            Err(err) => self.export_status = Some(format!("VE Memo error: {err}")),
+                        }
+                    }
                 });
                 ui.add_space(10.0);
 
@@ -2273,54 +2494,18 @@ impl PlanningView {
                                 ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                             }
                             ui.end_row();
-                            for (pkg, oe, a, b, c, flag_icon, flag, col) in [
-                                (
-                                    "02 Bored Piles",
-                                    curr.format_value(t.cost_substructure),
-                                    curr.format_value(t.cost_substructure * 0.98),
-                                    curr.format_value(t.cost_substructure * 0.95),
-                                    curr.format_value(t.cost_substructure * 1.28),
-                                    AppIcon::AlertTriangle,
-                                    "Bidder C +28%",
-                                    theme.accent_orange,
-                                ),
-                                (
-                                    "05 Steel Supply BJ41",
-                                    curr.format_value(t.cost_steel_material),
-                                    curr.format_value(t.cost_steel_material * 0.97),
-                                    curr.format_value(t.cost_steel_material * 0.92),
-                                    curr.format_value(t.cost_steel_material * 0.99),
-                                    AppIcon::CheckCircle,
-                                    "Balanced",
-                                    theme.accent_green,
-                                ),
-                                (
-                                    "05 Workshop Fab + NDT",
-                                    curr.format_value(t.cost_workshop_fab),
-                                    curr.format_value(t.cost_workshop_fab * 1.03),
-                                    curr.format_value(t.cost_workshop_fab * 0.94),
-                                    curr.format_value(t.cost_workshop_fab * 0.96),
-                                    AppIcon::CheckCircle,
-                                    "Balanced",
-                                    theme.accent_green,
-                                ),
-                                (
-                                    "05 Crane Erection",
-                                    curr.format_value(t.cost_erection_crane),
-                                    curr.format_value(t.cost_erection_crane * 1.02),
-                                    curr.format_value(t.cost_erection_crane * 0.91),
-                                    curr.format_value(t.cost_erection_crane * 0.95),
-                                    AppIcon::Star,
-                                    "Best Value (Bidder B)",
-                                    theme.accent_blue,
-                                ),
-                            ] {
-                                ui.label(RichText::new(pkg).size(10.5).strong().color(theme.text_primary));
-                                ui.label(RichText::new(oe).size(10.5).color(theme.text_secondary));
-                                ui.label(RichText::new(a).size(10.5).color(theme.text_secondary));
-                                ui.label(RichText::new(b).size(10.5).strong().color(theme.accent_green));
-                                ui.label(RichText::new(c).size(10.5).color(theme.text_secondary));
-                                icons::icon_label(ui, flag_icon, 12.0, col, flag, 10.5, col, true);
+                            for line in &sum.lines {
+                                let (icon, col) = if line.balanced {
+                                    (AppIcon::CheckCircle, theme.accent_green)
+                                } else {
+                                    (AppIcon::AlertTriangle, theme.accent_orange)
+                                };
+                                ui.label(RichText::new(line.package).size(10.5).strong().color(theme.text_primary));
+                                ui.label(RichText::new(curr.format_value(line.owner_est)).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(curr.format_value(line.bidder_a)).size(10.5).color(theme.text_secondary));
+                                ui.label(RichText::new(curr.format_value(line.bidder_b)).size(10.5).strong().color(theme.accent_green));
+                                ui.label(RichText::new(curr.format_value(line.bidder_c)).size(10.5).color(theme.text_secondary));
+                                icons::icon_label(ui, icon, 12.0, col, &line.outlier_note, 10.5, col, true);
                                 ui.end_row();
                             }
                         });
@@ -2364,5 +2549,18 @@ mod tests {
         assert!(evm.spi > 0.5 && evm.cpi > 0.5);
         assert!(evm.eac_val >= takeoff.grand_total_rab);
         assert!(evm.net_claim < evm.ev_val);
+    }
+
+    #[test]
+    fn test_value_engineering_bid_leveling_outliers_and_ari() {
+        let pv = PlanningView::default();
+        let takeoff = pv.compute_takeoff(&[]);
+        let tight = compute_bid_leveling_matrix(&takeoff, 15.0, true, 0.90);
+        let loose = compute_bid_leveling_matrix(&takeoff, 30.0, false, 0.95);
+        assert!(tight.outlier_count >= 2);
+        assert_eq!(loose.outlier_count, 0);
+        assert_eq!(tight.best_bidder_idx, 1);
+        assert!(tight.ve_savings_val > 0.0);
+        assert!(tight.ari_compliant);
     }
 }

@@ -164,11 +164,11 @@ impl MyProjectView {
         active_pillar: &mut NavigationPillar,
         features: &mut FeatureRegistry,
     ) {
-        let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
-        let outer_margin = Margin::symmetric(if is_mobile { 10 } else { 20 }, 12);
-
         ui.vertical(|ui| {
-            Frame::new().inner_margin(outer_margin).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // Top Library Mode Selector (Phase 31 Responsive Sub-Tab Bar)
                 ui_kit::subtab_bar(
                     ui,

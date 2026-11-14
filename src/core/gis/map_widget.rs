@@ -1705,4 +1705,31 @@ mod tests {
         let area = SlippyMapState::geodetic_polygon_area_m2(&poly);
         assert!(area > 11_000.0 && area < 13_000.0);
     }
+
+    #[test]
+    fn test_world_tile_cache_decode_and_ready_state() {
+        let mut png_bytes = Vec::new();
+        let img = image::RgbaImage::from_pixel(2, 2, image::Rgba([40, 120, 220, 255]));
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut std::io::Cursor::new(&mut png_bytes), image::ImageFormat::Png)
+            .expect("encode 2x2 PNG tile");
+
+        let color_img = decode_tile_bytes_to_color_image(&png_bytes).expect("decode PNG tile");
+        assert_eq!(color_img.size, [2, 2]);
+        assert!(decode_tile_bytes_to_color_image(b"not-a-valid-image").is_none());
+
+        let cache = WorldTileCache::default();
+        if let Ok(mut guard) = cache.inner.lock() {
+            guard.insert(
+                (1, 14, 12000, 8000),
+                TileEntryState::Ready {
+                    image: Some(color_img),
+                    texture: None,
+                },
+            );
+        }
+        let (ready, total) = cache.stats();
+        assert_eq!(ready, 1);
+        assert_eq!(total, 1);
+    }
 }

@@ -268,6 +268,12 @@ pub struct UniversalCanvasState {
     pub import_json_buffer: String,
     pub pending_imported_settings: Option<WorkspaceCanvasSettings>,
     pub request_scroll_to_workbench: bool,
+    // Phase 41: Precision CAD input, transforms & bottom-toolbar Quick-Jump / Shortcuts
+    pub cad_step_mm: f64,
+    pub cad_rotate_deg: f64,
+    pub cad_cmd_input: String,
+    pub shortcuts_modal_open: bool,
+    pub quick_jump_query: String,
 }
 
 impl Default for UniversalCanvasState {
@@ -313,6 +319,11 @@ impl Default for UniversalCanvasState {
             import_json_buffer: String::new(),
             pending_imported_settings: None,
             request_scroll_to_workbench: false,
+            cad_step_mm: 1000.0,
+            cad_rotate_deg: 90.0,
+            cad_cmd_input: String::new(),
+            shortcuts_modal_open: false,
+            quick_jump_query: String::new(),
         }
     }
 }
@@ -353,14 +364,18 @@ impl UniversalCanvasState {
             .inner_margin(Margin::same(12))
     }
 
-    /// Shared dismissible status toast strip rendered above the canvas viewport.
+    /// Shared dismissible status toast strip rendered above or below the canvas viewport.
     pub fn render_toast_bar(ui: &mut Ui, theme: &MacTheme, status_message: &mut Option<String>) {
         if let Some(msg) = status_message.clone() {
             Frame::new()
                 .fill(theme.accent_green.gamma_multiply(0.14))
+                .corner_radius(CornerRadius::same(8))
                 .stroke(Stroke::new(1.0, theme.accent_green.gamma_multiply(0.5)))
                 .inner_margin(Margin::symmetric(12, 5))
                 .show(ui, |ui| {
+                    let inner_w = ui.available_width().max(120.0);
+                    ui.set_width(inner_w);
+                    ui.set_max_width(inner_w);
                     ui.horizontal_wrapped(|ui| {
                         icons::icon_label(
                             ui,
@@ -855,6 +870,287 @@ impl UniversalCanvasState {
         true
     }
 
+    /// Parses CAD Cartesian (`@dx,dy` or `dx,dy`) or polar (`@dist<deg` or `dist<deg`) coordinate vectors in mm.
+    pub fn parse_cad_delta_expr(raw: &str) -> Option<(f64, f64)> {
+        let s = raw.trim().trim_start_matches('@');
+        if let Some((d_str, a_str)) = s.split_once('<') {
+            let dist = d_str.trim().parse::<f64>().ok()?;
+            let rad = a_str.trim().parse::<f64>().ok()?.to_radians();
+            return Some((dist * rad.cos(), dist * rad.sin()));
+        }
+        if let Some((x_str, y_str)) = s.split_once(',') {
+            let dx = x_str.trim().parse::<f64>().ok()?;
+            let dy = y_str.trim().parse::<f64>().ok()?;
+            return Some((dx, dy));
+        }
+        None
+    }
+
+    /// Creates a displaced duplicate of the selected (or latest) entity by `(dx_mm, dy_mm)` with undo support.
+    pub fn duplicate_selected_or_last(&mut self, dx_mm: f64, dy_mm: f64) -> bool {
+        let Some(idx) = self.target_entity_idx() else {
+            return false;
+        };
+        let mut cloned = self.entities[idx].clone();
+        match &mut cloned.kind {
+            CanvasShapeKind::Line { start_mm, end_mm }
+            | CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                start_mm[0] += dx_mm;
+                start_mm[1] += dy_mm;
+                end_mm[0] += dx_mm;
+                end_mm[1] += dy_mm;
+            }
+            CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                min_mm[0] += dx_mm;
+                min_mm[1] += dy_mm;
+                max_mm[0] += dx_mm;
+                max_mm[1] += dy_mm;
+            }
+            CanvasShapeKind::Circle { center_mm, .. } => {
+                center_mm[0] += dx_mm;
+                center_mm[1] += dy_mm;
+            }
+            CanvasShapeKind::Freehand { points_mm } => {
+                for p in points_mm {
+                    p[0] += dx_mm;
+                    p[1] += dy_mm;
+                }
+            }
+            CanvasShapeKind::Callout { pos_mm, .. } => {
+                pos_mm[0] += dx_mm;
+                pos_mm[1] += dy_mm;
+            }
+        }
+        self.push_undo();
+        let new_id = self.next_entity_id;
+        self.next_entity_id += 1;
+        cloned.id = new_id;
+        self.entities.push(cloned);
+        self.selected_entity_id = Some(new_id);
+        true
+    }
+
+    /// Rotates the selected (or latest) entity around its centroid by `angle_deg` degrees with undo support.
+    pub fn rotate_selected_or_last(&mut self, angle_deg: f64) -> bool {
+        let Some(idx) = self.target_entity_idx() else {
+            return false;
+        };
+        self.push_undo();
+        let rad = angle_deg.to_radians();
+        let (c, s) = (rad.cos(), rad.sin());
+        let rot_pt = |pt: [f64; 2], pivot: [f64; 2]| -> [f64; 2] {
+            let rx = pt[0] - pivot[0];
+            let ry = pt[1] - pivot[1];
+            [pivot[0] + rx * c - ry * s, pivot[1] + rx * s + ry * c]
+        };
+        if let Some(ent) = self.entities.get_mut(idx) {
+            match &mut ent.kind {
+                CanvasShapeKind::Line { start_mm, end_mm }
+                | CanvasShapeKind::Dimension { start_mm, end_mm } => {
+                    let pivot = [
+                        0.5 * (start_mm[0] + end_mm[0]),
+                        0.5 * (start_mm[1] + end_mm[1]),
+                    ];
+                    *start_mm = rot_pt(*start_mm, pivot);
+                    *end_mm = rot_pt(*end_mm, pivot);
+                }
+                CanvasShapeKind::Rectangle { min_mm, max_mm } => {
+                    let pivot = [0.5 * (min_mm[0] + max_mm[0]), 0.5 * (min_mm[1] + max_mm[1])];
+                    let corners = [
+                        rot_pt([min_mm[0], min_mm[1]], pivot),
+                        rot_pt([max_mm[0], min_mm[1]], pivot),
+                        rot_pt([max_mm[0], max_mm[1]], pivot),
+                        rot_pt([min_mm[0], max_mm[1]], pivot),
+                    ];
+                    let x0 = corners.iter().map(|p| p[0]).fold(f64::INFINITY, f64::min);
+                    let x1 = corners.iter().map(|p| p[0]).fold(f64::NEG_INFINITY, f64::max);
+                    let y0 = corners.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
+                    let y1 = corners.iter().map(|p| p[1]).fold(f64::NEG_INFINITY, f64::max);
+                    *min_mm = [x0, y0];
+                    *max_mm = [x1, y1];
+                }
+                CanvasShapeKind::Freehand { points_mm } if !points_mm.is_empty() => {
+                    let n = points_mm.len() as f64;
+                    let pivot = [
+                        points_mm.iter().map(|p| p[0]).sum::<f64>() / n,
+                        points_mm.iter().map(|p| p[1]).sum::<f64>() / n,
+                    ];
+                    for p in points_mm {
+                        *p = rot_pt(*p, pivot);
+                    }
+                }
+                CanvasShapeKind::Circle { .. }
+                | CanvasShapeKind::Callout { .. }
+                | CanvasShapeKind::Freehand { .. } => {}
+            }
+            self.selected_entity_id = Some(ent.id);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Executes a typed precision CAD command (`@dx,dy`, `@dist<deg`, `move`, `ro`, `cp`, `o`, tools).
+    pub fn execute_precision_command(
+        &mut self,
+        raw: &str,
+        active_pillar: NavigationPillar,
+        bim_project: &BimProject,
+    ) -> String {
+        let trimmed = raw.trim();
+        let lower = trimmed.to_lowercase();
+        let anchor = self
+            .entities
+            .last()
+            .and_then(|e| match &e.kind {
+                CanvasShapeKind::Line { end_mm, .. } => Some(*end_mm),
+                CanvasShapeKind::Rectangle { max_mm, .. } => Some(*max_mm),
+                CanvasShapeKind::Circle { center_mm, .. } => Some(*center_mm),
+                _ => None,
+            })
+            .unwrap_or(self.cursor_world_mm);
+
+        if trimmed.starts_with('@') {
+            if let Some((dx, dy)) = Self::parse_cad_delta_expr(trimmed) {
+                self.push_undo();
+                let id = self.next_entity_id;
+                self.next_entity_id += 1;
+                let end = [anchor[0] + dx, anchor[1] + dy];
+                self.entities.push(CanvasEntity {
+                    id,
+                    pillar_badge: active_pillar.badge().to_string(),
+                    pillar_name: active_pillar.clean_name().to_string(),
+                    kind: CanvasShapeKind::Line {
+                        start_mm: anchor,
+                        end_mm: end,
+                    },
+                    color_rgb: self.active_color_rgb(),
+                    stroke_width: self.stroke_width,
+                });
+                self.selected_entity_id = Some(id);
+                return format!(
+                    "Drew relative segment ({:.0}, {:.0}) -> ({:.0}, {:.0}) mm",
+                    anchor[0], anchor[1], end[0], end[1]
+                );
+            }
+        }
+
+        if let Some(rest) = lower.strip_prefix("move ") {
+            if let Some((dx, dy)) = Self::parse_cad_delta_expr(rest) {
+                return if self.translate_selected_or_last(dx, dy) {
+                    format!("Moved entity by ({dx:.0}, {dy:.0}) mm")
+                } else {
+                    "No entity selected or present to move".to_string()
+                };
+            }
+        } else if let Some(rest) = lower.strip_prefix("cp ").or_else(|| lower.strip_prefix("copy ")) {
+            if let Some((dx, dy)) = Self::parse_cad_delta_expr(rest) {
+                return if self.duplicate_selected_or_last(dx, dy) {
+                    format!("Duplicated entity by ({dx:.0}, {dy:.0}) mm")
+                } else {
+                    "No entity selected or present to duplicate".to_string()
+                };
+            }
+        } else if let Some(rest) = lower.strip_prefix("ro ").or_else(|| lower.strip_prefix("rotate ")) {
+            if let Ok(deg) = rest.trim().parse::<f64>() {
+                return if self.rotate_selected_or_last(deg) {
+                    format!("Rotated entity {deg:.1}°")
+                } else {
+                    "No entity selected or present to rotate".to_string()
+                };
+            }
+        } else if let Some(rest) = lower.strip_prefix("o ").or_else(|| lower.strip_prefix("offset ")) {
+            if let Ok(d) = rest.trim().parse::<f64>() {
+                return if self.offset_selected_or_last(d) {
+                    format!("Offset duplicate by {d:.0} mm")
+                } else {
+                    "No entity selected or present to offset".to_string()
+                };
+            }
+        }
+
+        match lower.as_str() {
+            "l" | "line" => {
+                self.active_tool = UniversalCanvasTool::Line;
+                "Active tool: Line (L)".to_string()
+            }
+            "r" | "rect" | "rectangle" => {
+                self.active_tool = UniversalCanvasTool::Rectangle;
+                "Active tool: Rectangle (R)".to_string()
+            }
+            "c" | "circle" => {
+                self.active_tool = UniversalCanvasTool::Circle;
+                "Active tool: Circle (C)".to_string()
+            }
+            "d" | "dim" | "dimension" => {
+                self.active_tool = UniversalCanvasTool::Dimension;
+                "Active tool: Dimension (D)".to_string()
+            }
+            "t" | "text" | "callout" => {
+                self.active_tool = UniversalCanvasTool::Callout;
+                "Active tool: Callout (T)".to_string()
+            }
+            "e" | "erase" => {
+                self.active_tool = UniversalCanvasTool::Eraser;
+                "Active tool: Eraser (E)".to_string()
+            }
+            "ro" | "rotate" => {
+                if self.rotate_selected_or_last(self.cad_rotate_deg) {
+                    format!("Rotated entity {:.1}°", self.cad_rotate_deg)
+                } else {
+                    "No entity to rotate".to_string()
+                }
+            }
+            "cp" | "copy" | "dup" => {
+                if self.duplicate_selected_or_last(self.cad_step_mm, 0.0) {
+                    format!("Copied entity +{:.0} mm East", self.cad_step_mm)
+                } else {
+                    "No entity to duplicate".to_string()
+                }
+            }
+            "m" | "move" => {
+                if self.translate_selected_or_last(self.cad_step_mm, 0.0) {
+                    format!("Moved entity +{:.0} mm East", self.cad_step_mm)
+                } else {
+                    "No entity to move".to_string()
+                }
+            }
+            "x" | "mirror" => {
+                let mx = bim_project
+                    .plan_extents_mm()
+                    .map_or(0.0, |(a, b)| 0.5 * (a[0] + b[0]));
+                if self.mirror_selected_or_last(mx) {
+                    format!("Mirrored across X={mx:.0} mm")
+                } else {
+                    "No entity to mirror".to_string()
+                }
+            }
+            "undo" | "u" => {
+                if self.undo() {
+                    "Undo applied".to_string()
+                } else {
+                    "Nothing to undo".to_string()
+                }
+            }
+            "redo" => {
+                if self.redo() {
+                    "Redo applied".to_string()
+                } else {
+                    "Nothing to redo".to_string()
+                }
+            }
+            "fit" | "z" => {
+                self.fit_world_to_bim_extents(bim_project.plan_extents_mm());
+                "Fitted camera to BIM footprint (Z)".to_string()
+            }
+            "freeze" => {
+                self.is_frozen = !self.is_frozen;
+                format!("Canvas Frozen = {}", self.is_frozen)
+            }
+            _ => format!("Unknown CAD command '{}' — try @5000,0 | @4500<45 | move @1000,0 | ro 90", trimmed),
+        }
+    }
+
     /// Deletes the selected (or latest) entity with undo support.
     pub fn delete_selected_or_last(&mut self) -> bool {
         let Some(idx) = self.target_entity_idx() else {
@@ -1273,23 +1569,19 @@ impl UniversalCanvasState {
                     sidebar_toggle_inset_px,
                 );
 
-                // 4. Bottom-Docked Collapsible Inspector Panel (cleanly outside viewport across all viewports)
+                // 4. Bottom-Docked Collapsible Inspector Panel (exact full toolbar/viewport width)
                 if self.inspector_open {
                     ui.add_space(6.0);
-                    Frame::new()
-                        .inner_margin(Margin::symmetric(4, 2))
-                        .show(ui, |ui| {
-                            self.render_floating_inspector_panel(
-                                ui,
-                                theme,
-                                active_pillar,
-                                bim_project,
-                                members,
-                                variables,
-                                workspace_settings,
-                                false,
-                            );
-                        });
+                    self.render_floating_inspector_panel(
+                        ui,
+                        theme,
+                        active_pillar,
+                        bim_project,
+                        members,
+                        variables,
+                        workspace_settings,
+                        false,
+                    );
                 }
             });
     }
@@ -1552,11 +1844,20 @@ impl UniversalCanvasState {
 
                     ui.separator();
 
-                    // CAD Modify Palette (Move, Offset, Mirror, Delete)
+                    // CAD Modify Palette (Numeric Step, Move, Offset, Copy, Rotate 90°, Mirror, Delete)
+                    ui.label(RichText::new("Step:").size(10.0).color(theme.text_muted));
+                    ui.add(
+                        egui::DragValue::new(&mut self.cad_step_mm)
+                            .range(10.0..=50_000.0)
+                            .speed(50.0)
+                            .suffix(" mm"),
+                    )
+                    .on_hover_text("Precision step distance for Move / Copy / Offset");
+
                     if icons::icon_button(
                         ui,
                         AppIcon::ArrowRight,
-                        "Move +1m",
+                        "Move",
                         10.5,
                         theme.text_primary,
                         theme.bg_card,
@@ -1564,12 +1865,34 @@ impl UniversalCanvasState {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
-                    .on_hover_text("Move selected or latest canvas entity +1000 mm East (M)")
+                    .on_hover_text("Move selected or latest canvas entity East by Step mm (M)")
                     .clicked()
                     {
-                        if self.translate_selected_or_last(1000.0, 0.0) {
+                        let step = self.cad_step_mm;
+                        if self.translate_selected_or_last(step, 0.0) {
                             self.status_message =
-                                Some("Moved canvas entity +1000 mm East (M)".to_string());
+                                Some(format!("Moved canvas entity +{step:.0} mm East (M)"));
+                        }
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Layers,
+                        "Copy",
+                        10.5,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Duplicate selected or latest entity displaced +Step mm East")
+                    .clicked()
+                    {
+                        let step = self.cad_step_mm;
+                        if self.duplicate_selected_or_last(step, 0.0) {
+                            self.status_message =
+                                Some(format!("Duplicated entity +{step:.0} mm East"));
                         }
                     }
 
@@ -1590,6 +1913,26 @@ impl UniversalCanvasState {
                         if self.offset_selected_or_last(500.0) {
                             self.status_message =
                                 Some("Created +500 mm offset duplicate (O)".to_string());
+                        }
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Compass,
+                        "Rot 90°",
+                        10.5,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Rotate selected or latest canvas entity +90° around centroid")
+                    .clicked()
+                    {
+                        if self.rotate_selected_or_last(90.0) {
+                            self.status_message =
+                                Some("Rotated canvas entity +90° around centroid".to_string());
                         }
                     }
 
@@ -1713,6 +2056,60 @@ impl UniversalCanvasState {
                             variables,
                             workspace_settings,
                         );
+                    }
+
+                    ui.separator();
+
+                    // Precision Relative/Polar CAD CLI Input + Shortcuts Palette Toggle
+                    let cmd_w = crate::ui_kit::clamped_row_width(ui, 90.0, 175.0, 125.0);
+                    crate::ui_kit::wrap_before(ui, cmd_w + 150.0);
+                    let cmd_resp = ui.add(
+                        egui::TextEdit::singleline(&mut self.cad_cmd_input)
+                            .desired_width(cmd_w)
+                            .hint_text("@dx,dy | @d<deg | ro 90"),
+                    );
+                    let run_cad = icons::icon_button(
+                        ui,
+                        AppIcon::Play,
+                        "Run",
+                        10.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .clicked()
+                        || (cmd_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
+                    if run_cad && !self.cad_cmd_input.trim().is_empty() {
+                        let raw = std::mem::take(&mut self.cad_cmd_input);
+                        self.status_message =
+                            Some(self.execute_precision_command(&raw, active_pillar, bim_project));
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Shield,
+                        "? Shortcuts",
+                        10.0,
+                        if self.shortcuts_modal_open {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if self.shortcuts_modal_open {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Open Keyboard Shortcuts, Precision CLI Syntax & Module Quick-Jump (Ctrl/Cmd+K)")
+                    .clicked()
+                    {
+                        self.shortcuts_modal_open = !self.shortcuts_modal_open;
                     }
                 });
             });
@@ -3679,5 +4076,38 @@ mod tests {
         assert_eq!(canvas.entities.len(), 2);
         assert!(canvas.undo());
         assert_eq!(canvas.entities.len(), 3);
+    }
+
+    #[test]
+    fn test_canvas_precision_polar_relative_duplicate_and_rotate() {
+        let mut canvas = UniversalCanvasState::default();
+        let bim = BimProject::sample_bimcraft_building();
+
+        let (dx, dy) = UniversalCanvasState::parse_cad_delta_expr("@5000<0").expect("polar 0 deg");
+        assert!((dx - 5000.0).abs() < 1e-6);
+        assert!(dy.abs() < 1e-6);
+
+        let (dx2, dy2) =
+            UniversalCanvasState::parse_cad_delta_expr("@1200,-600").expect("relative coords");
+        assert_eq!((dx2, dy2), (1200.0, -600.0));
+
+        let msg = canvas.execute_precision_command(
+            "@4000<0",
+            NavigationPillar::ResearchConcept,
+            &bim,
+        );
+        assert!(msg.contains("Drew relative segment"));
+        assert_eq!(canvas.entities.len(), 1);
+
+        assert!(canvas.rotate_selected_or_last(90.0));
+        match &canvas.entities[0].kind {
+            CanvasShapeKind::Line { start_mm, end_mm } => {
+                assert!((end_mm[1] - start_mm[1] - 4000.0).abs() < 1e-4);
+            }
+            _ => panic!("expected rotated line"),
+        }
+
+        assert!(canvas.duplicate_selected_or_last(1500.0, 0.0));
+        assert_eq!(canvas.entities.len(), 2);
     }
 }

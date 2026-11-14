@@ -359,13 +359,129 @@ impl IndustrializedView {
             },
         );
     }
+}
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Print3dToolpathReport {
+    pub layer_count: usize,
+    pub layer_time_min: f32,
+    pub open_time_ok: bool,
+    pub mortar_volume_m3: f32,
+    pub pump_pressure_mpa: f32,
+    pub gcode_preview: String,
+    pub full_gcode: String,
+}
+
+/// Slices a BIM structural perimeter into 3D concrete printing contours and validates thermal cold-joint limits.
+pub fn generate_concrete_3d_gcode(
+    project: &crate::core::BimProject,
+    nozzle_mm: f32,
+    layer_h_mm: f32,
+    feed_mm_s: f32,
+    wall_height_m: f32,
+    spiralize: bool,
+    cold_joint_cap_min: f32,
+) -> Print3dToolpathReport {
+    let nw = nozzle_mm.clamp(20.0, 90.0);
+    let lh = layer_h_mm.clamp(6.0, 35.0);
+    let feed = feed_mm_s.clamp(50.0, 400.0);
+    let h_m = wall_height_m.clamp(0.4, 4.5);
+
+    let wall_len_m: f32 = project
+        .walls
+        .iter()
+        .map(|w| ((w.end.0 - w.start.0).hypot(w.end.1 - w.start.1) / 1000.0) as f32)
+        .sum();
+    let perim_m = if wall_len_m >= 4.0 {
+        wall_len_m.clamp(6.0, 65.0)
+    } else {
+        11.2
+    };
+    let toolpath_per_layer_m = perim_m * if spiralize { 2.35 } else { 2.55 };
+    let layer_time_min = (toolpath_per_layer_m * 1000.0) / feed / 60.0;
+    let open_time_ok = layer_time_min <= cold_joint_cap_min.max(4.0);
+    let layer_count = ((h_m * 1000.0) / lh).ceil().max(1.0) as usize;
+
+    let bead_area_m2 = (nw / 1000.0) * (lh / 1000.0) * 0.96;
+    let mortar_volume_m3 = toolpath_per_layer_m * (layer_count as f32) * bead_area_m2;
+    let flow_rate_factor = (nw * lh * feed) / (45.0 * 15.0 * 185.0);
+    let pump_pressure_mpa = (1.15 + 0.65 * flow_rate_factor).clamp(0.8, 3.8);
+
+    let f_mm_min = (feed * 60.0).round() as u32;
+    let mut full_gcode = format!(
+        "; EigenGraph 3DCP Contour Slicer v1.1\n\
+         ; Project: {} | Layers: {} | Nozzle: {:.0}x{:.0} mm | Spiralize: {}\n\
+         G90 ; Absolute mm\n\
+         M82 ; Pump flow sync enabled ({:.2} MPa)\n",
+        project.project_name, layer_count, nw, lh, spiralize, pump_pressure_mpa
+    );
+    let preview_layers = layer_count.min(4);
+    let x_span_mm = (perim_m * 280.0).clamp(1800.0, 6400.0);
+    let y_span_mm = (perim_m * 110.0).clamp(720.0, 2200.0);
+    let mut ext_e = 0.0_f32;
+    for l in 1..=layer_count {
+        let z_mm = l as f32 * lh;
+        let de = toolpath_per_layer_m * 0.14;
+        ext_e += de * 0.35;
+        let line1 = format!(
+            "G1 X{:.1} Y{:.1} Z{:.1} F{} E{:.2} ; Layer {} Outer\n",
+            x_span_mm, 140.0, z_mm, f_mm_min, ext_e, l
+        );
+        ext_e += de * 0.25;
+        let line2 = format!(
+            "G1 X{:.1} Y{:.1} Z{:.1} E{:.2} ; Layer {} Truss Turn\n",
+            x_span_mm, y_span_mm, z_mm, ext_e, l
+        );
+        ext_e += de * 0.40;
+        let line3 = format!(
+            "G1 X120.0 Y{:.1} Z{:.1} E{:.2} ; Layer {} Return\n",
+            y_span_mm, z_mm, ext_e, l
+        );
+        if l <= preview_layers || l == layer_count {
+            full_gcode.push_str(&line1);
+            full_gcode.push_str(&line2);
+            full_gcode.push_str(&line3);
+        } else {
+            full_gcode.push_str(&line1);
+        }
+    }
+    full_gcode.push_str("M84 ; Pump & Gantry Home Park\n");
+
+    let gcode_preview: String = full_gcode.lines().take(9).collect::<Vec<_>>().join("\n");
+
+    Print3dToolpathReport {
+        layer_count,
+        layer_time_min,
+        open_time_ok,
+        mortar_volume_m3,
+        pump_pressure_mpa,
+        gcode_preview,
+        full_gcode,
+    }
+}
+
+impl super::IndustrializedView {
     pub(super) fn render_concrete_3d_printing(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
+        let rep = generate_concrete_3d_gcode(
+            bim_project,
+            self.print_nozzle_mm,
+            self.print_layer_h_mm,
+            self.print_feed_mm_s,
+            self.print_wall_height_m,
+            self.print_spiralize,
+            self.print_cold_joint_cap_min,
+        );
+        let time_col = if rep.open_time_ok {
+            theme.accent_green
+        } else {
+            theme.accent_red
+        };
         ui_kit::feature_slot_card(
             ui,
             theme,
@@ -375,49 +491,98 @@ impl IndustrializedView {
                 let cards = [
                     (
                         "EXTRUSION NOZZLE",
-                        "45 × 15 mm Layer",
-                        "118 Sliced Contours (Total H = 1.77 m)",
+                        format!("{:.0} × {:.0} mm Layer", self.print_nozzle_mm, self.print_layer_h_mm),
+                        format!("{} Sliced Contours (Total H = {:.2} m)", rep.layer_count, self.print_wall_height_m),
                         theme.accent_blue,
                     ),
                     (
                         "PRINT HEAD FEED RATE",
-                        "185 mm/s Constant",
-                        "Stepover 2-Perimeter Truss Infill",
+                        format!("{:.0} mm/s Constant", self.print_feed_mm_s),
+                        if self.print_spiralize {
+                            "Spiralize 2-Perimeter Truss Infill".to_string()
+                        } else {
+                            "Discrete Layer Z-Lift Mode".to_string()
+                        },
                         theme.accent_green,
                     ),
                     (
                         "OPEN-TIME LAYER WINDOW",
-                        "11.4 min / Layer",
-                        "Max Cold-Joint Cap = 18.0 min (Safe)",
-                        theme.accent_green,
+                        format!("{:.1} min / Layer", rep.layer_time_min),
+                        if rep.open_time_ok {
+                            format!("Max Cold-Joint Cap = {:.1} min (Safe)", self.print_cold_joint_cap_min)
+                        } else {
+                            format!("COLD-JOINT RISK (> {:.1} min Cap)", self.print_cold_joint_cap_min)
+                        },
+                        time_col,
                     ),
                     (
                         "ESTIMATED MORTAR VOLUME",
-                        "6.42 m³ Fiber-Mix",
-                        "Pump Pressure = 1.8 MPa @ Hose",
+                        format!("{:.2} m³ Fiber-Mix", rep.mortar_volume_m3),
+                        format!("Pump Pressure = {:.2} MPa @ Hose", rep.pump_pressure_mpa),
                         theme.accent_orange,
                     ),
                 ];
                 ui_kit::responsive_grid_n(ui, cards.len(), 210.0, |ui, idx| {
-                    let (t, v, s, c) = cards[idx];
-                    self.render_stat_card(ui, theme, t, v, s, c);
+                    let (t, v, s, c) = &cards[idx];
+                    self.render_stat_card(ui, theme, t, v, s, *c);
                 });
 
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Slicer: Continuous Spiralize Contour");
-                    let _ = ui.selectable_label(false, "6-Axis Gantry Kinematic Limits");
-                    let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Printer, "Slice Selected Element & Export 3DCP G-Code (.gcode)", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    ui.label(RichText::new("Nozzle (mm):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.print_nozzle_mm, 25.0..=80.0).suffix(" mm"));
+                    ui.label(RichText::new("Layer H (mm):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.print_layer_h_mm, 8.0..=30.0).suffix(" mm"));
+                    ui.label(RichText::new("Feed (mm/s):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.print_feed_mm_s, 80.0..=300.0).suffix(" mm/s"));
+                });
+                ui.add_space(6.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Wall Height (m):").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.print_wall_height_m, 0.6..=3.6).suffix(" m"));
+                    ui.label(RichText::new("Cold-Joint Cap:").size(11.0).color(theme.text_secondary));
+                    ui.add(egui::Slider::new(&mut self.print_cold_joint_cap_min, 5.0..=30.0).suffix(" min"));
+                    ui.checkbox(&mut self.print_spiralize, "Spiralize Contour");
+                    if crate::icons::icon_button(
+                        ui,
+                        crate::icons::AppIcon::Printer,
+                        "Slice & Export 3DCP G-Code (.gcode)",
+                        12.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        match crate::core::web_bridge::save_text_file(
+                            "EigenGraph_3DCP_Toolpath.gcode",
+                            &rep.full_gcode,
+                            "text/plain",
+                        ) {
+                            Ok(msg) => {
+                                self.export_status = Some(format!(
+                                    "Sliced {} contours ({:.2} m³ mortar) & exported G-Code ({msg})",
+                                    rep.layer_count, rep.mortar_volume_m3
+                                ))
+                            }
+                            Err(err) => self.export_status = Some(format!("3DCP G-Code export error: {err}")),
+                        }
+                    }
                 });
                 ui.add_space(12.0);
 
                 ui_kit::responsive_two_panes(ui, 640.0, |ui, pane| match pane {
                     0 => {
                         ui.label(
-                            RichText::new("3DCP LAYER TOOLPATH CONTOUR PREVIEW (Z = 0.45 m)")
-                                .size(11.0)
-                                .strong()
-                                .color(theme.accent_blue),
+                            RichText::new(format!(
+                                "3DCP LAYER TOOLPATH CONTOUR PREVIEW (Z = {:.2} m)",
+                                self.print_wall_height_m * 0.25
+                            ))
+                            .size(11.0)
+                            .strong()
+                            .color(theme.accent_blue),
                         );
                         ui.add_space(6.0);
                         let desired = Vec2::new(ui.available_width(), 160.0);
@@ -429,24 +594,24 @@ impl IndustrializedView {
                             Color32::from_rgb(13, 17, 24),
                         );
                         let pad = rect.shrink(24.0);
-                        // Outer & Inner shell loops
+                        let bead_px = (self.print_nozzle_mm / 18.0).clamp(1.6, 4.2);
                         painter.rect_stroke(
                             pad,
                             CornerRadius::same(10),
-                            Stroke::new(2.2, theme.accent_blue),
+                            Stroke::new(bead_px, theme.accent_blue),
                             StrokeKind::Inside,
                         );
                         painter.rect_stroke(
                             pad.shrink(12.0),
                             CornerRadius::same(6),
-                            Stroke::new(2.0, theme.accent_green),
+                            Stroke::new(bead_px * 0.9, theme.accent_green),
                             StrokeKind::Inside,
                         );
-                        // Sinusoidal internal truss infill
                         let inner = pad.shrink(12.0);
-                        let mut zig = Vec::with_capacity(17);
-                        for i in 0..=16 {
-                            let frac = i as f32 / 16.0;
+                        let steps = ((self.print_feed_mm_s / 12.0).round() as usize).clamp(10, 26);
+                        let mut zig = Vec::with_capacity(steps + 1);
+                        for i in 0..=steps {
+                            let frac = i as f32 / steps as f32;
                             let px = inner.left() + frac * inner.width();
                             let py = if i % 2 == 0 {
                                 inner.top() + 3.0
@@ -461,7 +626,10 @@ impl IndustrializedView {
                         painter.text(
                             Pos2::new(rect.center().x, rect.bottom() - 10.0),
                             Align2::CENTER_CENTER,
-                            "Zero-Travel Sinusoidal Lattice Infill (f'c,28 = 55 MPa)",
+                            format!(
+                                "{} Sinusoidal Truss Loops • {:.0} mm/s Feed",
+                                rep.layer_count, self.print_feed_mm_s
+                            ),
                             FontId::monospace(9.0),
                             theme.text_secondary,
                         );
@@ -481,18 +649,10 @@ impl IndustrializedView {
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
                                 ui.label(
-                                    RichText::new(
-                                        "; EigenGraph 3DCP Contour Slicer v1.0\n\
-                                         G90 ; Absolute mm\n\
-                                         M82 ; Pump flow sync enabled (1.8 MPa)\n\
-                                         G1 X120.0 Y140.0 Z450.0 F11100 E12.40\n\
-                                         G1 X2850.0 Y140.0 Z450.0 E118.65 ; Outer Bead\n\
-                                         G1 X2850.0 Y920.0 Z450.0 E152.10 ; Sinusoid Turn\n\
-                                         G1 X120.0 Y920.0 Z465.0 F11100 E264.80 ; Z+15mm",
-                                    )
-                                    .size(10.5)
-                                    .monospace()
-                                    .color(theme.accent_green),
+                                    RichText::new(&rep.gcode_preview)
+                                        .size(10.0)
+                                        .monospace()
+                                        .color(theme.accent_green),
                                 );
                             });
                     }
@@ -504,7 +664,7 @@ impl IndustrializedView {
 
 #[cfg(test)]
 mod tests {
-    use super::compute_precast_hauling_audit;
+    use super::{compute_precast_hauling_audit, generate_concrete_3d_gcode};
     use crate::core::BimProject;
 
     #[test]
@@ -517,5 +677,17 @@ mod tests {
         assert!(pass_rep.peak_gvw_ton <= 64.0);
         assert!(strict_rep.pieces.iter().any(|p| p.qa_gate == "HOLD"));
         assert!(strict_rep.min_clearance_margin_m < 0.0);
+    }
+
+    #[test]
+    fn test_concrete_3d_printing_gcode_cold_joint_window() {
+        let proj = BimProject::sample_bimcraft_building();
+        let fast = generate_concrete_3d_gcode(&proj, 45.0, 15.0, 220.0, 1.80, true, 18.0);
+        let slow_cap = generate_concrete_3d_gcode(&proj, 45.0, 10.0, 65.0, 1.80, false, 3.0);
+        assert!(fast.layer_count >= 100);
+        assert!(fast.full_gcode.contains("G90 ; Absolute mm"));
+        assert!(fast.mortar_volume_m3 > 0.0);
+        assert!(fast.open_time_ok);
+        assert!(!slow_cap.open_time_ok);
     }
 }

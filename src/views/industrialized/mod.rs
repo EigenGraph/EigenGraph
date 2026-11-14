@@ -113,6 +113,13 @@ pub struct IndustrializedView {
     pub precast_portal_clear_m: f32,
     pub precast_grout_7day_mpa: f32,
     pub precast_night_escort: bool,
+    // Phase 41 (10D-05): Concrete 3D Printing Parametric G-Code Slicer
+    pub print_nozzle_mm: f32,
+    pub print_layer_h_mm: f32,
+    pub print_feed_mm_s: f32,
+    pub print_wall_height_m: f32,
+    pub print_spiralize: bool,
+    pub print_cold_joint_cap_min: f32,
 }
 
 impl Default for IndustrializedView {
@@ -176,6 +183,12 @@ impl Default for IndustrializedView {
             precast_portal_clear_m: 4.55,
             precast_grout_7day_mpa: 68.5,
             precast_night_escort: true,
+            print_nozzle_mm: 45.0,
+            print_layer_h_mm: 15.0,
+            print_feed_mm_s: 185.0,
+            print_wall_height_m: 1.80,
+            print_spiralize: true,
+            print_cold_joint_cap_min: 18.0,
         }
     }
 }
@@ -190,7 +203,10 @@ impl IndustrializedView {
         features: &mut FeatureRegistry,
     ) {
         ui.vertical(|ui| {
-            Frame::new().inner_margin(Margin::symmetric(20, 12)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // 1. TOP SUBTABS SELECTOR
                 self.render_header_bar(ui, theme);
 
@@ -246,7 +262,7 @@ impl IndustrializedView {
                         self.render_precast_logistics_tolerance(ui, theme, bim_project, features)
                     }
                     IndustrializedSubTab::Concrete3DPrinting => {
-                        self.render_concrete_3d_printing(ui, theme, features)
+                        self.render_concrete_3d_printing(ui, theme, bim_project, features)
                     }
                 }
 

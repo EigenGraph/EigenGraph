@@ -313,6 +313,15 @@ pub struct AiFirmView {
     pub audit_profile_idx: usize,
     pub audit_include_detailing: bool,
     pub last_audit_report: Option<ComplianceAuditReport>,
+    // Phase 41: Pareto Multi-Objective NSGA-II Optimizer (AI-05)
+    pub pareto_w_cost: f32,
+    pub pareto_w_carbon: f32,
+    pub pareto_w_ari: f32,
+    pub pareto_min_ari: f32,
+    pub pareto_generations: usize,
+    pub pareto_front: Vec<crate::core::parametric::ParetoCandidate>,
+    pub selected_pareto_id: Option<usize>,
+    pub pareto_status: Option<String>,
 }
 
 impl Default for AiFirmView {
@@ -362,6 +371,16 @@ impl Default for AiFirmView {
             audit_profile_idx: 0,
             audit_include_detailing: true,
             last_audit_report: None,
+            pareto_w_cost: 0.40,
+            pareto_w_carbon: 0.35,
+            pareto_w_ari: 0.25,
+            pareto_min_ari: 0.85,
+            pareto_generations: 50,
+            pareto_front: crate::core::parametric::solve_nsga2_structural_pareto(
+                0.40, 0.35, 0.25, 0.85, 50,
+            ),
+            selected_pareto_id: None,
+            pareto_status: None,
         }
     }
 }
@@ -377,13 +396,11 @@ impl AiFirmView {
         _db_components: &mut [DatabaseComponent],
         features: &mut FeatureRegistry,
     ) {
-        let margin_x = if ui.available_width() < MacTheme::MOBILE_BREAKPOINT {
-            10
-        } else {
-            20
-        };
         ui.vertical(|ui| {
-            Frame::new().inner_margin(Margin::symmetric(margin_x, 16)).show(ui, |ui| {
+            Frame::new().inner_margin(Margin::symmetric(0, 8)).show(ui, |ui| {
+                let full_w = ui.available_width().max(160.0);
+                ui.set_width(full_w);
+                ui.set_max_width(full_w);
                 // 1. Top Subtabs Bar
                 self.render_header_bar(ui, theme);
                 ui.add_space(16.0);
@@ -1514,45 +1531,83 @@ impl AiFirmView {
     }
 
     fn render_pareto_optimizer(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::ParetoMultiObjectiveOptimizer, |ui| {
+            let mut dirty = false;
             ui_kit::responsive_two_panes(ui, 620.0, |ui, pane| match pane {
                 0 => {
-                    ui.label(RichText::new("OPTIMIZATION WEIGHTS & CONSTRAINTS").size(11.0).strong().color(theme.accent_blue));
+                    ui.label(RichText::new("NSGA-II WEIGHTS & STRUCTURAL CONSTRAINTS").size(11.0).strong().color(theme.accent_blue));
                     ui.add_space(6.0);
-                    let mut w_cost = 0.40_f32;
-                    let mut w_carbon = 0.35_f32;
-                    let mut w_ari = 0.25_f32;
-                    ui.add(egui::Slider::new(&mut w_cost, 0.0..=1.0).text("Weight Cost (5D Capex)"));
-                    ui.add(egui::Slider::new(&mut w_carbon, 0.0..=1.0).text("Weight Embodied Carbon (CO2e)"));
-                    ui.add(egui::Slider::new(&mut w_ari, 0.0..=1.0).text("Weight Redundancy (ARI Min)"));
+                    dirty |= ui.add(egui::Slider::new(&mut self.pareto_w_cost, 0.05..=1.0).text("Weight Cost (5D Capex)")).changed();
+                    dirty |= ui.add(egui::Slider::new(&mut self.pareto_w_carbon, 0.05..=1.0).text("Weight Embodied Carbon (CO2e)")).changed();
+                    dirty |= ui.add(egui::Slider::new(&mut self.pareto_w_ari, 0.05..=1.0).text("Weight Redundancy (ARI Min)")).changed();
+                    dirty |= ui.add(egui::Slider::new(&mut self.pareto_min_ari, 0.70..=0.95).text("Min ARI Constraint")).changed();
                     ui.add_space(6.0);
-                    ui.label(RichText::new("Constraints: Min ARI >= 0.85 | Max Drift <= h/500 | DCR <= 0.90").size(10.5).color(theme.text_secondary));
+                    ui.label(RichText::new(format!(
+                        "Constraints: ARI >= {:.2} | Drift <= h/500 | DCR <= 0.90 | Rank-0 Non-Dominated: {}",
+                        self.pareto_min_ari,
+                        self.pareto_front.len()
+                    )).size(10.5).color(theme.text_secondary));
                     ui.add_space(8.0);
-                    let _ = icons::icon_button(
-                        ui,
-                        AppIcon::Sparkles,
-                        "Evolve 50 NSGA-II Generations (40 Pop)",
-                        11.0,
-                        Color32::WHITE,
-                        theme.accent_blue,
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        egui::Vec2::ZERO,
-                    );
+                    ui.horizontal_wrapped(|ui| {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Sparkles,
+                            format!("Evolve {} NSGA-II Gens", self.pareto_generations),
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            egui::Vec2::ZERO,
+                        )
+                        .clicked()
+                        {
+                            self.pareto_generations = (self.pareto_generations + 25).min(200);
+                            dirty = true;
+                        }
+                        let active_sol = self
+                            .selected_pareto_id
+                            .and_then(|sid| self.pareto_front.iter().find(|c| c.id == sid))
+                            .or_else(|| self.pareto_front.iter().find(|c| c.is_knee))
+                            .or_else(|| self.pareto_front.first())
+                            .cloned();
+                        if let Some(sol) = active_sol {
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::CheckCircle,
+                                format!("Apply #{} ({:.0}x{:.0} Col)", sol.id, sol.col_size_mm, sol.col_size_mm),
+                                11.0,
+                                Color32::WHITE,
+                                theme.accent_green,
+                                Stroke::NONE,
+                                CornerRadius::same(6),
+                                egui::Vec2::ZERO,
+                            )
+                            .clicked()
+                            {
+                                let span_mm = (sol.bay_span_m * 1000.0).round();
+                                self.pending_bim_nl_command = Some(format!("add column at {},{}", span_mm, span_mm));
+                                self.pareto_status = Some(format!(
+                                    "Applied Pareto Solution #{} (Bay {:.1}m, Col {:.0}mm, Beam {:.0}mm, fc {:.0} MPa, ARI {:.3}) to BIM Queue.",
+                                    sol.id, sol.bay_span_m, sol.col_size_mm, sol.beam_depth_mm, sol.fc_mpa, sol.ari_score
+                                ));
+                            }
+                        }
+                    });
                 }
                 _ => {
                     ui.label(RichText::new("NON-DOMINATED PARETO FRONTIER (COST vs CARBON CO2e)").size(11.0).strong().color(theme.accent_blue));
                     ui.add_space(6.0);
-                    let desired = egui::Vec2::new(ui.available_width(), 155.0);
-                    let (rect, _) = ui.allocate_exact_size(desired, egui::Sense::hover());
+                    let desired = egui::Vec2::new(ui.available_width(), 165.0);
+                    let (rect, resp) = ui.allocate_exact_size(desired, egui::Sense::click());
                     let painter = ui.painter_at(rect);
                     painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
-                    let pad = 26.0;
+                    let pad = 28.0;
                     let plot = rect.shrink(pad);
                     painter.line_segment(
                         [egui::Pos2::new(plot.left(), plot.bottom()), egui::Pos2::new(plot.right(), plot.bottom())],
@@ -1562,48 +1617,120 @@ impl AiFirmView {
                         [egui::Pos2::new(plot.left(), plot.bottom()), egui::Pos2::new(plot.left(), plot.top())],
                         Stroke::new(1.0, theme.text_muted),
                     );
-                    let pts = [
-                        (0.12_f32, 0.85_f32, false),
-                        (0.26, 0.63, false),
-                        (0.42, 0.44, true),
-                        (0.62, 0.30, false),
-                        (0.84, 0.20, false),
-                    ];
-                    let screen_pts: Vec<egui::Pos2> = pts
-                        .iter()
-                        .map(|&(nx, ny, _)| egui::Pos2::new(plot.left() + nx * plot.width(), plot.bottom() - ny * plot.height()))
-                        .collect();
-                    for w in screen_pts.windows(2) {
-                        painter.line_segment([w[0], w[1]], Stroke::new(2.0, theme.accent_blue));
+
+                    if !self.pareto_front.is_empty() {
+                        let min_c = self.pareto_front.iter().map(|c| c.capex_idr_b).fold(f32::INFINITY, f32::min);
+                        let max_c = self.pareto_front.iter().map(|c| c.capex_idr_b).fold(f32::NEG_INFINITY, f32::max).max(min_c + 0.1);
+                        let min_g = self.pareto_front.iter().map(|c| c.carbon_tco2e).fold(f32::INFINITY, f32::min);
+                        let max_g = self.pareto_front.iter().map(|c| c.carbon_tco2e).fold(f32::NEG_INFINITY, f32::max).max(min_g + 1.0);
+
+                        let screen_pts: Vec<(usize, egui::Pos2, bool, f32)> = self
+                            .pareto_front
+                            .iter()
+                            .map(|c| {
+                                let nx = ((c.capex_idr_b - min_c) / (max_c - min_c)).clamp(0.05, 0.95);
+                                let ny = ((c.carbon_tco2e - min_g) / (max_g - min_g)).clamp(0.08, 0.92);
+                                (
+                                    c.id,
+                                    egui::Pos2::new(plot.left() + nx * plot.width(), plot.bottom() - ny * plot.height()),
+                                    c.is_knee,
+                                    c.ari_score,
+                                )
+                            })
+                            .collect();
+
+                        for w in screen_pts.windows(2) {
+                            painter.line_segment([w[0].1, w[1].1], Stroke::new(1.8, theme.accent_blue));
+                        }
+                        if resp.clicked() {
+                            if let Some(pos) = resp.interact_pointer_pos() {
+                                if let Some((best_id, _, _, _)) = screen_pts
+                                    .iter()
+                                    .min_by(|a, b| a.1.distance(pos).total_cmp(&b.1.distance(pos)))
+                                {
+                                    self.selected_pareto_id = Some(*best_id);
+                                }
+                            }
+                        }
+                        let sel_id = self.selected_pareto_id;
+                        for (cid, pt, is_knee, ari) in &screen_pts {
+                            let is_sel = sel_id == Some(*cid);
+                            let col = if *is_knee {
+                                theme.accent_green
+                            } else if is_sel {
+                                theme.accent_blue
+                            } else {
+                                theme.accent_orange
+                            };
+                            painter.circle_filled(*pt, if *is_knee || is_sel { 6.5 } else { 4.2 }, col);
+                            if *is_knee || is_sel {
+                                icons::paint_icon(
+                                    &painter,
+                                    egui::Rect::from_min_size(egui::Pos2::new(pt.x + 6.0, pt.y - 16.0), egui::Vec2::splat(11.0)),
+                                    AppIcon::Star,
+                                    col,
+                                );
+                                painter.text(
+                                    egui::Pos2::new(pt.x + 20.0, pt.y - 6.0),
+                                    egui::Align2::LEFT_BOTTOM,
+                                    format!("#{} (ARI {:.3})", cid, ari),
+                                    egui::FontId::proportional(10.0),
+                                    col,
+                                );
+                            }
+                        }
                     }
-                    for (idx, &(_, _, knee)) in pts.iter().enumerate() {
-                        let col = if knee { theme.accent_green } else { theme.accent_orange };
-                        painter.circle_filled(screen_pts[idx], if knee { 6.0 } else { 4.5 }, col);
-                    }
-                    icons::paint_icon(
-                        &painter,
-                        egui::Rect::from_min_size(
-                            egui::Pos2::new(screen_pts[2].x + 6.0, screen_pts[2].y - 19.0),
-                            egui::Vec2::splat(11.0),
-                        ),
-                        AppIcon::Star,
-                        theme.accent_green,
-                    );
-                    painter.text(
-                        egui::Pos2::new(screen_pts[2].x + 20.0, screen_pts[2].y - 8.0),
-                        egui::Align2::LEFT_BOTTOM,
-                        "Knee Sol #14 (ARI 0.942)",
-                        egui::FontId::proportional(10.0),
-                        theme.accent_green,
-                    );
                     painter.text(
                         egui::Pos2::new(plot.center().x, rect.bottom() - 8.0),
                         egui::Align2::CENTER_CENTER,
-                        "5D Structural Capex (IDR Billion) ->",
+                        "5D Structural Capex (IDR Billion) ->  (Click node to inspect)",
                         egui::FontId::proportional(9.5),
                         theme.text_muted,
                     );
                 }
+            });
+
+            if dirty {
+                self.pareto_front = crate::core::parametric::solve_nsga2_structural_pareto(
+                    self.pareto_w_cost,
+                    self.pareto_w_carbon,
+                    self.pareto_w_ari,
+                    self.pareto_min_ari,
+                    self.pareto_generations,
+                );
+            }
+
+            ui.add_space(8.0);
+            if let Some(ref msg) = self.pareto_status {
+                ui.label(RichText::new(msg).size(11.0).strong().color(theme.accent_green));
+                ui.add_space(4.0);
+            }
+
+            egui::ScrollArea::horizontal().id_salt("pareto_candidates_table").show(ui, |ui| {
+                egui::Grid::new("pareto_candidates_grid")
+                    .striped(true)
+                    .spacing([14.0, 4.0])
+                    .show(ui, |ui| {
+                        for h in ["SOL #", "BAY (m)", "COL (mm)", "BEAM (mm)", "fc (MPa)", "CAPEX (IDR B)", "CARBON (tCO2e)", "ARI", "DCR"] {
+                            ui.label(RichText::new(h).size(10.0).strong().color(theme.text_muted));
+                        }
+                        ui.end_row();
+                        for c in self.pareto_front.iter().take(6) {
+                            let tag = if c.is_knee { format!("#{} KNEE", c.id) } else { format!("#{}", c.id) };
+                            if ui.selectable_label(self.selected_pareto_id == Some(c.id), tag).clicked() {
+                                self.selected_pareto_id = Some(c.id);
+                            }
+                            ui.label(RichText::new(format!("{:.1}", c.bay_span_m)).size(10.5));
+                            ui.label(RichText::new(format!("{:.0}", c.col_size_mm)).size(10.5));
+                            ui.label(RichText::new(format!("{:.0}", c.beam_depth_mm)).size(10.5));
+                            ui.label(RichText::new(format!("{:.0}", c.fc_mpa)).size(10.5));
+                            ui.label(RichText::new(format!("{:.2}", c.capex_idr_b)).size(10.5).color(theme.accent_blue));
+                            ui.label(RichText::new(format!("{:.1}", c.carbon_tco2e)).size(10.5).color(theme.accent_orange));
+                            ui.label(RichText::new(format!("{:.3}", c.ari_score)).size(10.5).color(theme.accent_green));
+                            ui.label(RichText::new(format!("{:.2}", c.max_dcr)).size(10.5));
+                            ui.end_row();
+                        }
+                    });
             });
         });
     }

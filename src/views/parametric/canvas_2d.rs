@@ -25,6 +25,8 @@ impl ParametricView {
 
         if self.view_mode == DraftingViewMode::VisualNodeGraphDynamo {
             let slot_resp = ui.vertical(|ui| {
+                ui.set_width(avail_w);
+                ui.set_max_width(avail_w);
                 self.render_dynamo_algorithmic_studio(ui, theme, avail_w, canvas_h);
             });
             self.last_canvas_rect = Some(slot_resp.response.rect);
@@ -48,6 +50,8 @@ impl ParametricView {
             DraftingViewMode::RebarBbsDetailing | DraftingViewMode::ElevationsAndMepRiser
         ) {
             let slot_resp = ui.vertical(|ui| {
+                ui.set_width(avail_w);
+                ui.set_max_width(avail_w);
                 egui::ScrollArea::vertical()
                     .id_salt("parametric_detailing_slots_scroll")
                     .max_height(canvas_h)

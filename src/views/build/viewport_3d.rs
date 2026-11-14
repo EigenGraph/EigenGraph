@@ -56,17 +56,80 @@ impl BuildView {
     }
 
     fn apply_3d_move_1m(&mut self, universal_canvas: &mut UniversalCanvasState) {
-        if self.sketch_mode_active && universal_canvas.translate_selected_or_last(1000.0, 0.0) {
-            self.modify_status_msg = Some("Moved sketch entity +1000 mm East (M)".to_string());
+        let step = universal_canvas.cad_step_mm;
+        if self.sketch_mode_active && universal_canvas.translate_selected_or_last(step, 0.0) {
+            self.modify_status_msg = Some(format!("Moved sketch entity +{step:.0} mm East (M)"));
             return;
         }
         if let Some(id) = self.bim_bus.project.latest_element_id() {
             match self.bim_bus.execute(crate::core::BimCommand::MoveElement {
                 element_id: id,
-                delta: crate::core::P2(1000.0, 0.0),
+                delta: crate::core::P2(step, 0.0),
             }) {
                 Ok(msg) => {
                     self.modify_status_msg = Some(msg.clone());
+                    self.bim_console_logs.push(msg);
+                }
+                Err(e) => self.modify_status_msg = Some(e),
+            }
+        }
+    }
+
+    fn apply_3d_rotate_90(&mut self, universal_canvas: &mut UniversalCanvasState) {
+        if self.sketch_mode_active && universal_canvas.rotate_selected_or_last(90.0) {
+            self.modify_status_msg = Some("Rotated sketch entity +90°".to_string());
+            return;
+        }
+        let target_id = self
+            .selected_member_id
+            .or_else(|| self.bim_bus.project.latest_element_id());
+        if let Some(id) = target_id {
+            match self.bim_bus.execute(crate::core::BimCommand::RotateElement {
+                element_id: id,
+                angle_deg: 90.0,
+            }) {
+                Ok(msg) => {
+                    self.modify_status_msg = Some(msg.clone());
+                    self.bim_console_logs.push(msg);
+                }
+                Err(e) => self.modify_status_msg = Some(e),
+            }
+        }
+    }
+
+    fn apply_3d_duplicate(&mut self, universal_canvas: &mut UniversalCanvasState) {
+        let step = universal_canvas.cad_step_mm;
+        if self.sketch_mode_active && universal_canvas.duplicate_selected_or_last(step, 0.0) {
+            self.modify_status_msg =
+                Some(format!("Duplicated sketch entity +{step:.0} mm East"));
+            return;
+        }
+        if let Some(w) = self.bim_bus.project.walls.last().cloned() {
+            match self.bim_bus.execute(crate::core::BimCommand::AddWall {
+                base_level_id: w.base_level_id,
+                start: crate::core::P2(w.start.0 + step, w.start.1),
+                end: crate::core::P2(w.end.0 + step, w.end.1),
+                thickness_mm: w.thickness_mm,
+                is_structural: w.is_structural,
+            }) {
+                Ok(msg) => {
+                    self.modify_status_msg = Some(format!("Copied wall +{step:.0} mm: {msg}"));
+                    self.bim_console_logs.push(msg);
+                }
+                Err(e) => self.modify_status_msg = Some(e),
+            }
+        } else if let Some(c) = self.bim_bus.project.columns.last().cloned() {
+            match self.bim_bus.execute(crate::core::BimCommand::AddColumn {
+                base_level_id: c.base_level_id,
+                top_level_id: c.top_level_id,
+                pos: crate::core::P2(c.pos.0 + step, c.pos.1),
+                width_mm: c.width_mm,
+                depth_mm: c.depth_mm,
+                is_round: c.is_round,
+                profile_name: c.profile_name,
+            }) {
+                Ok(msg) => {
+                    self.modify_status_msg = Some(format!("Copied column +{step:.0} mm: {msg}"));
                     self.bim_console_logs.push(msg);
                 }
                 Err(e) => self.modify_status_msg = Some(e),
@@ -1891,10 +1954,19 @@ impl BuildView {
                         }
                     }
 
+                    ui.label(RichText::new("Step:").size(10.0).color(theme.text_muted));
+                    ui.add(
+                        egui::DragValue::new(&mut universal_canvas.cad_step_mm)
+                            .range(10.0..=50_000.0)
+                            .speed(50.0)
+                            .suffix(" mm"),
+                    )
+                    .on_hover_text("Precision step distance for Move & Copy");
+
                     if icons::icon_button(
                         ui,
                         AppIcon::ArrowRight,
-                        "Move +1m",
+                        "Move",
                         10.0,
                         theme.text_primary,
                         theme.bg_card,
@@ -1902,10 +1974,44 @@ impl BuildView {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
-                    .on_hover_text("Move latest BIM element or sketch +1000 mm East (M)")
+                    .on_hover_text("Move latest BIM element or sketch East by Step mm (M)")
                     .clicked()
                     {
                         self.apply_3d_move_1m(universal_canvas);
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Layers,
+                        "Copy",
+                        10.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Duplicate latest wall, column, or sketch East by Step mm")
+                    .clicked()
+                    {
+                        self.apply_3d_duplicate(universal_canvas);
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Compass,
+                        "Rot 90°",
+                        10.0,
+                        theme.text_primary,
+                        theme.bg_card,
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Rotate selected/latest element or sketch +90°")
+                    .clicked()
+                    {
+                        self.apply_3d_rotate_90(universal_canvas);
                     }
 
                     if icons::icon_button(
@@ -2004,6 +2110,31 @@ impl BuildView {
                         universal_canvas.import_json_open = true;
                     }
 
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Shield,
+                        "? Shortcuts",
+                        10.0,
+                        if universal_canvas.shortcuts_modal_open {
+                            Color32::WHITE
+                        } else {
+                            theme.text_secondary
+                        },
+                        if universal_canvas.shortcuts_modal_open {
+                            theme.accent_blue
+                        } else {
+                            theme.bg_card
+                        },
+                        Stroke::new(1.0, theme.border_subtle),
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Open CAD Shortcuts, Relative/Polar CLI Syntax & Module Quick-Jump (Ctrl/Cmd+K)")
+                    .clicked()
+                    {
+                        universal_canvas.shortcuts_modal_open = !universal_canvas.shortcuts_modal_open;
+                    }
+
                     // Active Disruption / Palette Badges & Selection Clear
                     if !self.simulated_eliminated_ids.is_empty() {
                         icons::pill_badge(
@@ -2050,10 +2181,13 @@ impl BuildView {
         if self.sketch_mode_active {
             Frame::new()
                 .fill(theme.bg_sidebar)
+                .corner_radius(CornerRadius::same(8))
                 .stroke(Stroke::new(1.0, theme.border_subtle))
                 .inner_margin(Margin::symmetric(12, 5))
                 .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
+                    let inner_w = ui.available_width().max(120.0);
+                    ui.set_width(inner_w);
+                    ui.set_max_width(inner_w);
                     ui.horizontal_wrapped(|ui| {
                         universal_canvas.render_sketch_tools_bar(ui, theme, 24.0, false);
                         ui.separator();
@@ -2354,10 +2488,13 @@ impl BuildView {
 
         Frame::new()
             .fill(theme.bg_sidebar)
+            .corner_radius(CornerRadius::same(8))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .inner_margin(Margin::symmetric(10, 8))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let inner_w = ui.available_width().max(120.0);
+                ui.set_width(inner_w);
+                ui.set_max_width(inner_w);
                 if avail_w >= 960.0 && open_count > 1 {
                     let flags = [
                         self.floating_project_open,
@@ -2476,6 +2613,47 @@ impl BuildView {
             let mut it = s.split(',').filter_map(|p| p.trim().parse::<f64>().ok());
             Some(crate::core::P2(it.next()?, it.next()?))
         };
+
+        if trimmed.starts_with('@') {
+            if let Some((dx, dy)) = UniversalCanvasState::parse_cad_delta_expr(trimmed) {
+                let start = self
+                    .pending_3d_start_mm
+                    .map(|p| crate::core::P2(p[0], p[1]))
+                    .or_else(|| self.bim_bus.project.walls.last().map(|w| w.end))
+                    .unwrap_or(crate::core::P2(0.0, 0.0));
+                let end = crate::core::P2(start.0 + dx, start.1 + dy);
+                match self.bim_bus.execute(crate::core::BimCommand::AddWall {
+                    base_level_id: active_lvl_id,
+                    start,
+                    end,
+                    thickness_mm: 200.0,
+                    is_structural: true,
+                }) {
+                    Ok(msg) => {
+                        self.pending_3d_start_mm = Some([end.0, end.1]);
+                        self.bim_console_logs.push(msg.clone());
+                        self.modify_status_msg = Some(msg);
+                    }
+                    Err(e) => self.modify_status_msg = Some(e),
+                }
+                return;
+            }
+        }
+
+        if let Some(deg_str) = lower.strip_prefix("ro ").or_else(|| lower.strip_prefix("rotate ")) {
+            if let Ok(deg) = deg_str.trim().parse::<f64>() {
+                if let Some(id) = self.bim_bus.project.latest_element_id() {
+                    if let Ok(msg) = self.bim_bus.execute(crate::core::BimCommand::RotateElement {
+                        element_id: id,
+                        angle_deg: deg,
+                    }) {
+                        self.bim_console_logs.push(msg.clone());
+                        self.modify_status_msg = Some(msg);
+                    }
+                }
+                return;
+            }
+        }
 
         if lower == "undo" {
             let msg = self
