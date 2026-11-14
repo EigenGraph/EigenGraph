@@ -106,6 +106,8 @@ pub struct IndustrializedView {
     pub scanner_input: String,
     pub selected_module_tag: String,
     pub scanner_log: Vec<String>,
+    // Phase 38: One-click IFC -> Editable BimProject bridge
+    pub request_apply_bim_project: Option<crate::core::BimProject>,
 }
 
 impl Default for IndustrializedView {
@@ -164,6 +166,7 @@ impl Default for IndustrializedView {
             scanner_input: String::new(),
             selected_module_tag: String::new(),
             scanner_log: Vec::new(),
+            request_apply_bim_project: None,
         }
     }
 }

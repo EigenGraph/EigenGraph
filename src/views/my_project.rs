@@ -13,6 +13,33 @@ pub enum LibraryViewMode {
     TypologyTemplateLauncher,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectTemplateKind {
+    SteelBridgeViaduct,
+    DualSystemRcTower,
+    PtBoxGirderFlyover,
+    PrecastLogisticsHub,
+}
+
+impl ProjectTemplateKind {
+    pub fn title(&self) -> &'static str {
+        match self {
+            Self::SteelBridgeViaduct => "36m Composite Warren Arch Viaduct",
+            Self::DualSystemRcTower => "24-Storey Dual-System RC Tower",
+            Self::PtBoxGirderFlyover => "PT Post-Tensioned Box-Girder Flyover",
+            Self::PrecastLogisticsHub => "Automated Precast Logistics Fulfillment Hub",
+        }
+    }
+
+    pub fn category_idx(&self) -> usize {
+        match self {
+            Self::DualSystemRcTower => 1,
+            Self::SteelBridgeViaduct | Self::PtBoxGirderFlyover => 2,
+            Self::PrecastLogisticsHub => 3,
+        }
+    }
+}
+
 pub struct MyProjectView {
     pub library_mode: LibraryViewMode,
     pub selected_category: String,
@@ -26,6 +53,8 @@ pub struct MyProjectView {
     pub request_save_active_to_vault: bool,
     pub request_export_active_archive: bool,
     pub save_project_name_input: String,
+    pub template_filter: usize,
+    pub request_apply_template: Option<ProjectTemplateKind>,
     // Phase 27: BIM Family Catalog & Parameter Inspector fields
     pub families: Vec<BimFamilyItem>,
     pub selected_family_idx: usize,
@@ -48,6 +77,8 @@ impl Default for MyProjectView {
             request_save_active_to_vault: false,
             request_export_active_archive: false,
             save_project_name_input: "Workspace_Project".to_string(),
+            template_filter: 0,
+            request_apply_template: None,
             families: Vec::new(),
             selected_family_idx: 0,
             family_search_query: String::new(),
@@ -1413,22 +1444,29 @@ impl MyProjectView {
     }
 
     fn render_typology_templates(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::MultiTypologyProjectTemplates, |ui| {
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "All Structural Typologies");
-                let _ = ui.selectable_label(false, "High-Rise RC / Core Wall");
-                let _ = ui.selectable_label(false, "Long-Span Steel & Bridges");
-                let _ = ui.selectable_label(false, "Industrial Precast DfMA");
+                for (fidx, flabel) in [
+                    (0, "All Structural Typologies"),
+                    (1, "High-Rise RC / Core Wall"),
+                    (2, "Long-Span Steel & Bridges"),
+                    (3, "Industrial Precast DfMA"),
+                ] {
+                    if ui.selectable_label(self.template_filter == fidx, flabel).clicked() {
+                        self.template_filter = fidx;
+                    }
+                }
             });
             ui.add_space(10.0);
 
             let templates = [
                 (
+                    ProjectTemplateKind::SteelBridgeViaduct,
                     AppIcon::Beam,
                     "36m Composite Warren Arch Viaduct",
                     "SNI 1725 / AASHTO LRFD Bridge Spec",
@@ -1437,6 +1475,7 @@ impl MyProjectView {
                     theme.accent_blue,
                 ),
                 (
+                    ProjectTemplateKind::DualSystemRcTower,
                     AppIcon::Building,
                     "24-Storey Dual-System RC Tower",
                     "SNI 2847 / ACI 318 / SNI 1726 KDS-D",
@@ -1445,6 +1484,7 @@ impl MyProjectView {
                     theme.accent_green,
                 ),
                 (
+                    ProjectTemplateKind::PtBoxGirderFlyover,
                     AppIcon::Cube3D,
                     "PT Post-Tensioned Box-Girder Flyover",
                     "AASHTO Segmental / ACI 318 Ch. 20",
@@ -1453,6 +1493,7 @@ impl MyProjectView {
                     theme.accent_orange,
                 ),
                 (
+                    ProjectTemplateKind::PrecastLogisticsHub,
                     AppIcon::BoxPackage,
                     "Automated Precast Logistics Fulfillment Hub",
                     "PCI Design Handbook / 10D DfMA Ready",
@@ -1462,8 +1503,13 @@ impl MyProjectView {
                 ),
             ];
 
-            ui_kit::responsive_grid_n(ui, templates.len(), 250.0, |ui, idx| {
-                let (icon, title, code, specs, btn_label, accent) = templates[idx];
+            let visible: Vec<_> = templates
+                .into_iter()
+                .filter(|t| self.template_filter == 0 || t.0.category_idx() == self.template_filter)
+                .collect();
+
+            ui_kit::responsive_grid_n(ui, visible.len().max(1), 250.0, |ui, idx| {
+                let (kind, icon, title, code, specs, btn_label, accent) = visible[idx];
                 Frame::new()
                     .fill(theme.bg_card)
                     .corner_radius(CornerRadius::same(8))
@@ -1476,7 +1522,7 @@ impl MyProjectView {
                         ui.add_space(6.0);
                         ui.label(RichText::new(specs).size(11.0).color(theme.text_secondary));
                         ui.add_space(10.0);
-                        let _ = icons::icon_button(
+                        if icons::icon_button(
                             ui,
                             AppIcon::Plus,
                             btn_label,
@@ -1486,9 +1532,317 @@ impl MyProjectView {
                             Stroke::NONE,
                             CornerRadius::same(6),
                             Vec2::ZERO,
-                        );
+                        )
+                        .clicked()
+                        {
+                            self.request_apply_template = Some(kind);
+                        }
                     });
             });
         });
+    }
+}
+
+struct TypologyGridSpec<'a> {
+    project_name: &'a str,
+    xs_mm: &'a [f64],
+    ys_mm: &'a [f64],
+    elevations_mm: &'a [(f64, &'a str)],
+    col_w_mm: f64,
+    col_d_mm: f64,
+    beam_w_mm: f64,
+    beam_d_mm: f64,
+    footing_w_mm: f64,
+    slab_thickness_mm: f64,
+    is_steel_wf: bool,
+    col_profile: &'a str,
+    beam_profile: &'a str,
+    add_core_walls: bool,
+    reinforce_concrete: bool,
+}
+
+fn build_grid_typology_project(spec: TypologyGridSpec<'_>) -> crate::core::BimProject {
+    use crate::core::P2;
+    use crate::core::bim::*;
+    let mut proj = BimProject::empty();
+    proj.project_name = spec.project_name.to_string();
+    proj.levels.clear();
+
+    let mut level_ids = Vec::with_capacity(spec.elevations_mm.len());
+    for &(elev_mm, lname) in spec.elevations_mm {
+        let id = proj.alloc_id();
+        proj.levels.push(BimLevel {
+            id,
+            name: lname.to_string(),
+            elevation_mm: elev_mm,
+        });
+        level_ids.push(id);
+    }
+
+    let y_min = *spec.ys_mm.first().unwrap_or(&0.0);
+    let y_max = *spec.ys_mm.last().unwrap_or(&6000.0);
+    let x_min = *spec.xs_mm.first().unwrap_or(&0.0);
+    let x_max = *spec.xs_mm.last().unwrap_or(&6000.0);
+    for (i, &x) in spec.xs_mm.iter().enumerate() {
+        let gid = proj.alloc_id();
+        proj.grids.push(BimGrid {
+            id: gid,
+            label: format!("{}", i + 1),
+            start: P2(x, y_min - 1800.0),
+            end: P2(x, y_max + 1800.0),
+        });
+    }
+    for (i, &y) in spec.ys_mm.iter().enumerate() {
+        let gid = proj.alloc_id();
+        let ch = (b'A' + (i as u8 % 26)) as char;
+        proj.grids.push(BimGrid {
+            id: gid,
+            label: ch.to_string(),
+            start: P2(x_min - 1800.0, y),
+            end: P2(x_max + 1800.0, y),
+        });
+    }
+
+    let base_lid = level_ids[0];
+    for &x in spec.xs_mm {
+        for &y in spec.ys_mm {
+            let fid = proj.alloc_id();
+            proj.footings.push(BimFooting {
+                id: fid,
+                name: format!("Footing F-({:.0},{:.0})", x * 1e-3, y * 1e-3),
+                level_id: base_lid,
+                pos: P2(x, y),
+                width_mm: spec.footing_w_mm,
+                length_mm: spec.footing_w_mm,
+                thickness_mm: 650.0,
+            });
+            for pair in level_ids.windows(2) {
+                let cid = proj.alloc_id();
+                proj.columns.push(BimColumn {
+                    id: cid,
+                    name: format!("Col C-L{}-({:.0},{:.0})", pair[0], x * 1e-3, y * 1e-3),
+                    base_level_id: pair[0],
+                    top_level_id: pair[1],
+                    pos: P2(x, y),
+                    width_mm: spec.col_w_mm,
+                    depth_mm: spec.col_d_mm,
+                    rotation_deg: 0.0,
+                    is_round: false,
+                    is_wf_profile: spec.is_steel_wf,
+                    profile_name: spec.col_profile.to_string(),
+                });
+            }
+        }
+    }
+
+    for &lvl in level_ids.iter().skip(1) {
+        for &y in spec.ys_mm {
+            for xs in spec.xs_mm.windows(2) {
+                let bid = proj.alloc_id();
+                proj.runs.push(BimRun {
+                    id: bid,
+                    name: format!("Girder G-L{}", lvl),
+                    category: RunCategory::StructuralBeam,
+                    level_id: lvl,
+                    start: P2(xs[0], y),
+                    end: P2(xs[1], y),
+                    start_offset_mm: 0.0,
+                    end_offset_mm: 0.0,
+                    justify: RunJustify::Top,
+                    profile_name: spec.beam_profile.to_string(),
+                    width_mm: spec.beam_w_mm,
+                    depth_mm: spec.beam_d_mm,
+                    is_round: false,
+                    is_wf_profile: spec.is_steel_wf,
+                    system_name: "Primary Gravity & Lateral Frame".to_string(),
+                });
+            }
+        }
+        for &x in spec.xs_mm {
+            for ys in spec.ys_mm.windows(2) {
+                let bid = proj.alloc_id();
+                proj.runs.push(BimRun {
+                    id: bid,
+                    name: format!("Tie Beam B-L{}", lvl),
+                    category: RunCategory::StructuralBeam,
+                    level_id: lvl,
+                    start: P2(x, ys[0]),
+                    end: P2(x, ys[1]),
+                    start_offset_mm: 0.0,
+                    end_offset_mm: 0.0,
+                    justify: RunJustify::Top,
+                    profile_name: spec.beam_profile.to_string(),
+                    width_mm: spec.beam_w_mm,
+                    depth_mm: spec.beam_d_mm,
+                    is_round: false,
+                    is_wf_profile: spec.is_steel_wf,
+                    system_name: "Transverse Tie Frame".to_string(),
+                });
+            }
+        }
+        let sid = proj.alloc_id();
+        proj.slabs.push(BimSlab {
+            id: sid,
+            name: format!("Deck Slab L{}", lvl),
+            level_id: lvl,
+            boundary: vec![
+                P2(x_min, y_min),
+                P2(x_max, y_min),
+                P2(x_max, y_max),
+                P2(x_min, y_max),
+            ],
+            openings: Vec::new(),
+            thickness_mm: spec.slab_thickness_mm,
+            is_roof: false,
+            roof_slope_deg: 0.0,
+        });
+    }
+
+    if spec.add_core_walls && spec.xs_mm.len() >= 3 && spec.ys_mm.len() >= 3 {
+        let cx0 = spec.xs_mm[1];
+        let cx1 = spec.xs_mm[2];
+        let cy0 = spec.ys_mm[1];
+        let cy1 = spec.ys_mm[2];
+        for pair in level_ids.windows(2) {
+            for (s, e) in [
+                (P2(cx0, cy0), P2(cx1, cy0)),
+                (P2(cx1, cy0), P2(cx1, cy1)),
+                (P2(cx0, cy1), P2(cx0, cy0)),
+            ] {
+                let wid = proj.alloc_id();
+                proj.walls.push(BimWall {
+                    id: wid,
+                    name: format!("Core Shear Wall L{}", pair[0]),
+                    base_level_id: pair[0],
+                    top_level_id: Some(pair[1]),
+                    unconnected_height_mm: 3600.0,
+                    start: s,
+                    end: e,
+                    thickness_mm: 350.0,
+                    layers: BimWall::default_compound_layers(350.0),
+                    is_structural: true,
+                    openings: Vec::new(),
+                });
+            }
+        }
+    }
+
+    if spec.reinforce_concrete {
+        proj.reinforce_all_concrete(&RebarPreset::default());
+    }
+    proj
+}
+
+/// Instantiates a multi-discipline structural BIM seed on explicit user request (startup remains blank).
+pub fn instantiate_typology_template(kind: ProjectTemplateKind) -> crate::core::BimProject {
+    match kind {
+        ProjectTemplateKind::SteelBridgeViaduct => build_grid_typology_project(TypologyGridSpec {
+            project_name: kind.title(),
+            xs_mm: &[0.0, 12000.0, 24000.0, 36000.0],
+            ys_mm: &[0.0, 4200.0, 8400.0],
+            elevations_mm: &[
+                (0.0, "Pier Cap Foundation (+0.0m)"),
+                (7500.0, "Bridge Deck Datum (+7.5m)"),
+            ],
+            col_w_mm: 650.0,
+            col_d_mm: 650.0,
+            beam_w_mm: 400.0,
+            beam_d_mm: 900.0,
+            footing_w_mm: 2800.0,
+            slab_thickness_mm: 280.0,
+            is_steel_wf: true,
+            col_profile: "WF 600x300x14x23",
+            beam_profile: "W14x90 Composite Girder",
+            add_core_walls: false,
+            reinforce_concrete: false,
+        }),
+        ProjectTemplateKind::DualSystemRcTower => build_grid_typology_project(TypologyGridSpec {
+            project_name: kind.title(),
+            xs_mm: &[0.0, 7500.0, 13500.0, 21000.0],
+            ys_mm: &[0.0, 7500.0, 13500.0, 21000.0],
+            elevations_mm: &[
+                (0.0, "Base Podium (+0.0m)"),
+                (4200.0, "Level 2 (+4.2m)"),
+                (7800.0, "Level 3 (+7.8m)"),
+                (11400.0, "Level 4 (+11.4m)"),
+                (15000.0, "Level 5 (+15.0m)"),
+                (18600.0, "Roof Core Crown (+18.6m)"),
+            ],
+            col_w_mm: 600.0,
+            col_d_mm: 600.0,
+            beam_w_mm: 350.0,
+            beam_d_mm: 650.0,
+            footing_w_mm: 2400.0,
+            slab_thickness_mm: 180.0,
+            is_steel_wf: false,
+            col_profile: "RC 600x600 C45",
+            beam_profile: "RC 350x650 SMF C35",
+            add_core_walls: true,
+            reinforce_concrete: true,
+        }),
+        ProjectTemplateKind::PtBoxGirderFlyover => build_grid_typology_project(TypologyGridSpec {
+            project_name: kind.title(),
+            xs_mm: &[0.0, 15000.0, 30000.0, 45000.0],
+            ys_mm: &[0.0, 9000.0],
+            elevations_mm: &[
+                (0.0, "Pile Cap Ground (+0.0m)"),
+                (9000.0, "Box-Girder Superstructure (+9.0m)"),
+            ],
+            col_w_mm: 1100.0,
+            col_d_mm: 1100.0,
+            beam_w_mm: 800.0,
+            beam_d_mm: 1600.0,
+            footing_w_mm: 3600.0,
+            slab_thickness_mm: 300.0,
+            is_steel_wf: false,
+            col_profile: "RC Hammerhead Pier 1100",
+            beam_profile: "PT Box-Girder 800x1600",
+            add_core_walls: false,
+            reinforce_concrete: true,
+        }),
+        ProjectTemplateKind::PrecastLogisticsHub => build_grid_typology_project(TypologyGridSpec {
+            project_name: kind.title(),
+            xs_mm: &[0.0, 18000.0, 36000.0],
+            ys_mm: &[0.0, 9000.0, 18000.0, 27000.0],
+            elevations_mm: &[
+                (0.0, "Slab-on-Grade (+0.0m)"),
+                (8500.0, "Mezzanine / Eave (+8.5m)"),
+            ],
+            col_w_mm: 550.0,
+            col_d_mm: 550.0,
+            beam_w_mm: 400.0,
+            beam_d_mm: 850.0,
+            footing_w_mm: 2200.0,
+            slab_thickness_mm: 200.0,
+            is_steel_wf: false,
+            col_profile: "Precast Corbel C550",
+            beam_profile: "PCI Double-Tee / G850",
+            add_core_walls: false,
+            reinforce_concrete: true,
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_typology_templates_generate_valid_bim_and_fem_only_on_demand() {
+        assert!(crate::core::BimProject::empty().is_empty());
+        for kind in [
+            ProjectTemplateKind::SteelBridgeViaduct,
+            ProjectTemplateKind::DualSystemRcTower,
+            ProjectTemplateKind::PtBoxGirderFlyover,
+            ProjectTemplateKind::PrecastLogisticsHub,
+        ] {
+            let proj = instantiate_typology_template(kind);
+            assert!(!proj.is_empty(), "{:?} must generate BIM elements", kind);
+            let fem = proj.to_structural_model();
+            assert!(!fem.elements.is_empty(), "{:?} must convert to FEM elements", kind);
+            if kind != ProjectTemplateKind::SteelBridgeViaduct {
+                assert!(proj.total_rebar_weight_kg() > 0.0, "{:?} must populate rebar", kind);
+            }
+        }
     }
 }

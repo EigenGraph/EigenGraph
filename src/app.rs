@@ -67,6 +67,7 @@ pub struct EigenGraphApp {
     last_bim_sig: (usize, usize, usize, usize, usize, usize, usize),
     last_uc_earth: (f64, f64, f32, crate::core::gis::TileSource),
     last_res_earth: (f64, f64, f32, crate::core::gis::TileSource),
+    last_planning_sim_day: u32,
 }
 
 impl Default for EigenGraphApp {
@@ -135,6 +136,7 @@ impl Default for EigenGraphApp {
             last_bim_sig: (0, 0, 0, 0, 0, 1, 0),
             last_uc_earth: uc_earth,
             last_res_earth: res_earth,
+            last_planning_sim_day: 0,
         }
     }
 }
@@ -554,6 +556,13 @@ impl App for EigenGraphApp {
             self.sync_bim_to_fem();
         }
         self.sync_earth_maps();
+        if self.planning_view.simulation_day != self.last_planning_sim_day {
+            self.last_planning_sim_day = self.planning_view.simulation_day;
+            if self.planning_view.simulation_day > 0 {
+                self.build_view.simulation_4d_day = self.planning_view.simulation_day as usize;
+                self.build_view.highlight_4d_erection = true;
+            }
+        }
 
         // Keyboard shortcut (Cmd+,) toggles Settings modal
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Comma)) {
@@ -732,6 +741,9 @@ impl App for EigenGraphApp {
                                         Some(format!("Archive serialization failed: {}", err));
                                 }
                             }
+                        }
+                        if let Some(kind) = self.my_project_view.request_apply_template.take() {
+                            self.apply_typology_template(kind);
                         }
                         if std::mem::take(&mut self.my_project_view.request_export_active_archive) {
                             self.universal_canvas.export_unified_file(
@@ -932,6 +944,7 @@ impl App for EigenGraphApp {
                             ui,
                             &self.theme,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &mut self.feature_registry,
                         );
                     }
@@ -942,6 +955,23 @@ impl App for EigenGraphApp {
                             &self.members,
                             &mut self.feature_registry,
                         );
+                        if let Some(proj) = self.industrialized_view.request_apply_bim_project.take() {
+                            let el_cnt = proj.element_count();
+                            let pname = proj.project_name.clone();
+                            self.build_view.bim_bus = crate::core::BimCommandBus::from_project(proj.clone());
+                            self.parametric_view.bim_bus = crate::core::BimCommandBus::from_project(proj);
+                            self.build_view.cam_pan = egui::Vec2::ZERO;
+                            self.build_view.cam_zoom = 1.1;
+                            self.parametric_view.canvas_pan = egui::Vec2::ZERO;
+                            self.parametric_view.active_level_idx = 0;
+                            self.sync_bim_to_fem();
+                            self.sync_earth_maps();
+                            self.build_view.modify_status_msg = Some(format!(
+                                "Loaded IFC -> Editable BimProject '{}' ({} elements).",
+                                pname, el_cnt
+                            ));
+                            self.active_pillar = NavigationPillar::GeometryAssembly;
+                        }
                     }
                     NavigationPillar::Prediction => {
                         self.prediction_view.show(
@@ -1612,6 +1642,25 @@ impl EigenGraphApp {
                 );
             }
         }
+    }
+
+    fn apply_typology_template(&mut self, kind: crate::views::my_project::ProjectTemplateKind) {
+        let proj = crate::views::my_project::instantiate_typology_template(kind);
+        self.build_view.bim_bus.project = proj.clone();
+        self.parametric_view.bim_bus.project = proj;
+        self.universal_canvas.ground_origin_anchored = true;
+        self.sync_bim_to_fem();
+        self.sync_earth_maps();
+        let msg = format!(
+            "Instantiated '{}' template ({} BIM elements, {} FEM members, {:.0} kg rebar).",
+            kind.title(),
+            self.build_view.bim_bus.project.element_count(),
+            self.members.len(),
+            self.build_view.bim_bus.project.total_rebar_weight_kg(),
+        );
+        self.my_project_view.export_success_msg = Some(msg.clone());
+        self.universal_canvas.status_message = Some(msg);
+        self.active_pillar = NavigationPillar::GeometryAssembly;
     }
 
     fn sync_earth_maps(&mut self) {

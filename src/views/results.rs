@@ -198,14 +198,35 @@ impl ResultsView {
                     }
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let safe_base = {
+                            let s: String = bim_project
+                                .project_name
+                                .chars()
+                                .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                                .collect();
+                            if s.trim_matches('_').is_empty() {
+                                "EigenGraph_DED".to_string()
+                            } else {
+                                s
+                            }
+                        };
+                        let sheet_num = "S-101";
+                        let sheet_title = format!("{} - General Structural Plan", bim_project.project_name);
+
                         if crate::icons::icon_button(ui, crate::icons::AppIcon::UploadImport, "Export Vector PDF (ISO A1)", 11.0, Color32::WHITE, theme.accent_green, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
-                            self.export_status = Some("Vector PDF generated successfully (ISO A1 standard, 300 DPI vector lines, TrueType annotations, embedded PE seal).".to_string());
+                            let bytes = bim_project.export_sheet_pdf(sheet_num, &sheet_title);
+                            let fname = format!("{safe_base}_{sheet_num}.pdf");
+                            self.export_status = Some(dispatch_ded_export(&fname, &bytes, "application/pdf"));
                         }
                         if crate::icons::icon_button(ui, crate::icons::AppIcon::RulerSquare, "AutoCAD 2024 DXF", 11.0, theme.text_primary, theme.bg_sidebar, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
-                            self.export_status = Some("AutoCAD 2024 DXF export generated with organized layers (S-GRID, S-COLS, S-BEAMS, S-ANNO-DIMS).".to_string());
+                            let dxf = bim_project.export_sheet_dxf(sheet_num, &sheet_title);
+                            let fname = format!("{safe_base}_{sheet_num}.dxf");
+                            self.export_status = Some(dispatch_ded_export(&fname, dxf.as_bytes(), "application/dxf"));
                         }
                         if crate::icons::icon_button(ui, crate::icons::AppIcon::Globe, "SVG", 11.0, theme.text_primary, theme.bg_sidebar, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
-                            self.export_status = Some("Scalable Vector Graphics (SVG) exported with responsive viewport bounding box.".to_string());
+                            let svg = bim_project.export_sheet_svg(sheet_num, &sheet_title);
+                            let fname = format!("{safe_base}_{sheet_num}.svg");
+                            self.export_status = Some(dispatch_ded_export(&fname, svg.as_bytes(), "image/svg+xml"));
                         }
                     });
                 });
@@ -1852,6 +1873,34 @@ impl ResultsView {
                     });
             },
         );
+    }
+}
+
+fn dispatch_ded_export(filename: &str, bytes: &[u8], mime_type: &str) -> String {
+    #[cfg(target_arch = "wasm32")]
+    {
+        match crate::core::web_bridge::trigger_browser_download(filename, bytes, mime_type) {
+            Ok(msg) => format!(
+                "{msg} ({:.1} KB) — ready for plot/CAD submission.",
+                bytes.len() as f64 / 1024.0
+            ),
+            Err(e) => format!("DED Browser Export Error ({filename}): {e}"),
+        }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = mime_type;
+        let exports_dir = crate::core::InternalVault::vault_root_dir().join("Exports");
+        let _ = std::fs::create_dir_all(&exports_dir);
+        let out_path = exports_dir.join(filename);
+        match std::fs::write(&out_path, bytes) {
+            Ok(_) => format!(
+                "Exported {filename} ({:.1} KB) to {}",
+                bytes.len() as f64 / 1024.0,
+                out_path.display()
+            ),
+            Err(e) => format!("DED Export Write Error ({filename}): {e}"),
+        }
     }
 }
 

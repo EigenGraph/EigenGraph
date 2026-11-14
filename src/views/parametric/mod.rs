@@ -164,6 +164,8 @@ pub struct ParametricView {
     pub show_cli_float: bool,
     pub sketch_draw_mode: bool,
     pub last_floating_rects: Vec<Rect>,
+    pub selected_rebar_host_idx: usize,
+    pub rebar_seismic_hooks_135: bool,
 }
 
 impl Default for ParametricView {
@@ -219,6 +221,8 @@ impl Default for ParametricView {
             show_cli_float: false,
             sketch_draw_mode: false,
             last_floating_rects: Vec::new(),
+            selected_rebar_host_idx: 0,
+            rebar_seismic_hooks_135: true,
         }
     }
 }
@@ -266,10 +270,13 @@ impl ParametricView {
 
         Frame::new()
             .fill(theme.bg_sidebar)
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .inner_margin(Margin::same(0))
+            .corner_radius(CornerRadius::same(12))
+            .stroke(Stroke::new(1.0, theme.border_card))
+            .inner_margin(Margin::same(8))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let outer_avail_w = ui.available_width().max(160.0);
+                ui.set_width(outer_avail_w);
+                ui.set_max_width(outer_avail_w);
 
                 // 1. In-Canvas Top HUD Toolbar, Inline Levels + CAD Command Bar & Docked Inspectors
                 self.render_drafting_ribbon(
@@ -286,6 +293,7 @@ impl ParametricView {
 
                 // Dismissible Status Toast (shared across Universal, Parametric & Geometry)
                 UniversalCanvasState::render_toast_bar(ui, theme, &mut self.save_notification);
+                ui.add_space(6.0);
 
                 // 2. Full-Width Unobstructed World-Grounded Drawing Viewport
                 self.render_drawing_canvas(
@@ -297,6 +305,7 @@ impl ParametricView {
                     universal_canvas,
                     members,
                     workspace_settings,
+                    outer_avail_w,
                 );
             });
 
@@ -626,5 +635,132 @@ impl ParametricView {
             *active_pillar = NavigationPillar::GeometryAssembly;
             self.show_db_drawer = false;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parametric_canvas_width_matches_container_without_right_overflow() {
+        let _ctx = egui::Context::default();
+        let theme = MacTheme::for_mode(crate::theme::ThemeMode::ProDark);
+        let mut features = FeatureRegistry::default();
+        let mut universal = UniversalCanvasState::default();
+        let mut parametric = ParametricView::default();
+        let mut build = crate::views::build::BuildView::default();
+        let mut db_components = Vec::new();
+        let mut active_pillar = NavigationPillar::ParametricDED;
+        let members = Vec::new();
+        let vars = Vec::new();
+        let ws = WorkspaceCanvasSettings {
+            theme_mode: crate::theme::ThemeMode::ProDark,
+            canvas_height_ratio: 0.74,
+            freeze_by_default: true,
+            show_grid: true,
+            snap_to_grid: true,
+            grid_spacing_mm: 500.0,
+            show_bim_base_layer: true,
+            show_domain_overlay: true,
+            sync_all_layers: true,
+            show_floating_inspector: false,
+            show_ai_copilot: true,
+            unit_system: "Metric".to_string(),
+            design_standard: "SNI".to_string(),
+            solver_threads: 4,
+            enable_svd_guard: true,
+            enable_anti_leakage: true,
+        };
+
+        let mut failures = Vec::new();
+        for win_w in [1000.0_f32, 700.0, 390.0] {
+            for mode_idx in 0..3 {
+                let mut panel_right = 0.0_f32;
+                let mut rect_right = 0.0_f32;
+                let mut outer_right = 0.0_f32;
+                let ctx_i = egui::Context::default();
+                for _ in 0..3 {
+                    let input = egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(win_w, 800.0))),
+                        ..Default::default()
+                    };
+                    let mut out = ctx_i.run_ui(input, |ui| {
+                        egui::CentralPanel::default().show(ui, |ui| {
+                            panel_right = ui.max_rect().right();
+                            egui::ScrollArea::vertical()
+                                .id_salt(("test_scroll", mode_idx, win_w as i32))
+                                .auto_shrink([false, false])
+                                .show(ui, |ui| {
+                                    let r = Frame::new().inner_margin(Margin::symmetric(14, 12)).show(ui, |ui| {
+                                        match mode_idx {
+                                            0 => universal.show(
+                                                ui,
+                                                &theme,
+                                                NavigationPillar::ResearchConcept,
+                                                &mut build.bim_bus.project,
+                                                &mut members.clone(),
+                                                &mut parametric.variables,
+                                                ws.clone(),
+                                                0.0,
+                                            ),
+                                            1 => parametric.show(
+                                                ui,
+                                                &theme,
+                                                &mut db_components,
+                                                &mut active_pillar,
+                                                &mut features,
+                                                &mut universal,
+                                                &members,
+                                                ws.clone(),
+                                                0.0,
+                                            ),
+                                            _ => build.show(
+                                                ui,
+                                                &theme,
+                                                &members,
+                                                &db_components,
+                                                &mut features,
+                                                &mut universal,
+                                                &vars,
+                                                ws.clone(),
+                                                0.0,
+                                            ),
+                                        }
+                                    });
+                                    outer_right = r.response.rect.right();
+                                });
+                        });
+                    });
+                    out.textures_delta.clear();
+                    rect_right = match mode_idx {
+                        0 => outer_right,
+                        1 => parametric.last_canvas_rect.map(|r| r.right()).unwrap_or(0.0),
+                        _ => build.last_viewport_rect.map(|r| r.right()).unwrap_or(0.0),
+                    };
+                }
+                let name = match mode_idx {
+                    0 => "Universal",
+                    1 => "Parametric",
+                    _ => "Build",
+                };
+                let canvas_ok = if mode_idx == 0 {
+                    outer_right <= panel_right + 1.0
+                } else {
+                    rect_right <= panel_right - 13.0
+                };
+                eprintln!(
+                    "win_w={:.0} {}: panel_right={:.2}, outer_right={:.2}, canvas_right={:.2}",
+                    win_w, name, panel_right, outer_right, rect_right
+                );
+                if !(outer_right <= panel_right + 1.0 && canvas_ok) {
+                    failures.push(format!(
+                        "{} @ {:.0}: panel_right={:.2}, outer_right={:.2}, canvas_right={:.2}",
+                        name, win_w, panel_right, outer_right, rect_right
+                    ));
+                }
+            }
+        }
+        assert!(failures.is_empty(), "Canvas layout overflows: {:?}", failures);
     }
 }

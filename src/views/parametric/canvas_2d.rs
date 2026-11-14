@@ -14,10 +14,11 @@ impl ParametricView {
         universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
         _members: &[crate::models::StructuralMember],
         _workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
+        outer_avail_w: f32,
     ) {
         ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
 
-        let avail_w = ui.available_width().max(260.0);
+        let avail_w = outer_avail_w.min(ui.available_width()).max(200.0);
         let canvas_h = universal_canvas.preferred_canvas_height(ui.ctx());
         self.last_floating_rects.clear();
 
@@ -46,7 +47,7 @@ impl ParametricView {
             self.last_canvas_rect = Some(rect);
             painter.rect_filled(
                 rect,
-                CornerRadius::ZERO,
+                CornerRadius::same(10),
                 UniversalCanvasState::canvas_bg(theme),
             );
 
@@ -109,7 +110,17 @@ impl ParametricView {
             if universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx()) {
                 UniversalCanvasState::paint_frozen_badge(&painter, rect, theme, 14.0);
             }
+
+            UniversalCanvasState::paint_rounded_viewport_border(
+                &painter,
+                rect,
+                10.0,
+                theme.bg_sidebar,
+                theme.border_subtle,
+            );
         }
+
+        ui.add_space(6.0);
 
         // Universal-style Bottom Status Telemetry Strip
         let lvl_name = self
@@ -122,56 +133,88 @@ impl ParametricView {
         let synced_count = universal_canvas.entities.len();
         Frame::new()
             .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .inner_margin(Margin::symmetric(12, 6))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let inner_w = ui.available_width().max(120.0);
+                ui.set_width(inner_w);
+                ui.set_max_width(inner_w);
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+                let geo_txt = format!(
+                    "Earth {:.4}°, {:.4}° (z{:.1})",
+                    universal_canvas.cursor_lat_lon.0,
+                    universal_canvas.cursor_lat_lon.1,
+                    universal_canvas.world_map.zoom_level,
+                );
+                let local_txt = format!(
+                    "({:.0}, {:.0}, {:.0}) mm • {}",
+                    self.cursor_pos_mm.0,
+                    self.cursor_pos_mm.1,
+                    self.cursor_pos_mm.2,
+                    lvl_name,
+                );
+                let counts_txt = format!(
+                    "{}W / {}C / {}B / {}Rm • ARI {:.3}",
+                    self.bim_bus.project.walls.len(),
+                    self.bim_bus.project.columns.len(),
+                    self.bim_bus.project.runs.len(),
+                    self.bim_bus.project.rooms.len(),
+                    self.live_ari_score,
+                );
+                let mode_txt = format!(
+                    "{} • {} Synced",
+                    if self.sketch_draw_mode {
+                        "Universal Ink"
+                    } else if self.ortho_mode {
+                        "ORTHO 90°"
+                    } else if self.snap_to_grid {
+                        "OSNAP On"
+                    } else {
+                        "Freehand BIM"
+                    },
+                    synced_count,
+                );
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new(format!(
-                            "Earth {:.4}°, {:.4}° (z{:.1}) • Local ({:.0}, {:.0}, {:.0}) mm • {}",
-                            universal_canvas.cursor_lat_lon.0,
-                            universal_canvas.cursor_lat_lon.1,
-                            universal_canvas.world_map.zoom_level,
-                            self.cursor_pos_mm.0,
-                            self.cursor_pos_mm.1,
-                            self.cursor_pos_mm.2,
-                            lvl_name,
-                        ))
-                        .size(10.5)
-                        .monospace()
-                        .color(theme.text_muted),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Globe,
+                        11.5,
+                        theme.accent_blue,
+                        geo_txt,
+                        10.0,
+                        theme.text_muted,
+                        false,
                     );
-                    ui.separator();
-                    ui.label(
-                        RichText::new(format!(
-                            "{} Walls / {} Cols / {} Beams / {} Rooms • ARI {:.3}",
-                            self.bim_bus.project.walls.len(),
-                            self.bim_bus.project.columns.len(),
-                            self.bim_bus.project.runs.len(),
-                            self.bim_bus.project.rooms.len(),
-                            self.live_ari_score,
-                        ))
-                        .size(10.5)
-                        .color(theme.accent_blue),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Compass,
+                        11.0,
+                        theme.text_muted,
+                        local_txt,
+                        10.0,
+                        theme.text_secondary,
+                        false,
                     );
-                    ui.separator();
-                    ui.label(
-                        RichText::new(format!(
-                            "Mode: {} • {} Synced Drawings",
-                            if self.sketch_draw_mode {
-                                "Universal Ink Sketch"
-                            } else if self.ortho_mode {
-                                "ORTHO 90°"
-                            } else if self.snap_to_grid {
-                                "OSNAP On"
-                            } else {
-                                "Freehand BIM"
-                            },
-                            synced_count,
-                        ))
-                        .size(10.5)
-                        .color(theme.accent_green),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Layers,
+                        11.0,
+                        theme.accent_blue,
+                        counts_txt,
+                        10.0,
+                        theme.accent_blue,
+                        true,
+                    );
+                    icons::icon_label(
+                        ui,
+                        AppIcon::CheckCircle,
+                        11.0,
+                        theme.accent_green,
+                        mode_txt,
+                        10.0,
+                        theme.accent_green,
+                        true,
                     );
                 });
             });

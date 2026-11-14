@@ -2296,6 +2296,96 @@ trailer << /Size 6 /Root 1 0 R >>\n%%EOF\n"
         pdf.into_bytes()
     }
 
+    /// Exports a real ASCII AutoCAD DXF drawing (AC1015 / DXF 2000 compatible) with organized CAD layers:
+    /// `S-GRID`, `S-WALL`, `S-COLS`, `S-BEAMS`, `S-SLAB`, and `S-ANNO-DIMS`.
+    pub fn export_sheet_dxf(&self, sheet_number: &str, sheet_title: &str) -> String {
+        let mut dxf = String::with_capacity(8192);
+        let push_pair = |buf: &mut String, code: i32, val: &str| {
+            buf.push_str(&format!("{code}\n{val}\n"));
+        };
+        push_pair(&mut dxf, 0, "SECTION");
+        push_pair(&mut dxf, 2, "HEADER");
+        push_pair(&mut dxf, 9, "$ACADVER");
+        push_pair(&mut dxf, 1, "AC1015");
+        push_pair(&mut dxf, 9, "$INSUNITS");
+        push_pair(&mut dxf, 70, "4");
+        push_pair(&mut dxf, 0, "ENDSEC");
+
+        push_pair(&mut dxf, 0, "SECTION");
+        push_pair(&mut dxf, 2, "TABLES");
+        push_pair(&mut dxf, 0, "TABLE");
+        push_pair(&mut dxf, 2, "LAYER");
+        push_pair(&mut dxf, 70, "6");
+        for (layer, color_idx) in [
+            ("S-GRID", 8),
+            ("S-WALL", 7),
+            ("S-COLS", 5),
+            ("S-BEAMS", 3),
+            ("S-SLAB", 9),
+            ("S-ANNO-DIMS", 2),
+        ] {
+            push_pair(&mut dxf, 0, "LAYER");
+            push_pair(&mut dxf, 2, layer);
+            push_pair(&mut dxf, 70, "0");
+            dxf.push_str(&format!("62\n{color_idx}\n6\nCONTINUOUS\n"));
+        }
+        push_pair(&mut dxf, 0, "ENDTAB");
+        push_pair(&mut dxf, 0, "ENDSEC");
+
+        push_pair(&mut dxf, 0, "SECTION");
+        push_pair(&mut dxf, 2, "ENTITIES");
+
+        fn push_line(buf: &mut String, layer: &str, x1: f64, y1: f64, x2: f64, y2: f64) {
+            buf.push_str(&format!(
+                "0\nLINE\n8\n{layer}\n10\n{x1:.2}\n20\n{y1:.2}\n30\n0.0\n11\n{x2:.2}\n21\n{y2:.2}\n31\n0.0\n"
+            ));
+        }
+        fn push_rect(buf: &mut String, layer: &str, ring: &[P2]) {
+            if ring.is_empty() {
+                return;
+            }
+            buf.push_str(&format!("0\nLWPOLYLINE\n8\n{layer}\n90\n{}\n70\n1\n", ring.len()));
+            for p in ring {
+                buf.push_str(&format!("10\n{:.2}\n20\n{:.2}\n", p.0, p.1));
+            }
+        }
+
+        for g in &self.grids {
+            push_line(&mut dxf, "S-GRID", g.start.0, g.start.1, g.end.0, g.end.1);
+            dxf.push_str(&format!(
+                "0\nTEXT\n8\nS-ANNO-DIMS\n10\n{:.2}\n20\n{:.2}\n30\n0.0\n40\n350.0\n1\n{}\n",
+                g.start.0,
+                g.start.1 - 450.0,
+                g.label
+            ));
+        }
+        for w in &self.walls {
+            push_rect(&mut dxf, "S-WALL", &w.footprint_ring());
+        }
+        for c in &self.columns {
+            push_rect(&mut dxf, "S-COLS", &c.footprint_ring());
+        }
+        for f in &self.footings {
+            push_rect(&mut dxf, "S-COLS", &f.footprint_ring());
+        }
+        for r in &self.runs {
+            push_line(&mut dxf, "S-BEAMS", r.start.0, r.start.1, r.end.0, r.end.1);
+        }
+        for s in &self.slabs {
+            push_rect(&mut dxf, "S-SLAB", &s.boundary);
+        }
+        dxf.push_str(&format!(
+            "0\nTEXT\n8\nS-ANNO-DIMS\n10\n0.0\n20\n-1800.0\n30\n0.0\n40\n420.0\n1\n{} | {} - {}\n",
+            self.project_name.replace('\n', " "),
+            sheet_number,
+            sheet_title.replace('\n', " "),
+        ));
+
+        push_pair(&mut dxf, 0, "ENDSEC");
+        push_pair(&mut dxf, 0, "EOF");
+        dxf
+    }
+
     /// Exports the complete BIM project into an industry-standard **IFC4** STEP file with full
     /// spatial hierarchy (`IfcProject -> IfcSite -> IfcBuilding -> IfcBuildingStorey`) and entities
     /// (`IfcWall`, `IfcOpeningElement`, `IfcDoor`, `IfcWindow`, `IfcColumn`, `IfcBeam`, `IfcFooting`,
@@ -3420,5 +3510,19 @@ mod tests {
         assert!(bus.project.rebars.is_empty());
         bus.undo().expect("Undo portal frame should succeed");
         assert!(bus.project.is_empty());
+    }
+
+    #[test]
+    fn test_export_sheet_dxf_contains_organized_layers() {
+        let proj = BimProject::sample_bimcraft_building();
+        let dxf = proj.export_sheet_dxf("S-101", "Structural Foundation & Framing");
+        assert!(dxf.contains("SECTION\n2\nHEADER"));
+        assert!(dxf.contains("S-GRID"));
+        assert!(dxf.contains("S-WALL"));
+        assert!(dxf.contains("S-COLS"));
+        assert!(dxf.contains("S-BEAMS"));
+        assert!(dxf.contains("S-ANNO-DIMS"));
+        assert!(dxf.contains("LWPOLYLINE"));
+        assert!(dxf.ends_with("EOF\n"));
     }
 }

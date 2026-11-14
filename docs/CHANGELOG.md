@@ -7,6 +7,25 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.8] - 2026-11-14 — Phase 38: Rounded Drawing Canvas Chrome, Parametric Width Overflow Fix, Phase 33 Unlocks, Vector DED Downloads & IFC-to-BimProject
+
+### Added & Changed
+- **Rounded Canvas Chrome & Responsive Parametric Overflow Fix (`src/ui_kit.rs`, `src/icons.rs`, `src/views/universal_canvas.rs`, `src/views/parametric/`, `src/views/build/`)**:
+  - Updated `CornerRadius::same(12)` outer canvas frames, `CornerRadius::same(8)` inner top toolbars and bottom footers, and added viewport border spandrel painting (`UniversalCanvasState::paint_rounded_viewport_border`) so drawing canvases have rounded corners matching their sub-tab controls.
+  - Resolved `egui 0.36.2` `horizontal_wrapped` pre-wrap overflow (`available_size_before_wrap().x`) via `ui_kit::wrap_before` / `clamped_row_width` and bounded Frame inner widths across Desktop (`1000px`), Tablet (`700px`), and Mobile (`390px`) with zero horizontal clipping.
+- **Activated All 5 Remaining Phase 33 Modules (`src/features.rs`)**:
+  - **Multi-Typology Project Templates (`LIB-05`: `src/views/my_project.rs`, `src/app.rs`)**: Added on-demand structural templates (`Steel Bridge Viaduct`, `Dual-System RC Tower`, `Post-Tensioned Box Girder Flyover`, `Precast Industrial Logistics Hub`) generating live `BimProject`, analytical FEM members, and Earth sync strictly on user selection (startup workspace remains blank).
+  - **Automated RC Rebar BBS Drafter (`2D-05`: `src/views/parametric/detailing_2d.rs`, `src/views/parametric/mod.rs`)**: Connected live `BimProject` concrete column/beam/footing selection, `"Auto-Arm All RC Elements"` rebar synthesis, scaled section/elevation rendering, confinement zones (`Lo`), and live ISO 3766 Bar Bending Schedule cut tables.
+  - **Federated 3D Discipline Isolation, 3-Axis Section Box & 4D Erection Highlight (`3D-05`: `src/views/build/mod.rs`, `src/views/build/sidebar.rs`, `src/views/build/viewport_3d.rs`, `src/app.rs`)**: Implemented live `ARC`/`STR`/`MEP`/`GEO` visibility filtering, full 3-axis `(X, Y, Elev Z)` Section Box triangle & wireframe clipping, footing 3D mesh rendering, and live 4D Erection Stage viewport coloring synchronized with `Time & Scheduling`.
+  - **Bridge Moving Load & Influence Line Analyzer (`SIM-06`: `src/views/analyze/extended_mechanics.rs`, `src/views/analyze/mod.rs`)**: Implemented closed-form 1-span simple and 2-span continuous influence-line and moving-truck solver (`AASHTO HL-93` and `SNI 1725:2016 BGT/BTR`), dynamic impact allowance (`IM`), interactive axle stepping, and live `+Mmax` / `-Mpier` / `Vmax` plotting.
+  - **Live BIM Rebar BBS to 1D Cutting Stock Sync (`9D-02`: `src/core/cso.rs`, `src/views/lean.rs`, `src/app.rs`)**: Added `CuttingStockOptimizer::extract_items_from_bim_rebar` and live source toggle in `Lean Construction` to optimize active `BimProject` rebar bar marks (`D10–D32`) into 12 m commercial stock cutting patterns.
+- **Real Vector DED Downloads & IFC-to-Editable `BimProject` Converter (`src/core/bim.rs`, `src/views/results.rs`, `src/core/ifc.rs`, `src/views/industrialized/`)**:
+  - Added `BimProject::export_sheet_dxf` (ASCII DXF `AC1015` with organized CAD layers `S-GRID`, `S-WALL`, `S-COLS`, `S-BEAMS`, `S-SLAB`, `S-ANNO-DIMS`) and wired PDF (ISO A1), DXF, and SVG exports in `Report -> Drawing Sheets` to trigger browser downloads on WebAssembly or write to the Vault `Exports/` directory natively.
+  - Implemented `IfcModel::to_bim_project` and `"Convert IFC -> Editable BimProject"` in OpenBIM IFC Studio to convert parsed IFC2x3/IFC4 elements into editable native BIM objects across Geometry, Parametric, and Analysis.
+- **Version Bump**: Incremented crate version sequentially from `0.3.7` to `0.3.8` in `Cargo.toml`, `README.md`, `src/views/settings.rs`, and `docs/CHANGELOG.md`.
+
+---
+
 ## [v0.3.7] - 2026-11-14 — Phase 37: Full 1-File Workspace Save/Load, 3D Earth BIM Authoring, Reactive BIM-to-FEM & Clash Sync, Browser File Drop & Text-to-BIM
 
 ### Added & Changed

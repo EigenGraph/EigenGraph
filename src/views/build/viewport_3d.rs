@@ -32,17 +32,21 @@ impl BuildView {
         workspace_settings: WorkspaceCanvasSettings,
         sidebar_toggle_inset_px: f32,
     ) {
-        let avail_w = ui.available_width().max(260.0);
+        let avail_w = ui.available_width().max(200.0);
         let is_wide = avail_w >= 980.0;
         let has_floating_room = avail_w >= 720.0;
 
         // 1. Universal-style Top Canvas HUD Toolbar
         Frame::new()
             .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .inner_margin(Margin::symmetric(12, 8))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let inner_w = ui.available_width().max(120.0);
+                ui.set_width(inner_w);
+                ui.set_max_width(inner_w);
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                 ui.horizontal_wrapped(|ui| {
                     if sidebar_toggle_inset_px > 0.0 {
                         ui.add_space(sidebar_toggle_inset_px);
@@ -378,6 +382,7 @@ impl BuildView {
 
         // 4. Shared Status Toast Banner
         UniversalCanvasState::render_toast_bar(ui, theme, &mut self.modify_status_msg);
+        ui.add_space(6.0);
 
         // 5. Full-Width 3D Earth Ground Viewport matching Universal Canvas height
         let canvas_height = universal_canvas.preferred_canvas_height(ui.ctx());
@@ -389,7 +394,7 @@ impl BuildView {
         let _ = is_wide;
         let _ = has_floating_room;
 
-        painter.rect_filled(rect, CornerRadius::ZERO, UniversalCanvasState::canvas_bg(theme));
+        painter.rect_filled(rect, CornerRadius::same(10), UniversalCanvasState::canvas_bg(theme));
         let pointer_in_floating = false;
 
         // Geometry Definitions & Model Centers
@@ -844,14 +849,14 @@ impl BuildView {
                         }
                     }
 
-                    // Phase 26: 3D Interactive Section Box Cage
+                    // Phase 26 / 38: 3D Interactive Section Box Cage (X, Elev-Z, Plan-Y)
                     if self.section_box_enabled {
                         let bx0 = self.section_box_min_x;
                         let bx1 = self.section_box_max_x;
-                        let by0 = self.section_box_min_y;
+                        let by0 = self.section_box_min_z;
                         let by1 = self.section_box_max_z_m;
-                        let bz0 = self.section_box_min_z;
-                        let bz1 = 15.0;
+                        let bz0 = self.section_box_min_y;
+                        let bz1 = self.section_box_max_y;
 
                         let corners = [
                             (bx0, by0, bz0), (bx1, by0, bz0), (bx1, by0, bz1), (bx0, by0, bz1),
@@ -987,16 +992,30 @@ impl BuildView {
                             stroke: Stroke,
                         }
                         let mut tris_to_draw: Vec<TriDraw> = Vec::new();
-                        let max_y_clip = if self.section_box_enabled { self.section_box_max_z_m } else { 999.0 };
+                        let sbox_on = self.section_box_enabled;
+                        let (min_x_c, max_x_c) = (self.section_box_min_x, self.section_box_max_x);
+                        let (min_y_c, max_y_c) = (self.section_box_min_y, self.section_box_max_y);
+                        let (min_z_c, max_z_c) = (self.section_box_min_z, self.section_box_max_z_m);
+                        let max_y_clip = if sbox_on { max_z_c } else { 999.0 };
 
                         let mut push_mesh = |mesh: &[[crate::core::P3; 3]], base_col: Color32, edge_alpha: u8| {
+                            if base_col.a() == 0 {
+                                return;
+                            }
                             for tri in mesh {
                                 // Convert BIM (X_mm, Y_mm, Z_mm) -> Viewport 3D (X_m, Z_m_up, Y_m)
                                 let v0 = (tri[0][0] as f32 * 0.001, tri[0][2] as f32 * 0.001, tri[0][1] as f32 * 0.001);
                                 let v1 = (tri[1][0] as f32 * 0.001, tri[1][2] as f32 * 0.001, tri[1][1] as f32 * 0.001);
                                 let v2 = (tri[2][0] as f32 * 0.001, tri[2][2] as f32 * 0.001, tri[2][1] as f32 * 0.001);
 
-                                if v0.1 > max_y_clip && v1.1 > max_y_clip && v2.1 > max_y_clip {
+                                if sbox_on
+                                    && ((v0.0 < min_x_c && v1.0 < min_x_c && v2.0 < min_x_c)
+                                        || (v0.0 > max_x_c && v1.0 > max_x_c && v2.0 > max_x_c)
+                                        || (v0.1 < min_z_c && v1.1 < min_z_c && v2.1 < min_z_c)
+                                        || (v0.1 > max_z_c && v1.1 > max_z_c && v2.1 > max_z_c)
+                                        || (v0.2 < min_y_c && v1.2 < min_y_c && v2.2 < min_y_c)
+                                        || (v0.2 > max_y_c && v1.2 > max_y_c && v2.2 > max_y_c))
+                                {
                                     continue;
                                 }
 
@@ -1036,39 +1055,135 @@ impl BuildView {
                             }
                         };
 
-                        // 1. Slabs with Boolean Shaft Voids
-                        for s in &self.bim_bus.project.slabs {
-                            let z = self.bim_bus.project.level_elevation(s.level_id);
-                            let mesh = s.mesh_3d(z);
-                            push_mesh(&mesh, Color32::from_rgba_unmultiplied(80, 105, 135, 195), 35);
+                        let stage_4d_active = self.highlight_4d_erection && self.simulation_4d_day > 0;
+                        let sim_scale_max = if self.simulation_4d_day > 180 { 360.0_f32 } else { 180.0_f32 };
+                        let prog_4d = (self.simulation_4d_day as f32 / sim_scale_max).clamp(0.0, 1.0);
+                        let max_bldg_z_m = self
+                            .bim_bus
+                            .project
+                            .levels
+                            .iter()
+                            .map(|l| (l.elevation_mm as f32) * 0.001)
+                            .fold(3.5_f32, f32::max);
+                        let active_front_z_m = (((prog_4d - 0.12) / 0.65).clamp(0.0, 1.0)) * (max_bldg_z_m + 3.5);
+                        let color_for_4d = |normal: Color32, elev_m: f32, is_foundation: bool, is_arc_enclosure: bool, is_mep: bool| -> Color32 {
+                            if !stage_4d_active {
+                                return normal;
+                            }
+                            if is_foundation {
+                                if prog_4d <= 0.22 {
+                                    return Color32::from_rgba_unmultiplied(249, 115, 22, 235);
+                                }
+                                return normal;
+                            }
+                            if is_mep {
+                                if prog_4d < 0.65 {
+                                    return Color32::from_rgba_unmultiplied(100, 116, 139, 30);
+                                } else if prog_4d < 0.85 {
+                                    return Color32::from_rgba_unmultiplied(249, 115, 22, 235);
+                                }
+                                return normal;
+                            }
+                            if is_arc_enclosure {
+                                if prog_4d < 0.45 {
+                                    return Color32::from_rgba_unmultiplied(100, 116, 139, 30);
+                                } else if prog_4d < 0.72 {
+                                    return Color32::from_rgba_unmultiplied(249, 115, 22, 220);
+                                }
+                                return normal;
+                            }
+                            if elev_m <= active_front_z_m - 2.0 {
+                                normal
+                            } else if elev_m <= active_front_z_m + 1.8 {
+                                Color32::from_rgba_unmultiplied(249, 115, 22, 240)
+                            } else {
+                                Color32::from_rgba_unmultiplied(148, 163, 184, 34)
+                            }
+                        };
+
+                        // 0. GEO Foundations / Footings
+                        if self.show_layer_geo {
+                            for f in &self.bim_bus.project.footings {
+                                let z = self.bim_bus.project.level_elevation(f.level_id);
+                                let mesh = f.mesh_3d(z);
+                                let fcol = color_for_4d(
+                                    Color32::from_rgba_unmultiplied(168, 120, 72, 230),
+                                    (z as f32) * 0.001,
+                                    true,
+                                    false,
+                                    false,
+                                );
+                                push_mesh(&mesh, fcol, 45);
+                            }
                         }
-                        // 2. Walls with CSG Door & Window Voids
+
+                        // 1. Slabs with Boolean Shaft Voids (STR)
+                        if self.show_layer_struct {
+                            for s in &self.bim_bus.project.slabs {
+                                let z = self.bim_bus.project.level_elevation(s.level_id);
+                                let mesh = s.mesh_3d(z);
+                                let scol = color_for_4d(
+                                    Color32::from_rgba_unmultiplied(80, 105, 135, 195),
+                                    (z as f32) * 0.001,
+                                    false,
+                                    false,
+                                    false,
+                                );
+                                push_mesh(&mesh, scol, 35);
+                            }
+                        }
+                        // 2. Walls with CSG Door & Window Voids (STR structural or ARC enclosure)
                         let wall_col = if self.show_rebar_cage {
                             Color32::from_rgba_unmultiplied(120, 145, 175, 135)
                         } else {
                             Color32::from_rgba_unmultiplied(145, 165, 190, 240)
                         };
                         for w in &self.bim_bus.project.walls {
+                            let visible = if w.is_structural { self.show_layer_struct } else { self.show_layer_arch };
+                            if !visible {
+                                continue;
+                            }
                             let z_base = self.bim_bus.project.level_elevation(w.base_level_id);
                             let z_top = w
                                 .top_level_id
                                 .map(|id| self.bim_bus.project.level_elevation(id))
                                 .unwrap_or(z_base + w.unconnected_height_mm);
                             let mesh = w.mesh_3d(z_base, z_top);
-                            push_mesh(&mesh, wall_col, 45);
+                            let wcol = color_for_4d(
+                                wall_col,
+                                (z_base as f32) * 0.001,
+                                false,
+                                !w.is_structural,
+                                false,
+                            );
+                            push_mesh(&mesh, wcol, 45);
                         }
-                        // 3. Columns & Footings
-                        for c in &self.bim_bus.project.columns {
-                            let z_base = self.bim_bus.project.level_elevation(c.base_level_id);
-                            let z_top = self.bim_bus.project.level_elevation(c.top_level_id);
-                            let mesh = c.mesh_3d(z_base, z_top);
-                            push_mesh(&mesh, Color32::from_rgba_unmultiplied(65, 160, 220, 215), 55);
+                        // 3. Columns (STR)
+                        if self.show_layer_struct {
+                            for c in &self.bim_bus.project.columns {
+                                let z_base = self.bim_bus.project.level_elevation(c.base_level_id);
+                                let z_top = self.bim_bus.project.level_elevation(c.top_level_id);
+                                let mesh = c.mesh_3d(z_base, z_top);
+                                let ccol = color_for_4d(
+                                    Color32::from_rgba_unmultiplied(65, 160, 220, 215),
+                                    (z_base as f32) * 0.001,
+                                    false,
+                                    false,
+                                    false,
+                                );
+                                push_mesh(&mesh, ccol, 55);
+                            }
                         }
-                        // 4. 3D Runs (True Wide-Flange I-Beams, RC Beams, MEP Ducts)
+                        // 4. 3D Runs (True Wide-Flange I-Beams, RC Beams [STR], MEP Ducts/Pipes [MEP])
                         for r in &self.bim_bus.project.runs {
+                            let is_beam = r.category == crate::core::RunCategory::StructuralBeam;
+                            let visible = if is_beam { self.show_layer_struct } else { self.show_layer_mep };
+                            if !visible {
+                                continue;
+                            }
                             let z = self.bim_bus.project.level_elevation(r.level_id);
                             let mesh = r.mesh_3d(z);
-                            let rcol = match r.category {
+                            let base_rcol = match r.category {
                                 crate::core::RunCategory::StructuralBeam if r.is_wf_profile => {
                                     Color32::from_rgba_unmultiplied(245, 158, 11, 245)
                                 }
@@ -1081,6 +1196,7 @@ impl BuildView {
                                 }
                                 _ => Color32::from_rgba_unmultiplied(56, 189, 248, 220),
                             };
+                            let rcol = color_for_4d(base_rcol, (z as f32) * 0.001, false, false, !is_beam);
                             push_mesh(&mesh, rcol, 55);
                         }
 
@@ -1577,6 +1693,29 @@ impl BuildView {
             }
         }
 
+        if self.highlight_4d_erection && self.simulation_4d_day > 0 {
+            let badge = Rect::from_min_size(rect.right_top() + Vec2::new(-230.0, 14.0), Vec2::new(212.0, 24.0));
+            painter.rect_filled(badge, CornerRadius::same(6), Color32::from_rgba_unmultiplied(15, 23, 42, 220));
+            painter.rect_stroke(badge, CornerRadius::same(6), Stroke::new(1.0, theme.accent_orange), egui::StrokeKind::Inside);
+            painter.text(
+                badge.center(),
+                Align2::CENTER_CENTER,
+                format!("4D ERECTION DAY {}", self.simulation_4d_day),
+                egui::FontId::monospace(10.0),
+                theme.accent_orange,
+            );
+        }
+
+        UniversalCanvasState::paint_rounded_viewport_border(
+            &painter,
+            rect,
+            10.0,
+            theme.bg_sidebar,
+            theme.border_subtle,
+        );
+
+        ui.add_space(6.0);
+
         // 8. Sleek Earth & BIM Telemetry Footer Bar below the 3D Viewport
         let synced_count = universal_canvas.entities.len();
         let map_telem = universal_canvas.world_map.telemetry();
@@ -1595,39 +1734,61 @@ impl BuildView {
 
         Frame::new()
             .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .inner_margin(Margin::symmetric(12, 6))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let inner_w = ui.available_width().max(120.0);
+                ui.set_width(inner_w);
+                ui.set_max_width(inner_w);
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+                let earth_txt = format!(
+                    "Earth {:.4}°, {:.4}° • z{:.1} ({:.1} m/px)",
+                    universal_canvas.cursor_lat_lon.0,
+                    universal_canvas.cursor_lat_lon.1,
+                    universal_canvas.world_map.zoom_level,
+                    map_telem.ground_resolution_m_px,
+                );
+                let scale_txt = format!(
+                    "{} • {} • {}",
+                    active_lvl_lbl, self.view_scale, self.lod_level,
+                );
+                let counts_txt = format!(
+                    "{} Elements • {} Synced",
+                    members.len(),
+                    synced_count,
+                );
                 ui.horizontal_wrapped(|ui| {
-                    icons::draw_icon(ui, AppIcon::Globe, 12.0, theme.accent_blue);
-                    ui.label(
-                        RichText::new(format!(
-                            "Earth {:.4}°, {:.4}°  •  Map z{:.1} ({:.1} m/px)  •  {}  •  Scale {}  •  {}",
-                            universal_canvas.cursor_lat_lon.0,
-                            universal_canvas.cursor_lat_lon.1,
-                            universal_canvas.world_map.zoom_level,
-                            map_telem.ground_resolution_m_px,
-                            active_lvl_lbl,
-                            self.view_scale,
-                            self.lod_level,
-                        ))
-                        .size(10.0)
-                        .monospace()
-                        .color(theme.text_muted),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Globe,
+                        11.5,
+                        theme.accent_blue,
+                        earth_txt,
+                        10.0,
+                        theme.text_muted,
+                        false,
                     );
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        icons::icon_label(
-                            ui,
-                            AppIcon::CheckCircle,
-                            11.0,
-                            theme.accent_green,
-                            format!("{} Elements • {} Synced Drawings", members.len(), synced_count),
-                            10.0,
-                            theme.accent_green,
-                            true,
-                        );
-                    });
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Layers,
+                        11.0,
+                        theme.text_muted,
+                        scale_txt,
+                        10.0,
+                        theme.text_secondary,
+                        false,
+                    );
+                    icons::icon_label(
+                        ui,
+                        AppIcon::CheckCircle,
+                        11.0,
+                        theme.accent_green,
+                        counts_txt,
+                        10.0,
+                        theme.accent_green,
+                        true,
+                    );
                 });
             });
     }
@@ -1640,14 +1801,21 @@ impl BuildView {
         theme: &MacTheme,
         universal_canvas: &mut UniversalCanvasState,
     ) {
+        ui.add_space(4.0);
         Frame::new()
-            .fill(theme.bg_sidebar)
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .inner_margin(Margin::symmetric(12, 6))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let inner_w = ui.available_width().max(120.0);
+                ui.set_width(inner_w);
+                ui.set_max_width(inner_w);
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                 ui.horizontal_wrapped(|ui| {
                     // Datum Levels Selector + Quick Add Level
+                    let lvl_w = crate::ui_kit::clamped_row_width(ui, 80.0, 142.0, 108.0);
+                    crate::ui_kit::wrap_before(ui, lvl_w + 104.0);
                     ui.label(RichText::new("Level:").size(10.0).color(theme.text_muted));
                     let current_lvl_text = self
                         .bim_bus
@@ -1664,7 +1832,7 @@ impl BuildView {
 
                     let levels_clone = self.bim_bus.project.levels.clone();
                     egui::ComboBox::from_id_salt("geometry_top_level_combo")
-                        .width(142.0)
+                        .width(lvl_w)
                         .selected_text(RichText::new(current_lvl_text).size(10.0).color(theme.text_primary))
                         .show_ui(ui, |ui| {
                             for lvl in &levels_clone {
@@ -1762,6 +1930,7 @@ impl BuildView {
                     ui.separator();
 
                     // Scale & Detail Level
+                    crate::ui_kit::wrap_before(ui, 134.0);
                     ui.label(RichText::new("Scale:").size(10.0).color(theme.text_muted));
                     egui::ComboBox::from_id_salt("viewport_scale_combo")
                         .width(64.0)
@@ -1774,9 +1943,11 @@ impl BuildView {
                             }
                         });
 
+                    let lod_w = crate::ui_kit::clamped_row_width(ui, 84.0, 118.0, 74.0);
+                    crate::ui_kit::wrap_before(ui, lod_w + 72.0);
                     ui.label(RichText::new("Detail:").size(10.0).color(theme.text_muted));
                     egui::ComboBox::from_id_salt("viewport_lod_combo")
-                        .width(118.0)
+                        .width(lod_w)
                         .selected_text(RichText::new(&self.lod_level).size(10.0).color(theme.accent_blue))
                         .show_ui(ui, |ui| {
                             for l in [
@@ -1794,11 +1965,12 @@ impl BuildView {
                     ui.separator();
 
                     // Visual Display Toggles
-                    let toggles: [(&mut bool, AppIcon, &str); 7] = [
+                    let toggles: [(&mut bool, AppIcon, &str); 8] = [
                         (&mut self.show_sun_shadows, AppIcon::Sun, "Sun"),
                         (&mut self.show_level_datums, AppIcon::RulerSquare, "Datums"),
                         (&mut self.show_grid_bubbles, AppIcon::Grid, "Grids"),
                         (&mut self.section_box_enabled, AppIcon::BoxPackage, "Section"),
+                        (&mut self.highlight_4d_erection, AppIcon::Clock, "4D Stage"),
                         (&mut self.temporary_isolate_active, AppIcon::Target, "Isolate"),
                         (&mut self.show_3d_clash_markers, AppIcon::AlertTriangle, "Clashes"),
                         (&mut self.show_axes, AppIcon::Compass, "Axes"),
@@ -1821,15 +1993,20 @@ impl BuildView {
                             *flag = !*flag;
                         }
                     }
+                    if self.highlight_4d_erection && self.simulation_4d_day == 0 {
+                        self.simulation_4d_day = 60;
+                    }
 
                     ui.separator();
 
                     // Inline BIM / CAD Command Line inside Top Toolbar
+                    let cmd_w = crate::ui_kit::clamped_row_width(ui, 72.0, 180.0, 146.0);
+                    crate::ui_kit::wrap_before(ui, cmd_w + 146.0);
                     ui.label(RichText::new("BIM Cmd:").size(10.0).strong().color(theme.accent_blue));
                     let cmd_resp = ui.add(
                         egui::TextEdit::singleline(&mut self.bim_console_input)
                             .hint_text("wall 0,0->6000,0 | col 0,0 | level L2 3500 | clear")
-                            .desired_width(190.0),
+                            .desired_width(cmd_w),
                     );
                     let run_clicked = icons::icon_button(
                         ui,

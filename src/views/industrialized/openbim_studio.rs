@@ -319,6 +319,36 @@ impl IndustrializedView {
 
                     if crate::icons::icon_button(
                         ui,
+                        crate::icons::AppIcon::Cube3D,
+                        "Convert IFC -> Editable BimProject",
+                        12.0,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        if let Some(ref m) = self.ifc_model {
+                            match m.to_bim_project() {
+                                Ok(proj) => {
+                                    let el_cnt = proj.element_count();
+                                    let lvl_cnt = proj.levels.len();
+                                    self.request_apply_bim_project = Some(proj);
+                                    self.export_status = Some(format!(
+                                        "Converted IFC model into editable BimProject ({el_cnt} elements, {lvl_cnt} levels) and synced workspace."
+                                    ));
+                                }
+                                Err(e) => {
+                                    self.export_status = Some(format!("IFC -> BimProject Conversion Warning: {e}"));
+                                }
+                            }
+                        }
+                    }
+
+                    if crate::icons::icon_button(
+                        ui,
                         crate::icons::AppIcon::Globe,
                         "Export Clean IFC 4.3 (.ifc)",
                         12.0,

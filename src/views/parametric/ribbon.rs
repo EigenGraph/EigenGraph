@@ -32,11 +32,15 @@ impl ParametricView {
     ) {
         let _avail_w = ui.available_width();
         Frame::new()
-            .fill(theme.bg_sidebar)
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .inner_margin(Margin::symmetric(10, 8))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let inner_w = ui.available_width().max(120.0);
+                ui.set_width(inner_w);
+                ui.set_max_width(inner_w);
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                 ui.vertical(|ui| {
                     // Row 1: Universal Canvas HUD Toolbar (Module Pill, Views, Snaps, Freeze, Floating Panel Toggles, 1-File Sync)
                     ui.horizontal_wrapped(|ui| {
@@ -82,6 +86,7 @@ impl ParametricView {
                         ui.separator();
 
                         // Undo / Redo / Grid / Ortho / OSNAP / Fit
+                        crate::ui_kit::wrap_before(ui, 76.0);
                         ui.add_enabled_ui(!self.bim_bus.undo_stack.is_empty(), |ui| {
                             if icons::icon_button(
                                 ui,
@@ -102,6 +107,7 @@ impl ParametricView {
                                 }
                             }
                         });
+                        crate::ui_kit::wrap_before(ui, 76.0);
                         ui.add_enabled_ui(!self.bim_bus.redo_stack.is_empty(), |ui| {
                             if icons::icon_button(
                                 ui,
@@ -522,36 +528,40 @@ impl ParametricView {
 
                             ui.separator();
 
+                            crate::ui_kit::wrap_before(ui, 95.0);
                             ui.label(RichText::new("No:").size(10.5).color(theme.text_secondary));
                             ui.add(egui::TextEdit::singleline(&mut self.sheet_number).desired_width(45.0));
 
+                            let title_w = crate::ui_kit::clamped_row_width(ui, 72.0, 170.0, 62.0);
+                            crate::ui_kit::wrap_before(ui, title_w + 56.0);
                             ui.label(RichText::new("Title:").size(10.5).color(theme.text_secondary));
-                            ui.add(egui::TextEdit::singleline(&mut self.sheet_title).desired_width(170.0));
+                            ui.add(egui::TextEdit::singleline(&mut self.sheet_title).desired_width(title_w));
 
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if icons::icon_button(
-                                    ui,
-                                    AppIcon::Printer,
-                                    "Print Vector PDF",
-                                    11.0,
-                                    Color32::WHITE,
-                                    theme.accent_blue,
-                                    Stroke::NONE,
-                                    CornerRadius::same(5),
-                                    Vec2::new(0.0, 24.0),
-                                )
-                                .on_hover_text("Export official scaled drawing sheet to vector PDF")
-                                .clicked()
-                                {
-                                    self.export_bim_deliverables();
-                                }
-                            });
+                            crate::ui_kit::wrap_before(ui, 130.0);
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Printer,
+                                "Print Vector PDF",
+                                11.0,
+                                Color32::WHITE,
+                                theme.accent_blue,
+                                Stroke::NONE,
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .on_hover_text("Export official scaled drawing sheet to vector PDF")
+                            .clicked()
+                            {
+                                self.export_bim_deliverables();
+                            }
                         });
                     }
 
                     // Row 2B: Organized Levels Quick Bar + Inline CAD Command Line inside Top Toolbar
                     ui.add_space(4.0);
                     ui.horizontal_wrapped(|ui| {
+                        let lvl_w = crate::ui_kit::clamped_row_width(ui, 80.0, 138.0, 118.0);
+                        crate::ui_kit::wrap_before(ui, lvl_w + 115.0);
                         icons::icon_label(
                             ui,
                             AppIcon::Layers,
@@ -570,6 +580,7 @@ impl ParametricView {
                             .map(|l| format!("{} ({:+.1} m)", l.name, l.elevation_mm * 1e-3))
                             .unwrap_or_else(|| "Level 1 (+0.0 m)".to_string());
                         egui::ComboBox::from_id_salt("param_top_level_combo")
+                            .width(lvl_w)
                             .selected_text(RichText::new(active_lvl_text).size(10.5).color(theme.text_primary))
                             .show_ui(ui, |ui| {
                                 for (idx, lvl) in self.bim_bus.project.levels.iter().enumerate() {
@@ -605,8 +616,8 @@ impl ParametricView {
                             self.refresh_live_ari();
                         }
 
-                        ui.separator();
-
+                        let cli_w = crate::ui_kit::clamped_row_width(ui, 68.0, 175.0, 146.0);
+                        crate::ui_kit::wrap_before(ui, cli_w + 146.0);
                         icons::icon_label(
                             ui,
                             AppIcon::Cpu,
@@ -619,7 +630,7 @@ impl ParametricView {
                         );
                         let cli_resp = ui.add(
                             egui::TextEdit::singleline(&mut self.command_line_input)
-                                .desired_width(210.0)
+                                .desired_width(cli_w)
                                 .hint_text("WA, BM, CL, DR, WN, RM, RF, UNDO..."),
                         );
                         if ((cli_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))
@@ -639,14 +650,18 @@ impl ParametricView {
                             self.command_line_input.clear();
                             cli_resp.request_focus();
                         }
-                        if let Some(last_log) = self.command_history.last() {
-                            ui.label(
+                    });
+                    if let Some(last_log) = self.command_history.last() {
+                        ui.add_space(2.0);
+                        ui.add(
+                            egui::Label::new(
                                 RichText::new(last_log)
                                     .size(10.0)
                                     .color(theme.text_muted),
-                            );
-                        }
-                    });
+                            )
+                            .wrap(),
+                        );
+                    }
 
                     // Row 3: Expandable Top-Toolbar Docked Inspectors (Project/Levels, Properties/Variables/Canvas, CLI Log)
                     self.render_top_toolbar_inspector_dock(

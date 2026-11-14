@@ -466,6 +466,64 @@ impl UniversalCanvasState {
         );
     }
 
+    /// Masks outer sharp corners of an interactive canvas/map viewport to a smooth `radius`
+    /// using spandrel triangles in `outer_bg`, then strokes a crisp rounded border over it.
+    pub fn paint_rounded_viewport_border(
+        painter: &egui::Painter,
+        rect: Rect,
+        radius: f32,
+        outer_bg: Color32,
+        stroke_color: Color32,
+    ) {
+        let r = radius.clamp(2.0, rect.width().min(rect.height()) * 0.45);
+        let segs = 7usize;
+        let corners = [
+            // (outer_corner, arc_center, start_angle, end_angle)
+            (
+                Pos2::new(rect.left(), rect.top()),
+                Pos2::new(rect.left() + r, rect.top() + r),
+                std::f32::consts::PI,
+                std::f32::consts::FRAC_PI_2 * 3.0,
+            ),
+            (
+                Pos2::new(rect.right(), rect.top()),
+                Pos2::new(rect.right() - r, rect.top() + r),
+                std::f32::consts::FRAC_PI_2 * 3.0,
+                std::f32::consts::TAU,
+            ),
+            (
+                Pos2::new(rect.right(), rect.bottom()),
+                Pos2::new(rect.right() - r, rect.bottom() - r),
+                0.0,
+                std::f32::consts::FRAC_PI_2,
+            ),
+            (
+                Pos2::new(rect.left(), rect.bottom()),
+                Pos2::new(rect.left() + r, rect.bottom() - r),
+                std::f32::consts::FRAC_PI_2,
+                std::f32::consts::PI,
+            ),
+        ];
+
+        for (outer, center, a0, a1) in corners {
+            let mut pts = Vec::with_capacity(segs + 2);
+            pts.push(outer);
+            for s in 0..=segs {
+                let t = s as f32 / segs as f32;
+                let ang = a0 + (a1 - a0) * t;
+                pts.push(Pos2::new(center.x + r * ang.cos(), center.y + r * ang.sin()));
+            }
+            painter.add(egui::Shape::convex_polygon(pts, outer_bg, Stroke::NONE));
+        }
+
+        painter.rect_stroke(
+            rect,
+            CornerRadius::same(r.round() as u8),
+            Stroke::new(1.0, stroke_color),
+            StrokeKind::Inside,
+        );
+    }
+
     /// Returns `true` when the pointer hovers over the live, unfrozen canvas area (excluding the floating inspector).
     pub fn is_pointer_in_live_canvas(&self, ctx: &egui::Context) -> bool {
         if self.is_frozen {
@@ -775,10 +833,13 @@ impl UniversalCanvasState {
 
         Frame::new()
             .fill(theme.bg_sidebar)
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .inner_margin(Margin::same(0))
+            .corner_radius(CornerRadius::same(12))
+            .stroke(Stroke::new(1.0, theme.border_card))
+            .inner_margin(Margin::same(8))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let outer_w = ui.available_width().max(160.0);
+                ui.set_width(outer_w);
+                ui.set_max_width(outer_w);
 
                 // 1. Top Canvas HUD Toolbar (wraps cleanly and yields room for floating ☰ toggle)
                 self.render_canvas_toolbar(
@@ -794,15 +855,16 @@ impl UniversalCanvasState {
 
                 // Optional status toast
                 Self::render_toast_bar(ui, theme, &mut self.status_message);
+                ui.add_space(6.0);
 
                 // 2. Main Interactive Drawing Viewport
-                let avail_w = ui.available_width().max(260.0);
+                let avail_w = ui.available_width().max(200.0);
                 let (response, painter) =
                     ui.allocate_painter(Vec2::new(avail_w, canvas_h), Sense::click_and_drag());
                 let rect = response.rect;
                 self.last_canvas_rect = Some(rect);
 
-                painter.rect_filled(rect, CornerRadius::ZERO, Self::canvas_bg(theme));
+                painter.rect_filled(rect, CornerRadius::same(10), Self::canvas_bg(theme));
 
                 // Reserve floating inspector rect on wide screens (>= 720px)
                 let floating_inspector_rect = if self.inspector_open && avail_w >= 720.0 {
@@ -932,6 +994,16 @@ impl UniversalCanvasState {
                     });
                 }
 
+                Self::paint_rounded_viewport_border(
+                    &painter,
+                    rect,
+                    10.0,
+                    theme.bg_sidebar,
+                    theme.border_subtle,
+                );
+
+                ui.add_space(6.0);
+
                 // 3. Bottom Canvas Status Strip
                 self.render_status_footer(ui, theme, active_pillar, bim_project);
 
@@ -968,11 +1040,15 @@ impl UniversalCanvasState {
         sidebar_toggle_inset_px: f32,
     ) {
         Frame::new()
-            .fill(theme.bg_sidebar)
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .inner_margin(Margin::symmetric(10, 8))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let outer_w = ui.available_width().max(160.0);
+                ui.set_width(outer_w);
+                ui.set_max_width(outer_w);
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                 ui.horizontal_wrapped(|ui| {
                     if sidebar_toggle_inset_px > 0.0 {
                         ui.add_space(sidebar_toggle_inset_px);
@@ -1169,8 +1245,10 @@ impl UniversalCanvasState {
             }
         };
 
+        let combo_w = crate::ui_kit::clamped_row_width(ui, 64.0, 102.0, 28.0);
+        crate::ui_kit::wrap_before(ui, combo_w + 32.0);
         egui::ComboBox::from_id_salt("universal_world_basemap_combo")
-            .width(102.0)
+            .width(combo_w)
             .selected_text(short_name(self.world_map.tile_provider))
             .show_ui(ui, |ui| {
                 for src in [
@@ -1257,10 +1335,12 @@ impl UniversalCanvasState {
         }
 
         // Phase 37 (1D-04): Earth City / Geodetic Coordinate Search & Distance/Area Measurement
+        let search_w = crate::ui_kit::clamped_row_width(ui, 64.0, 110.0, 82.0);
+        crate::ui_kit::wrap_before(ui, search_w + 80.0);
         let search_resp = ui.add(
             egui::TextEdit::singleline(&mut self.earth_search_query)
                 .hint_text("City or lat,lon...")
-                .desired_width(115.0),
+                .desired_width(search_w),
         );
         let search_enter =
             search_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
@@ -2698,52 +2778,82 @@ impl UniversalCanvasState {
     ) {
         Frame::new()
             .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
             .stroke(Stroke::new(1.0, theme.border_subtle))
             .inner_margin(Margin::symmetric(12, 6))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let inner_w = ui.available_width().max(120.0);
+                ui.set_width(inner_w);
+                ui.set_max_width(inner_w);
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+                let telem = self.world_map.telemetry();
+                let geo_txt = format!(
+                    "{:.4}°, {:.4}° • z{:.1} ({:.1} m/px)",
+                    self.cursor_lat_lon.0,
+                    self.cursor_lat_lon.1,
+                    self.world_map.zoom_level,
+                    telem.ground_resolution_m_px,
+                );
+                let coord_txt = format!(
+                    "({:.0}, {:.0}) mm",
+                    self.cursor_world_mm[0], self.cursor_world_mm[1],
+                );
+                let counts_txt = format!(
+                    "{} Draw ({} {}) • {} BIM",
+                    self.entities.len(),
+                    self.count_for_pillar(active_pillar),
+                    active_pillar.badge(),
+                    bim_project.walls.len()
+                        + bim_project.columns.len()
+                        + bim_project.runs.len()
+                );
                 ui.horizontal_wrapped(|ui| {
-                    let telem = self.world_map.telemetry();
-                    icons::draw_icon(ui, AppIcon::Globe, 12.0, theme.accent_blue);
-                    ui.label(
-                        RichText::new(format!(
-                            "{:.4}°, {:.4}°  •  Map z{:.1} ({:.1} m/px)  •  ({:.0}, {:.0}) mm  •  {} Drawings ({} in {})  •  {} BIM",
-                            self.cursor_lat_lon.0,
-                            self.cursor_lat_lon.1,
-                            self.world_map.zoom_level,
-                            telem.ground_resolution_m_px,
-                            self.cursor_world_mm[0],
-                            self.cursor_world_mm[1],
-                            self.entities.len(),
-                            self.count_for_pillar(active_pillar),
-                            active_pillar.badge(),
-                            bim_project.walls.len()
-                                + bim_project.columns.len()
-                                + bim_project.runs.len()
-                        ))
-                        .size(10.5)
-                        .monospace()
-                        .color(theme.text_secondary),
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Globe,
+                        12.0,
+                        theme.accent_blue,
+                        geo_txt,
+                        10.5,
+                        theme.text_secondary,
+                        false,
                     );
-
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if icons::icon_button(
-                            ui,
-                            AppIcon::ArrowDown,
-                            format!("{} Workbench", active_pillar.clean_name()),
-                            10.5,
-                            theme.accent_blue,
-                            theme.accent_blue.gamma_multiply(0.14),
-                            Stroke::NONE,
-                            CornerRadius::same(6),
-                            Vec2::new(0.0, 22.0),
-                        )
-                        .on_hover_text("Scroll down to the detailed module workbench")
-                        .clicked()
-                        {
-                            self.request_scroll_to_workbench = true;
-                        }
-                    });
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Compass,
+                        11.0,
+                        theme.text_muted,
+                        coord_txt,
+                        10.5,
+                        theme.text_secondary,
+                        false,
+                    );
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Layers,
+                        11.0,
+                        theme.accent_blue,
+                        counts_txt,
+                        10.5,
+                        theme.text_secondary,
+                        false,
+                    );
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ArrowDown,
+                        format!("{} Workbench", active_pillar.clean_name()),
+                        10.5,
+                        theme.accent_blue,
+                        theme.accent_blue.gamma_multiply(0.14),
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 22.0),
+                    )
+                    .on_hover_text("Scroll down to the detailed module workbench")
+                    .clicked()
+                    {
+                        self.request_scroll_to_workbench = true;
+                    }
                 });
             });
     }

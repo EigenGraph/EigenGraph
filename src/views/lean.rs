@@ -37,6 +37,8 @@ pub struct LeanView {
     pub lps_week_filter: String,
     pub lps_new_task_name: String,
     pub lps_new_task_week: String,
+    // Phase 38: Live BimProject Rebar BBS -> CSO 1D Sync (9D-02)
+    pub use_bim_rebar_source: bool,
 }
 
 impl Default for LeanView {
@@ -54,6 +56,7 @@ impl Default for LeanView {
             lps_week_filter: "All Weeks".to_string(),
             lps_new_task_name: String::new(),
             lps_new_task_week: "W-06".to_string(),
+            use_bim_rebar_source: false,
         }
     }
 }
@@ -64,6 +67,7 @@ impl LeanView {
         ui: &mut Ui,
         theme: &MacTheme,
         members: &[StructuralMember],
+        bim_project: &crate::core::bim::BimProject,
         features: &mut FeatureRegistry,
     ) {
         let margin_x = if MacTheme::is_mobile(ui.ctx()) { 12 } else { 20 };
@@ -107,7 +111,7 @@ impl LeanView {
 
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
-                    LeanSubTab::CuttingStock => self.render_cutting_stock(ui, theme, members, features),
+                    LeanSubTab::CuttingStock => self.render_cutting_stock(ui, theme, members, bim_project, features),
                     LeanSubTab::LastPlanner => self.render_last_planner(ui, theme),
                     LeanSubTab::ValueStream => self.render_value_stream(ui, theme),
                     LeanSubTab::JitDelivery => self.render_jit_delivery(ui, theme),
@@ -180,10 +184,15 @@ impl LeanView {
         ui: &mut Ui,
         theme: &MacTheme,
         members: &[StructuralMember],
+        bim_project: &crate::core::bim::BimProject,
         features: &mut FeatureRegistry,
     ) {
-        // 1. Dynamic Extraction from active model members
-        let items = CuttingStockOptimizer::extract_items_from_members(members);
+        // 1. Dynamic Extraction from active BimProject Rebar BBS or StructuralMembers
+        let items = if self.use_bim_rebar_source && !bim_project.rebars.is_empty() {
+            CuttingStockOptimizer::extract_items_from_bim_rebar(bim_project)
+        } else {
+            CuttingStockOptimizer::extract_items_from_members(members)
+        };
 
         // Get unique profiles list
         let mut profiles = vec!["All Profiles".to_string()];
@@ -191,6 +200,9 @@ impl LeanView {
             if !profiles.contains(&it.profile) && !it.profile.is_empty() {
                 profiles.push(it.profile.clone());
             }
+        }
+        if !profiles.contains(&self.selected_profile) {
+            self.selected_profile = "All Profiles".to_string();
         }
 
         let filter_opt = if self.selected_profile == "All Profiles" {
@@ -249,20 +261,39 @@ impl LeanView {
         ui.add_space(12.0);
 
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::LiveRebarBbsCuttingSync, |ui| {
+            let rebar_cnt = bim_project.rebars.len();
+            let rebar_kg = bim_project.total_rebar_weight_kg();
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Source: Active BimProject Bar Marks (D16-D25)");
-                let _ = ui.selectable_label(false, "12m Stock Splice Coupler Pairing");
-                let _ = crate::icons::icon_button(
+                if ui.selectable_label(!self.use_bim_rebar_source, format!("Source: Analytical Steel/Frame Members ({})", members.len())).clicked() {
+                    self.use_bim_rebar_source = false;
+                    self.selected_profile = "All Profiles".to_string();
+                }
+                if ui.selectable_label(self.use_bim_rebar_source, format!("Source: Active BimProject Rebar Marks ({} marks, {:.0} kg)", rebar_cnt, rebar_kg)).clicked() {
+                    self.use_bim_rebar_source = true;
+                    self.selected_profile = "All Profiles".to_string();
+                    if rebar_cnt == 0 {
+                        self.export_status = Some("No rebar bars in active BimProject yet. Generate rebar via Parametric -> Rebar BBS or Instantiate a Typology Template first.".to_string());
+                    }
+                }
+                if crate::icons::icon_button(
                     ui,
                     crate::icons::AppIcon::Scissors,
                     "Optimize BIM Rebar Schedule (1D BFD)",
                     12.0,
-                    theme.text_primary,
-                    theme.bg_card,
-                    egui::Stroke::new(1.0, theme.border_subtle),
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    egui::Stroke::NONE,
                     CornerRadius::same(6),
                     Vec2::ZERO,
-                );
+                ).clicked() {
+                    self.use_bim_rebar_source = true;
+                    self.selected_profile = "All Profiles".to_string();
+                    self.export_status = if rebar_cnt > 0 {
+                        Some(format!("Synchronized {} live BimProject rebar marks ({:.1} kg) into 1D Best-Fit Decreasing cutting stock engine.", rebar_cnt, rebar_kg))
+                    } else {
+                        Some("No concrete rebar bars detected yet in BimProject — open Parametric -> Rebar BBS & Detailing -> Auto-Arm All RC Elements.".to_string())
+                    };
+                }
             });
         });
 

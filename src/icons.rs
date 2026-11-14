@@ -3,8 +3,7 @@
 //! ribbons, subtabs, and status badges never suffer from missing OS/WASM emoji glyphs (`□`).
 
 use egui::{
-    Color32, CornerRadius, CursorIcon, FontId, Frame, Margin, Pos2, Rect, Response, Sense,
-    Stroke, Ui, Vec2,
+    Color32, CornerRadius, CursorIcon, FontId, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2,
 };
 
 use crate::theme::MacTheme;
@@ -792,6 +791,75 @@ pub fn draw_icon(ui: &mut Ui, icon: AppIcon, size: f32, color: Color32) -> Respo
 }
 
 /// Draws a compact vector icon immediately followed by a clean label.
+#[allow(clippy::too_many_arguments)]
+fn paint_atomic_icon_text(
+    ui: &mut Ui,
+    icon: AppIcon,
+    icon_size: f32,
+    icon_color: Color32,
+    text: String,
+    text_size: f32,
+    text_color: Color32,
+    strong: bool,
+    fill: Color32,
+    stroke: Stroke,
+    radius: CornerRadius,
+    pad: Vec2,
+    gap: f32,
+) {
+    let mut rt = egui::RichText::new(text).size(text_size).color(text_color);
+    if strong {
+        rt = rt.strong();
+    }
+    let max_row_w = ui.max_rect().width().max(80.0);
+    let max_text_w = (max_row_w - pad.x * 2.0 - icon_size - gap).max(40.0);
+    let mut galley = egui::WidgetText::from(rt.clone()).into_galley(
+        ui,
+        Some(egui::TextWrapMode::Extend),
+        max_text_w,
+        egui::TextStyle::Body,
+    );
+    if galley.size().x > max_text_w {
+        galley = egui::WidgetText::from(rt).into_galley(
+            ui,
+            Some(egui::TextWrapMode::Wrap),
+            max_text_w,
+            egui::TextStyle::Body,
+        );
+    }
+    let content_w = if galley.is_empty() {
+        icon_size
+    } else {
+        icon_size + gap + galley.size().x
+    };
+    let content_h = icon_size.max(galley.size().y);
+    let desired = Vec2::new(
+        (content_w + pad.x * 2.0).min(max_row_w),
+        content_h + pad.y * 2.0,
+    );
+    let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
+    if fill != Color32::TRANSPARENT {
+        ui.painter().rect_filled(rect, radius, fill);
+    }
+    if stroke.width > 0.0 {
+        ui.painter()
+            .rect_stroke(rect, radius, stroke, egui::StrokeKind::Middle);
+    }
+    let icon_rect = Rect::from_min_size(
+        Pos2::new(rect.left() + pad.x, rect.center().y - icon_size * 0.5),
+        Vec2::splat(icon_size),
+    );
+    paint_icon(ui.painter(), icon_rect, icon, icon_color);
+    if !galley.is_empty() {
+        let text_pos = Pos2::new(
+            icon_rect.right() + gap,
+            rect.center().y - galley.size().y * 0.5,
+        );
+        ui.painter().galley(text_pos, galley, text_color);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn icon_label(
     ui: &mut Ui,
     icon: AppIcon,
@@ -802,16 +870,21 @@ pub fn icon_label(
     text_color: Color32,
     strong: bool,
 ) {
-    let text_str = text.into();
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 5.0;
-        draw_icon(ui, icon, icon_size, icon_color);
-        let mut rt = egui::RichText::new(text_str).size(text_size).color(text_color);
-        if strong {
-            rt = rt.strong();
-        }
-        ui.label(rt);
-    });
+    paint_atomic_icon_text(
+        ui,
+        icon,
+        icon_size,
+        icon_color,
+        text.into(),
+        text_size,
+        text_color,
+        strong,
+        Color32::TRANSPARENT,
+        Stroke::NONE,
+        CornerRadius::ZERO,
+        Vec2::ZERO,
+        5.0,
+    );
 }
 
 /// Interactive button with a crisp painted vector icon on the left and clean English text.
@@ -1269,14 +1342,21 @@ pub fn smart_label(ui: &mut Ui, raw: &str, size: f32, color: Color32, strong: bo
 
 /// Compact pill badge with a crisp painted vector icon.
 pub fn pill_badge(ui: &mut Ui, icon: AppIcon, text: impl Into<String>, color: Color32) {
-    Frame::new()
-        .fill(color.gamma_multiply(0.14))
-        .stroke(Stroke::new(1.0, color.gamma_multiply(0.55)))
-        .corner_radius(CornerRadius::same(6))
-        .inner_margin(Margin::symmetric(8, 3))
-        .show(ui, |ui| {
-            icon_label(ui, icon, 11.5, color, text, 10.0, color, true);
-        });
+    paint_atomic_icon_text(
+        ui,
+        icon,
+        11.5,
+        color,
+        text.into(),
+        10.0,
+        color,
+        true,
+        color.gamma_multiply(0.14),
+        Stroke::new(1.0, color.gamma_multiply(0.55)),
+        CornerRadius::same(6),
+        Vec2::new(8.0, 3.0),
+        5.0,
+    );
 }
 
 #[cfg(test)]

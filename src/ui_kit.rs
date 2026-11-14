@@ -252,6 +252,21 @@ pub fn subtab_bar<T: Copy + PartialEq>(
         });
 }
 
+/// Forces a clean row break inside `ui.horizontal_wrapped` when `ui.available_size_before_wrap().x < needed_width`,
+/// preventing non-atomic widgets like `ComboBox` or `TextEdit` from overflowing past `max_rect.right()`.
+pub fn wrap_before(ui: &mut Ui, needed_width: f32) {
+    let rem = ui.available_size_before_wrap().x;
+    if rem < needed_width && rem < ui.max_rect().width() - 1.0 {
+        ui.end_row();
+    }
+}
+
+/// Computes a responsive control width bounded by the current `ui.max_rect().width()`.
+pub fn clamped_row_width(ui: &Ui, min_w: f32, max_w: f32, reserve_w: f32) -> f32 {
+    let row_cap = (ui.max_rect().width() - reserve_w).max(min_w.min(ui.max_rect().width()));
+    row_cap.min(max_w).max(min_w.min(row_cap))
+}
+
 /// Standardized KPI / Telemetry metric card used across all 15 engineering pillars.
 pub fn stat_card(
     ui: &mut Ui,

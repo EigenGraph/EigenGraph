@@ -286,6 +286,12 @@ pub struct BuildView {
     pub ground_author_tool: Ground3DAuthorTool,
     pub pending_3d_start_mm: Option<[f64; 2]>,
     pub hover_3d_ground_snap_mm: Option<[f64; 2]>,
+    // Phase 38: Federated Discipline Layers & 4D Erection Highlights
+    pub show_layer_arch: bool,
+    pub show_layer_struct: bool,
+    pub show_layer_mep: bool,
+    pub show_layer_geo: bool,
+    pub highlight_4d_erection: bool,
 }
 
 impl Default for BuildView {
@@ -312,7 +318,7 @@ impl Default for BuildView {
             bim_bus: crate::core::BimCommandBus::new(),
             show_rebar_cage: true,
             section_box_enabled: false,
-            section_box_max_z_m: 6.5,
+            section_box_max_z_m: 25.0,
             modify_status_msg: None,
             // Phase 26 Defaults
             active_ribbon_tab: BimRibbonTab::Architecture,
@@ -325,11 +331,11 @@ impl Default for BuildView {
             show_grid_bubbles: true,
             show_sun_shadows: true,
             temporary_isolate_active: false,
-            section_box_min_x: -15.0,
-            section_box_max_x: 15.0,
-            section_box_min_y: 0.0,
-            section_box_max_y: 18.0,
-            section_box_min_z: -15.0,
+            section_box_min_x: -30.0,
+            section_box_max_x: 30.0,
+            section_box_min_y: -30.0,
+            section_box_max_y: 30.0,
+            section_box_min_z: -5.0,
             simulation_4d_playing: false,
             simulation_4d_day: 0,
             simulation_4d_speed: 1.0,
@@ -390,6 +396,11 @@ impl Default for BuildView {
             ground_author_tool: Ground3DAuthorTool::Orbit,
             pending_3d_start_mm: None,
             hover_3d_ground_snap_mm: None,
+            show_layer_arch: true,
+            show_layer_struct: true,
+            show_layer_mep: true,
+            show_layer_geo: true,
+            highlight_4d_erection: false,
         }
     }
 }
@@ -431,10 +442,13 @@ impl BuildView {
 
         Frame::new()
             .fill(theme.bg_sidebar)
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .inner_margin(Margin::same(0))
+            .corner_radius(CornerRadius::same(12))
+            .stroke(Stroke::new(1.0, theme.border_card))
+            .inner_margin(Margin::same(8))
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let outer_w = ui.available_width().max(160.0);
+                ui.set_width(outer_w);
+                ui.set_max_width(outer_w);
                 self.render_canvas(
                     ui,
                     theme,

@@ -1232,6 +1232,288 @@ impl IfcModel {
         Ok(model)
     }
 
+    /// Converts parsed OpenBIM IFC elements (`IfcWall`, `IfcColumn`, `IfcBeam`, `IfcSlab`, `IfcFooting`)
+    /// into an editable `BimProject` workspace with synthesized levels and structural grids.
+    pub fn to_bim_project(&self) -> Result<crate::core::bim::BimProject, String> {
+        use crate::core::P2;
+        use crate::core::bim::{
+            BimColumn, BimFooting, BimGrid, BimLevel, BimProject, BimRun, BimSlab, BimWall,
+            RunCategory, RunJustify, ViewRange,
+        };
+
+        fn collect_storeys(node: &IfcSpatialNode, out: &mut Vec<(String, f64)>) {
+            if node.class_name == "IFCBUILDINGSTOREY" {
+                let raw_elev = node.elevation_m.unwrap_or(0.0);
+                // Handle either meter-scale (e.g. 3.5) or millimeter-scale (e.g. 3500.0)
+                let elev_mm = if raw_elev.abs() <= 200.0 {
+                    raw_elev * 1000.0
+                } else {
+                    raw_elev
+                };
+                out.push((node.name.clone(), elev_mm));
+            }
+            for ch in &node.children {
+                collect_storeys(ch, out);
+            }
+        }
+
+        let mut storey_pairs = Vec::new();
+        collect_storeys(&self.spatial_root, &mut storey_pairs);
+        if storey_pairs.is_empty() {
+            storey_pairs.push(("Level 1 (+0.00m)".to_string(), 0.0));
+            storey_pairs.push(("Level 2 (+3.50m)".to_string(), 3500.0));
+        } else if storey_pairs.len() == 1 {
+            storey_pairs.push(("Roof Level (+3.50m)".to_string(), storey_pairs[0].1 + 3500.0));
+        }
+        storey_pairs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        let levels: Vec<BimLevel> = storey_pairs
+            .iter()
+            .enumerate()
+            .map(|(i, (name, elev_mm))| BimLevel {
+                id: i + 1,
+                name: name.clone(),
+                elevation_mm: *elev_mm,
+            })
+            .collect();
+
+        let match_level = |z_m: f64| -> usize {
+            let z_mm = z_m * 1000.0;
+            levels
+                .iter()
+                .min_by(|a, b| {
+                    (a.elevation_mm - z_mm)
+                        .abs()
+                        .partial_cmp(&(b.elevation_mm - z_mm).abs())
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .map(|l| l.id)
+                .unwrap_or(1)
+        };
+        let next_level_above = |base_id: usize| -> usize {
+            let base_idx = levels.iter().position(|l| l.id == base_id).unwrap_or(0);
+            levels
+                .get((base_idx + 1).min(levels.len() - 1))
+                .map(|l| l.id)
+                .unwrap_or(base_id)
+        };
+
+        let mut next_id = levels.len() + 1;
+        let mut alloc_id = || -> usize {
+            let id = next_id;
+            next_id += 1;
+            id
+        };
+
+        let mut walls = Vec::new();
+        let mut columns = Vec::new();
+        let mut runs = Vec::new();
+        let mut footings = Vec::new();
+        let mut slabs = Vec::new();
+        let mut xs_mm: Vec<f64> = Vec::new();
+        let mut ys_mm: Vec<f64> = Vec::new();
+
+        for el in &self.elements {
+            let dx = (el.bbox.max_x - el.bbox.min_x).abs();
+            let dy = (el.bbox.max_y - el.bbox.min_y).abs();
+            let dz = (el.bbox.max_z - el.bbox.min_z).abs();
+            let cx = el.centroid.0 * 1000.0;
+            let cy = el.centroid.1 * 1000.0;
+
+            match el.class_name.as_str() {
+                "IFCWALL" | "IFCWALLSTANDARDCASE" => {
+                    let (p0, p1, thk_mm) = if dx >= dy {
+                        let half = (dx * 0.5).max(0.5) * 1000.0;
+                        (P2(cx - half, cy), P2(cx + half, cy), (dy * 1000.0).clamp(120.0, 500.0))
+                    } else {
+                        let half = (dy * 0.5).max(0.5) * 1000.0;
+                        (P2(cx, cy - half), P2(cx, cy + half), (dx * 1000.0).clamp(120.0, 500.0))
+                    };
+                    let base_lvl = match_level(el.bbox.min_z);
+                    walls.push(BimWall {
+                        id: alloc_id(),
+                        name: if el.name.is_empty() { "IFC Wall".to_string() } else { el.name.clone() },
+                        base_level_id: base_lvl,
+                        top_level_id: Some(next_level_above(base_lvl)),
+                        unconnected_height_mm: (dz * 1000.0).clamp(2400.0, 6000.0),
+                        start: p0,
+                        end: p1,
+                        thickness_mm: thk_mm,
+                        is_structural: !el.object_type.to_lowercase().contains("partition"),
+                        layers: BimWall::default_compound_layers(thk_mm),
+                        openings: Vec::new(),
+                    });
+                    xs_mm.extend([p0.0, p1.0]);
+                    ys_mm.extend([p0.1, p1.1]);
+                }
+                "IFCCOLUMN" => {
+                    let base_lvl = match_level(el.bbox.min_z);
+                    let mut top_lvl = match_level(el.bbox.max_z);
+                    if top_lvl == base_lvl {
+                        top_lvl = next_level_above(base_lvl);
+                    }
+                    let is_steel = el.object_type.to_uppercase().contains("UB")
+                        || el.object_type.to_uppercase().contains("WF")
+                        || el.object_type.to_uppercase().contains("H");
+                    columns.push(BimColumn {
+                        id: alloc_id(),
+                        name: if el.name.is_empty() { "IFC Column".to_string() } else { el.name.clone() },
+                        base_level_id: base_lvl,
+                        top_level_id: top_lvl,
+                        pos: P2(cx, cy),
+                        width_mm: (dx * 1000.0).clamp(250.0, 1200.0),
+                        depth_mm: (dy * 1000.0).clamp(250.0, 1200.0),
+                        rotation_deg: 0.0,
+                        is_round: false,
+                        is_wf_profile: is_steel,
+                        profile_name: if el.object_type.is_empty() { "400x400 RC".to_string() } else { el.object_type.clone() },
+                    });
+                    xs_mm.push(cx);
+                    ys_mm.push(cy);
+                }
+                "IFCBEAM" | "IFCMEMBER" | "IFCSTRUCTURALCURVEMEMBER" => {
+                    let (start, end) = if let Some(&(a, b)) = el.wireframe_lines.first() {
+                        let pa = P2(a.0 * 1000.0, a.1 * 1000.0);
+                        let pb = P2(b.0 * 1000.0, b.1 * 1000.0);
+                        if pa.dist(pb) >= 200.0 {
+                            (pa, pb)
+                        } else if dx >= dy {
+                            let half = (dx * 0.5).max(1.0) * 1000.0;
+                            (P2(cx - half, cy), P2(cx + half, cy))
+                        } else {
+                            let half = (dy * 0.5).max(1.0) * 1000.0;
+                            (P2(cx, cy - half), P2(cx, cy + half))
+                        }
+                    } else if dx >= dy {
+                        let half = (dx * 0.5).max(1.0) * 1000.0;
+                        (P2(cx - half, cy), P2(cx + half, cy))
+                    } else {
+                        let half = (dy * 0.5).max(1.0) * 1000.0;
+                        (P2(cx, cy - half), P2(cx, cy + half))
+                    };
+                    let lvl = match_level(el.bbox.max_z);
+                    let is_steel = el.object_type.to_uppercase().contains("UB")
+                        || el.object_type.to_uppercase().contains("WF")
+                        || el.object_type.to_uppercase().contains("IPE")
+                        || el.material_name.as_deref().unwrap_or("").to_lowercase().contains("steel");
+                    runs.push(BimRun {
+                        id: alloc_id(),
+                        name: if el.name.is_empty() { "IFC Beam".to_string() } else { el.name.clone() },
+                        category: RunCategory::StructuralBeam,
+                        level_id: lvl,
+                        start,
+                        end,
+                        start_offset_mm: 0.0,
+                        end_offset_mm: 0.0,
+                        justify: RunJustify::Top,
+                        profile_name: if el.object_type.is_empty() { "300x600 RC".to_string() } else { el.object_type.clone() },
+                        width_mm: (dx.min(dy) * 1000.0).clamp(200.0, 600.0),
+                        depth_mm: (dz * 1000.0).clamp(300.0, 1200.0),
+                        is_round: false,
+                        is_wf_profile: is_steel,
+                        system_name: "IFC Imported Structure".to_string(),
+                    });
+                    xs_mm.extend([start.0, end.0]);
+                    ys_mm.extend([start.1, end.1]);
+                }
+                "IFCFOOTING" => {
+                    let lvl = levels.first().map(|l| l.id).unwrap_or(1);
+                    footings.push(BimFooting {
+                        id: alloc_id(),
+                        name: if el.name.is_empty() { "IFC Footing".to_string() } else { el.name.clone() },
+                        level_id: lvl,
+                        pos: P2(cx, cy),
+                        width_mm: (dx * 1000.0).clamp(1200.0, 4000.0),
+                        length_mm: (dy * 1000.0).clamp(1200.0, 4000.0),
+                        thickness_mm: (dz * 1000.0).clamp(400.0, 1200.0),
+                    });
+                    xs_mm.push(cx);
+                    ys_mm.push(cy);
+                }
+                "IFCSLAB" | "IFCROOF" => {
+                    let min_x = (el.bbox.min_x * 1000.0).min(cx - 1000.0);
+                    let max_x = (el.bbox.max_x * 1000.0).max(cx + 1000.0);
+                    let min_y = (el.bbox.min_y * 1000.0).min(cy - 1000.0);
+                    let max_y = (el.bbox.max_y * 1000.0).max(cy + 1000.0);
+                    let lvl = match_level(el.bbox.max_z);
+                    slabs.push(BimSlab {
+                        id: alloc_id(),
+                        name: if el.name.is_empty() { "IFC Slab".to_string() } else { el.name.clone() },
+                        level_id: lvl,
+                        boundary: vec![P2(min_x, min_y), P2(max_x, min_y), P2(max_x, max_y), P2(min_x, max_y)],
+                        openings: Vec::new(),
+                        thickness_mm: (dz * 1000.0).clamp(120.0, 400.0),
+                        is_roof: el.class_name == "IFCROOF",
+                        roof_slope_deg: 0.0,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        if walls.is_empty() && columns.is_empty() && runs.is_empty() && footings.is_empty() && slabs.is_empty() {
+            return Err("No convertible BIM structural/architectural elements found in this IFC model.".to_string());
+        }
+
+        let mut grids = Vec::new();
+        let min_x = xs_mm.iter().copied().fold(f64::INFINITY, f64::min).min(-1000.0) - 1500.0;
+        let max_x = xs_mm.iter().copied().fold(f64::NEG_INFINITY, f64::max).max(6000.0) + 1500.0;
+        let min_y = ys_mm.iter().copied().fold(f64::INFINITY, f64::min).min(-1000.0) - 1500.0;
+        let max_y = ys_mm.iter().copied().fold(f64::NEG_INFINITY, f64::max).max(6000.0) + 1500.0;
+
+        let dedup_coords = |vals: &[f64]| -> Vec<f64> {
+            let mut sorted: Vec<f64> = vals.iter().copied().filter(|v| v.is_finite()).collect();
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let mut res: Vec<f64> = Vec::new();
+            for v in sorted {
+                if res.last().map_or(true, |last| (v - *last).abs() > 450.0) {
+                    res.push(v);
+                }
+            }
+            res
+        };
+        for (idx, &xg) in dedup_coords(&xs_mm).iter().take(12).enumerate() {
+            grids.push(BimGrid {
+                id: alloc_id(),
+                label: format!("{}", idx + 1),
+                start: P2(xg, min_y),
+                end: P2(xg, max_y),
+            });
+        }
+        for (idx, &yg) in dedup_coords(&ys_mm).iter().take(12).enumerate() {
+            let ch = (b'A' + (idx as u8 % 26)) as char;
+            grids.push(BimGrid {
+                id: alloc_id(),
+                label: ch.to_string(),
+                start: P2(min_x, yg),
+                end: P2(max_x, yg),
+            });
+        }
+
+        let pname = if self.header.file_name.trim().is_empty() {
+            "Converted IFC Project".to_string()
+        } else {
+            self.header.file_name.trim_end_matches(".ifc").to_string()
+        };
+
+        Ok(BimProject {
+            project_name: pname,
+            next_id,
+            levels,
+            grids,
+            walls,
+            runs,
+            columns,
+            footings,
+            slabs,
+            rooms: Vec::new(),
+            dimensions: Vec::new(),
+            rebars: Vec::new(),
+            view_range: ViewRange::default(),
+            section_line: (P2(min_x, 0.0), P2(max_x, 0.0)),
+        })
+    }
+
     /// Generates a pristine reference IFC4 2-Storey Concrete Villa STEP file for instant testing.
     pub fn sample_villa_ifc4() -> String {
         r#"ISO-10303-21;
@@ -3944,6 +4226,16 @@ mod tests {
         assert!(json.contains("\"IfcProject\""));
         assert!(json.contains("\"expressId\":"));
         assert!(json.ends_with('}'));
+    }
+
+    #[test]
+    fn test_ifc_model_to_bim_project_roundtrip() {
+        let villa_ifc = IfcModel::sample_villa_ifc4();
+        let model = IfcModel::parse(&villa_ifc).expect("Parse villa");
+        let bim = model.to_bim_project().expect("IFC should convert into editable BimProject");
+        assert!(bim.levels.len() >= 2);
+        assert!(bim.element_count() > 0);
+        assert!(!bim.columns.is_empty());
     }
 }
 

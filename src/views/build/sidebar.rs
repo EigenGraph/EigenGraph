@@ -1245,27 +1245,64 @@ impl BuildView {
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::FederatedLayersAxisSlicer, |ui| {
             ui.label(RichText::new("Federated Discipline Isolation").size(10.5).strong().color(theme.accent_blue));
             ui.horizontal_wrapped(|ui| {
-                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Building, "ARC (Walls/Glazing)", 10.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO);
-                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Cube3D, "STR (Frame/Core)", 10.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO);
-                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Bolt, "MEP (Risers/Ducts)", 10.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(5), Vec2::ZERO);
-                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Layers, "GEO (Soil/Piles)", 10.0, theme.text_secondary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(5), Vec2::ZERO);
+                let mut toggle_chip = |icon: crate::icons::AppIcon, label: &str, active: &mut bool| {
+                    let fg = if *active { Color32::WHITE } else { theme.text_secondary };
+                    let bg = if *active { theme.accent_blue } else { theme.bg_card };
+                    let stroke = if *active { Stroke::NONE } else { Stroke::new(1.0, theme.border_subtle) };
+                    if crate::icons::icon_button(ui, icon, label, 10.0, fg, bg, stroke, CornerRadius::same(5), Vec2::ZERO).clicked() {
+                        *active = !*active;
+                    }
+                };
+                toggle_chip(crate::icons::AppIcon::Building, "ARC (Walls/Glazing)", &mut self.show_layer_arch);
+                toggle_chip(crate::icons::AppIcon::Cube3D, "STR (Frame/Core)", &mut self.show_layer_struct);
+                toggle_chip(crate::icons::AppIcon::Bolt, "MEP (Risers/Ducts)", &mut self.show_layer_mep);
+                toggle_chip(crate::icons::AppIcon::Layers, "GEO (Soil/Piles)", &mut self.show_layer_geo);
             });
             ui.add_space(6.0);
-            let mut x_slice = 24.0_f32;
-            let mut y_slice = 18.0_f32;
-            ui.add(egui::Slider::new(&mut x_slice, 0.0..=30.0).text("Clip X (m)"));
-            ui.add(egui::Slider::new(&mut y_slice, 0.0..=24.0).text("Clip Y (m)"));
-            let _ = crate::icons::icon_button(
-                ui,
-                crate::icons::AppIcon::SectionCut,
-                "Apply Multi-Axis Section Box Crop",
-                10.5,
-                theme.text_primary,
-                theme.bg_card,
-                Stroke::new(1.0, theme.border_subtle),
-                CornerRadius::same(5),
-                Vec2::ZERO,
-            );
+            ui.add(egui::Slider::new(&mut self.section_box_max_x, -10.0..=45.0).text("Clip X Max (m)"));
+            ui.add(egui::Slider::new(&mut self.section_box_max_y, -10.0..=45.0).text("Clip Y Max (m)"));
+            ui.add(egui::Slider::new(&mut self.section_box_max_z_m, 0.5..=50.0).text("Clip Elev Z (m)"));
+            ui.horizontal_wrapped(|ui| {
+                let sbox_lbl = if self.section_box_enabled { "Section Box: ON" } else { "Apply 3-Axis Section Box Crop" };
+                let sbox_fg = if self.section_box_enabled { Color32::WHITE } else { theme.text_primary };
+                let sbox_bg = if self.section_box_enabled { theme.accent_orange } else { theme.bg_card };
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::SectionCut,
+                    sbox_lbl,
+                    10.5,
+                    sbox_fg,
+                    sbox_bg,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(5),
+                    Vec2::ZERO,
+                ).clicked() {
+                    self.section_box_enabled = !self.section_box_enabled;
+                }
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::AppIcon::Undo,
+                    "Reset All",
+                    10.0,
+                    theme.text_secondary,
+                    theme.bg_card,
+                    Stroke::new(1.0, theme.border_subtle),
+                    CornerRadius::same(5),
+                    Vec2::ZERO,
+                ).clicked() {
+                    self.show_layer_arch = true;
+                    self.show_layer_struct = true;
+                    self.show_layer_mep = true;
+                    self.show_layer_geo = true;
+                    self.section_box_enabled = false;
+                    self.section_box_min_x = -30.0;
+                    self.section_box_max_x = 30.0;
+                    self.section_box_min_y = -30.0;
+                    self.section_box_max_y = 30.0;
+                    self.section_box_min_z = -5.0;
+                    self.section_box_max_z_m = 25.0;
+                }
+            });
         });
     }
 

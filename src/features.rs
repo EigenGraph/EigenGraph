@@ -219,7 +219,7 @@ impl FeatureRegistry {
                 code: "LIB-05",
                 title: "Multi-Typology Structural Project Templates",
                 description: "One-click seed launchers for Long-Span Steel Trusses, Dual-System RC Towers, PT Viaducts, and Precast Logistics.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/views/my_project.rs + src/core/parametric.rs",
                 prioritized: false,
             },
@@ -391,7 +391,7 @@ impl FeatureRegistry {
                 code: "2D-05",
                 title: "Automated RC Beam/Column Rebar Elevation & BBS Drafter",
                 description: "Generates ACI 318 / SNI 2847 seismic confinement zones, lap splice zones, and bar-mark shape-code schedules.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/views/parametric/detailing_2d.rs",
                 prioritized: false,
             },
@@ -455,7 +455,7 @@ impl FeatureRegistry {
                 code: "3D-05",
                 title: "Federated Discipline Layers & Multi-Axis Section Box",
                 description: "Independent Arch/Struct/MEP/Rebar visibility filters paired with orthogonal X/Y/Z clip-plane sliders.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/views/build/sidebar.rs + src/views/build/viewport_3d.rs",
                 prioritized: false,
             },
@@ -529,7 +529,7 @@ impl FeatureRegistry {
                 code: "SIM-06",
                 title: "AASHTO HL-93 / SNI 1725 Bridge Moving Load & Influence Lines",
                 description: "Computes truck/tandem/lane influence line ordinates, impact factor IM, and live-load bending envelopes.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/views/analyze/extended_mechanics.rs",
                 prioritized: false,
             },
@@ -793,7 +793,7 @@ impl FeatureRegistry {
                 code: "9D-02",
                 title: "Live BIM Rebar Schedule -> 1D Cutting Sync",
                 description: "Feeds active BimProject rebar bar marks and lengths directly into the 1D cutting stock optimizer.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/core/cso.rs + src/views/lean.rs",
                 prioritized: false,
             },
@@ -1136,15 +1136,15 @@ mod tests {
             );
         }
         assert_eq!(reg.total_count(), 74);
-        assert_eq!(reg.active_count(), 39);
-        assert_eq!(reg.locked_count(), 35);
+        assert_eq!(reg.active_count(), 44);
+        assert_eq!(reg.locked_count(), 30);
     }
 
     #[test]
     fn test_feature_registry_phases_and_json_export() {
         let mut reg = FeatureRegistry::new();
         assert_eq!(reg.locked_by_phase_count("Phase 32"), 0);
-        assert_eq!(reg.locked_by_phase_count("Phase 33"), 5);
+        assert_eq!(reg.locked_by_phase_count("Phase 33"), 0);
         assert_eq!(reg.locked_by_phase_count("Phase 34"), 18);
         assert_eq!(reg.locked_by_phase_count("Phase 35"), 12);
 

@@ -104,6 +104,27 @@ impl CuttingStockOptimizer {
         items
     }
 
+    /// Extracts live reinforcing steel cut bars (`D10-D32`, stirrups & longitudinal bars) from the active `BimProject` BBS schedule.
+    pub fn extract_items_from_bim_rebar(project: &crate::core::bim::BimProject) -> Vec<CuttingItem> {
+        let mut items = Vec::with_capacity(project.rebars.len());
+        for bar in &project.rebars {
+            let single_len_m = bar.single_length_mm() * 0.001;
+            if single_len_m <= 0.05 {
+                continue;
+            }
+            let unit_mass_kg_per_m = 0.006165 * bar.diameter_mm * bar.diameter_mm;
+            items.push(CuttingItem {
+                id: bar.id,
+                label: format!("{}#{}-D{:.0}", bar.host_kind, bar.host_id, bar.diameter_mm),
+                profile: format!("Rebar D{:.0} ({})", bar.diameter_mm, bar.grade),
+                length_m: single_len_m,
+                quantity: bar.count.max(1),
+                weight_per_m_kg: unit_mass_kg_per_m.max(0.22),
+            });
+        }
+        items
+    }
+
     /// Extracts cut pieces from active structural members, inferring realistic lengths from element categories
     pub fn extract_items_from_members(members: &[StructuralMember]) -> Vec<CuttingItem> {
         let mut items = Vec::new();
@@ -488,5 +509,18 @@ mod tests {
         assert!(csv.contains("Bar_Mark"));
         assert!(csv.contains("C1-MB1"));
         assert!(csv.contains("BJTS 420B"));
+    }
+
+    #[test]
+    fn test_extract_items_from_bim_rebar_and_optimize() {
+        let mut proj = crate::core::bim::BimProject::sample_bimcraft_building();
+        let count = proj.reinforce_all_concrete(&crate::core::bim::RebarPreset::default());
+        assert!(count > 0);
+        let items = CuttingStockOptimizer::extract_items_from_bim_rebar(&proj);
+        assert!(!items.is_empty());
+        assert!(items.iter().any(|i| i.profile.starts_with("Rebar D")));
+        let report = CuttingStockOptimizer::optimize_1d(&items, None, 12.0, 5.0, 1.5, 17500.0);
+        assert!(report.master_bars_used >= 1);
+        assert!(report.material_yield_pct > 50.0);
     }
 }
