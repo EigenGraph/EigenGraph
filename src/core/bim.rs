@@ -1458,6 +1458,64 @@ impl BimProject {
             + self.slabs.len()
     }
 
+    /// Computes `[min_x_mm, min_y_mm], [max_x_mm, max_y_mm]` planar bounding box across all
+    /// modeled BIM elements (walls, beams/runs, columns, footings, slabs, rooms, and grids).
+    pub fn plan_extents_mm(&self) -> Option<([f64; 2], [f64; 2])> {
+        let mut min_x = f64::INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        let mut any = false;
+        let mut push_pt = |p: P2| {
+            min_x = min_x.min(p.0);
+            min_y = min_y.min(p.1);
+            max_x = max_x.max(p.0);
+            max_y = max_y.max(p.1);
+            any = true;
+        };
+
+        for w in &self.walls {
+            for pt in w.footprint_ring() {
+                push_pt(pt);
+            }
+        }
+        for r in &self.runs {
+            for pt in r.footprint_ring() {
+                push_pt(pt);
+            }
+        }
+        for c in &self.columns {
+            for pt in c.footprint_ring() {
+                push_pt(pt);
+            }
+        }
+        for f in &self.footings {
+            for pt in f.footprint_ring() {
+                push_pt(pt);
+            }
+        }
+        for s in &self.slabs {
+            for pt in &s.boundary {
+                push_pt(*pt);
+            }
+        }
+        for rm in &self.rooms {
+            for pt in &rm.outer_ring {
+                push_pt(*pt);
+            }
+        }
+        for g in &self.grids {
+            push_pt(g.start);
+            push_pt(g.end);
+        }
+
+        if any && min_x.is_finite() && max_x.is_finite() {
+            Some(([min_x, min_y], [max_x, max_y]))
+        } else {
+            None
+        }
+    }
+
     /// Evaluates Revit-style Object Snaps (`SE, SM, SI, SC, SP, SN`) and 15° Angular Ruler Guides
     /// near `cursor_pt` (within `snap_radius_mm`).
     pub fn find_snap(

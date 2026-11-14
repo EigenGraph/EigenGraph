@@ -774,6 +774,7 @@ impl App for EigenGraphApp {
                                         self.parametric_view.bim_bus.project =
                                             self.build_view.bim_bus.project.clone();
                                         self.sync_bim_to_fem();
+                                        self.build_view.fit_view_to_project(&mut self.universal_canvas, &self.members);
                                         self.sync_earth_maps();
                                         self.my_project_view.export_success_msg = Some(format!(
                                             "Loaded workspace '{}' ({} BIM elements, {} drawings, {} FEM members) from Vault.",
@@ -823,6 +824,7 @@ impl App for EigenGraphApp {
                             ui,
                             &self.theme,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &self.projects,
                             &mut self.db_components,
                             &mut self.feature_registry,
@@ -936,6 +938,7 @@ impl App for EigenGraphApp {
                             ui,
                             &self.theme,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &mut self.feature_registry,
                         );
                     }
@@ -960,11 +963,9 @@ impl App for EigenGraphApp {
                             let pname = proj.project_name.clone();
                             self.build_view.bim_bus = crate::core::BimCommandBus::from_project(proj.clone());
                             self.parametric_view.bim_bus = crate::core::BimCommandBus::from_project(proj);
-                            self.build_view.cam_pan = egui::Vec2::ZERO;
-                            self.build_view.cam_zoom = 1.1;
-                            self.parametric_view.canvas_pan = egui::Vec2::ZERO;
                             self.parametric_view.active_level_idx = 0;
                             self.sync_bim_to_fem();
+                            self.build_view.fit_view_to_project(&mut self.universal_canvas, &self.members);
                             self.sync_earth_maps();
                             self.build_view.modify_status_msg = Some(format!(
                                 "Loaded IFC -> Editable BimProject '{}' ({} elements).",
@@ -1650,6 +1651,7 @@ impl EigenGraphApp {
         self.parametric_view.bim_bus.project = proj;
         self.universal_canvas.ground_origin_anchored = true;
         self.sync_bim_to_fem();
+        self.build_view.fit_view_to_project(&mut self.universal_canvas, &self.members);
         self.sync_earth_maps();
         let msg = format!(
             "Instantiated '{}' template ({} BIM elements, {} FEM members, {:.0} kg rebar).",

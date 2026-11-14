@@ -40,6 +40,57 @@ impl ProjectTemplateKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum CdeContainerState {
+    Wip,
+    Shared,
+    Published,
+    Archive,
+}
+
+impl CdeContainerState {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Wip => "WIP",
+            Self::Shared => "Shared",
+            Self::Published => "Published",
+            Self::Archive => "Archive",
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CdeDocumentPackage {
+    pub doc_code: String,
+    pub originator: String,
+    pub container: CdeContainerState,
+    pub suitability: String,
+    pub revision: String,
+    pub verifier: String,
+}
+
+impl CdeDocumentPackage {
+    pub fn promote_container(&mut self) {
+        match self.container {
+            CdeContainerState::Wip => {
+                self.container = CdeContainerState::Shared;
+                self.suitability = "S4 • Stage Approval".to_string();
+                self.revision = "P01.01".to_string();
+            }
+            CdeContainerState::Shared => {
+                self.container = CdeContainerState::Published;
+                self.suitability = "A1 • Authorized Construction".to_string();
+                self.revision = "C01.01".to_string();
+            }
+            CdeContainerState::Published => {
+                self.container = CdeContainerState::Archive;
+                self.suitability = "A4 • Immutable Record".to_string();
+            }
+            CdeContainerState::Archive => {}
+        }
+    }
+}
+
 pub struct MyProjectView {
     pub library_mode: LibraryViewMode,
     pub selected_category: String,
@@ -60,6 +111,10 @@ pub struct MyProjectView {
     pub selected_family_idx: usize,
     pub family_search_query: String,
     pub family_category_filter: String,
+    // Phase 39: ISO 19650 CDE Hub (LIB-04)
+    pub cde_container_filter: usize,
+    pub cde_packages: Vec<CdeDocumentPackage>,
+    pub cde_new_doc_code: String,
 }
 
 impl Default for MyProjectView {
@@ -83,6 +138,18 @@ impl Default for MyProjectView {
             selected_family_idx: 0,
             family_search_query: String::new(),
             family_category_filter: "All Families".to_string(),
+            cde_container_filter: 0,
+            cde_packages: vec![
+                CdeDocumentPackage {
+                    doc_code: "EG-STR-MOD-L01-M3-S-001".to_string(),
+                    originator: "STR-TEAM".to_string(),
+                    container: CdeContainerState::Wip,
+                    suitability: "S0 • Authoring Draft".to_string(),
+                    revision: "W01.01".to_string(),
+                    verifier: "Structural Lead".to_string(),
+                },
+            ],
+            cde_new_doc_code: "EG-ARC-PLN-ZZZ-DR-A-101".to_string(),
         }
     }
 }
@@ -1377,17 +1444,25 @@ impl MyProjectView {
     }
 
     fn render_cde_iso19650_hub(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::CdeIso19650DocumentHub, |ui| {
+            let wip_cnt = self.cde_packages.iter().filter(|p| p.container == CdeContainerState::Wip).count();
+            let shared_cnt = self.cde_packages.iter().filter(|p| p.container == CdeContainerState::Shared).count();
+            let pub_cnt = self.cde_packages.iter().filter(|p| p.container == CdeContainerState::Published).count();
+            let arch_cnt = self.cde_packages.iter().filter(|p| p.container == CdeContainerState::Archive).count();
+            let wip_s = format!("{} Packages", wip_cnt);
+            let shared_s = format!("{} Packages", shared_cnt);
+            let pub_s = format!("{} Packages", pub_cnt);
+            let arch_s = format!("{} Snapshots", arch_cnt);
             let containers = [
-                ("WORK IN PROGRESS (WIP)", "14 Packages", "S0 — Authoring & Internal QA", theme.accent_orange),
-                ("SHARED COORDINATION", "9 Packages", "S1–S4 — Interdisciplinary BIM Check", theme.accent_blue),
-                ("PUBLISHED RECORD (IFC4/DED)", "6 Packages", "A1 — Authorized Construction Issue", theme.accent_green),
-                ("IMMUTABLE ARCHIVE", "23 Snapshots", "SHA-256 Tamper-Evident Vault", theme.text_primary),
+                ("WORK IN PROGRESS (WIP)", wip_s.as_str(), "S0 — Authoring & Internal QA", theme.accent_orange),
+                ("SHARED COORDINATION", shared_s.as_str(), "S1–S4 — Interdisciplinary BIM Check", theme.accent_blue),
+                ("PUBLISHED RECORD (IFC4/DED)", pub_s.as_str(), "A1 — Authorized Construction Issue", theme.accent_green),
+                ("IMMUTABLE ARCHIVE", arch_s.as_str(), "SHA-256 Tamper-Evident Record", theme.text_primary),
             ];
             ui_kit::responsive_grid_n(ui, containers.len(), 175.0, |ui, idx| {
                 let (title, val, sub, col) = containers[idx];
@@ -1396,50 +1471,126 @@ impl MyProjectView {
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Active Container: SHARED");
-                let _ = ui.selectable_label(false, "WIP Team Folders");
-                let _ = ui.selectable_label(false, "Transmittal Queue (2 Pending)");
-                let _ = icons::icon_button(
+                for (fidx, flbl) in [
+                    (0, "All Containers"),
+                    (1, "WIP"),
+                    (2, "Shared"),
+                    (3, "Published"),
+                    (4, "Archive"),
+                ] {
+                    if ui.selectable_label(self.cde_container_filter == fidx, flbl).clicked() {
+                        self.cde_container_filter = fidx;
+                    }
+                }
+                ui.add(egui::TextEdit::singleline(&mut self.cde_new_doc_code).desired_width(180.0));
+                if icons::icon_button(
                     ui,
-                    AppIcon::UploadImport,
-                    "Issue Transmittal Package (ISO 19650)",
-                    11.5,
+                    AppIcon::Plus,
+                    "Add WIP Container",
+                    10.5,
+                    Color32::WHITE,
+                    theme.accent_green,
+                    Stroke::NONE,
+                    CornerRadius::same(6),
+                    Vec2::ZERO,
+                )
+                .clicked()
+                    && !self.cde_new_doc_code.trim().is_empty()
+                {
+                    self.cde_packages.push(CdeDocumentPackage {
+                        doc_code: self.cde_new_doc_code.trim().to_string(),
+                        originator: "BIM-TEAM".to_string(),
+                        container: CdeContainerState::Wip,
+                        suitability: "S0 • Initial Draft".to_string(),
+                        revision: "W01.01".to_string(),
+                        verifier: "Lead Coordinator".to_string(),
+                    });
+                }
+                if icons::icon_button(
+                    ui,
+                    AppIcon::SaveDisk,
+                    "Export Transmittal Manifest (.json)",
+                    10.5,
                     Color32::WHITE,
                     theme.accent_blue,
                     Stroke::NONE,
                     CornerRadius::same(6),
                     Vec2::ZERO,
-                );
+                )
+                .clicked()
+                {
+                    if let Ok(json_str) = serde_json::to_string_pretty(&self.cde_packages) {
+                        let _ = crate::core::web_bridge::save_text_file(
+                            "ISO19650_CDE_Transmittal.json",
+                            &json_str,
+                            "application/json",
+                        );
+                        self.export_success_msg = Some(format!(
+                            "Exported ISO 19650 CDE Transmittal Manifest ({} packages).",
+                            self.cde_packages.len()
+                        ));
+                    }
+                }
             });
             ui.add_space(10.0);
 
+            let mut promote_idx: Option<usize> = None;
+            let filter_idx = self.cde_container_filter;
             ScrollArea::horizontal().id_salt("cde_iso19650_table").show(ui, |ui| {
                 egui::Grid::new("cde_iso19650_grid")
                     .striped(true)
                     .spacing(Vec2::new(14.0, 6.0))
                     .show(ui, |ui| {
-                        for h in ["Document Code", "Originator", "Container", "Suitability", "Revision", "Lead Verifier"] {
+                        for h in ["Document Code", "Originator", "Container", "Suitability", "Revision", "Lead Verifier", "Workflow"] {
                             ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                         }
                         ui.end_row();
 
-                        let rows = [
-                            ("EG-STR-MOD-L01-M3-S-001", "STR-TEAM", "Published", "A1 • Authorized Construction", "P04.01", "Senior PE Reviewer"),
-                            ("EG-ARC-PLN-ZZZ-DR-A-101", "ARC-TEAM", "Shared", "S4 • Stage Approval", "P03.02", "Lead Architect"),
-                            ("EG-MEP-HVC-L02-M3-M-204", "MEP-TEAM", "Shared", "S1 • Coordination", "P02.01", "MEP BIM Manager"),
-                            ("EG-GEO-TIN-SITE-SH-G-001", "GEO-TEAM", "WIP", "S0 • Initial Draft", "W01.04", "Geotech Specialist"),
-                        ];
-                        for (doc, orig, cont, suit, rev, lead) in rows {
-                            ui.label(RichText::new(doc).size(10.5).monospace().color(theme.text_primary));
-                            ui.label(RichText::new(orig).size(10.5).color(theme.text_secondary));
-                            ui.label(RichText::new(cont).size(10.5).strong().color(theme.accent_green));
-                            ui.label(RichText::new(suit).size(10.5).color(theme.text_secondary));
-                            ui.label(RichText::new(rev).size(10.5).monospace().color(theme.accent_blue));
-                            ui.label(RichText::new(lead).size(10.5).color(theme.text_muted));
+                        for (idx, pkg) in self.cde_packages.iter().enumerate() {
+                            let show_row = match filter_idx {
+                                1 => pkg.container == CdeContainerState::Wip,
+                                2 => pkg.container == CdeContainerState::Shared,
+                                3 => pkg.container == CdeContainerState::Published,
+                                4 => pkg.container == CdeContainerState::Archive,
+                                _ => true,
+                            };
+                            if !show_row {
+                                continue;
+                            }
+                            let c_col = match pkg.container {
+                                CdeContainerState::Wip => theme.accent_orange,
+                                CdeContainerState::Shared => theme.accent_blue,
+                                CdeContainerState::Published => theme.accent_green,
+                                CdeContainerState::Archive => theme.text_muted,
+                            };
+                            ui.label(RichText::new(&pkg.doc_code).size(10.5).monospace().color(theme.text_primary));
+                            ui.label(RichText::new(&pkg.originator).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(pkg.container.label()).size(10.5).strong().color(c_col));
+                            ui.label(RichText::new(&pkg.suitability).size(10.5).color(theme.text_secondary));
+                            ui.label(RichText::new(&pkg.revision).size(10.5).monospace().color(theme.accent_blue));
+                            ui.label(RichText::new(&pkg.verifier).size(10.5).color(theme.text_muted));
+                            if pkg.container != CdeContainerState::Archive {
+                                if ui.small_button("Promote Gate").clicked() {
+                                    promote_idx = Some(idx);
+                                }
+                            } else {
+                                ui.label(RichText::new("Sealed").size(10.0).color(theme.text_muted));
+                            }
                             ui.end_row();
                         }
                     });
             });
+            if let Some(pidx) = promote_idx {
+                if let Some(pkg) = self.cde_packages.get_mut(pidx) {
+                    pkg.promote_container();
+                    self.export_success_msg = Some(format!(
+                        "Promoted '{}' to {} ({}).",
+                        pkg.doc_code,
+                        pkg.container.label(),
+                        pkg.suitability
+                    ));
+                }
+            }
         });
     }
 
@@ -1844,5 +1995,25 @@ mod tests {
                 assert!(proj.total_rebar_weight_kg() > 0.0, "{:?} must populate rebar", kind);
             }
         }
+    }
+
+    #[test]
+    fn test_iso19650_cde_workflow_promotion_chain() {
+        let mut pkg = CdeDocumentPackage {
+            doc_code: "EG-STR-001".to_string(),
+            originator: "STR".to_string(),
+            container: CdeContainerState::Wip,
+            suitability: "S0".to_string(),
+            revision: "W01".to_string(),
+            verifier: "PE".to_string(),
+        };
+        pkg.promote_container();
+        assert_eq!(pkg.container, CdeContainerState::Shared);
+        assert!(pkg.suitability.starts_with("S4"));
+        pkg.promote_container();
+        assert_eq!(pkg.container, CdeContainerState::Published);
+        assert!(pkg.suitability.starts_with("A1"));
+        pkg.promote_container();
+        assert_eq!(pkg.container, CdeContainerState::Archive);
     }
 }

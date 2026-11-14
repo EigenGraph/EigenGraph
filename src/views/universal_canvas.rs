@@ -373,96 +373,123 @@ impl UniversalCanvasState {
         }
     }
 
-    /// Shared Freeze Canvas toggle button across Universal Canvas, Parametric, and Geometry.
-    pub fn render_freeze_button(
+    /// Computes the top-left floating pill rect inside any drawing viewport,
+    /// shifting past the mobile reopen-sidebar button when the viewport sits at the top.
+    pub fn floating_freeze_pill_rect(
+        viewport_rect: Rect,
+        is_frozen: bool,
+        sidebar_toggle_inset_px: f32,
+    ) -> Rect {
+        let inset_x = if sidebar_toggle_inset_px > 0.0 && viewport_rect.top() < 120.0 {
+            sidebar_toggle_inset_px
+        } else {
+            0.0
+        };
+        let pill_w: f32 = if is_frozen { 154.0 } else { 116.0 };
+        let max_w = (viewport_rect.width() - 28.0 - inset_x).max(96.0);
+        Rect::from_min_size(
+            Pos2::new(
+                viewport_rect.left() + 14.0 + inset_x,
+                viewport_rect.top() + 14.0,
+            ),
+            Vec2::new(pill_w.min(max_w), 28.0),
+        )
+    }
+
+    /// Registers hit-testing for the top-left floating Freeze / Live toggle BEFORE
+    /// underlying canvas pan/zoom/draw handlers so clicks never pass through.
+    /// Returns `(pill_rect, pointer_in_pill, hovered)`.
+    pub fn interact_floating_freeze_pill(
         ui: &mut Ui,
-        theme: &MacTheme,
+        viewport_rect: Rect,
+        id_salt: &str,
         is_frozen: &mut bool,
-        height: f32,
-    ) {
-        let freeze_icon = if *is_frozen {
-            AppIcon::Snowflake
-        } else {
-            AppIcon::Unlock
-        };
-        let freeze_label = if *is_frozen {
-            "Frozen (Scroll Page)"
-        } else {
-            "Freeze Canvas"
-        };
-        let freeze_bg = if *is_frozen {
-            theme.accent_blue
-        } else {
-            theme.bg_card
-        };
-        let freeze_fg = if *is_frozen {
-            Color32::WHITE
-        } else {
-            theme.accent_orange
-        };
-        let freeze_stroke = Stroke::new(
-            1.0,
-            if *is_frozen {
-                theme.accent_blue
+        sidebar_toggle_inset_px: f32,
+    ) -> (Rect, bool, bool) {
+        let pill_rect =
+            Self::floating_freeze_pill_rect(viewport_rect, *is_frozen, sidebar_toggle_inset_px);
+        let resp = ui
+            .interact(
+                pill_rect,
+                ui.make_persistent_id(("floating_freeze_pill", id_salt)),
+                Sense::click(),
+            )
+            .on_hover_text(if *is_frozen {
+                "Canvas frozen (page scrolls normally). Click to unfreeze & draw or zoom."
             } else {
-                theme.accent_orange.gamma_multiply(0.6)
-            },
-        );
-        if icons::icon_button(
-            ui,
-            freeze_icon,
-            freeze_label,
-            10.5,
-            freeze_fg,
-            freeze_bg,
-            freeze_stroke,
-            CornerRadius::same(6),
-            Vec2::new(0.0, height),
-        )
-        .on_hover_text(
-            "Freeze canvas zoom/pan so vertical scrolling moves the page without zooming in or out",
-        )
-        .clicked()
-        {
+                "Canvas live. Click to freeze zoom/pan so page scrolls freely."
+            });
+        if resp.clicked() {
             *is_frozen = !*is_frozen;
             ui_kit::set_canvas_frozen(ui.ctx(), *is_frozen);
         }
+        let pointer_in_pill = resp.hovered()
+            || resp.clicked()
+            || ui.ctx().input(|i| {
+                i.pointer
+                    .hover_pos()
+                    .or_else(|| i.pointer.interact_pos())
+                    .is_some_and(|p| pill_rect.expand(4.0).contains(p))
+            });
+        (pill_rect, pointer_in_pill, resp.hovered())
     }
 
-    /// Shared Freeze Canvas badge painted inside the viewport when scroll guard is active.
-    pub fn paint_frozen_badge(
+    /// Paints the translucent top-left floating Freeze / Live capsule over the finished viewport.
+    pub fn paint_floating_freeze_pill(
         painter: &egui::Painter,
-        rect: Rect,
+        pill_rect: Rect,
         theme: &MacTheme,
-        bottom_offset_px: f32,
+        is_frozen: bool,
+        hovered: bool,
     ) {
-        let badge_pos = Pos2::new(rect.left() + 14.0, rect.bottom() - bottom_offset_px);
-        let text_rect = Rect::from_min_size(
-            Pos2::new(badge_pos.x, badge_pos.y - 24.0),
-            Vec2::new(280.0, 24.0),
-        );
-        painter.rect_filled(
-            text_rect,
-            CornerRadius::same(6),
-            theme.accent_blue.gamma_multiply(0.22),
-        );
-        painter.rect_stroke(
-            text_rect,
-            CornerRadius::same(6),
-            Stroke::new(1.0, theme.accent_blue.gamma_multiply(0.7)),
-            StrokeKind::Inside,
-        );
+        let (bg, border, icon, icon_col, text_col, label) = if is_frozen {
+            let alpha = if hovered { 244 } else { 226 };
+            (
+                Color32::from_rgba_unmultiplied(
+                    theme.accent_blue.r(),
+                    theme.accent_blue.g(),
+                    theme.accent_blue.b(),
+                    alpha,
+                ),
+                Color32::from_rgba_unmultiplied(219, 234, 254, 220),
+                AppIcon::Snowflake,
+                Color32::WHITE,
+                Color32::WHITE,
+                "Frozen • Unfreeze",
+            )
+        } else {
+            let bg = if theme.is_dark() {
+                Color32::from_rgba_unmultiplied(18, 24, 36, if hovered { 238 } else { 214 })
+            } else {
+                Color32::from_rgba_unmultiplied(255, 255, 255, if hovered { 242 } else { 222 })
+            };
+            (
+                bg,
+                if hovered {
+                    theme.accent_orange
+                } else {
+                    theme.accent_orange.gamma_multiply(0.75)
+                },
+                AppIcon::Unlock,
+                theme.accent_orange,
+                theme.text_primary,
+                "Live • Freeze",
+            )
+        };
+        let rounding = CornerRadius::same(14);
+        painter.rect_filled(pill_rect, rounding, bg);
+        painter.rect_stroke(pill_rect, rounding, Stroke::new(1.1, border), StrokeKind::Inside);
         let icon_rect = Rect::from_min_size(
-            Pos2::new(text_rect.left() + 7.0, text_rect.center().y - 6.0),
-            Vec2::splat(12.0),
+            Pos2::new(pill_rect.left() + 9.0, pill_rect.center().y - 6.5),
+            Vec2::splat(13.0),
         );
-        icons::paint_icon(painter, icon_rect, AppIcon::Snowflake, theme.accent_blue);
+        icons::paint_icon(painter, icon_rect, icon, icon_col);
         painter.text(
-            Pos2::new(text_rect.left() + 24.0, text_rect.center().y),
+            Pos2::new(pill_rect.left() + 27.0, pill_rect.center().y),
             Align2::LEFT_CENTER,
-            "CANVAS FROZEN • Scroll moves page vertically",
-            egui::FontId::proportional(10.5),
-            theme.text_primary,
+            label,
+            egui::FontId::proportional(11.0),
+            text_col,
         );
     }
 
@@ -841,23 +868,7 @@ impl UniversalCanvasState {
                 ui.set_width(outer_w);
                 ui.set_max_width(outer_w);
 
-                // 1. Top Canvas HUD Toolbar (wraps cleanly and yields room for floating ☰ toggle)
-                self.render_canvas_toolbar(
-                    ui,
-                    theme,
-                    active_pillar,
-                    bim_project,
-                    members,
-                    variables,
-                    workspace_settings.clone(),
-                    sidebar_toggle_inset_px,
-                );
-
-                // Optional status toast
-                Self::render_toast_bar(ui, theme, &mut self.status_message);
-                ui.add_space(6.0);
-
-                // 2. Main Interactive Drawing Viewport
+                // 1. Main Interactive Drawing Viewport (Top)
                 let avail_w = ui.available_width().max(200.0);
                 let (response, painter) =
                     ui.allocate_painter(Vec2::new(avail_w, canvas_h), Sense::click_and_drag());
@@ -865,6 +876,16 @@ impl UniversalCanvasState {
                 self.last_canvas_rect = Some(rect);
 
                 painter.rect_filled(rect, CornerRadius::same(10), Self::canvas_bg(theme));
+
+                // Top-left Floating Freeze / Live Toggle inside Viewport (interact BEFORE pan/draw handlers)
+                let (freeze_pill_rect, pointer_in_freeze_pill, freeze_pill_hovered) =
+                    Self::interact_floating_freeze_pill(
+                        ui,
+                        rect,
+                        "universal",
+                        &mut self.is_frozen,
+                        sidebar_toggle_inset_px,
+                    );
 
                 // Reserve floating inspector rect on wide screens (>= 720px)
                 let floating_inspector_rect = if self.inspector_open && avail_w >= 720.0 {
@@ -886,16 +907,16 @@ impl UniversalCanvasState {
                         .input(|i| i.pointer.hover_pos().is_some_and(|p| ir.contains(p)))
                 });
 
-                // Handle Pan / Zoom / Drawing Interaction (respecting Freeze Canvas)
+                // Handle Pan / Zoom / Drawing Interaction (respecting Freeze Canvas & Floating Controls)
                 self.handle_canvas_interaction(
                     ui,
                     &response,
                     rect,
                     active_pillar,
-                    pointer_in_inspector,
+                    pointer_in_inspector || pointer_in_freeze_pill,
                 );
 
-                // 2a. Phase 35: Earth World Map Ground Basemap (Vector Continents + Online Raster Tiles + Geodetic/Metric Grid)
+                // 1a. Phase 35: Earth World Map Ground Basemap (Vector Continents + Online Raster Tiles + Geodetic/Metric Grid)
                 self.world_map.render_world_background(
                     ui,
                     &painter,
@@ -906,7 +927,7 @@ impl UniversalCanvasState {
                     false,
                 );
 
-                // 2b. Render Fine Millimeter Engineering Grid (site scale), BIM Base Layer, Domain Overlay, Entities & Preview
+                // 1b. Render Fine Millimeter Engineering Grid (site scale), BIM Base Layer, Domain Overlay, Entities & Preview
                 let world_to_screen = |w: [f64; 2]| self.world_to_screen(rect, w);
                 if self.show_grid && self.world_map.zoom_level >= 15.5 {
                     self.paint_grid(&painter, rect, theme, &world_to_screen);
@@ -965,17 +986,12 @@ impl UniversalCanvasState {
                     && bim_project.is_empty()
                 {
                     painter.text(
-                        Pos2::new(rect.left() + 14.0, rect.top() + 14.0),
+                        Pos2::new(rect.left() + 14.0, rect.top() + 50.0),
                         Align2::LEFT_TOP,
                         "World Map Ground Canvas • Pan/Zoom to any site or click Ground 1:200 to draw directly on terrain",
                         egui::FontId::proportional(11.0),
                         theme.text_primary.gamma_multiply(0.85),
                     );
-                }
-
-                // Floating Freeze Banner inside canvas when frozen
-                if self.is_frozen {
-                    Self::paint_frozen_badge(&painter, rect, theme, 14.0);
                 }
 
                 // Render Floating Collapsible Inspector Overlay (Desktop / Tablet >= 720px)
@@ -994,12 +1010,38 @@ impl UniversalCanvasState {
                     });
                 }
 
+                // Floating Top-Left Freeze / Unfreeze Pill inside Viewport
+                Self::paint_floating_freeze_pill(
+                    &painter,
+                    freeze_pill_rect,
+                    theme,
+                    self.is_frozen,
+                    freeze_pill_hovered,
+                );
+
                 Self::paint_rounded_viewport_border(
                     &painter,
                     rect,
                     10.0,
                     theme.bg_sidebar,
                     theme.border_subtle,
+                );
+
+                ui.add_space(6.0);
+
+                // Optional status toast
+                Self::render_toast_bar(ui, theme, &mut self.status_message);
+
+                // 2. Bottom Canvas HUD Toolbar (below Main Drawing Viewport)
+                self.render_canvas_toolbar(
+                    ui,
+                    theme,
+                    active_pillar,
+                    bim_project,
+                    members,
+                    variables,
+                    workspace_settings.clone(),
+                    sidebar_toggle_inset_px,
                 );
 
                 ui.add_space(6.0);
@@ -1037,7 +1079,7 @@ impl UniversalCanvasState {
         members: &[StructuralMember],
         variables: &[ParametricVariable],
         workspace_settings: WorkspaceCanvasSettings,
-        sidebar_toggle_inset_px: f32,
+        _sidebar_toggle_inset_px: f32,
     ) {
         Frame::new()
             .fill(theme.bg_card)
@@ -1050,10 +1092,6 @@ impl UniversalCanvasState {
                 ui.set_max_width(outer_w);
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                 ui.horizontal_wrapped(|ui| {
-                    if sidebar_toggle_inset_px > 0.0 {
-                        ui.add_space(sidebar_toggle_inset_px);
-                    }
-
                     // Active Module Pill
                     icons::pill_badge(
                         ui,
@@ -1147,7 +1185,7 @@ impl UniversalCanvasState {
                     if icons::icon_button(
                         ui,
                         AppIcon::ZoomFit,
-                        "Fit",
+                        "Fit Model",
                         10.5,
                         theme.text_secondary,
                         theme.bg_card,
@@ -1155,10 +1193,14 @@ impl UniversalCanvasState {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
-                    .on_hover_text("Fit Ground Site (or Global World Map when empty)")
+                    .on_hover_text("Auto-fit view to active BIM footprint or Global World Map")
                     .clicked()
                     {
-                        self.fit_world_or_site(!bim_project.is_empty());
+                        if let Some(extents) = bim_project.plan_extents_mm() {
+                            self.fit_world_to_bim_extents(Some(extents));
+                        } else {
+                            self.fit_world_or_site(!bim_project.is_empty());
+                        }
                     }
 
                     ui.separator();
@@ -1167,9 +1209,6 @@ impl UniversalCanvasState {
                     self.render_world_map_toolbar_controls(ui, theme, 26.0);
 
                     ui.separator();
-
-                    // Prominent Freeze Canvas Toggle (Prevents scroll zoom so vertical page scroll works smoothly)
-                    Self::render_freeze_button(ui, theme, &mut self.is_frozen, 26.0);
 
                     // Collapsible Floating Inspector Panel Toggle
                     let insp_bg = if self.inspector_open {
@@ -1452,6 +1491,31 @@ impl UniversalCanvasState {
         }
         self.pan = Vec2::ZERO;
         self.zoom = 1.0;
+    }
+
+    /// Auto-fits the World Map camera smoothly around planar BIM extents `[min_mm, max_mm]`.
+    pub fn fit_world_to_bim_extents(&mut self, extents_mm: Option<([f64; 2], [f64; 2])>) {
+        if let Some((min_mm, max_mm)) = extents_mm {
+            let cx = 0.5 * (min_mm[0] + max_mm[0]);
+            let cy = 0.5 * (min_mm[1] + max_mm[1]);
+            let (lat, lon) = crate::core::gis::SlippyMapState::world_mm_to_lat_lon(
+                self.ground_origin_lat_lon,
+                [cx, cy],
+            );
+            let span_m = ((max_mm[0] - min_mm[0]).abs().max((max_mm[1] - min_mm[1]).abs())
+                / 1000.0)
+                .max(6.0);
+            let cos_lat = lat.to_radians().cos().abs().max(0.2);
+            let desired_res_m_px = (span_m / 420.0).max(0.01);
+            let target_zoom = ((156_543.03392 * cos_lat / desired_res_m_px).log2() as f32)
+                .clamp(14.0, 19.0);
+            self.ground_origin_anchored = true;
+            self.world_map.zoom_to_ground_site(lat, lon, target_zoom);
+            self.pan = Vec2::ZERO;
+            self.zoom = 1.0;
+        } else {
+            self.fit_world_or_site(false);
+        }
     }
 
     /// Anchors ground `(0, 0) mm` origin to `screen_pos` on Earth if the workspace is still blank.

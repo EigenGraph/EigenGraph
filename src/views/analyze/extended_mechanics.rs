@@ -303,19 +303,168 @@ impl AnalyzeView {
             );
         });
     }
+}
 
+#[derive(Clone, Debug)]
+pub struct RetainingSlopeResult {
+    pub ka: f32,
+    pub kae: f32,
+    pub fs_overturning: f32,
+    pub fs_sliding: f32,
+    pub bishop_fs_static: f32,
+    pub bishop_fs_seismic: f32,
+    pub q_toe_kpa: f32,
+}
+
+/// Computes Rankine / Mononobe-Okabe cantilever retaining wall stability & Bishop Simplified circular slip FS.
+pub fn compute_retaining_wall_bishop_stability(
+    wall_h_m: f32,
+    base_b_m: f32,
+    phi_deg: f32,
+    cohesion_kpa: f32,
+    gamma_knm3: f32,
+    kh: f32,
+    has_shear_key: bool,
+    surcharge_kpa: f32,
+) -> RetainingSlopeResult {
+    let h = wall_h_m.clamp(1.5, 18.0);
+    let b = base_b_m.clamp(1.0, 14.0);
+    let phi = phi_deg.clamp(15.0, 45.0).to_radians();
+    let ka = ((std::f32::consts::FRAC_PI_4 - 0.5 * phi).tan()).powi(2);
+
+    // Mononobe-Okabe dynamic active earth pressure coefficient (kv = 0, i = 0, beta = 90)
+    let theta = (kh.clamp(0.0, 0.45)).atan();
+    let denom_mo = if phi > theta {
+        let rt = (phi.sin() * (phi - theta).sin() / (theta.cos())).max(0.0).sqrt();
+        theta.cos() * (1.0 + rt).powi(2)
+    } else {
+        theta.cos()
+    };
+    let kae = (phi.cos().powi(2) / denom_mo.max(0.15)).clamp(ka, 1.25);
+
+    // Thrusts per meter width (static + surcharge)
+    let pa_soil = 0.5 * ka * gamma_knm3 * h * h;
+    let pa_sur = ka * surcharge_kpa * h;
+    let pa_dyn_incr = 0.5 * (kae - ka) * gamma_knm3 * h * h;
+
+    // Wall concrete geometry + soil on heel
+    let t_stem = (0.30 + h * 0.06).clamp(0.30, 0.85);
+    let t_base = (0.35 + h * 0.05).clamp(0.35, 0.90);
+    let heel_w = (b - 0.30 * b - t_stem).max(0.35 * b);
+    let w_conc = (t_stem * (h - t_base) + b * t_base) * 24.0;
+    let w_soil = heel_w * (h - t_base) * gamma_knm3 + heel_w * surcharge_kpa;
+    let total_v = (w_conc + w_soil).max(1.0);
+
+    let m_res = w_conc * (0.35 * b) + w_soil * (b - 0.5 * heel_w);
+    let m_ot = pa_soil * (h / 3.0) + pa_sur * (h / 2.0);
+    let fs_overturning = (m_res / m_ot.max(1e-3)).clamp(0.2, 12.0);
+
+    let mu_base = (0.67 * phi).tan();
+    let key_passive = if has_shear_key {
+        0.5 * (1.0 / ka.max(0.15)) * gamma_knm3 * 0.90 * 0.90
+    } else {
+        0.0
+    };
+    let res_slide = total_v * mu_base + cohesion_kpa * 0.5 * b + key_passive;
+    let fs_sliding = (res_slide / (pa_soil + pa_sur + 0.5 * pa_dyn_incr).max(1e-3)).clamp(0.2, 10.0);
+
+    let e_m = ((m_res - m_ot) / total_v - 0.5 * b).abs().min(0.45 * b);
+    let q_toe_kpa = (total_v / b) * (1.0 + 6.0 * e_m / b);
+
+    // Bishop Simplified iterative method-of-slices along critical circle behind wall toe
+    let mut fs_static = 1.60_f32;
+    let mut fs_seismic = 1.25_f32;
+    let n_slices = 10usize;
+    let slice_b = (1.6 * h) / (n_slices as f32);
+    for _pass in 0..8 {
+        let mut num_s = 0.0_f32;
+        let mut den_s = 0.0_f32;
+        let mut num_eq = 0.0_f32;
+        let mut den_eq = 0.0_f32;
+        for i in 0..n_slices {
+            let frac = (i as f32 + 0.5) / n_slices as f32;
+            let sin_a = (-0.20 + 0.85 * frac).clamp(-0.7, 0.78);
+            let cos_a = (1.0 - sin_a * sin_a).sqrt();
+            let h_i = (4.0 * frac * (1.0 - frac) * h * 0.82).max(0.35);
+            let w_i = h_i * slice_b * gamma_knm3 + slice_b * surcharge_kpa;
+            let m_a_s = (cos_a + sin_a * phi.tan() / fs_static.max(0.3)).max(0.25);
+            let m_a_eq = (cos_a + sin_a * phi.tan() / fs_seismic.max(0.3)).max(0.25);
+            let res_i = cohesion_kpa * slice_b + w_i * phi.tan();
+            num_s += res_i / m_a_s;
+            den_s += (w_i * sin_a).max(0.1);
+            num_eq += res_i / m_a_eq;
+            den_eq += (w_i * sin_a + w_i * kh * 0.55).max(0.1);
+        }
+        fs_static = (num_s / den_s.max(0.1)).clamp(0.4, 5.5);
+        fs_seismic = (num_eq / den_eq.max(0.1)).clamp(0.3, 4.5);
+    }
+
+    RetainingSlopeResult {
+        ka,
+        kae,
+        fs_overturning,
+        fs_sliding,
+        bishop_fs_static: fs_static,
+        bishop_fs_seismic: fs_seismic,
+        q_toe_kpa,
+    }
+}
+
+impl AnalyzeView {
     pub(super) fn render_slope_retaining_stability(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::RetainingWallSlopeStability, |ui| {
+            let res = compute_retaining_wall_bishop_stability(
+                self.rw_wall_height_m,
+                self.rw_base_width_m,
+                self.rw_backfill_phi_deg,
+                self.rw_cohesion_kpa,
+                self.rw_unit_weight_knm3,
+                self.rw_kh_seismic,
+                self.rw_shear_key,
+                self.rw_surcharge_kpa,
+            );
+            let ot_txt = format!(
+                "FS = {:.2} ({})",
+                res.fs_overturning,
+                if res.fs_overturning >= 2.0 { "SAFE" } else { "CHECK" }
+            );
+            let sl_txt = format!(
+                "FS = {:.2} ({})",
+                res.fs_sliding,
+                if res.fs_sliding >= 1.5 { "SAFE" } else { "KEY REQ" }
+            );
+            let bp_txt = format!("{:.2} Static / {:.2} EQ", res.bishop_fs_static, res.bishop_fs_seismic);
+            let ka_txt = format!("Ka = {:.3} (Kae = {:.3})", res.ka, res.kae);
             let cards = [
-                ("OVERTURNING SAFETY (FS_OT)", "FS = 2.64 (SAFE)", "Min Required = 2.00 (Static)", theme.accent_green),
-                ("SLIDING SAFETY (FS_SL)", "FS = 1.82 (SAFE)", "Min Required = 1.50 (c-phi Soil)", theme.accent_green),
-                ("BISHOP CIRCULAR SLIP FS", "1.58 Static / 1.18 EQ", "SNI 8460:2017 Pseudo-Static kh=0.18", theme.accent_blue),
-                ("ACTIVE EARTH COEFFICIENT", "Ka = 0.294 (Kae = 0.42)", "Mononobe-Okabe Seismic Thrust", theme.accent_orange),
+                (
+                    "OVERTURNING SAFETY (FS_OT)",
+                    ot_txt.as_str(),
+                    "Min Required = 2.00 (Static)",
+                    if res.fs_overturning >= 2.0 { theme.accent_green } else { theme.accent_red },
+                ),
+                (
+                    "SLIDING SAFETY (FS_SL)",
+                    sl_txt.as_str(),
+                    if self.rw_shear_key { "Shear Key Passive Engaged" } else { "Base Friction Only" },
+                    if res.fs_sliding >= 1.5 { theme.accent_green } else { theme.accent_orange },
+                ),
+                (
+                    "BISHOP CIRCULAR SLIP FS",
+                    bp_txt.as_str(),
+                    "SNI 8460:2017 Pseudo-Static Slices",
+                    if res.bishop_fs_seismic >= 1.10 { theme.accent_blue } else { theme.accent_orange },
+                ),
+                (
+                    "ACTIVE & TOE BEARING",
+                    ka_txt.as_str(),
+                    "Mononobe-Okabe Seismic Thrust",
+                    theme.accent_orange,
+                ),
             ];
             ui_kit::responsive_grid_n(ui, cards.len(), 175.0, |ui, idx| {
                 let (t, v, s, c) = cards[idx];
@@ -324,66 +473,95 @@ impl AnalyzeView {
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Method: Bishop Simplified Slices");
-                let _ = ui.selectable_label(false, "Cantilever Retaining Wall + Key");
-                let _ = icons::icon_button(
+                ui.label(RichText::new("H (m):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.rw_wall_height_m).range(2.0..=14.0).speed(0.1).max_decimals(1));
+                ui.label(RichText::new("Base B (m):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.rw_base_width_m).range(1.5..=10.0).speed(0.1).max_decimals(1));
+                ui.label(RichText::new("φ (°):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.rw_backfill_phi_deg).range(18.0..=42.0).speed(0.5).max_decimals(0));
+                ui.label(RichText::new("c' (kPa):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.rw_cohesion_kpa).range(0.0..=60.0).speed(1.0).max_decimals(0));
+                ui.label(RichText::new("kh (g):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.rw_kh_seismic).range(0.0..=0.40).speed(0.01).max_decimals(2));
+                if ui.selectable_label(self.rw_shear_key, "Base Shear Key").clicked() {
+                    self.rw_shear_key = !self.rw_shear_key;
+                }
+                if icons::icon_button(
                     ui,
                     AppIcon::Search,
-                    "Search Critical Slip Surface Arc",
-                    11.0,
+                    "Sweep Critical Slip Circle",
+                    10.5,
                     Color32::WHITE,
                     theme.accent_blue,
                     Stroke::NONE,
                     CornerRadius::same(6),
                     Vec2::ZERO,
-                );
+                )
+                .clicked()
+                {
+                    self.export_status = Some(format!(
+                        "Bishop Slip FS = {:.2} (Seismic {:.2}), q_toe = {:.1} kPa",
+                        res.bishop_fs_static, res.bishop_fs_seismic, res.q_toe_kpa
+                    ));
+                }
             });
             ui.add_space(10.0);
 
-            let desired = Vec2::new(ui.available_width(), 155.0);
+            let desired = Vec2::new(ui.available_width(), 165.0);
             let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
             let painter = ui.painter_at(rect);
             painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
-            let base_y = rect.bottom() - 24.0;
+            let base_y = rect.bottom() - 26.0;
             let wall_x = rect.center().x - 16.0;
+            let wall_h_px = (self.rw_wall_height_m * 15.0).clamp(48.0, rect.height() - 48.0);
+            let base_w_px = (self.rw_base_width_m * 16.0).clamp(48.0, 150.0);
+            let top_y = base_y - wall_h_px;
             // Ground slope + retaining stem geometry
             painter.line_segment(
                 [Pos2::new(rect.left() + 20.0, base_y), Pos2::new(wall_x, base_y)],
                 Stroke::new(2.0, theme.text_secondary),
             );
             painter.line_segment(
-                [Pos2::new(wall_x, rect.top() + 34.0), Pos2::new(rect.right() - 20.0, rect.top() + 34.0)],
+                [Pos2::new(wall_x, top_y), Pos2::new(rect.right() - 20.0, top_y)],
                 Stroke::new(2.0, theme.text_secondary),
             );
             let stem = Rect::from_min_max(
-                Pos2::new(wall_x, rect.top() + 34.0),
+                Pos2::new(wall_x, top_y),
                 Pos2::new(wall_x + 14.0, base_y),
             );
             painter.rect_filled(stem, CornerRadius::ZERO, theme.accent_blue.gamma_multiply(0.75));
             let footing = Rect::from_min_max(
-                Pos2::new(wall_x - 24.0, base_y - 12.0),
-                Pos2::new(wall_x + 48.0, base_y),
+                Pos2::new(wall_x - base_w_px * 0.30, base_y - 12.0),
+                Pos2::new(wall_x + base_w_px * 0.70, base_y),
             );
             painter.rect_filled(footing, CornerRadius::ZERO, theme.accent_blue);
+            if self.rw_shear_key {
+                let key = Rect::from_min_max(
+                    Pos2::new(wall_x, base_y),
+                    Pos2::new(wall_x + 12.0, base_y + 12.0),
+                );
+                painter.rect_filled(key, CornerRadius::ZERO, theme.accent_green);
+            }
 
             // Critical circular slip arc
             let mut arc_pts = Vec::with_capacity(24);
             for i in 0..=23 {
                 let t = i as f32 / 23.0;
-                let px = (wall_x - 42.0) + t * 155.0;
-                let depth = 4.0 * t * (1.0 - t) * 58.0;
-                let top_interp = if px < wall_x { base_y } else { rect.top() + 34.0 };
-                let py = (base_y - 26.0 * t) + depth.min(54.0);
-                let _ = top_interp;
+                let px = (wall_x - 42.0) + t * (base_w_px + 96.0);
+                let depth = 4.0 * t * (1.0 - t) * 56.0;
+                let py = (base_y - wall_h_px * 0.30 * t) + depth.min(54.0);
                 arc_pts.push(Pos2::new(px.min(rect.right() - 24.0), py.min(rect.bottom() - 8.0)));
             }
             for w in arc_pts.windows(2) {
                 painter.line_segment([w[0], w[1]], Stroke::new(2.2, theme.accent_red));
             }
             painter.text(
-                Pos2::new(rect.right() - 28.0, rect.bottom() - 14.0),
+                Pos2::new(rect.right() - 20.0, rect.bottom() - 12.0),
                 Align2::RIGHT_CENTER,
-                "Critical Slip Circle (FS = 1.58)",
+                format!(
+                    "Bishop Slip Circle (FS = {:.2} Static / {:.2} EQ) • q_toe = {:.0} kPa",
+                    res.bishop_fs_static, res.bishop_fs_seismic, res.q_toe_kpa
+                ),
                 FontId::proportional(10.0),
                 theme.accent_red,
             );
@@ -478,5 +656,18 @@ mod tests {
         assert!(cont.env_max_pos_moment_knm > simple.env_max_pos_moment_knm * 0.5);
         assert!(cont.env_max_neg_pier_knm < -500.0);
         assert_eq!(cont.influence_line.len(), 41);
+    }
+
+    #[test]
+    fn test_retaining_wall_and_bishop_circular_slip_solver() {
+        let with_key = super::compute_retaining_wall_bishop_stability(
+            5.5, 3.8, 32.0, 12.0, 18.5, 0.18, true, 15.0,
+        );
+        let no_key = super::compute_retaining_wall_bishop_stability(
+            5.5, 3.8, 32.0, 12.0, 18.5, 0.18, false, 15.0,
+        );
+        assert!(with_key.ka < with_key.kae);
+        assert!(with_key.fs_sliding > no_key.fs_sliding);
+        assert!(with_key.bishop_fs_static > with_key.bishop_fs_seismic);
     }
 }

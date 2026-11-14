@@ -316,58 +316,218 @@ impl ParametricView {
             });
         });
     }
+}
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct MepRiserRow {
+    pub riser_id: String,
+    pub system_name: String,
+    pub size_spec: String,
+    pub firestop_collar: String,
+    pub head_loss: String,
+}
+
+/// Derives storey-aware vertical MEP riser shaft schedules from live `BimProject` heights.
+pub fn compute_mep_riser_schedule(project: &BimProject, system_filter_idx: usize) -> Vec<MepRiserRow> {
+    let max_elev_m = project
+        .levels
+        .iter()
+        .map(|l| l.elevation_mm as f32 / 1000.0)
+        .fold(3.8_f32, f32::max);
+    let storeys = project.levels.len().max(1);
+    let static_head_kpa = 9.81 * max_elev_m;
+    let chw_loss = (max_elev_m * 0.72).max(4.5);
+    let mut rows = vec![
+        MepRiserRow {
+            riser_id: "CHW-R01".to_string(),
+            system_name: format!("Chilled Water Supply ({storeys} Flrs)"),
+            size_spec: if storeys >= 6 { "DN200 Sch40".to_string() } else { "DN125 Sch40".to_string() },
+            firestop_collar: "2-Hr Intumescent UL".to_string(),
+            head_loss: format!("{:.1} kPa ({:.1}m H)", chw_loss, max_elev_m),
+        },
+        MepRiserRow {
+            riser_id: "FSP-R02".to_string(),
+            system_name: "Class I Fire Standpipe".to_string(),
+            size_spec: "DN150 Galv. Steel".to_string(),
+            firestop_collar: "2-Hr Cast-In Sleeve".to_string(),
+            head_loss: format!("{:.1} kPa static", static_head_kpa),
+        },
+        MepRiserRow {
+            riser_id: "HVC-D01".to_string(),
+            system_name: "Fresh Air Pressurization Duct".to_string(),
+            size_spec: if storeys >= 6 { "800x500 mm GI".to_string() } else { "600x400 mm GI".to_string() },
+            firestop_collar: "Fire Damper FD-90".to_string(),
+            head_loss: format!("{:.1} Pa ({:.1}m)", max_elev_m * 1.15, max_elev_m),
+        },
+        MepRiserRow {
+            riser_id: "ELV-B01".to_string(),
+            system_name: "Main Electrical Riser Busway".to_string(),
+            size_spec: format!("Cu IP55 ({}A)", storeys * 250),
+            firestop_collar: "3-Hr Mortar Seal".to_string(),
+            head_loss: format!("{:.2}% dV", (max_elev_m * 0.04).clamp(0.4, 2.8)),
+        },
+    ];
+    if system_filter_idx == 1 {
+        rows.retain(|r| r.riser_id.starts_with("FSP") || r.riser_id.starts_with("ELV"));
+    }
+    rows
+}
+
+impl ParametricView {
     pub(super) fn render_elevations_mep_riser(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::BuildingElevationsMepRiser, |ui| {
+            let proj = &self.bim_bus.project;
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "North Facade Elevation");
-                let _ = ui.selectable_label(false, "East Facade Elevation");
-                let _ = ui.selectable_label(false, "HVAC + Chilled Water Riser");
-                let _ = ui.selectable_label(false, "Fire Standpipe + Sprinkler");
-                let _ = icons::icon_button(
+                for (idx, lbl) in [
+                    (0, "North Facade (X-Z)"),
+                    (1, "East Facade (Y-Z)"),
+                    (2, "South Facade (X-Z)"),
+                    (3, "West Facade (Y-Z)"),
+                ] {
+                    if ui.selectable_label(self.elev_facade_idx == idx, lbl).clicked() {
+                        self.elev_facade_idx = idx;
+                    }
+                }
+                ui.separator();
+                if ui.selectable_label(self.elev_mep_system_idx == 0, "All HVAC + CHW + Fire").clicked() {
+                    self.elev_mep_system_idx = 0;
+                }
+                if ui.selectable_label(self.elev_mep_system_idx == 1, "Fire Standpipe Focus").clicked() {
+                    self.elev_mep_system_idx = 1;
+                }
+                if icons::icon_button(
                     ui,
                     AppIcon::RulerSquare,
-                    "Project All Facades & Riser Stacks to Sheets",
+                    "Export Elevation + MEP Riser (.svg)",
                     10.5,
                     theme.text_primary,
                     theme.bg_card,
                     Stroke::NONE,
                     CornerRadius::same(5),
                     Vec2::new(0.0, 24.0),
-                );
+                )
+                .clicked()
+                {
+                    let dir_name = ["North", "East", "South", "West"][self.elev_facade_idx.min(3)];
+                    let svg = format!(
+                        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"840\" height=\"420\">\n<rect width=\"840\" height=\"420\" fill=\"#0f172a\"/>\n<text x=\"24\" y=\"32\" fill=\"#e2e8f0\" font-size=\"16\">{} — {} Orthographic Elevation ({} Levels, {} Elements)</text>\n</svg>",
+                        proj.project_name, dir_name, proj.levels.len(), proj.element_count()
+                    );
+                    let fname = format!("Elevation_{}_{}.svg", dir_name, proj.project_name.replace([' ', '/', '\\'], "_"));
+                    let _ = crate::core::web_bridge::save_text_file(&fname, &svg, "image/svg+xml");
+                }
             });
             ui.add_space(10.0);
 
             ui_kit::responsive_two_panes(ui, 620.0, |ui, pane| match pane {
                 0 => {
-                    ui.label(RichText::new("ORTHOGRAPHIC FACADE DATUM & BAY ELEVATION").size(11.0).strong().color(theme.accent_blue));
+                    let dir_name = ["NORTH", "EAST", "SOUTH", "WEST"][self.elev_facade_idx.min(3)];
+                    ui.label(RichText::new(format!("{} ORTHOGRAPHIC FACADE & DATUM ELEVATION", dir_name)).size(11.0).strong().color(theme.accent_blue));
                     ui.add_space(6.0);
-                    let desired = Vec2::new(ui.available_width(), 165.0);
+                    let desired = Vec2::new(ui.available_width(), 185.0);
                     let (rect, _) = ui.allocate_exact_size(desired, Sense::hover());
                     let painter = ui.painter_at(rect);
                     painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
-                    let left = rect.left() + 58.0;
+                    let left = rect.left() + 74.0;
                     let right = rect.right() - 24.0;
-                    for (i, lvl) in ["Roof +19.2m", "L5 +15.6m", "L4 +12.0m", "L3 +8.4m", "L2 +4.8m", "GF ±0.0m"].iter().enumerate() {
-                        let y = rect.top() + 20.0 + (i as f32) * 23.0;
-                        painter.line_segment([Pos2::new(left, y), Pos2::new(right, y)], Stroke::new(1.0, theme.text_muted.gamma_multiply(0.5)));
-                        painter.text(Pos2::new(left - 6.0, y), Align2::RIGHT_CENTER, *lvl, FontId::proportional(9.5), theme.accent_blue);
+                    let top_pad = rect.top() + 18.0;
+                    let bot_pad = rect.bottom() - 18.0;
+
+                    let mut sorted_lvls = proj.levels.clone();
+                    sorted_lvls.sort_by(|a, b| a.elevation_mm.total_cmp(&b.elevation_mm));
+                    let min_z_mm = sorted_lvls.first().map(|l| l.elevation_mm).unwrap_or(0.0).min(0.0);
+                    let max_z_mm = sorted_lvls
+                        .iter()
+                        .map(|l| l.elevation_mm + 3600.0)
+                        .chain(proj.columns.iter().map(|c| proj.level_elevation(c.top_level_id)))
+                        .chain(proj.walls.iter().map(|w| {
+                            let wb = proj.level_elevation(w.base_level_id);
+                            w.top_level_id
+                                .map(|id| proj.level_elevation(id))
+                                .unwrap_or(wb + w.unconnected_height_mm)
+                        }))
+                        .fold(4000.0_f64, f64::max);
+                    let z_span = (max_z_mm - min_z_mm).max(3000.0);
+                    let z_to_y = |z_mm: f64| -> f32 {
+                        let t = ((z_mm - min_z_mm) / z_span).clamp(0.0, 1.0) as f32;
+                        bot_pad - t * (bot_pad - top_pad)
+                    };
+
+                    for lvl in &sorted_lvls {
+                        let y = z_to_y(lvl.elevation_mm);
+                        painter.line_segment([Pos2::new(left, y), Pos2::new(right, y)], Stroke::new(1.0, theme.text_muted.gamma_multiply(0.45)));
+                        painter.text(
+                            Pos2::new(left - 6.0, y),
+                            Align2::RIGHT_CENTER,
+                            format!("{} {:+.1}m", lvl.name.chars().take(8).collect::<String>(), lvl.elevation_mm / 1000.0),
+                            FontId::proportional(9.0),
+                            theme.accent_blue,
+                        );
                     }
-                    let frame_rect = Rect::from_min_max(Pos2::new(left + 12.0, rect.top() + 20.0), Pos2::new(right - 12.0, rect.top() + 135.0));
-                    painter.rect_stroke(frame_rect, CornerRadius::ZERO, Stroke::new(1.8, theme.accent_green), StrokeKind::Inside);
-                    for col in 1..4 {
-                        let cx = frame_rect.left() + (col as f32 / 4.0) * frame_rect.width();
-                        painter.line_segment([Pos2::new(cx, frame_rect.top()), Pos2::new(cx, frame_rect.bottom())], Stroke::new(1.2, theme.text_secondary));
+
+                    let use_x = self.elev_facade_idx % 2 == 0;
+                    let extents = proj.plan_extents_mm().unwrap_or(([0.0, 0.0], [12000.0, 8000.0]));
+                    let (min_u, max_u) = if use_x { (extents.0[0], extents.1[0]) } else { (extents.0[1], extents.1[1]) };
+                    let u_span = (max_u - min_u).max(2000.0);
+                    let u_to_x = |u_mm: f64| -> f32 {
+                        let mut t = ((u_mm - min_u) / u_span).clamp(0.0, 1.0) as f32;
+                        if self.elev_facade_idx >= 2 {
+                            t = 1.0 - t;
+                        }
+                        left + 12.0 + t * (right - left - 24.0)
+                    };
+
+                    if proj.is_empty() {
+                        painter.text(
+                            rect.center(),
+                            Align2::CENTER_CENTER,
+                            "Empty Ground Canvas — Draw walls/columns in Plan or instantiate a template to project Elevations",
+                            FontId::proportional(10.5),
+                            theme.text_muted,
+                        );
+                    } else {
+                        for w in &proj.walls {
+                            let x0 = u_to_x(if use_x { w.start.0 } else { w.start.1 });
+                            let x1 = u_to_x(if use_x { w.end.0 } else { w.end.1 });
+                            let wb = proj.level_elevation(w.base_level_id);
+                            let wt = w
+                                .top_level_id
+                                .map(|id| proj.level_elevation(id))
+                                .unwrap_or(wb + w.unconnected_height_mm);
+                            let y0 = z_to_y(wt);
+                            let y1 = z_to_y(wb);
+                            let r = Rect::from_two_pos(Pos2::new(x0.min(x1), y0), Pos2::new(x0.max(x1).max(x0.min(x1) + 2.0), y1));
+                            painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.4, theme.accent_green), StrokeKind::Inside);
+                        }
+                        for c in &proj.columns {
+                            let cx = u_to_x(if use_x { c.pos.0 } else { c.pos.1 });
+                            painter.line_segment(
+                                [
+                                    Pos2::new(cx, z_to_y(proj.level_elevation(c.top_level_id))),
+                                    Pos2::new(cx, z_to_y(proj.level_elevation(c.base_level_id))),
+                                ],
+                                Stroke::new(2.0, theme.text_secondary),
+                            );
+                        }
+                        for b in &proj.runs {
+                            let (a3, b3) = b.centerline_3d(proj.level_elevation(b.level_id));
+                            let x0 = u_to_x(if use_x { a3[0] } else { a3[1] });
+                            let x1 = u_to_x(if use_x { b3[0] } else { b3[1] });
+                            let ya = z_to_y(a3[2]);
+                            let yb = z_to_y(b3[2]);
+                            painter.line_segment([Pos2::new(x0, ya), Pos2::new(x1, yb)], Stroke::new(2.2, theme.accent_orange));
+                        }
                     }
                 }
                 _ => {
                     ui.label(RichText::new("VERTICAL MEP SHAFT & FIRESTOP RISER SCHEDULE").size(11.0).strong().color(theme.accent_blue));
                     ui.add_space(6.0);
+                    let rows = compute_mep_riser_schedule(proj, self.elev_mep_system_idx);
                     ScrollArea::horizontal().id_salt("mep_riser_table").show(ui, |ui| {
                         egui::Grid::new("mep_riser_grid")
                             .striped(true)
@@ -377,17 +537,12 @@ impl ParametricView {
                                     ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                                 }
                                 ui.end_row();
-                                for (id, sys, spec, collar, drop) in [
-                                    ("CHW-R01", "Chilled Water Supply", "DN200 Sch40", "2-Hr Intumescent UL", "14.2 kPa/100m"),
-                                    ("FSP-R02", "Class I Fire Standpipe", "DN150 Galv.", "2-Hr Cast-In Sleeve", "38.0 kPa static"),
-                                    ("HVC-D01", "Fresh Air Pressurization", "800×500 mm", "Fire Damper FD-90", "0.85 Pa/m"),
-                                    ("ELV-B01", "Main 1600A Busway", "Cu IP55", "3-Hr Mortar Seal", "1.1% dV"),
-                                ] {
-                                    ui.label(RichText::new(id).size(10.5).monospace().color(theme.text_primary));
-                                    ui.label(RichText::new(sys).size(10.5).color(theme.text_secondary));
-                                    ui.label(RichText::new(spec).size(10.5).color(theme.text_muted));
-                                    ui.label(RichText::new(collar).size(10.5).strong().color(theme.accent_green));
-                                    ui.label(RichText::new(drop).size(10.5).monospace().color(theme.accent_orange));
+                                for r in &rows {
+                                    ui.label(RichText::new(&r.riser_id).size(10.5).monospace().color(theme.text_primary));
+                                    ui.label(RichText::new(&r.system_name).size(10.5).color(theme.text_secondary));
+                                    ui.label(RichText::new(&r.size_spec).size(10.5).color(theme.text_muted));
+                                    ui.label(RichText::new(&r.firestop_collar).size(10.5).strong().color(theme.accent_green));
+                                    ui.label(RichText::new(&r.head_loss).size(10.5).monospace().color(theme.accent_orange));
                                     ui.end_row();
                                 }
                             });
@@ -412,5 +567,14 @@ mod tests {
         let sum_wt: f64 = rows.iter().map(|r| r.total_weight_kg).sum();
         assert!((sum_wt - proj.total_rebar_weight_kg()).abs() < 1e-3);
         assert!(rows.iter().any(|r| r.iso_shape.contains("SC-51")));
+    }
+
+    #[test]
+    fn test_compute_mep_riser_schedule_scales_with_levels() {
+        let proj = BimProject::sample_bimcraft_building();
+        let all = compute_mep_riser_schedule(&proj, 0);
+        assert_eq!(all.len(), 4);
+        let fire_only = compute_mep_riser_schedule(&proj, 1);
+        assert_eq!(fire_only.len(), 2);
     }
 }

@@ -19,6 +19,42 @@ struct Member3D {
 
 
 impl BuildView {
+    /// Auto-fits the 3D orbit camera zoom and ground World Map around active BIM / FEM extents.
+    pub fn fit_view_to_project(
+        &mut self,
+        universal_canvas: &mut UniversalCanvasState,
+        members: &[StructuralMember],
+    ) {
+        let extents = self.bim_bus.project.plan_extents_mm();
+        universal_canvas.fit_world_to_bim_extents(extents);
+        let (_, _, raw) = self.build_model_geometry(members);
+        if raw.is_empty() {
+            self.cam_zoom = 1.15;
+            self.cam_pan = Vec2::ZERO;
+            return;
+        }
+        let mut min_v = (f32::INFINITY, f32::INFINITY, f32::INFINITY);
+        let mut max_v = (f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
+        for m in &raw {
+            for p in [m.p1, m.p2] {
+                min_v.0 = min_v.0.min(p.0);
+                min_v.1 = min_v.1.min(p.1);
+                min_v.2 = min_v.2.min(p.2);
+                max_v.0 = max_v.0.max(p.0);
+                max_v.1 = max_v.1.max(p.1);
+                max_v.2 = max_v.2.max(p.2);
+            }
+        }
+        let span_m = (max_v.0 - min_v.0)
+            .max(max_v.1 - min_v.1)
+            .max(max_v.2 - min_v.2)
+            .max(4.0);
+        self.cam_zoom = (14.5 / span_m).clamp(0.30, 2.80);
+        self.cam_pan = Vec2::ZERO;
+        self.cam_yaw = 0.65;
+        self.cam_pitch = 0.35;
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(super) fn render_canvas(
         &mut self,
@@ -36,355 +72,7 @@ impl BuildView {
         let is_wide = avail_w >= 980.0;
         let has_floating_room = avail_w >= 720.0;
 
-        // 1. Universal-style Top Canvas HUD Toolbar
-        Frame::new()
-            .fill(theme.bg_card)
-            .corner_radius(CornerRadius::same(8))
-            .stroke(Stroke::new(1.0, theme.border_subtle))
-            .inner_margin(Margin::symmetric(12, 8))
-            .show(ui, |ui| {
-                let inner_w = ui.available_width().max(120.0);
-                ui.set_width(inner_w);
-                ui.set_max_width(inner_w);
-                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
-                ui.horizontal_wrapped(|ui| {
-                    if sidebar_toggle_inset_px > 0.0 {
-                        ui.add_space(sidebar_toggle_inset_px);
-                    }
-
-                    icons::pill_badge(ui, AppIcon::Cube3D, "Geometry • 3D", theme.accent_blue);
-                    ui.separator();
-
-                    // Render Style & Internal Force Diagrams
-                    let modes = [
-                        (Render3DMode::CsgSolidBrep, AppIcon::Cube3D, "CSG B-Rep", "True 3D CSG Boolean Mesh (Openings, WF Flanges & Rebar)"),
-                        (Render3DMode::SolidShaded, AppIcon::SolidBox, "Solid", "Shaded solid structural frame"),
-                        (Render3DMode::Wireframe, AppIcon::Wireframe, "Wireframe", "Vector wireframe members"),
-                        (Render3DMode::AxialForceNFD, AppIcon::ChartBar, "NFD", "Normal / Axial Force Diagram (Red=Tension, Blue=Compression)"),
-                        (Render3DMode::ShearForceSFD, AppIcon::Bolt, "SFD", "Shear Force Diagram (SFD)"),
-                        (Render3DMode::BendingMomentBMD, AppIcon::ChartLine, "BMD", "Bending Moment Diagram (BMD)"),
-                    ];
-                    for (rm, icon, lbl, tip) in modes {
-                        let sel = self.render_mode == rm;
-                        if icons::icon_button(
-                            ui,
-                            icon,
-                            lbl,
-                            10.5,
-                            if sel { Color32::WHITE } else { theme.text_secondary },
-                            if sel { theme.accent_blue } else { theme.bg_card },
-                            Stroke::NONE,
-                            CornerRadius::same(6),
-                            Vec2::new(0.0, 26.0),
-                        )
-                        .on_hover_text(tip)
-                        .clicked()
-                        {
-                            self.render_mode = rm;
-                        }
-                    }
-
-                    ui.separator();
-
-                    // Phase 35: World Map Basemap, Globe Reset, Ground 1:200 & Site Origin Controls
-                    universal_canvas.render_world_map_toolbar_controls(ui, theme, 26.0);
-
-                    ui.separator();
-
-                    // ViewCube Camera Presets
-                    for (lbl, yaw, pitch) in [
-                        ("Iso", 0.65_f32, 0.35_f32),
-                        ("Front", 0.0, 0.0),
-                        ("Top", 0.0, 1.50),
-                        ("Side", 1.57, 0.0),
-                    ] {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new(lbl).size(10.5).color(theme.text_secondary),
-                                )
-                                .fill(theme.bg_card)
-                                .corner_radius(CornerRadius::same(6))
-                                .min_size(Vec2::new(0.0, 26.0)),
-                            )
-                            .clicked()
-                        {
-                            self.cam_yaw = yaw;
-                            self.cam_pitch = pitch;
-                        }
-                    }
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::ZoomFit,
-                        "Fit",
-                        10.5,
-                        theme.accent_blue,
-                        theme.bg_card,
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        Vec2::new(0.0, 26.0),
-                    )
-                    .clicked()
-                    {
-                        self.cam_zoom = 1.15;
-                        self.cam_pan = Vec2::ZERO;
-                    }
-                    if ui
-                        .add(
-                            egui::Button::new(RichText::new("Persp").size(10.5).color(
-                                if self.perspective {
-                                    Color32::WHITE
-                                } else {
-                                    theme.text_secondary
-                                },
-                            ))
-                            .fill(if self.perspective {
-                                theme.accent_blue
-                            } else {
-                                theme.bg_card
-                            })
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(0.0, 26.0)),
-                        )
-                        .clicked()
-                    {
-                        self.perspective = !self.perspective;
-                    }
-
-                    ui.separator();
-
-                    // Shared Freeze Canvas Toggle
-                    UniversalCanvasState::render_freeze_button(
-                        ui,
-                        theme,
-                        &mut universal_canvas.is_frozen,
-                        26.0,
-                    );
-
-                    // Top-Toolbar Dockable Inspector Toggles (open inside top dock above canvas)
-                    let proj_active = self.floating_project_open;
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::Folder,
-                        "Project",
-                        10.5,
-                        if proj_active { Color32::WHITE } else { theme.text_secondary },
-                        if proj_active { theme.accent_green } else { theme.bg_card },
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        Vec2::new(0.0, 26.0),
-                    )
-                    .on_hover_text("Toggle Project & Model Tree drawer in the top toolbar dock")
-                    .clicked()
-                    {
-                        self.floating_project_open = !self.floating_project_open;
-                    }
-
-                    let prop_active = self.floating_properties_open;
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::SlidersPanel,
-                        "Properties",
-                        10.5,
-                        if prop_active { Color32::WHITE } else { theme.text_secondary },
-                        if prop_active { theme.accent_green } else { theme.bg_card },
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        Vec2::new(0.0, 26.0),
-                    )
-                    .on_hover_text("Toggle Properties, Clash, Audit, Geometry & Layers drawer in the top toolbar dock")
-                    .clicked()
-                    {
-                        self.floating_properties_open = !self.floating_properties_open;
-                    }
-
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::ChartBar,
-                        "Data Deck",
-                        10.5,
-                        if self.floating_deck_open { Color32::WHITE } else { theme.text_secondary },
-                        if self.floating_deck_open { theme.accent_blue } else { theme.bg_card },
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        Vec2::new(0.0, 26.0),
-                    )
-                    .on_hover_text("Toggle Schedules QTO, 4D Simulation, Clash & BIM Console drawer in the top toolbar dock")
-                    .clicked()
-                    {
-                        self.floating_deck_open = !self.floating_deck_open;
-                        self.bottom_deck_expanded = self.floating_deck_open;
-                    }
-
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::Wrench,
-                        "BIM Tools",
-                        10.5,
-                        if self.show_discipline_ribbon { Color32::WHITE } else { theme.text_secondary },
-                        if self.show_discipline_ribbon { theme.accent_blue } else { theme.bg_card },
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        Vec2::new(0.0, 26.0),
-                    )
-                    .on_hover_text("Show or hide the 12-discipline BIM authoring ribbon")
-                    .clicked()
-                    {
-                        self.show_discipline_ribbon = !self.show_discipline_ribbon;
-                    }
-
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::Pencil,
-                        "Sketch",
-                        10.5,
-                        if self.sketch_mode_active { Color32::WHITE } else { theme.text_secondary },
-                        if self.sketch_mode_active { theme.accent_orange } else { theme.bg_card },
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        Vec2::new(0.0, 26.0),
-                    )
-                    .on_hover_text("Draw synced Universal Ink Sketch annotations directly on the 3D ground plane")
-                    .clicked()
-                    {
-                        self.sketch_mode_active = !self.sketch_mode_active;
-                    }
-
-                    ui.separator();
-
-                    // Unified 1-File Sync & Import
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::SaveDisk,
-                        "Save 1-File",
-                        10.5,
-                        Color32::WHITE,
-                        theme.accent_green,
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        Vec2::new(0.0, 26.0),
-                    )
-                    .on_hover_text("Save entire project workspace into 1 verified .eigen.json file")
-                    .clicked()
-                    {
-                        universal_canvas.export_unified_file(
-                            &self.bim_bus.project,
-                            members,
-                            parametric_variables,
-                            workspace_settings.clone(),
-                        );
-                        if let Some(ref msg) = universal_canvas.status_message {
-                            self.modify_status_msg = Some(msg.clone());
-                        }
-                    }
-
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::UploadImport,
-                        "Import",
-                        10.5,
-                        theme.text_secondary,
-                        theme.bg_card,
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        Vec2::new(0.0, 26.0),
-                    )
-                    .on_hover_text("Import unified .eigen.json workspace archive")
-                    .clicked()
-                    {
-                        universal_canvas.import_json_open = true;
-                    }
-
-                    // Active Disruption / Palette Badges & Selection Clear
-                    if !self.simulated_eliminated_ids.is_empty() {
-                        icons::pill_badge(
-                            ui,
-                            AppIcon::AlertTriangle,
-                            format!(
-                                "N-{} DISRUPTION: {:?}",
-                                self.simulated_eliminated_ids.len(),
-                                self.simulated_eliminated_ids
-                            ),
-                            theme.accent_red,
-                        );
-                    } else {
-                        icons::pill_badge(
-                            ui,
-                            AppIcon::Palette,
-                            self.color_mode.clone(),
-                            theme.accent_blue,
-                        );
-                    }
-                    if self.selected_member_id.is_some()
-                        && icons::icon_button(
-                            ui,
-                            AppIcon::Close,
-                            "Clear Sel",
-                            10.0,
-                            theme.text_secondary,
-                            theme.bg_card,
-                            Stroke::NONE,
-                            CornerRadius::same(5),
-                            Vec2::new(0.0, 26.0),
-                        )
-                        .clicked()
-                    {
-                        self.selected_member_id = None;
-                    }
-                });
-            });
-
-        // 1B. Row 2: Levels, Scale, Detail (LOD), Visual Toggles & BIM Command Line (inside Top Toolbar)
-        self.render_top_toolbar_row2_and_cmd(ui, theme, universal_canvas);
-
-        // 2. Conditional Universal Ink Sketch Bar (when Ground Sketch Mode is active)
-        if self.sketch_mode_active {
-            Frame::new()
-                .fill(theme.bg_sidebar)
-                .stroke(Stroke::new(1.0, theme.border_subtle))
-                .inner_margin(Margin::symmetric(12, 5))
-                .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.horizontal_wrapped(|ui| {
-                        universal_canvas.render_sketch_tools_bar(ui, theme, 24.0, false);
-                        ui.separator();
-                        universal_canvas.render_color_swatches(ui, theme);
-                        ui.separator();
-                        icons::pill_badge(
-                            ui,
-                            AppIcon::LinkChain,
-                            "3D Ground Sync Active (y=0.02m)",
-                            theme.accent_green,
-                        );
-                    });
-                });
-        }
-
-        // 3. Conditional 12-Discipline BIM Authoring Ribbon
-        if self.show_discipline_ribbon {
-            self.render_bim_master_ribbon(ui, theme, 0.0);
-        }
-
-        // 3B. Top-Toolbar Dockable Inspector Area (Project Browser, Properties, Data Deck — never floats over canvas)
-        if self.floating_project_open || self.floating_properties_open || self.floating_deck_open {
-            self.render_top_dock_drawers(
-                ui,
-                theme,
-                members,
-                db_components,
-                features,
-                universal_canvas,
-                parametric_variables,
-                &workspace_settings,
-                avail_w,
-            );
-        }
-
-        // 4. Shared Status Toast Banner
-        UniversalCanvasState::render_toast_bar(ui, theme, &mut self.modify_status_msg);
-        ui.add_space(6.0);
-
-        // 5. Full-Width 3D Earth Ground Viewport matching Universal Canvas height
+        // 1. Full-Width 3D Earth Ground Viewport FIRST (at top of canvas container)
         let canvas_height = universal_canvas.preferred_canvas_height(ui.ctx());
         let (response, painter) =
             ui.allocate_painter(Vec2::new(avail_w, canvas_height), Sense::click_and_drag());
@@ -395,7 +83,17 @@ impl BuildView {
         let _ = has_floating_room;
 
         painter.rect_filled(rect, CornerRadius::same(10), UniversalCanvasState::canvas_bg(theme));
-        let pointer_in_floating = false;
+
+        // Top-left Floating Freeze / Live Toggle inside 3D Viewport (interact BEFORE orbit/draw checks)
+        let (freeze_pill_rect, pointer_in_freeze_pill, freeze_pill_hovered) =
+            UniversalCanvasState::interact_floating_freeze_pill(
+                ui,
+                rect,
+                "geometry_3d",
+                &mut universal_canvas.is_frozen,
+                sidebar_toggle_inset_px,
+            );
+        let pointer_in_floating = pointer_in_freeze_pill;
 
         // Geometry Definitions & Model Centers
         let (center_3d, base_scale_unit, raw_members) = self.build_model_geometry(members);
@@ -1630,10 +1328,13 @@ impl BuildView {
             universal_canvas.paint_live_preview_world(&painter, rect, theme, &ground_to_screen);
         }
 
-        if universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx()) {
-            let bottom_offset = if self.show_axes { 88.0 } else { 14.0 };
-            UniversalCanvasState::paint_frozen_badge(&painter, rect, theme, bottom_offset);
-        }
+        UniversalCanvasState::paint_floating_freeze_pill(
+            &painter,
+            freeze_pill_rect,
+            theme,
+            universal_canvas.is_frozen,
+            freeze_pill_hovered,
+        );
 
         // 7. Floating Hover Glass Tooltip
         if let Some(hid) = hovered_member {
@@ -1791,6 +1492,341 @@ impl BuildView {
                     );
                 });
             });
+
+        // 2. Shared Status Toast Banner & Bottom HUD Toolbars below 3D Viewport
+        UniversalCanvasState::render_toast_bar(ui, theme, &mut self.modify_status_msg);
+        ui.add_space(6.0);
+
+        Frame::new()
+            .fill(theme.bg_card)
+            .corner_radius(CornerRadius::same(8))
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .inner_margin(Margin::symmetric(12, 8))
+            .show(ui, |ui| {
+                let inner_w = ui.available_width().max(120.0);
+                ui.set_width(inner_w);
+                ui.set_max_width(inner_w);
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+                ui.horizontal_wrapped(|ui| {
+                    icons::pill_badge(ui, AppIcon::Cube3D, "Geometry • 3D", theme.accent_blue);
+                    ui.separator();
+
+                    // Render Style & Internal Force Diagrams
+                    let modes = [
+                        (Render3DMode::CsgSolidBrep, AppIcon::Cube3D, "CSG B-Rep", "True 3D CSG Boolean Mesh (Openings, WF Flanges & Rebar)"),
+                        (Render3DMode::SolidShaded, AppIcon::SolidBox, "Solid", "Shaded solid structural frame"),
+                        (Render3DMode::Wireframe, AppIcon::Wireframe, "Wireframe", "Vector wireframe members"),
+                        (Render3DMode::AxialForceNFD, AppIcon::ChartBar, "NFD", "Normal / Axial Force Diagram (Red=Tension, Blue=Compression)"),
+                        (Render3DMode::ShearForceSFD, AppIcon::Bolt, "SFD", "Shear Force Diagram (SFD)"),
+                        (Render3DMode::BendingMomentBMD, AppIcon::ChartLine, "BMD", "Bending Moment Diagram (BMD)"),
+                    ];
+                    for (rm, icon, lbl, tip) in modes {
+                        let sel = self.render_mode == rm;
+                        if icons::icon_button(
+                            ui,
+                            icon,
+                            lbl,
+                            10.5,
+                            if sel { Color32::WHITE } else { theme.text_secondary },
+                            if sel { theme.accent_blue } else { theme.bg_card },
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 26.0),
+                        )
+                        .on_hover_text(tip)
+                        .clicked()
+                        {
+                            self.render_mode = rm;
+                        }
+                    }
+
+                    ui.separator();
+
+                    // Phase 35: World Map Basemap, Globe Reset, Ground 1:200 & Site Origin Controls
+                    universal_canvas.render_world_map_toolbar_controls(ui, theme, 26.0);
+
+                    ui.separator();
+
+                    // ViewCube Camera Presets
+                    for (lbl, yaw, pitch) in [
+                        ("Iso", 0.65_f32, 0.35_f32),
+                        ("Front", 0.0, 0.0),
+                        ("Top", 0.0, 1.50),
+                        ("Side", 1.57, 0.0),
+                    ] {
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    RichText::new(lbl).size(10.5).color(theme.text_secondary),
+                                )
+                                .fill(theme.bg_card)
+                                .corner_radius(CornerRadius::same(6))
+                                .min_size(Vec2::new(0.0, 26.0)),
+                            )
+                            .clicked()
+                        {
+                            self.cam_yaw = yaw;
+                            self.cam_pitch = pitch;
+                        }
+                    }
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ZoomFit,
+                        "Fit Model",
+                        10.5,
+                        theme.accent_blue,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Auto-fit 3D camera and Earth site view to active BIM model extents")
+                    .clicked()
+                    {
+                        self.fit_view_to_project(universal_canvas, members);
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new("Persp").size(10.5).color(
+                                if self.perspective {
+                                    Color32::WHITE
+                                } else {
+                                    theme.text_secondary
+                                },
+                            ))
+                            .fill(if self.perspective {
+                                theme.accent_blue
+                            } else {
+                                theme.bg_card
+                            })
+                            .corner_radius(CornerRadius::same(6))
+                            .min_size(Vec2::new(0.0, 26.0)),
+                        )
+                        .clicked()
+                    {
+                        self.perspective = !self.perspective;
+                    }
+
+                    ui.separator();
+
+                    // Bottom-Toolbar Dockable Inspector Toggles
+                    let proj_active = self.floating_project_open;
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Folder,
+                        "Project",
+                        10.5,
+                        if proj_active { Color32::WHITE } else { theme.text_secondary },
+                        if proj_active { theme.accent_green } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Toggle Project & Model Tree drawer in toolbar dock")
+                    .clicked()
+                    {
+                        self.floating_project_open = !self.floating_project_open;
+                    }
+
+                    let prop_active = self.floating_properties_open;
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SlidersPanel,
+                        "Properties",
+                        10.5,
+                        if prop_active { Color32::WHITE } else { theme.text_secondary },
+                        if prop_active { theme.accent_green } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Toggle Properties, Clash, Audit, Geometry & Layers drawer in toolbar dock")
+                    .clicked()
+                    {
+                        self.floating_properties_open = !self.floating_properties_open;
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::ChartBar,
+                        "Data Deck",
+                        10.5,
+                        if self.floating_deck_open { Color32::WHITE } else { theme.text_secondary },
+                        if self.floating_deck_open { theme.accent_blue } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Toggle Schedules QTO, 4D Simulation, Clash & BIM Console drawer in toolbar dock")
+                    .clicked()
+                    {
+                        self.floating_deck_open = !self.floating_deck_open;
+                        self.bottom_deck_expanded = self.floating_deck_open;
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Wrench,
+                        "BIM Tools",
+                        10.5,
+                        if self.show_discipline_ribbon { Color32::WHITE } else { theme.text_secondary },
+                        if self.show_discipline_ribbon { theme.accent_blue } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Show or hide the 12-discipline BIM authoring ribbon")
+                    .clicked()
+                    {
+                        self.show_discipline_ribbon = !self.show_discipline_ribbon;
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Pencil,
+                        "Sketch",
+                        10.5,
+                        if self.sketch_mode_active { Color32::WHITE } else { theme.text_secondary },
+                        if self.sketch_mode_active { theme.accent_orange } else { theme.bg_card },
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Draw synced Universal Ink Sketch annotations directly on the 3D ground plane")
+                    .clicked()
+                    {
+                        self.sketch_mode_active = !self.sketch_mode_active;
+                    }
+
+                    ui.separator();
+
+                    // Unified 1-File Sync & Import
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SaveDisk,
+                        "Save 1-File",
+                        10.5,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Save entire project workspace into 1 verified .eigen.json file")
+                    .clicked()
+                    {
+                        universal_canvas.export_unified_file(
+                            &self.bim_bus.project,
+                            members,
+                            parametric_variables,
+                            workspace_settings.clone(),
+                        );
+                        if let Some(ref msg) = universal_canvas.status_message {
+                            self.modify_status_msg = Some(msg.clone());
+                        }
+                    }
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::UploadImport,
+                        "Import",
+                        10.5,
+                        theme.text_secondary,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::new(0.0, 26.0),
+                    )
+                    .on_hover_text("Import unified .eigen.json workspace archive")
+                    .clicked()
+                    {
+                        universal_canvas.import_json_open = true;
+                    }
+
+                    // Active Disruption / Palette Badges & Selection Clear
+                    if !self.simulated_eliminated_ids.is_empty() {
+                        icons::pill_badge(
+                            ui,
+                            AppIcon::AlertTriangle,
+                            format!(
+                                "N-{} DISRUPTION: {:?}",
+                                self.simulated_eliminated_ids.len(),
+                                self.simulated_eliminated_ids
+                            ),
+                            theme.accent_red,
+                        );
+                    } else {
+                        icons::pill_badge(
+                            ui,
+                            AppIcon::Palette,
+                            self.color_mode.clone(),
+                            theme.accent_blue,
+                        );
+                    }
+                    if self.selected_member_id.is_some()
+                        && icons::icon_button(
+                            ui,
+                            AppIcon::Close,
+                            "Clear Sel",
+                            10.0,
+                            theme.text_secondary,
+                            theme.bg_card,
+                            Stroke::NONE,
+                            CornerRadius::same(5),
+                            Vec2::new(0.0, 26.0),
+                        )
+                        .clicked()
+                    {
+                        self.selected_member_id = None;
+                    }
+                });
+            });
+
+        // 2B. Row 2: Levels, Scale, Detail (LOD), Visual Toggles & Inline BIM Command Line
+        self.render_top_toolbar_row2_and_cmd(ui, theme, universal_canvas);
+
+        // 3. Conditional Universal Ink Sketch Bar (when Ground Sketch Mode is active)
+        if self.sketch_mode_active {
+            Frame::new()
+                .fill(theme.bg_sidebar)
+                .stroke(Stroke::new(1.0, theme.border_subtle))
+                .inner_margin(Margin::symmetric(12, 5))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal_wrapped(|ui| {
+                        universal_canvas.render_sketch_tools_bar(ui, theme, 24.0, false);
+                        ui.separator();
+                        universal_canvas.render_color_swatches(ui, theme);
+                        ui.separator();
+                        icons::pill_badge(
+                            ui,
+                            AppIcon::LinkChain,
+                            "3D Ground Sync Active (y=0.02m)",
+                            theme.accent_green,
+                        );
+                    });
+                });
+        }
+
+        // 4. Conditional 12-Discipline BIM Authoring Ribbon
+        if self.show_discipline_ribbon {
+            self.render_bim_master_ribbon(ui, theme, 0.0);
+        }
+
+        // 5. Dockable Inspector Area (Project Browser, Properties, Data Deck — below viewport)
+        if self.floating_project_open || self.floating_properties_open || self.floating_deck_open {
+            self.render_top_dock_drawers(
+                ui,
+                theme,
+                members,
+                db_components,
+                features,
+                universal_canvas,
+                parametric_variables,
+                &workspace_settings,
+                avail_w,
+            );
+        }
     }
 
     /// Second organized Top Toolbar row inside Geometry canvas:

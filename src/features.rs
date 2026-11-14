@@ -209,7 +209,7 @@ impl FeatureRegistry {
                 code: "LIB-04",
                 title: "ISO 19650 Common Data Environment (CDE) Hub",
                 description: "WIP, Shared, Published, and Archive information containers with suitability codes (S0–A4) and transmittal sign-off.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/my_project.rs + src/core/vault.rs",
                 prioritized: false,
             },
@@ -263,7 +263,7 @@ impl FeatureRegistry {
                 code: "AI-04",
                 title: "Automated Multi-Code Compliance Auditor",
                 description: "Clause-by-clause SNI 2847 / ACI 318 / AISC 360 / SNI 1726 sweep checking SCWB joints, drift caps, and detailing rules.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/ai_firm.rs + src/core/fem.rs",
                 prioritized: false,
             },
@@ -327,7 +327,7 @@ impl FeatureRegistry {
                 code: "1D-05",
                 title: "Geotech Borehole Logs, SPT N60 & Vs30 Soil Stratigraphy",
                 description: "Subsurface boring log inspector, SNI 8460 liquefaction screening, and end-bearing pile socket recommendations.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/research.rs + src/core/geotech.rs",
                 prioritized: false,
             },
@@ -337,7 +337,7 @@ impl FeatureRegistry {
                 code: "1D-06",
                 title: "Site Hydrology, IDF Rainfall Curves & Floodplain Datum",
                 description: "100-year return-period IDF peak runoff (Q = C*I*A), detention sizing, and minimum finished floor elevation (FFE).",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/research.rs + src/core/gis/",
                 prioritized: false,
             },
@@ -401,7 +401,7 @@ impl FeatureRegistry {
                 code: "2D-06",
                 title: "Automated Building Elevations & MEP Riser Diagrams",
                 description: "Projects N/E/S/W architectural elevations with storey levels and schematic HVAC/Chilled-Water/Fire riser stacks.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/parametric/detailing_2d.rs",
                 prioritized: false,
             },
@@ -539,7 +539,7 @@ impl FeatureRegistry {
                 code: "SIM-07",
                 title: "Retaining Wall & Bishop Circular Slope Stability (SNI 8460)",
                 description: "Evaluates Mononobe-Okabe seismic earth pressure, overturning/sliding checks, and method-of-slices slip FS.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/analyze/extended_mechanics.rs",
                 prioritized: false,
             },
@@ -749,7 +749,7 @@ impl FeatureRegistry {
                 code: "8D-02",
                 title: "3D Crane Jib vs BIM Perimeter Clearance Check",
                 description: "Evaluates 3D swing clearance against active BimProject building envelopes and site boundaries.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/safety.rs + src/core/bim.rs",
                 prioritized: false,
             },
@@ -955,7 +955,7 @@ impl FeatureRegistry {
                 code: "PUB-04",
                 title: "PBG / SIMBG & IBC Regulatory Calculation Book Composer",
                 description: "Assembles multi-chapter permitting books combining SNI 1726 spectra, ETABS checks, and PE cover seals.",
-                status: Locked { target_phase: "Phase 34" },
+                status: Active,
                 module_hint: "src/views/results.rs",
                 prioritized: false,
             },
@@ -1136,8 +1136,8 @@ mod tests {
             );
         }
         assert_eq!(reg.total_count(), 74);
-        assert_eq!(reg.active_count(), 44);
-        assert_eq!(reg.locked_count(), 30);
+        assert_eq!(reg.active_count(), 52);
+        assert_eq!(reg.locked_count(), 22);
     }
 
     #[test]
@@ -1145,7 +1145,7 @@ mod tests {
         let mut reg = FeatureRegistry::new();
         assert_eq!(reg.locked_by_phase_count("Phase 32"), 0);
         assert_eq!(reg.locked_by_phase_count("Phase 33"), 0);
-        assert_eq!(reg.locked_by_phase_count("Phase 34"), 18);
+        assert_eq!(reg.locked_by_phase_count("Phase 34"), 10);
         assert_eq!(reg.locked_by_phase_count("Phase 35"), 12);
 
         let before = reg

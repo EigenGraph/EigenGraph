@@ -1542,7 +1542,7 @@ impl SettingsView {
                 ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
                 ui.label(
                     RichText::new(format!(
-                        "v{} — Phase 38 Rounded Canvas Chrome, Parametric Width Fix, Phase 33 Engineering Modules & Vector DED Exports",
+                        "v{} — Phase 39 Viewport-First Canvas, Floating Freeze Pill, Auto-Fit Camera & 8 Phase 34 Engineering Modules",
                         env!("CARGO_PKG_VERSION")
                     ))
                     .size(13.0)

@@ -22,6 +22,80 @@ pub enum SafetySubTab {
     PermitToWorkDrills,
 }
 
+#[derive(Clone, Debug)]
+pub struct CraneBimClearanceReport {
+    pub vertical_clearance_m: f32,
+    pub building_roof_m: f32,
+    pub farthest_corner_m: f32,
+    pub horizontal_gap_m: f32,
+    pub reaches_full_envelope: bool,
+    pub is_collision_free: bool,
+    pub bbox_min_m: Option<[f32; 2]>,
+    pub bbox_max_m: Option<[f32; 2]>,
+}
+
+/// Evaluates 3D tower crane swing radius and hook mast clearance against active `BimProject` extents.
+pub fn compute_crane_bim_perimeter_clearance(
+    project: &crate::core::BimProject,
+    mast_x_m: f32,
+    mast_y_m: f32,
+    mast_h_m: f32,
+    jib_len_m: f32,
+    boundary_buffer_m: f32,
+) -> CraneBimClearanceReport {
+    let roof_m = project
+        .levels
+        .iter()
+        .map(|l| l.elevation_mm as f32 / 1000.0 + 3.5)
+        .chain(project.columns.iter().map(|c| project.level_elevation(c.top_level_id) as f32 / 1000.0))
+        .fold(0.0_f32, f32::max);
+    let vertical_clearance_m = mast_h_m - roof_m;
+
+    let Some((min_mm, max_mm)) = project.plan_extents_mm() else {
+        return CraneBimClearanceReport {
+            vertical_clearance_m,
+            building_roof_m: roof_m,
+            farthest_corner_m: 0.0,
+            horizontal_gap_m: boundary_buffer_m,
+            reaches_full_envelope: true,
+            is_collision_free: true,
+            bbox_min_m: None,
+            bbox_max_m: None,
+        };
+    };
+
+    let min_x = min_mm[0] as f32 / 1000.0;
+    let min_y = min_mm[1] as f32 / 1000.0;
+    let max_x = max_mm[0] as f32 / 1000.0;
+    let max_y = max_mm[1] as f32 / 1000.0;
+
+    // Distance from mast center to nearest point on building plan AABB
+    let cx = mast_x_m.clamp(min_x, max_x);
+    let cy = mast_y_m.clamp(min_y, max_y);
+    let horizontal_gap_m = (mast_x_m - cx).hypot(mast_y_m - cy);
+
+    let corners = [(min_x, min_y), (max_x, min_y), (min_x, max_y), (max_x, max_y)];
+    let farthest_corner_m = corners
+        .iter()
+        .map(|&(px, py)| (mast_x_m - px).hypot(mast_y_m - py))
+        .fold(0.0_f32, f32::max);
+
+    let reaches_full_envelope = farthest_corner_m <= jib_len_m;
+    let is_collision_free =
+        vertical_clearance_m >= boundary_buffer_m || horizontal_gap_m >= boundary_buffer_m;
+
+    CraneBimClearanceReport {
+        vertical_clearance_m,
+        building_roof_m: roof_m,
+        farthest_corner_m,
+        horizontal_gap_m,
+        reaches_full_envelope,
+        is_collision_free,
+        bbox_min_m: Some([min_x, min_y]),
+        bbox_max_m: Some([max_x, max_y]),
+    }
+}
+
 pub struct SafetyView {
     pub active_subtab: SafetySubTab,
     // Tower Crane Parameters
@@ -32,6 +106,12 @@ pub struct SafetyView {
     pub crane_max_capacity_ton: f32,
     pub crane_tip_capacity_ton: f32,
     pub crane_slew_angle_deg: f32,
+    // Phase 39: 3D Crane vs BIM Perimeter Clearance Check (8D-02)
+    pub crane_mast_x_m: f32,
+    pub crane_mast_y_m: f32,
+    pub crane_boundary_buffer_m: f32,
+    pub crane_guard_bim: bool,
+    pub crane_sweep_status: Option<String>,
     // Fall Hazard Parameters
     pub guardrail_installed: bool,
     pub floor_openings_covered: bool,
@@ -50,6 +130,11 @@ impl Default for SafetyView {
             crane_max_capacity_ton: 12.0,
             crane_tip_capacity_ton: 2.4,
             crane_slew_angle_deg: 45.0,
+            crane_mast_x_m: -4.5,
+            crane_mast_y_m: 4.0,
+            crane_boundary_buffer_m: 3.0,
+            crane_guard_bim: true,
+            crane_sweep_status: None,
             guardrail_installed: true,
             floor_openings_covered: true,
             safety_harness_anchors_certified: true,
@@ -64,6 +149,7 @@ impl SafetyView {
         ui: &mut Ui,
         theme: &MacTheme,
         _members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
         let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
@@ -77,7 +163,7 @@ impl SafetyView {
 
                 // 2. Active Tab Content
                 match self.active_subtab {
-                    SafetySubTab::CraneEnvelope => self.render_crane_envelope(ui, theme, features),
+                    SafetySubTab::CraneEnvelope => self.render_crane_envelope(ui, theme, bim_project, features),
                     SafetySubTab::FallProtection => self.render_fall_protection(ui, theme),
                     SafetySubTab::SiteLogistics => self.render_site_logistics(ui, theme),
                     SafetySubTab::SafetyAuditMatrix => self.render_safety_audit_matrix(ui, theme),
@@ -125,11 +211,20 @@ impl SafetyView {
         &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
         let q_allow = self.calculate_crane_allowable_load();
         let is_overloaded = self.crane_current_load_ton > q_allow;
         let dcr = self.crane_current_load_ton / q_allow.max(0.01);
+        let crane_clearance = compute_crane_bim_perimeter_clearance(
+            bim_project,
+            self.crane_mast_x_m,
+            self.crane_mast_y_m,
+            self.crane_mast_height_m,
+            self.crane_jib_length_m,
+            self.crane_boundary_buffer_m,
+        );
 
         // Hero Card
         Frame::new()
@@ -185,7 +280,7 @@ impl SafetyView {
 
         ui.add_space(12.0);
 
-        // Phase 33 Locked Slot: 3D Crane Jib vs BIM Perimeter Clearance Check
+        // Phase 39 (8D-02): 3D Crane Jib vs BIM Perimeter Clearance Check
         ui_kit::feature_slot_card(
             ui,
             theme,
@@ -193,10 +288,46 @@ impl SafetyView {
             FeatureId::SitePerimeter3DCraneCollision,
             |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    let _ = ui.selectable_label(true, "Guard: Active BimProject Envelopes");
-                    let _ = ui.selectable_label(false, "Site Property Boundary Buffer (3.0 m)");
-                    let _ = icons::icon_button(ui, AppIcon::Shield, "Sweep 360° 3D Boom vs Building Envelope", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                    if ui.selectable_label(self.crane_guard_bim, "Guard Active BimProject Envelopes").clicked() {
+                        self.crane_guard_bim = !self.crane_guard_bim;
+                    }
+                    ui.label(RichText::new("Mast X (m):").size(10.5).color(theme.text_muted));
+                    ui.add(egui::DragValue::new(&mut self.crane_mast_x_m).range(-60.0..=60.0).speed(0.5).max_decimals(1));
+                    ui.label(RichText::new("Mast Y (m):").size(10.5).color(theme.text_muted));
+                    ui.add(egui::DragValue::new(&mut self.crane_mast_y_m).range(-60.0..=60.0).speed(0.5).max_decimals(1));
+                    ui.label(RichText::new("Buffer (m):").size(10.5).color(theme.text_muted));
+                    ui.add(egui::DragValue::new(&mut self.crane_boundary_buffer_m).range(1.0..=10.0).speed(0.2).max_decimals(1));
+                    if icons::icon_button(ui, AppIcon::Shield, "Sweep 360° 3D Boom vs BIM Perimeter", 11.0, Color32::WHITE, if crane_clearance.is_collision_free { theme.accent_green } else { theme.accent_red }, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
+                        self.crane_sweep_status = Some(format!(
+                            "{} | Mast ΔZ = {:.1}m (Roof {:.1}m) | Reach Coverage: {:.1}m / {:.1}m ({})",
+                            if crane_clearance.is_collision_free { "3D SWEEP CLEAR" } else { "COLLISION BUFFER VIOLATION" },
+                            crane_clearance.vertical_clearance_m,
+                            crane_clearance.building_roof_m,
+                            crane_clearance.farthest_corner_m,
+                            self.crane_jib_length_m,
+                            if crane_clearance.reaches_full_envelope { "100% BIM Covered" } else { "Corner Beyond Jib" },
+                        ));
+                    }
                 });
+                ui.add_space(6.0);
+                let col_clr = if crane_clearance.is_collision_free { theme.accent_green } else { theme.accent_red };
+                ui.label(
+                    RichText::new(format!(
+                        "Envelope Audit ({} BIM elements): Mast Vertical ΔZ = {:+.1} m vs Roof ({:.1} m)  •  Plan Gap = {:.1} m  •  Farthest Corner = {:.1} m ({})",
+                        bim_project.element_count(),
+                        crane_clearance.vertical_clearance_m,
+                        crane_clearance.building_roof_m,
+                        crane_clearance.horizontal_gap_m,
+                        crane_clearance.farthest_corner_m,
+                        if crane_clearance.reaches_full_envelope { "FULL REACH" } else { "OUT OF REACH" }
+                    ))
+                    .size(10.5)
+                    .strong()
+                    .color(col_clr),
+                );
+                if let Some(ref msg) = self.crane_sweep_status {
+                    ui.label(RichText::new(msg).size(10.0).color(theme.text_secondary));
+                }
             },
         );
 
@@ -337,6 +468,33 @@ impl SafetyView {
                             max_r_px,
                             Stroke::new(1.0, Color32::from_rgba_premultiplied(80, 140, 220, 100)),
                         );
+
+                        if self.crane_guard_bim {
+                            if let (Some(bmin), Some(bmax)) =
+                                (crane_clearance.bbox_min_m, crane_clearance.bbox_max_m)
+                            {
+                                let x0 = center.x + (bmin[0] - self.crane_mast_x_m) * scale;
+                                let x1 = center.x + (bmax[0] - self.crane_mast_x_m) * scale;
+                                let y0 = center.y - (bmax[1] - self.crane_mast_y_m) * scale;
+                                let y1 = center.y - (bmin[1] - self.crane_mast_y_m) * scale;
+                                let brect = egui::Rect::from_min_max(
+                                    egui::Pos2::new(x0.min(x1), y0.min(y1)),
+                                    egui::Pos2::new(x0.max(x1), y0.max(y1)),
+                                );
+                                let bcol = if crane_clearance.is_collision_free {
+                                    theme.accent_blue
+                                } else {
+                                    theme.accent_red
+                                };
+                                ui.painter().rect_filled(brect, CornerRadius::same(2), bcol.gamma_multiply(0.18));
+                                ui.painter().rect_stroke(
+                                    brect,
+                                    CornerRadius::same(2),
+                                    Stroke::new(1.2, bcol),
+                                    egui::StrokeKind::Inside,
+                                );
+                            }
+                        }
 
                         let pick_r_px = self.crane_current_radius_m * scale;
                         let pick_color = if is_overloaded {
@@ -751,5 +909,24 @@ impl SafetyView {
                 });
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_crane_bim_perimeter_clearance_against_live_project() {
+        let empty = crate::core::BimProject::empty();
+        let rep_empty = compute_crane_bim_perimeter_clearance(&empty, -4.0, 4.0, 45.0, 50.0, 3.0);
+        assert!(rep_empty.is_collision_free);
+        assert!(rep_empty.bbox_min_m.is_none());
+
+        let proj = crate::core::BimProject::sample_bimcraft_building();
+        let rep_clear = compute_crane_bim_perimeter_clearance(&proj, -4.5, 4.0, 45.0, 55.0, 3.0);
+        assert!(rep_clear.bbox_min_m.is_some());
+        assert!(rep_clear.is_collision_free);
+        assert!(rep_clear.reaches_full_envelope);
     }
 }

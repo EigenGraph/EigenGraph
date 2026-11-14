@@ -480,3 +480,22 @@ pub fn trigger_browser_download(
     let _ = web_sys::Url::revoke_object_url(&url);
     Ok(format!("Browser Download ({filename})"))
 }
+
+/// Saves a UTF-8 text deliverable via browser download on `wasm32` or the local Vault `Exports` folder natively.
+pub fn save_text_file(filename: &str, content: &str, mime_type: &str) -> Result<String, String> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        trigger_browser_download(filename, content.as_bytes(), mime_type)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = mime_type;
+        let exports_dir = crate::core::InternalVault::vault_root_dir().join("Exports");
+        std::fs::create_dir_all(&exports_dir)
+            .map_err(|e| format!("Failed to create Exports dir: {e}"))?;
+        let out_path = exports_dir.join(filename);
+        std::fs::write(&out_path, content.as_bytes())
+            .map_err(|e| format!("Failed to write {filename}: {e}"))?;
+        Ok(format!("Saved {}", out_path.display()))
+    }
+}

@@ -29,6 +29,246 @@ pub enum ResearchSubTab {
     AriFormulations,
 }
 
+#[derive(Clone, Debug)]
+pub struct BoreholeStratum {
+    pub depth_top_m: f32,
+    pub depth_bot_m: f32,
+    pub soil_name: String,
+    pub n60: u32,
+    pub vs_mps: f32,
+    pub strength_desc: String,
+    pub allowable_desc: String,
+    pub color_rgb: [u8; 3],
+}
+
+#[derive(Clone, Debug)]
+pub struct GeotechProfileSummary {
+    pub vs30_mps: f32,
+    pub site_class: &'static str,
+    pub liquefaction_fs: f32,
+    pub bearing_stratum_depth_m: f32,
+    pub rec_foundation: String,
+}
+
+pub fn preset_borehole_strata(idx: usize) -> Vec<BoreholeStratum> {
+    match idx {
+        1 => vec![
+            BoreholeStratum {
+                depth_top_m: 0.0,
+                depth_bot_m: 4.5,
+                soil_name: "Soft Marine Silt Fill".to_string(),
+                n60: 5,
+                vs_mps: 125.0,
+                strength_desc: "cu = 22 kPa".to_string(),
+                allowable_desc: "Skin 18 kPa".to_string(),
+                color_rgb: [120, 108, 96],
+            },
+            BoreholeStratum {
+                depth_top_m: 4.5,
+                depth_bot_m: 14.0,
+                soil_name: "Loose Saturated Silty Sand".to_string(),
+                n60: 9,
+                vs_mps: 165.0,
+                strength_desc: "phi' = 29 deg".to_string(),
+                allowable_desc: "Liquefiable Watch".to_string(),
+                color_rgb: [152, 134, 88],
+            },
+            BoreholeStratum {
+                depth_top_m: 14.0,
+                depth_bot_m: 24.0,
+                soil_name: "Medium-Dense Sandy Clay".to_string(),
+                n60: 26,
+                vs_mps: 255.0,
+                strength_desc: "phi' = 34 deg".to_string(),
+                allowable_desc: "Skin 74 kPa".to_string(),
+                color_rgb: [94, 114, 128],
+            },
+            BoreholeStratum {
+                depth_top_m: 24.0,
+                depth_bot_m: 30.0,
+                soil_name: "Dense Cemented Sand".to_string(),
+                n60: 48,
+                vs_mps: 410.0,
+                strength_desc: "phi' = 40 deg".to_string(),
+                allowable_desc: "End 1,450 kPa".to_string(),
+                color_rgb: [176, 146, 86],
+            },
+        ],
+        2 => vec![
+            BoreholeStratum {
+                depth_top_m: 0.0,
+                depth_bot_m: 5.0,
+                soil_name: "Volcanic Tuffaceous Silt".to_string(),
+                n60: 18,
+                vs_mps: 225.0,
+                strength_desc: "cu = 65 kPa".to_string(),
+                allowable_desc: "Skin 52 kPa".to_string(),
+                color_rgb: [134, 114, 92],
+            },
+            BoreholeStratum {
+                depth_top_m: 5.0,
+                depth_bot_m: 16.0,
+                soil_name: "Stiff Andesitic Breccia".to_string(),
+                n60: 38,
+                vs_mps: 380.0,
+                strength_desc: "phi' = 38 deg".to_string(),
+                allowable_desc: "Skin 110 kPa".to_string(),
+                color_rgb: [110, 118, 126],
+            },
+            BoreholeStratum {
+                depth_top_m: 16.0,
+                depth_bot_m: 30.0,
+                soil_name: "Sound Andesite Bedrock".to_string(),
+                n60: 55,
+                vs_mps: 690.0,
+                strength_desc: "qu = 5.4 MPa".to_string(),
+                allowable_desc: "End 2,600 kPa".to_string(),
+                color_rgb: [96, 102, 114],
+            },
+        ],
+        _ => vec![
+            BoreholeStratum {
+                depth_top_m: 0.0,
+                depth_bot_m: 6.0,
+                soil_name: "Engineered Silty Fill".to_string(),
+                n60: 11,
+                vs_mps: 185.0,
+                strength_desc: "phi' = 28 deg".to_string(),
+                allowable_desc: "Skin 34 kPa".to_string(),
+                color_rgb: [132, 114, 92],
+            },
+            BoreholeStratum {
+                depth_top_m: 6.0,
+                depth_bot_m: 15.0,
+                soil_name: "Alluvial Silty Clay".to_string(),
+                n60: 6,
+                vs_mps: 155.0,
+                strength_desc: "cu = 32 kPa".to_string(),
+                allowable_desc: "Skin 28 kPa".to_string(),
+                color_rgb: [92, 112, 128],
+            },
+            BoreholeStratum {
+                depth_top_m: 15.0,
+                depth_bot_m: 24.0,
+                soil_name: "Dense Cemented Sand".to_string(),
+                n60: 34,
+                vs_mps: 295.0,
+                strength_desc: "phi' = 37 deg".to_string(),
+                allowable_desc: "Skin 96 kPa".to_string(),
+                color_rgb: [176, 146, 86],
+            },
+            BoreholeStratum {
+                depth_top_m: 24.0,
+                depth_bot_m: 30.0,
+                soil_name: "Limestone Bedrock".to_string(),
+                n60: 52,
+                vs_mps: 540.0,
+                strength_desc: "qu = 3.8 MPa".to_string(),
+                allowable_desc: "End 1,950 kPa".to_string(),
+                color_rgb: [104, 108, 120],
+            },
+        ],
+    }
+}
+
+pub fn compute_geotech_profile_summary(
+    layers: &[BoreholeStratum],
+    gwt_m: f32,
+    mw: f32,
+    pga_g: f32,
+) -> GeotechProfileSummary {
+    let mut sum_d = 0.0_f32;
+    let mut sum_t = 0.0_f32;
+    let mut min_fs = 3.0_f32;
+    let mut bearing_depth = 24.0_f32;
+    let mut found_bearing = false;
+
+    for s in layers {
+        if s.depth_top_m >= 30.0 {
+            continue;
+        }
+        let d = (s.depth_bot_m.min(30.0) - s.depth_top_m).max(0.1);
+        sum_d += d;
+        sum_t += d / s.vs_mps.max(50.0);
+        if s.depth_bot_m > gwt_m && s.soil_name.to_lowercase().contains("sand") {
+            let n1_60 = (s.n60 as f32).clamp(2.0, 50.0);
+            let crr = (0.048 + 0.011 * n1_60 + (n1_60 / 35.0).powi(3) * 0.15).clamp(0.06, 0.65);
+            let z_mid = 0.5 * (s.depth_top_m + s.depth_bot_m);
+            let rd = (1.0 - 0.00765 * z_mid).max(0.5);
+            let eff_ratio = if z_mid > gwt_m { 1.75 } else { 1.0 };
+            let msl = (mw / 7.5).powf(-2.5);
+            let csr = (0.65 * pga_g.max(0.05) * eff_ratio * rd).max(0.04);
+            let fs = ((crr * msl) / csr).clamp(0.3, 4.0);
+            min_fs = min_fs.min(fs);
+        }
+        if !found_bearing && s.n60 >= 34 {
+            bearing_depth = s.depth_top_m.max(8.0);
+            found_bearing = true;
+        }
+    }
+    let vs30 = if sum_t > 0.0 { sum_d / sum_t } else { 240.0 };
+    let site_class = if vs30 > 1500.0 {
+        "Class SA (Hard Rock)"
+    } else if vs30 > 750.0 {
+        "Class SB (Rock)"
+    } else if vs30 >= 350.0 {
+        "Class SC (Very Dense Soil)"
+    } else if vs30 >= 175.0 {
+        "Class SD (Stiff/Medium)"
+    } else {
+        "Class SE (Soft Soil)"
+    };
+    let rec_foundation = if bearing_depth <= 6.0 && layers.first().is_some_and(|l| l.n60 >= 18) {
+        format!("Shallow Pad Footings @ -{:.1}m", bearing_depth)
+    } else {
+        format!("-{:.1}m Bored Pile Socket", bearing_depth.max(12.0))
+    };
+
+    GeotechProfileSummary {
+        vs30_mps: vs30,
+        site_class,
+        liquefaction_fs: min_fs,
+        bearing_stratum_depth_m: bearing_depth,
+        rec_foundation,
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct HydrologyIdfSummary {
+    pub return_period_yr: u32,
+    pub intensity_mm_hr: f32,
+    pub peak_runoff_m3_s: f32,
+    pub detention_vol_m3: f32,
+    pub recommended_ffe_asl_m: f32,
+}
+
+pub fn compute_hydrology_idf_floodplain(
+    return_idx: usize,
+    area_ha: f32,
+    runoff_c: f32,
+    tc_min: f32,
+    i100_1h_mm: f32,
+    flood_wl_asl_m: f32,
+) -> HydrologyIdfSummary {
+    let (yr, factor) = match return_idx {
+        0 => (10, 0.58_f32),
+        1 => (25, 0.76_f32),
+        _ => (100, 1.00_f32),
+    };
+    let i_tc = i100_1h_mm.max(20.0) * factor * (60.0 / tc_min.clamp(5.0, 180.0)).powf(0.55);
+    let q_peak = 0.00278 * runoff_c.clamp(0.15, 0.98) * i_tc * area_ha.max(0.2);
+    let det_ratio = ((runoff_c - 0.35).max(0.20) / runoff_c.max(0.35)).clamp(0.25, 0.85);
+    let vol_m3 = q_peak * (tc_min.max(5.0) * 60.0) * det_ratio * 1.15;
+    let freeboard = if yr >= 100 { 0.65 } else { 0.50 };
+    HydrologyIdfSummary {
+        return_period_yr: yr,
+        intensity_mm_hr: i_tc,
+        peak_runoff_m3_s: q_peak,
+        detention_vol_m3: vol_m3,
+        recommended_ffe_asl_m: flood_wl_asl_m + freeboard,
+    }
+}
+
 pub struct ResearchConceptView {
     pub active_subtab: ResearchSubTab,
     pub selected_truss_family: String,
@@ -64,6 +304,18 @@ pub struct ResearchConceptView {
     pub tin_show_datum_plane: bool,
     pub tin_yaw_deg: f32,
     pub tin_pitch_deg: f32,
+    // Phase 39: Geotech Borehole (1D-05) & Site Hydrology IDF (1D-06)
+    pub geotech_borehole_idx: usize,
+    pub geotech_gwt_depth_m: f32,
+    pub geotech_eq_mw: f32,
+    pub geotech_pga_g: f32,
+    pub geotech_layers: Vec<BoreholeStratum>,
+    pub hydro_return_idx: usize,
+    pub hydro_catchment_ha: f32,
+    pub hydro_runoff_c: f32,
+    pub hydro_tc_min: f32,
+    pub hydro_i100_1h_mm: f32,
+    pub hydro_flood_wl_asl_m: f32,
 }
 
 impl Default for ResearchConceptView {
@@ -105,6 +357,17 @@ impl Default for ResearchConceptView {
             tin_show_datum_plane: true,
             tin_yaw_deg: 38.0,
             tin_pitch_deg: 54.0,
+            geotech_borehole_idx: 0,
+            geotech_gwt_depth_m: 3.2,
+            geotech_eq_mw: 7.8,
+            geotech_pga_g: 0.36,
+            geotech_layers: preset_borehole_strata(0),
+            hydro_return_idx: 2,
+            hydro_catchment_ha: 6.2,
+            hydro_runoff_c: 0.75,
+            hydro_tc_min: 22.0,
+            hydro_i100_1h_mm: 88.0,
+            hydro_flood_wl_asl_m: 1.50,
         }
     }
 }
@@ -2075,17 +2338,31 @@ impl ResearchConceptView {
     }
 
     fn render_geotech_borehole(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::GeotechBoreholeStratigraphy, |ui| {
+            let summary = compute_geotech_profile_summary(
+                &self.geotech_layers,
+                self.geotech_gwt_depth_m,
+                self.geotech_eq_mw,
+                self.geotech_pga_g,
+            );
+            let vs_sub = format!("Vs30 = {:.0} m/s Weighted Avg", summary.vs30_mps);
+            let gwt_val = format!("-{:.2} m BGS", self.geotech_gwt_depth_m);
+            let liq_val = format!(
+                "Fs = {:.2} ({})",
+                summary.liquefaction_fs,
+                if summary.liquefaction_fs >= 1.25 { "SAFE" } else { "LIQ RISK" }
+            );
+            let liq_sub = format!("Seed-Idriss CRR/CSR @ Mw {:.1}", self.geotech_eq_mw);
             let stats = [
-                ("SITE CLASS (SNI 1726)", "Class SD (Medium)", "Vs30 = 248 m/s Weighted Avg", theme.accent_blue),
-                ("GROUNDWATER TABLE", "-3.20 m BGS", "Piezometer BH-02 Reading", theme.accent_orange),
-                ("LIQUEFACTION SCREEN", "Fs = 1.48 (SAFE)", "Seed-Idriss CRR/CSR @ Mw 7.8", theme.accent_green),
-                ("BEARING STRATUM TOE", "-24.0 m Bored Pile", "Dense Sand / Limestone N60 > 50", theme.text_primary),
+                ("SITE CLASS (SNI 1726)", summary.site_class, vs_sub.as_str(), theme.accent_blue),
+                ("GROUNDWATER TABLE", gwt_val.as_str(), "Interactive Piezometer Datum", theme.accent_orange),
+                ("LIQUEFACTION SCREEN", liq_val.as_str(), liq_sub.as_str(), if summary.liquefaction_fs >= 1.25 { theme.accent_green } else { theme.accent_red }),
+                ("BEARING STRATUM TOE", summary.rec_foundation.as_str(), "Socket & Pile End Bearing", theme.text_primary),
             ];
             ui_kit::responsive_grid_n(ui, stats.len(), 175.0, |ui, idx| {
                 let (title, val, sub, col) = stats[idx];
@@ -2094,20 +2371,44 @@ impl ResearchConceptView {
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Borehole BH-01");
-                let _ = ui.selectable_label(false, "BH-02 (Corner)");
-                let _ = ui.selectable_label(false, "CPT-04 Sounding");
-                let _ = icons::icon_button(
+                for (idx, lbl) in [
+                    (0, "BH-01 Alluvial Sand"),
+                    (1, "BH-02 Soft Coastal Fill"),
+                    (2, "CPT-04 Stiff Volcanic"),
+                ] {
+                    if ui.selectable_label(self.geotech_borehole_idx == idx, lbl).clicked() {
+                        self.geotech_borehole_idx = idx;
+                        self.geotech_layers = preset_borehole_strata(idx);
+                    }
+                }
+                ui.label(RichText::new("GWT (m):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.geotech_gwt_depth_m).range(0.5..=20.0).speed(0.1).max_decimals(1));
+                ui.label(RichText::new("Mw:").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.geotech_eq_mw).range(5.5..=9.0).speed(0.1).max_decimals(1));
+                ui.label(RichText::new("PGA (g):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.geotech_pga_g).range(0.05..=0.80).speed(0.01).max_decimals(2));
+                if icons::icon_button(
                     ui,
-                    AppIcon::UploadImport,
-                    "Import AGS / CSV Boring Log",
-                    11.0,
+                    AppIcon::SaveDisk,
+                    "Export AGS / CSV Log",
+                    10.5,
                     theme.text_primary,
                     theme.bg_canvas,
                     Stroke::new(1.0, theme.border_subtle),
                     CornerRadius::same(6),
                     Vec2::ZERO,
-                );
+                )
+                .clicked()
+                {
+                    let mut csv = String::from("depth_top_m,depth_bot_m,soil_name,N60,Vs_mps,strength,allowable\n");
+                    for s in &self.geotech_layers {
+                        csv.push_str(&format!(
+                            "{:.1},{:.1},{},{},{:.0},{},{}\n",
+                            s.depth_top_m, s.depth_bot_m, s.soil_name, s.n60, s.vs_mps, s.strength_desc, s.allowable_desc
+                        ));
+                    }
+                    let _ = crate::core::web_bridge::save_text_file("Borehole_Stratigraphy.csv", &csv, "text/csv");
+                }
             });
             ui.add_space(10.0);
 
@@ -2120,58 +2421,54 @@ impl ResearchConceptView {
                     let painter = ui.painter_at(rect);
                     painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(13, 17, 24));
 
-                    let strata = [
-                        (0.0_f32, 0.20_f32, "0–6m Engineered Fill (N=11)", Color32::from_rgb(132, 114, 92)),
-                        (0.20, 0.50, "6–15m Soft Silty Clay (N=6, Vs=155 m/s)", Color32::from_rgb(92, 112, 128)),
-                        (0.50, 0.80, "15–24m Dense Cemented Sand (N=34, Vs=295 m/s)", Color32::from_rgb(176, 146, 86)),
-                        (0.80, 1.00, "24–30m Limestone Bedrock (N>50, Vs=540 m/s)", Color32::from_rgb(104, 108, 120)),
-                    ];
                     let col_x = rect.left() + 18.0;
                     let col_w = 56.0;
-                    for (t0, t1, label, col) in strata {
+                    for s in &self.geotech_layers {
+                        let t0 = (s.depth_top_m / 30.0).clamp(0.0, 1.0);
+                        let t1 = (s.depth_bot_m / 30.0).clamp(0.0, 1.0);
                         let band = Rect::from_min_max(
                             Pos2::new(col_x, rect.top() + 10.0 + t0 * (rect.height() - 20.0)),
                             Pos2::new(col_x + col_w, rect.top() + 10.0 + t1 * (rect.height() - 20.0)),
                         );
+                        let col = Color32::from_rgb(s.color_rgb[0], s.color_rgb[1], s.color_rgb[2]);
                         painter.rect_filled(band, CornerRadius::ZERO, col);
                         painter.rect_stroke(band, CornerRadius::ZERO, Stroke::new(0.8, Color32::BLACK), StrokeKind::Inside);
                         painter.text(
                             Pos2::new(col_x + col_w + 12.0, band.center().y),
                             Align2::LEFT_CENTER,
-                            label,
-                            FontId::proportional(10.5),
+                            format!("{:.0}–{:.0}m {} (N={}, Vs={:.0})", s.depth_top_m, s.depth_bot_m, s.soil_name, s.n60, s.vs_mps),
+                            FontId::proportional(10.0),
                             theme.text_primary,
                         );
                     }
-                    let gwt_y = rect.top() + 10.0 + 0.11 * (rect.height() - 20.0);
+                    let gwt_y = rect.top() + 10.0 + (self.geotech_gwt_depth_m / 30.0).clamp(0.0, 1.0) * (rect.height() - 20.0);
                     painter.line_segment(
                         [Pos2::new(col_x - 6.0, gwt_y), Pos2::new(col_x + col_w + 6.0, gwt_y)],
-                        Stroke::new(1.5, theme.accent_blue),
+                        Stroke::new(2.0, theme.accent_blue),
                     );
                 }
                 _ => {
-                    ui.label(RichText::new("SPT BLOW COUNT (N60) & PILE DESIGN").size(11.0).strong().color(theme.accent_blue));
+                    ui.label(RichText::new("SPT BLOW COUNT (N60) & INTERACTIVE PILE DESIGN").size(11.0).strong().color(theme.accent_blue));
                     ui.add_space(6.0);
                     ScrollArea::horizontal().id_salt("geotech_spt_table").show(ui, |ui| {
                         egui::Grid::new("geotech_spt_grid")
                             .striped(true)
-                            .spacing(Vec2::new(14.0, 6.0))
+                            .spacing(Vec2::new(12.0, 6.0))
                             .show(ui, |ui| {
-                                for h in ["Depth (m)", "Soil Description", "N60", "cu / phi'", "Allowed Axial"] {
+                                for h in ["Depth (m)", "Soil Description", "N60 (Edit)", "Vs (m/s)", "Capacity"] {
                                     ui.label(RichText::new(h).size(10.5).strong().color(theme.accent_blue));
                                 }
                                 ui.end_row();
-                                for (d, desc, n60, str_p, cap) in [
-                                    ("3.0m", "Compacted Silty Fill", "11", "phi' = 28 deg", "Skin 34 kPa"),
-                                    ("10.0m", "Alluvial Silty Clay", "6", "cu = 32 kPa", "Skin 28 kPa"),
-                                    ("18.0m", "Dense Silty Sand", "34", "phi' = 37 deg", "Skin 96 kPa"),
-                                    ("26.0m", "Hard Limestone", "50+", "qu = 3.8 MPa", "End 1,950 kPa"),
-                                ] {
-                                    ui.label(RichText::new(d).size(10.5).monospace().color(theme.text_primary));
-                                    ui.label(RichText::new(desc).size(10.5).color(theme.text_secondary));
-                                    ui.label(RichText::new(n60).size(10.5).strong().color(theme.accent_orange));
-                                    ui.label(RichText::new(str_p).size(10.5).color(theme.text_muted));
-                                    ui.label(RichText::new(cap).size(10.5).strong().color(theme.accent_green));
+                                for s in &mut self.geotech_layers {
+                                    ui.label(RichText::new(format!("{:.1}–{:.1}m", s.depth_top_m, s.depth_bot_m)).size(10.5).monospace().color(theme.text_primary));
+                                    ui.label(RichText::new(&s.soil_name).size(10.5).color(theme.text_secondary));
+                                    let mut n_i = s.n60 as f32;
+                                    if ui.add(egui::DragValue::new(&mut n_i).range(1.0..=60.0).speed(1.0).max_decimals(0)).changed() {
+                                        s.n60 = n_i.round() as u32;
+                                        s.vs_mps = (80.0 * s.n60.max(1) as f32).powf(0.35).max(110.0) * 1.15;
+                                    }
+                                    ui.label(RichText::new(format!("{:.0}", s.vs_mps)).size(10.5).monospace().color(theme.text_muted));
+                                    ui.label(RichText::new(&s.allowable_desc).size(10.5).strong().color(theme.accent_green));
                                     ui.end_row();
                                 }
                             });
@@ -2182,17 +2479,33 @@ impl ResearchConceptView {
     }
 
     fn render_hydrology_floodplain(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         features: &mut FeatureRegistry,
     ) {
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::HydrologyIdfFloodplain, |ui| {
+            let hyd = compute_hydrology_idf_floodplain(
+                self.hydro_return_idx,
+                self.hydro_catchment_ha,
+                self.hydro_runoff_c,
+                self.hydro_tc_min,
+                self.hydro_i100_1h_mm,
+                self.hydro_flood_wl_asl_m,
+            );
+            let storm_hdr = format!("DESIGN STORM (T = {} YR)", hyd.return_period_yr);
+            let i_val = format!("I = {:.1} mm/hr", hyd.intensity_mm_hr);
+            let tc_sub = format!("tc = {:.0} min • Mononobe IDF", self.hydro_tc_min);
+            let q_val = format!("{:.2} m³/s", hyd.peak_runoff_m3_s);
+            let q_sub = format!("Catchment {:.1} ha • C = {:.2}", self.hydro_catchment_ha, self.hydro_runoff_c);
+            let v_val = format!("{:.0} m³ Required", hyd.detention_vol_m3);
+            let ffe_val = format!("+{:.2} m ASL", hyd.recommended_ffe_asl_m);
+            let ffe_sub = format!("Flood WL +{:.2}m + Freeboard", self.hydro_flood_wl_asl_m);
             let cards = [
-                ("DESIGN STORM (T = 100 YR)", "I = 142.8 mm/hr", "tc = 22 min • IDF Log-Pearson III", theme.accent_blue),
-                ("PEAK RUNOFF (Q = C·I·A)", "1.84 m³/s", "Catchment 6.2 ha • C = 0.75", theme.accent_orange),
-                ("DETENTION BASIN VOLUME", "1,420 m³ Required", "Zero-Runoff Delta Policy Compliant", theme.accent_green),
-                ("RECOMMENDED MIN FFE", "+2.15 m ASL", "+0.65m Freeboard Above Q100 Flood", theme.accent_green),
+                (storm_hdr.as_str(), i_val.as_str(), tc_sub.as_str(), theme.accent_blue),
+                ("PEAK RUNOFF (Q = C·I·A)", q_val.as_str(), q_sub.as_str(), theme.accent_orange),
+                ("DETENTION BASIN VOLUME", v_val.as_str(), "Zero-Runoff Delta Retention", theme.accent_green),
+                ("RECOMMENDED MIN FFE", ffe_val.as_str(), ffe_sub.as_str(), theme.accent_green),
             ];
             ui_kit::responsive_grid_n(ui, cards.len(), 175.0, |ui, idx| {
                 let (title, val, sub, col) = cards[idx];
@@ -2201,20 +2514,19 @@ impl ResearchConceptView {
 
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(false, "10-Yr Storm");
-                let _ = ui.selectable_label(false, "25-Yr Storm");
-                let _ = ui.selectable_label(true, "100-Yr Critical Storm");
-                let _ = icons::icon_button(
-                    ui,
-                    AppIcon::Pulse,
-                    "Compute Rational Hydrograph & Detention Size",
-                    11.0,
-                    Color32::WHITE,
-                    theme.accent_blue,
-                    Stroke::NONE,
-                    CornerRadius::same(6),
-                    Vec2::ZERO,
-                );
+                for (idx, lbl) in [(0, "10-Yr Storm"), (1, "25-Yr Storm"), (2, "100-Yr Critical Storm")] {
+                    if ui.selectable_label(self.hydro_return_idx == idx, lbl).clicked() {
+                        self.hydro_return_idx = idx;
+                    }
+                }
+                ui.label(RichText::new("Area (ha):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.hydro_catchment_ha).range(0.2..=250.0).speed(0.2).max_decimals(1));
+                ui.label(RichText::new("C:").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.hydro_runoff_c).range(0.15..=0.95).speed(0.02).max_decimals(2));
+                ui.label(RichText::new("tc (min):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.hydro_tc_min).range(5.0..=120.0).speed(1.0).max_decimals(0));
+                ui.label(RichText::new("Flood WL (m):").size(10.5).color(theme.text_muted));
+                ui.add(egui::DragValue::new(&mut self.hydro_flood_wl_asl_m).range(-2.0..=30.0).speed(0.05).max_decimals(2));
             });
             ui.add_space(10.0);
 
@@ -2231,22 +2543,26 @@ impl ResearchConceptView {
                 [Pos2::new(plot.left(), plot.bottom()), Pos2::new(plot.left(), plot.top())],
                 Stroke::new(1.0, theme.text_muted),
             );
-            for (scale, col, lbl) in [
-                (1.00_f32, theme.accent_red, "T = 100 yr"),
-                (0.76, theme.accent_orange, "T = 25 yr"),
-                (0.58, theme.accent_blue, "T = 10 yr"),
+            let max_i = (self.hydro_i100_1h_mm * (60.0_f32 / 5.0).powf(0.55)).max(120.0);
+            for (r_idx, scale, col, lbl) in [
+                (2, 1.00_f32, theme.accent_red, "T = 100 yr"),
+                (1, 0.76, theme.accent_orange, "T = 25 yr"),
+                (0, 0.58, theme.accent_blue, "T = 10 yr"),
             ] {
                 let mut pts = Vec::with_capacity(20);
                 for i in 0..20 {
                     let frac = i as f32 / 19.0;
-                    let intensity = scale * (0.95 / (1.0 + 3.8 * frac)).clamp(0.10, 1.0);
+                    let tc_pt = 5.0 + frac * 175.0;
+                    let i_val = self.hydro_i100_1h_mm * scale * (60.0 / tc_pt).powf(0.55);
+                    let y_norm = (i_val / max_i).clamp(0.04, 0.98);
                     pts.push(Pos2::new(
                         plot.left() + frac * plot.width(),
-                        plot.bottom() - intensity * plot.height(),
+                        plot.bottom() - y_norm * plot.height(),
                     ));
                 }
+                let stroke_w = if r_idx == self.hydro_return_idx { 2.8 } else { 1.5 };
                 for w in pts.windows(2) {
-                    painter.line_segment([w[0], w[1]], Stroke::new(2.0, col));
+                    painter.line_segment([w[0], w[1]], Stroke::new(stroke_w, col));
                 }
                 painter.text(
                     pts[2],
@@ -2256,13 +2572,39 @@ impl ResearchConceptView {
                     col,
                 );
             }
+            let op_frac = ((self.hydro_tc_min - 5.0) / 175.0).clamp(0.0, 1.0);
+            let op_x = plot.left() + op_frac * plot.width();
+            let op_y = plot.bottom() - (hyd.intensity_mm_hr / max_i).clamp(0.04, 0.98) * plot.height();
+            painter.circle_filled(Pos2::new(op_x, op_y), 4.5, Color32::WHITE);
             painter.text(
                 Pos2::new(plot.center().x, rect.bottom() - 8.0),
                 Align2::CENTER_CENTER,
-                "IDF Rainfall Duration tc (5 min -> 180 min)",
+                format!("IDF Duration tc = {:.0} min  •  I = {:.1} mm/hr  •  Min FFE = +{:.2} m ASL", self.hydro_tc_min, hyd.intensity_mm_hr, hyd.recommended_ffe_asl_m),
                 FontId::proportional(9.5),
                 theme.text_muted,
             );
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_geotech_vs30_and_hydrology_rational_solvers() {
+        let bh0 = preset_borehole_strata(0);
+        let sum0 = compute_geotech_profile_summary(&bh0, 3.2, 7.8, 0.36);
+        assert!(sum0.vs30_mps > 175.0 && sum0.vs30_mps < 350.0);
+        assert_eq!(sum0.site_class, "Class SD (Stiff/Medium)");
+
+        let bh1 = preset_borehole_strata(1);
+        let sum1 = compute_geotech_profile_summary(&bh1, 1.5, 7.8, 0.42);
+        assert!(sum1.liquefaction_fs < sum0.liquefaction_fs);
+
+        let h10 = compute_hydrology_idf_floodplain(0, 6.2, 0.75, 22.0, 88.0, 1.50);
+        let h100 = compute_hydrology_idf_floodplain(2, 6.2, 0.75, 22.0, 88.0, 1.50);
+        assert!(h100.peak_runoff_m3_s > h10.peak_runoff_m3_s);
+        assert!((h100.recommended_ffe_asl_m - 2.15).abs() < 1e-3);
     }
 }

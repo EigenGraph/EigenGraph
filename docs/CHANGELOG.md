@@ -7,6 +7,27 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.9] - 2026-11-14 — Phase 39: Viewport-First Canvas Layout, Top-Left Floating Freeze Toggle, Auto-Fit Camera & 8 Phase 34 Engineering Modules
+
+### Added & Changed
+- **Viewport-First Canvas Layout & Top-Left Floating Freeze Toggle (`src/views/universal_canvas.rs`, `src/views/parametric/`, `src/views/build/viewport_3d.rs`)**:
+  - Inverted the canvas stack order across all three interactive drawing viewports (**Universal Earth Canvas**, **Parametric 2D Drafting**, and **Geometry 3D Earth BIM**) so the main drawing viewport renders **first at the top**, with toolbars, CAD ribbons, telemetry strips, and inspector drawers cleanly docked **below**.
+  - Removed the Freeze button from all canvas toolbars and introduced an interactive top-left floating pill (**`Frozen • Unfreeze`** / **`Live • Freeze`**) inside each viewport using shared `UniversalCanvasState::{floating_freeze_pill_rect, interact_floating_freeze_pill, paint_floating_freeze_pill}` helpers with `sidebar_toggle_inset_px` clearance and zero click-through into pan, zoom, orbit, or drawing gestures.
+- **Auto-Fit Camera, `Fit Model` Controls & Direct Sheet Vector Exports (`src/core/bim.rs`, `src/views/universal_canvas.rs`, `src/views/parametric/ribbon.rs`, `src/app.rs`)**:
+  - Added `BimProject::plan_extents_mm`, `UniversalCanvasState::fit_world_to_bim_extents`, `ParametricView::fit_view_to_project`, and `BuildView::fit_view_to_project`, automatically fitting the active camera when opening Vault projects, converting IFC models to editable `BimProject`, or instantiating structural templates.
+  - Added direct **PDF**, **DXF**, **SVG**, and **All Pack** vector export buttons inside the Parametric Sheet A101 ribbon bar (`SheetExportFormat`) and added shared `crate::core::web_bridge::save_text_file` for seamless browser downloads on WebAssembly and Vault `Exports/` output natively.
+- **Activated 8 Additional Phase 34 Engineering Modules (`src/features.rs`: 52 Active / 22 Locked)**:
+  - **Automated Multi-Code Compliance Auditor (`AI-04`: `src/views/ai_firm.rs`)**: Evaluates live `BimProject` and FEM `StructuralMember[]` compliance against SNI 1726/2847/1729 and ACI/AISC clauses (`drift`, `axial utilization`, `ARI redundancy`, `confinement hoops`, `column-footing continuity`) with Markdown report export.
+  - **Retaining Wall & Bishop Simplified Slope Stability (`SIM-07`: `src/views/analyze/extended_mechanics.rs`, `src/views/analyze/mod.rs`)**: Computes Rankine `Ka`, Mononobe-Okabe dynamic `Kae`, overturning/sliding factors of safety with shear-key passive resistance, toe bearing pressure, and iterative Bishop Simplified static/seismic circular slip stability.
+  - **Geotech Borehole Vs30 & Hydrology IDF/Rational Runoff (`1D-05`, `1D-06`: `src/views/research.rs`)**: Interactive borehole stratigraphy (`BH-01`, `BH-02`, `CPT-04`) with editable SPT `N60` layers, `Vs30` seismic site classification, Seed-Idriss liquefaction screening, CSV export, plus Mononobe IDF curves, Rational peak runoff (`Q = 0.278 C i A`), and minimum flood-safe finished floor elevation (`FFE`).
+  - **Automated N/E/S/W Orthographic Elevations & Vertical MEP Riser Schedule (`2D-06`: `src/views/parametric/detailing_2d.rs`)**: Projects North/East/South/West orthographic facades and datum levels from live `BimProject` elements with SVG export and storey-scaled HVAC/CHW/Fire Standpipe riser schedules.
+  - **3D Tower Crane Perimeter & Clearance Radar (`8D-02`: `src/views/safety.rs`, `src/app.rs`)**: Evaluates tower crane jib sweep, mast height vs live building roof elevation, and horizontal buffer clearance on an interactive plan radar.
+  - **PBG/SIMBG & IBC HTML Calculation Book Composer (`PUB-04`: `src/views/results.rs`)**: Generates jurisdiction-aware HTML calculation books directly from live `BimProject` quantities, concrete/rebar totals, and FEM member utilization envelopes.
+  - **ISO 19650 CDE Stateful Container Workflow (`LIB-04`: `src/views/my_project.rs`)**: Interactive `WIP -> Shared -> Published -> Archive` container promotion, filtering, package addition, and `.json` transmittal manifest export.
+- **Version Bump**: Incremented crate version sequentially from `0.3.8` to `0.3.9` in `Cargo.toml`, `README.md`, `src/views/settings.rs`, and `docs/CHANGELOG.md`.
+
+---
+
 ## [v0.3.8] - 2026-11-14 — Phase 38: Rounded Drawing Canvas Chrome, Parametric Width Overflow Fix, Phase 33 Unlocks, Vector DED Downloads & IFC-to-BimProject
 
 ### Added & Changed

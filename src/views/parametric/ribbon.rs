@@ -28,7 +28,7 @@ impl ParametricView {
         universal_canvas: &mut UniversalCanvasState,
         members: &[crate::models::StructuralMember],
         workspace_settings: WorkspaceCanvasSettings,
-        sidebar_toggle_inset_px: f32,
+        _sidebar_toggle_inset_px: f32,
     ) {
         let _avail_w = ui.available_width();
         Frame::new()
@@ -42,11 +42,8 @@ impl ParametricView {
                 ui.set_max_width(inner_w);
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                 ui.vertical(|ui| {
-                    // Row 1: Universal Canvas HUD Toolbar (Module Pill, Views, Snaps, Freeze, Floating Panel Toggles, 1-File Sync)
+                    // Row 1: Universal Canvas HUD Toolbar (Module Pill, Views, Snaps, Panel Toggles, 1-File Sync)
                     ui.horizontal_wrapped(|ui| {
-                        if sidebar_toggle_inset_px > 0.0 {
-                            ui.add_space(sidebar_toggle_inset_px);
-                        }
                         icons::pill_badge(
                             ui,
                             AppIcon::RulerSquare,
@@ -182,7 +179,7 @@ impl ParametricView {
                         if icons::icon_button(
                             ui,
                             AppIcon::ZoomFit,
-                            "Fit",
+                            "Fit Model",
                             10.5,
                             theme.text_secondary,
                             theme.bg_card,
@@ -190,12 +187,10 @@ impl ParametricView {
                             CornerRadius::same(6),
                             Vec2::new(0.0, 26.0),
                         )
-                        .on_hover_text("Fit Ground Site (or Global World Map when empty)")
+                        .on_hover_text("Auto-fit canvas view to active BIM footprint or Global World Map")
                         .clicked()
                         {
-                            universal_canvas.fit_world_or_site(!self.bim_bus.project.is_empty());
-                            self.canvas_pan = Vec2::ZERO;
-                            self.canvas_zoom = 1.0;
+                            self.fit_view_to_project(universal_canvas);
                         }
 
                         ui.separator();
@@ -205,16 +200,7 @@ impl ParametricView {
 
                         ui.separator();
 
-                        // Shared Freeze Canvas button
-                        UniversalCanvasState::render_freeze_button(
-                            ui,
-                            theme,
-                            &mut universal_canvas.is_frozen,
-                            26.0,
-                        );
-
-                        // Floating HUD Overlays inside Canvas
-                        // Phase 36: Top Toolbar Dock Panel Toggles (no canvas-blocking floating HUD)
+                        // Toolbar Dock Panel Toggles (below canvas)
                         if icons::icon_button(
                             ui,
                             AppIcon::Folder,
@@ -537,19 +523,67 @@ impl ParametricView {
                             ui.label(RichText::new("Title:").size(10.5).color(theme.text_secondary));
                             ui.add(egui::TextEdit::singleline(&mut self.sheet_title).desired_width(title_w));
 
-                            crate::ui_kit::wrap_before(ui, 130.0);
+                            crate::ui_kit::wrap_before(ui, 165.0);
                             if icons::icon_button(
                                 ui,
                                 AppIcon::Printer,
-                                "Print Vector PDF",
-                                11.0,
+                                "PDF",
+                                10.5,
                                 Color32::WHITE,
                                 theme.accent_blue,
                                 Stroke::NONE,
                                 CornerRadius::same(5),
                                 Vec2::new(0.0, 24.0),
                             )
-                            .on_hover_text("Export official scaled drawing sheet to vector PDF")
+                            .on_hover_text("Export scaled Sheet to vector PDF")
+                            .clicked()
+                            {
+                                self.export_sheet_format(SheetExportFormat::Pdf);
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Document,
+                                "DXF",
+                                10.5,
+                                Color32::WHITE,
+                                theme.accent_green,
+                                Stroke::NONE,
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .on_hover_text("Export CAD Sheet layers directly to AutoCAD DXF")
+                            .clicked()
+                            {
+                                self.export_sheet_format(SheetExportFormat::Dxf);
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::Layers,
+                                "SVG",
+                                10.5,
+                                theme.text_primary,
+                                theme.bg_card,
+                                Stroke::new(1.0, theme.border_subtle),
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .on_hover_text("Export crisp vector SVG sheet")
+                            .clicked()
+                            {
+                                self.export_sheet_format(SheetExportFormat::Svg);
+                            }
+                            if icons::icon_button(
+                                ui,
+                                AppIcon::SaveDisk,
+                                "All Pack",
+                                10.5,
+                                theme.text_secondary,
+                                theme.bg_card,
+                                Stroke::NONE,
+                                CornerRadius::same(5),
+                                Vec2::new(0.0, 24.0),
+                            )
+                            .on_hover_text("Export PDF + DXF + SVG + IFC4 delivery pack")
                             .clicked()
                             {
                                 self.export_bim_deliverables();
@@ -678,68 +712,126 @@ impl ParametricView {
             });
     }
 
-    pub(super) fn export_bim_deliverables(&mut self) {
+    pub(super) fn export_sheet_format(&mut self, fmt: SheetExportFormat) {
         let safe_title = self.sheet_title.replace([' ', '/', '\\'], "_");
         let pdf_filename = format!("Sheet_{}_{}.pdf", self.sheet_number, safe_title);
+        let dxf_filename = format!("Sheet_{}_{}.dxf", self.sheet_number, safe_title);
         let svg_filename = format!("Sheet_{}_{}.svg", self.sheet_number, safe_title);
         let ifc_filename = format!(
             "{}.ifc",
             self.bim_bus.project.project_name.replace([' ', '/', '\\'], "_")
         );
 
-        let pdf_bytes = self
-            .bim_bus
-            .project
-            .export_sheet_pdf(&self.sheet_number, &self.sheet_title);
-        let svg_str = self
-            .bim_bus
-            .project
-            .export_sheet_svg(&self.sheet_number, &self.sheet_title);
-        let ifc_str = self.bim_bus.project.export_ifc4_spatial();
+        let pdf_bytes = if matches!(fmt, SheetExportFormat::Pdf | SheetExportFormat::All) {
+            Some(
+                self.bim_bus
+                    .project
+                    .export_sheet_pdf(&self.sheet_number, &self.sheet_title),
+            )
+        } else {
+            None
+        };
+        let dxf_str = if matches!(fmt, SheetExportFormat::Dxf | SheetExportFormat::All) {
+            Some(
+                self.bim_bus
+                    .project
+                    .export_sheet_dxf(&self.sheet_number, &self.sheet_title),
+            )
+        } else {
+            None
+        };
+        let svg_str = if matches!(fmt, SheetExportFormat::Svg | SheetExportFormat::All) {
+            Some(
+                self.bim_bus
+                    .project
+                    .export_sheet_svg(&self.sheet_number, &self.sheet_title),
+            )
+        } else {
+            None
+        };
+        let ifc_str = if fmt == SheetExportFormat::All {
+            Some(self.bim_bus.project.export_ifc4_spatial())
+        } else {
+            None
+        };
 
         #[cfg(target_arch = "wasm32")]
         {
-            let _ = crate::core::web_bridge::trigger_browser_download(
-                &pdf_filename,
-                &pdf_bytes,
-                "application/pdf",
-            );
-            let _ = crate::core::web_bridge::trigger_browser_download(
-                &svg_filename,
-                svg_str.as_bytes(),
-                "image/svg+xml;charset=utf-8",
-            );
-            let _ = crate::core::web_bridge::trigger_browser_download(
-                &ifc_filename,
-                ifc_str.as_bytes(),
-                "application/x-step;charset=utf-8",
-            );
-
-            self.save_notification = Some(format!(
-                "Exported '{}', '{}', and '{}' via browser downloads",
-                pdf_filename, svg_filename, ifc_filename
-            ));
+            let mut exported = Vec::new();
+            if let Some(ref bytes) = pdf_bytes {
+                let _ = crate::core::web_bridge::trigger_browser_download(
+                    &pdf_filename,
+                    bytes,
+                    "application/pdf",
+                );
+                exported.push(pdf_filename);
+            }
+            if let Some(ref dxf) = dxf_str {
+                let _ = crate::core::web_bridge::trigger_browser_download(
+                    &dxf_filename,
+                    dxf.as_bytes(),
+                    "application/dxf;charset=utf-8",
+                );
+                exported.push(dxf_filename);
+            }
+            if let Some(ref svg) = svg_str {
+                let _ = crate::core::web_bridge::trigger_browser_download(
+                    &svg_filename,
+                    svg.as_bytes(),
+                    "image/svg+xml;charset=utf-8",
+                );
+                exported.push(svg_filename);
+            }
+            if let Some(ref ifc) = ifc_str {
+                let _ = crate::core::web_bridge::trigger_browser_download(
+                    &ifc_filename,
+                    ifc.as_bytes(),
+                    "application/x-step;charset=utf-8",
+                );
+                exported.push(ifc_filename);
+            }
+            self.save_notification = Some(format!("Exported {} via browser downloads", exported.join(", ")));
         }
 
         #[cfg(not(target_arch = "wasm32"))]
         {
             let export_dir = crate::core::InternalVault::vault_root_dir().join("Exports");
             let _ = std::fs::create_dir_all(&export_dir);
-            let pdf_path = export_dir.join(&pdf_filename);
-            let svg_path = export_dir.join(&svg_filename);
-            let ifc_path = export_dir.join(&ifc_filename);
-
-            let _ = std::fs::write(&pdf_path, pdf_bytes);
-            let _ = std::fs::write(&svg_path, svg_str);
-            let _ = std::fs::write(&ifc_path, ifc_str);
-
+            let mut exported = Vec::new();
+            if let Some(bytes) = pdf_bytes {
+                let _ = std::fs::write(export_dir.join(&pdf_filename), bytes);
+                exported.push(pdf_filename);
+            }
+            if let Some(dxf) = dxf_str {
+                let _ = std::fs::write(export_dir.join(&dxf_filename), dxf);
+                exported.push(dxf_filename);
+            }
+            if let Some(svg) = svg_str {
+                let _ = std::fs::write(export_dir.join(&svg_filename), svg);
+                exported.push(svg_filename);
+            }
+            if let Some(ifc) = ifc_str {
+                let _ = std::fs::write(export_dir.join(&ifc_filename), ifc);
+                exported.push(ifc_filename);
+            }
             self.save_notification = Some(format!(
-                "Successfully exported Drawing Sheet '{}' to {}",
-                pdf_filename,
+                "Exported {} to {}",
+                exported.join(", "),
                 export_dir.display()
             ));
         }
     }
 
+    pub(super) fn export_bim_deliverables(&mut self) {
+        self.export_sheet_format(SheetExportFormat::All);
+    }
 
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum SheetExportFormat {
+    Pdf,
+    Dxf,
+    Svg,
+    All,
 }

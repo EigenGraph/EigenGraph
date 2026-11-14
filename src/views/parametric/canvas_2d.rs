@@ -15,6 +15,7 @@ impl ParametricView {
         _members: &[crate::models::StructuralMember],
         _workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
         outer_avail_w: f32,
+        sidebar_toggle_inset_px: f32,
     ) {
         ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
 
@@ -23,23 +24,59 @@ impl ParametricView {
         self.last_floating_rects.clear();
 
         if self.view_mode == DraftingViewMode::VisualNodeGraphDynamo {
-            self.render_dynamo_algorithmic_studio(ui, theme, avail_w, canvas_h);
+            let slot_resp = ui.vertical(|ui| {
+                self.render_dynamo_algorithmic_studio(ui, theme, avail_w, canvas_h);
+            });
+            self.last_canvas_rect = Some(slot_resp.response.rect);
+            let (pill_rect, _in_pill, pill_hovered) =
+                UniversalCanvasState::interact_floating_freeze_pill(
+                    ui,
+                    slot_resp.response.rect,
+                    "parametric_dynamo",
+                    &mut universal_canvas.is_frozen,
+                    sidebar_toggle_inset_px,
+                );
+            UniversalCanvasState::paint_floating_freeze_pill(
+                ui.painter(),
+                pill_rect,
+                theme,
+                universal_canvas.is_frozen,
+                pill_hovered,
+            );
         } else if matches!(
             self.view_mode,
             DraftingViewMode::RebarBbsDetailing | DraftingViewMode::ElevationsAndMepRiser
         ) {
-            egui::ScrollArea::vertical()
-                .id_salt("parametric_detailing_slots_scroll")
-                .max_height(canvas_h)
-                .show(ui, |ui| match self.view_mode {
-                    DraftingViewMode::RebarBbsDetailing => {
-                        self.render_rebar_bbs_detailing(ui, theme, features);
-                    }
-                    DraftingViewMode::ElevationsAndMepRiser => {
-                        self.render_elevations_mep_riser(ui, theme, features);
-                    }
-                    _ => {}
-                });
+            let slot_resp = ui.vertical(|ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("parametric_detailing_slots_scroll")
+                    .max_height(canvas_h)
+                    .show(ui, |ui| match self.view_mode {
+                        DraftingViewMode::RebarBbsDetailing => {
+                            self.render_rebar_bbs_detailing(ui, theme, features);
+                        }
+                        DraftingViewMode::ElevationsAndMepRiser => {
+                            self.render_elevations_mep_riser(ui, theme, features);
+                        }
+                        _ => {}
+                    });
+            });
+            self.last_canvas_rect = Some(slot_resp.response.rect);
+            let (pill_rect, _in_pill, pill_hovered) =
+                UniversalCanvasState::interact_floating_freeze_pill(
+                    ui,
+                    slot_resp.response.rect,
+                    "parametric_detailing",
+                    &mut universal_canvas.is_frozen,
+                    sidebar_toggle_inset_px,
+                );
+            UniversalCanvasState::paint_floating_freeze_pill(
+                ui.painter(),
+                pill_rect,
+                theme,
+                universal_canvas.is_frozen,
+                pill_hovered,
+            );
         } else {
             let (response, painter) =
                 ui.allocate_painter(Vec2::new(avail_w, canvas_h), Sense::click_and_drag());
@@ -51,7 +88,16 @@ impl ParametricView {
                 UniversalCanvasState::canvas_bg(theme),
             );
 
-            let pointer_in_floating = false;
+            // Top-left Floating Freeze / Live Toggle inside Viewport (interact BEFORE pan/draw checks)
+            let (freeze_pill_rect, pointer_in_freeze_pill, freeze_pill_hovered) =
+                UniversalCanvasState::interact_floating_freeze_pill(
+                    ui,
+                    rect,
+                    "parametric",
+                    &mut universal_canvas.is_frozen,
+                    sidebar_toggle_inset_px,
+                );
+            let pointer_in_floating = pointer_in_freeze_pill;
             let is_frozen_now =
                 universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx());
 
@@ -107,9 +153,13 @@ impl ParametricView {
                 | DraftingViewMode::ElevationsAndMepRiser => {}
             }
 
-            if universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx()) {
-                UniversalCanvasState::paint_frozen_badge(&painter, rect, theme, 14.0);
-            }
+            UniversalCanvasState::paint_floating_freeze_pill(
+                &painter,
+                freeze_pill_rect,
+                theme,
+                universal_canvas.is_frozen,
+                freeze_pill_hovered,
+            );
 
             UniversalCanvasState::paint_rounded_viewport_border(
                 &painter,

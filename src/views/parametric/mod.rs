@@ -166,6 +166,8 @@ pub struct ParametricView {
     pub last_floating_rects: Vec<Rect>,
     pub selected_rebar_host_idx: usize,
     pub rebar_seismic_hooks_135: bool,
+    pub elev_facade_idx: usize,
+    pub elev_mep_system_idx: usize,
 }
 
 impl Default for ParametricView {
@@ -223,6 +225,8 @@ impl Default for ParametricView {
             last_floating_rects: Vec::new(),
             selected_rebar_host_idx: 0,
             rebar_seismic_hooks_135: true,
+            elev_facade_idx: 0,
+            elev_mep_system_idx: 0,
         }
     }
 }
@@ -278,24 +282,7 @@ impl ParametricView {
                 ui.set_width(outer_avail_w);
                 ui.set_max_width(outer_avail_w);
 
-                // 1. In-Canvas Top HUD Toolbar, Inline Levels + CAD Command Bar & Docked Inspectors
-                self.render_drafting_ribbon(
-                    ui,
-                    theme,
-                    db_components,
-                    active_pillar,
-                    features,
-                    universal_canvas,
-                    members,
-                    workspace_settings.clone(),
-                    sidebar_toggle_inset_px,
-                );
-
-                // Dismissible Status Toast (shared across Universal, Parametric & Geometry)
-                UniversalCanvasState::render_toast_bar(ui, theme, &mut self.save_notification);
-                ui.add_space(6.0);
-
-                // 2. Full-Width Unobstructed World-Grounded Drawing Viewport
+                // 1. Full-Width Unobstructed World-Grounded Drawing Viewport (Top)
                 self.render_drawing_canvas(
                     ui,
                     theme,
@@ -304,8 +291,26 @@ impl ParametricView {
                     features,
                     universal_canvas,
                     members,
-                    workspace_settings,
+                    workspace_settings.clone(),
                     outer_avail_w,
+                    sidebar_toggle_inset_px,
+                );
+
+                // Dismissible Status Toast (shared across Universal, Parametric & Geometry)
+                UniversalCanvasState::render_toast_bar(ui, theme, &mut self.save_notification);
+                ui.add_space(6.0);
+
+                // 2. Bottom HUD Toolbar, Inline Levels + CAD Command Bar & Docked Inspectors
+                self.render_drafting_ribbon(
+                    ui,
+                    theme,
+                    db_components,
+                    active_pillar,
+                    features,
+                    universal_canvas,
+                    members,
+                    workspace_settings,
+                    sidebar_toggle_inset_px,
                 );
             });
 
@@ -313,6 +318,14 @@ impl ParametricView {
             self.render_db_drawer(ui.ctx(), theme, db_components, active_pillar);
         }
     }
+    /// Auto-fits the 2D drafting viewport and ground basemap to active BIM element bounds.
+    pub fn fit_view_to_project(&mut self, universal_canvas: &mut UniversalCanvasState) {
+        let extents = self.bim_bus.project.plan_extents_mm();
+        universal_canvas.fit_world_to_bim_extents(extents);
+        self.canvas_pan = Vec2::ZERO;
+        self.canvas_zoom = 1.0;
+    }
+
     pub(super) fn refresh_live_ari(&mut self) {
         if let Ok(rep) = self.bim_bus.project.evaluate_live_ari() {
             self.live_ari_score = rep.average_ari as f32;
