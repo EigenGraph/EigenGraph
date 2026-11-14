@@ -9,6 +9,480 @@
   <link data-trunk rel="icon" href="assets/icon.png" />
   <link data-trunk rel="rust" data-bin="eigengraph" data-wasm-opt="0" />
 
+  <script>
+    (function () {
+      const STORAGE_KEY = "eigengraph_vault_state_v1";
+      const DB_NAME = "EigenGraphVaultDB";
+      const DB_VERSION = 1;
+      const VAULT_FOLDERS = [
+        "Projects", "ParametricLibrary", "Columns", "Beams", "Slabs",
+        "Walls", "Footings", "Rebar", "Materials", "Hydraulic_Structures",
+        "KnowledgeBase", "Exports", "AI_Context", "ARI_Analyses"
+      ];
+      const NOTICE_TEXT =
+        "======================================================================\n" +
+        "                      EIGENGRAPH DATA VAULT\n" +
+        "======================================================================\n" +
+        "This folder acts as the personal local Engineering Vault for EigenGraph.\n" +
+        "Files in Projects/, ParametricLibrary/, and KnowledgeBase/ are kept here.\n";
+
+      let state = {
+        connected: false,
+        guest_mode: false,
+        vault_name: "",
+        backend: "none",
+        fs_supported: typeof window.showDirectoryPicker === "function",
+        needs_permission: false,
+        busy: false,
+        status_msg: "",
+        error_msg: "",
+        version: 1,
+        projects: []
+      };
+
+      try {
+        const cached = window.localStorage.getItem(STORAGE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed === "object") {
+            state = Object.assign(state, parsed, {
+              fs_supported: typeof window.showDirectoryPicker === "function",
+              busy: false,
+              version: (parsed.version || 1) + 1
+            });
+          }
+        }
+      } catch (_) {}
+
+      const fileCache = new Map();
+      let activeDirHandle = null;
+
+      function openDb() {
+        return new Promise((resolve, reject) => {
+          if (!("indexedDB" in window)) {
+            reject(new Error("IndexedDB unavailable in this browser."));
+            return;
+          }
+          const req = window.indexedDB.open(DB_NAME, DB_VERSION);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains("handles")) db.createObjectStore("handles");
+            if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
+            if (!db.objectStoreNames.contains("files")) db.createObjectStore("files", { keyPath: "path" });
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error || new Error("IndexedDB open failed."));
+        });
+      }
+
+      async function idbGet(storeName, key) {
+        const db = await openDb();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(storeName, "readonly");
+          const req = tx.objectStore(storeName).get(key);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async function idbPut(storeName, value, key) {
+        const db = await openDb();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(storeName, "readwrite");
+          const store = tx.objectStore(storeName);
+          const req = key !== undefined ? store.put(value, key) : store.put(value);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async function idbDelete(storeName, key) {
+        const db = await openDb();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(storeName, "readwrite");
+          const req = tx.objectStore(storeName).delete(key);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async function idbGetAllFiles() {
+        const db = await openDb();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction("files", "readonly");
+          const req = tx.objectStore("files").getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      function persistSnapshot() {
+        state.version = (state.version || 0) + 1;
+        state.fs_supported = typeof window.showDirectoryPicker === "function";
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            connected: state.connected,
+            guest_mode: state.guest_mode,
+            vault_name: state.vault_name,
+            backend: state.backend,
+            needs_permission: state.needs_permission,
+            status_msg: state.status_msg,
+            error_msg: state.error_msg,
+            version: state.version,
+            projects: state.projects
+          }));
+        } catch (_) {}
+      }
+
+      function extractProjectMeta(relPath, content, modifiedMs) {
+        const norm = relPath.replace(/\\/g, "/");
+        const base = norm.split("/").pop() || norm;
+        const lower = base.toLowerCase();
+        const isProjFolder = norm.startsWith("Projects/");
+        const isEigenExt = lower.endsWith(".eigen") || lower.endsWith(".eigen.json");
+        const isProjJson = isProjFolder && lower.endsWith(".json");
+        if (!isEigenExt && !isProjJson) return null;
+
+        let displayName = base.replace(/\.eigen\.json$/i, "").replace(/\.eigen$/i, "").replace(/\.json$/i, "");
+        let nodeCount = 0;
+        let memberCount = 0;
+        try {
+          const parsed = JSON.parse(content);
+          const model = parsed && parsed.model ? parsed.model : parsed;
+          if (model && typeof model === "object") {
+            if (typeof model.name === "string" && model.name.trim()) displayName = model.name.trim();
+            if (Array.isArray(model.nodes)) nodeCount = model.nodes.length;
+            else if (model.nodes && typeof model.nodes === "object") nodeCount = Object.keys(model.nodes).length;
+            if (Array.isArray(model.elements)) memberCount = model.elements.length;
+            else if (Array.isArray(model.members)) memberCount = model.members.length;
+            else if (model.elements && typeof model.elements === "object") memberCount = Object.keys(model.elements).length;
+            else if (model.members && typeof model.members === "object") memberCount = Object.keys(model.members).length;
+          }
+        } catch (_) {}
+
+        const dt = modifiedMs ? new Date(modifiedMs) : new Date();
+        const updatedAt = isNaN(dt.getTime()) ? "Indexed" : dt.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+        return {
+          name: displayName,
+          filename: base,
+          rel_path: norm,
+          category: isProjFolder ? "Projects" : "Vault Root",
+          node_count: nodeCount,
+          member_count: memberCount,
+          size_bytes: content.length,
+          updated_at: updatedAt
+        };
+      }
+
+      function rebuildProjectsFromCache() {
+        const list = [];
+        for (const [relPath, entry] of fileCache.entries()) {
+          const meta = extractProjectMeta(relPath, entry.content, entry.updated_at);
+          if (meta) list.push(meta);
+        }
+        list.sort((a, b) => a.name.localeCompare(b.name));
+        state.projects = list;
+      }
+
+      async function writeHandleFile(dirHandle, relPath, textContent) {
+        const parts = relPath.split("/").filter(Boolean);
+        if (parts.length === 0) return;
+        let curr = dirHandle;
+        for (let i = 0; i < parts.length - 1; i++) {
+          curr = await curr.getDirectoryHandle(parts[i], { create: true });
+        }
+        const fileHandle = await curr.getFileHandle(parts[parts.length - 1], { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(textContent);
+        await writable.close();
+      }
+
+      async function scanDirectoryIntoCache(dirHandle) {
+        fileCache.clear();
+        const foldersToCheck = [""].concat(["Projects", "ParametricLibrary", "KnowledgeBase", "Columns", "Beams", "Slabs", "Walls"]);
+        for (const folder of foldersToCheck) {
+          try {
+            const sub = folder ? await dirHandle.getDirectoryHandle(folder, { create: false }) : dirHandle;
+            for await (const [name, handle] of sub.entries()) {
+              if (handle.kind === "file" && (name.endsWith(".eigen") || name.endsWith(".json") || name.endsWith(".txt"))) {
+                const f = await handle.getFile();
+                if (f.size <= 8 * 1024 * 1024) {
+                  const text = await f.text();
+                  const rel = folder ? `${folder}/${name}` : name;
+                  fileCache.set(rel, { content: text, updated_at: f.lastModified });
+                  await idbPut("files", { path: rel, content: text, updated_at: f.lastModified }).catch(() => {});
+                }
+              }
+            }
+          } catch (_) {}
+        }
+        rebuildProjectsFromCache();
+      }
+
+      async function loadIdbFilesIntoCache() {
+        fileCache.clear();
+        const rows = await idbGetAllFiles();
+        for (const row of rows) {
+          if (row && row.path && typeof row.content === "string") {
+            fileCache.set(row.path, { content: row.content, updated_at: row.updated_at || Date.now() });
+          }
+        }
+        rebuildProjectsFromCache();
+      }
+
+      async function ensureVaultStructureInHandle(dirHandle) {
+        for (const f of VAULT_FOLDERS) {
+          await dirHandle.getDirectoryHandle(f, { create: true });
+        }
+        try {
+          await dirHandle.getFileHandle("_VAULT_NOTICE.txt", { create: false });
+        } catch (_) {
+          await writeHandleFile(dirHandle, "_VAULT_NOTICE.txt", NOTICE_TEXT);
+        }
+      }
+
+      async function connectExistingVaultAsync() {
+        state.busy = true;
+        state.error_msg = "";
+        persistSnapshot();
+        try {
+          if (typeof window.showDirectoryPicker === "function") {
+            const handle = await window.showDirectoryPicker({ id: "eigengraph-vault", mode: "readwrite" });
+            activeDirHandle = handle;
+            await idbPut("handles", handle, "active_handle");
+            await scanDirectoryIntoCache(handle);
+            state.connected = true;
+            state.guest_mode = false;
+            state.backend = "fs_access";
+            state.vault_name = handle.name || "Local Vault Folder";
+            state.needs_permission = false;
+            state.status_msg = `Connected local Vault folder '${state.vault_name}' (${state.projects.length} projects).`;
+            await idbPut("meta", { connected: true, backend: "fs_access", vault_name: state.vault_name }, "vault_meta");
+          } else {
+            await connectIndexedDbVaultAsync("Browser IndexedDB Vault");
+          }
+        } catch (err) {
+          if (err && err.name === "AbortError") {
+            state.status_msg = "Folder selection cancelled.";
+          } else {
+            state.error_msg = (err && err.message) ? err.message : String(err);
+          }
+        } finally {
+          state.busy = false;
+          persistSnapshot();
+        }
+      }
+
+      async function connectIndexedDbVaultAsync(vaultName) {
+        state.busy = true;
+        state.error_msg = "";
+        persistSnapshot();
+        try {
+          const cleanName = String(vaultName || "Browser IndexedDB Vault").trim() || "Browser IndexedDB Vault";
+          await loadIdbFilesIntoCache();
+          if (!fileCache.has("_VAULT_NOTICE.txt")) {
+            fileCache.set("_VAULT_NOTICE.txt", { content: NOTICE_TEXT, updated_at: Date.now() });
+            await idbPut("files", { path: "_VAULT_NOTICE.txt", content: NOTICE_TEXT, updated_at: Date.now() });
+          }
+          activeDirHandle = null;
+          state.connected = true;
+          state.guest_mode = false;
+          state.backend = "indexeddb";
+          state.vault_name = cleanName;
+          state.needs_permission = false;
+          state.status_msg = `Connected IndexedDB Vault '${cleanName}' (${state.projects.length} projects).`;
+          await idbPut("meta", { connected: true, backend: "indexeddb", vault_name: cleanName }, "vault_meta");
+        } catch (err) {
+          state.error_msg = (err && err.message) ? err.message : String(err);
+        } finally {
+          state.busy = false;
+          persistSnapshot();
+        }
+      }
+
+      async function createNewVaultAsync(vaultName, forceIndexedDb) {
+        state.busy = true;
+        state.error_msg = "";
+        persistSnapshot();
+        const cleanName = String(vaultName || "EigenGraph_Vault").trim() || "EigenGraph_Vault";
+        try {
+          if (!forceIndexedDb && typeof window.showDirectoryPicker === "function") {
+            const handle = await window.showDirectoryPicker({ id: "eigengraph-vault", mode: "readwrite" });
+            activeDirHandle = handle;
+            await idbPut("handles", handle, "active_handle");
+            await ensureVaultStructureInHandle(handle);
+            await scanDirectoryIntoCache(handle);
+            state.connected = true;
+            state.guest_mode = false;
+            state.backend = "fs_access";
+            state.vault_name = cleanName || handle.name || "EigenGraph Vault";
+            state.needs_permission = false;
+            state.status_msg = `Created & connected Vault '${state.vault_name}' in local folder '${handle.name}'.`;
+            await idbPut("meta", { connected: true, backend: "fs_access", vault_name: state.vault_name }, "vault_meta");
+          } else {
+            await connectIndexedDbVaultAsync(cleanName);
+            state.status_msg = `Created & connected Browser IndexedDB Vault '${cleanName}'.`;
+          }
+        } catch (err) {
+          if (err && err.name === "AbortError") {
+            state.status_msg = "Vault folder creation cancelled.";
+          } else {
+            state.error_msg = (err && err.message) ? err.message : String(err);
+          }
+        } finally {
+          state.busy = false;
+          persistSnapshot();
+        }
+      }
+
+      async function reconnectPermissionAsync() {
+        state.busy = true;
+        state.error_msg = "";
+        persistSnapshot();
+        try {
+          const handle = activeDirHandle || (await idbGet("handles", "active_handle"));
+          if (!handle) {
+            state.needs_permission = false;
+            state.connected = false;
+            state.error_msg = "Saved folder handle missing. Please select your Vault folder again.";
+          } else {
+            const perm = await handle.requestPermission({ mode: "readwrite" });
+            if (perm === "granted") {
+              activeDirHandle = handle;
+              await scanDirectoryIntoCache(handle);
+              state.needs_permission = false;
+              state.connected = true;
+              state.status_msg = `Reconnected folder '${state.vault_name}' (${state.projects.length} projects).`;
+            } else {
+              state.error_msg = "Folder write permission was denied by browser.";
+            }
+          }
+        } catch (err) {
+          state.error_msg = (err && err.message) ? err.message : String(err);
+        } finally {
+          state.busy = false;
+          persistSnapshot();
+        }
+      }
+
+      async function refreshScanAsync() {
+        state.busy = true;
+        persistSnapshot();
+        try {
+          if (state.backend === "fs_access" && activeDirHandle) {
+            await scanDirectoryIntoCache(activeDirHandle);
+            state.status_msg = `Refreshed Vault index (${state.projects.length} projects).`;
+          } else if (state.backend === "indexeddb") {
+            await loadIdbFilesIntoCache();
+            state.status_msg = `Refreshed IndexedDB Vault (${state.projects.length} projects).`;
+          }
+        } catch (err) {
+          state.error_msg = (err && err.message) ? err.message : String(err);
+        } finally {
+          state.busy = false;
+          persistSnapshot();
+        }
+      }
+
+      async function disconnectVaultAsync() {
+        activeDirHandle = null;
+        fileCache.clear();
+        await idbDelete("handles", "active_handle").catch(() => {});
+        await idbDelete("meta", "vault_meta").catch(() => {});
+        state.connected = false;
+        state.guest_mode = false;
+        state.vault_name = "";
+        state.backend = "none";
+        state.needs_permission = false;
+        state.error_msg = "";
+        state.projects = [];
+        state.status_msg = "Vault disconnected from browser session.";
+        persistSnapshot();
+      }
+
+      async function hydrateOnStartup() {
+        try {
+          const meta = await idbGet("meta", "vault_meta");
+          if (meta && meta.connected) {
+            if (meta.backend === "fs_access") {
+              const handle = await idbGet("handles", "active_handle");
+              if (handle && typeof handle.queryPermission === "function") {
+                const perm = await handle.queryPermission({ mode: "readwrite" });
+                activeDirHandle = handle;
+                state.connected = true;
+                state.backend = "fs_access";
+                state.vault_name = meta.vault_name || handle.name || "Local Vault Folder";
+                if (perm === "granted") {
+                  await scanDirectoryIntoCache(handle);
+                  state.needs_permission = false;
+                  state.status_msg = `Restored local folder '${state.vault_name}'.`;
+                } else {
+                  await loadIdbFilesIntoCache();
+                  state.needs_permission = true;
+                  state.status_msg = "Click 'Reconnect Folder' to resume writing to OS directory.";
+                }
+                persistSnapshot();
+                return;
+              }
+            } else if (meta.backend === "indexeddb") {
+              await loadIdbFilesIntoCache();
+              state.connected = true;
+              state.backend = "indexeddb";
+              state.vault_name = meta.vault_name || "Browser IndexedDB Vault";
+              state.needs_permission = false;
+              state.status_msg = `Restored Browser IndexedDB Vault '${state.vault_name}'.`;
+              persistSnapshot();
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+
+      window.EigenGraphVaultBridge = {
+        getVersion: () => state.version || 1,
+        getStateJson: () => JSON.stringify(state),
+        connectExistingVault: () => { void connectExistingVaultAsync(); },
+        connectIndexedDbVault: (name) => { void connectIndexedDbVaultAsync(name); },
+        createNewVault: (name, forceIdb) => { void createNewVaultAsync(name, !!forceIdb); },
+        reconnectVault: () => { void reconnectPermissionAsync(); },
+        refreshVault: () => { void refreshScanAsync(); },
+        disconnectVault: () => { void disconnectVaultAsync(); },
+        enterGuestMode: () => {
+          state.guest_mode = true;
+          state.connected = false;
+          state.error_msg = "";
+          state.status_msg = "Exploring workspace in Guest Session.";
+          persistSnapshot();
+        },
+        readFileSync: (relPath) => {
+          const norm = String(relPath || "").replace(/\\/g, "/");
+          const hit = fileCache.get(norm);
+          return hit ? hit.content : "";
+        },
+        writeFileAsync: (relPath, content) => {
+          const norm = String(relPath || "").replace(/\\/g, "/");
+          const now = Date.now();
+          fileCache.set(norm, { content: String(content || ""), updated_at: now });
+          rebuildProjectsFromCache();
+          persistSnapshot();
+          void idbPut("files", { path: norm, content: String(content || ""), updated_at: now }).catch(() => {});
+          if (state.backend === "fs_access" && activeDirHandle && !state.needs_permission) {
+            void writeHandleFile(activeDirHandle, norm, String(content || "")).catch(() => {});
+          }
+        },
+        deleteFileAsync: (relPath) => {
+          const norm = String(relPath || "").replace(/\\/g, "/");
+          fileCache.delete(norm);
+          rebuildProjectsFromCache();
+          persistSnapshot();
+          void idbDelete("files", norm).catch(() => {});
+        }
+      };
+
+      void hydrateOnStartup();
+    })();
+  </script>
+
   <style>
     html, body {
       margin: 0;

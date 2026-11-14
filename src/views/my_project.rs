@@ -20,6 +20,11 @@ pub struct MyProjectView {
     pub show_dossier_modal: bool,
     pub export_success_msg: Option<String>,
     pub custom_vault_override: String,
+    pub pending_open_vault_project: Option<crate::core::vault::PersonalVaultProjectEntry>,
+    pub request_open_settings_vault: bool,
+    pub request_refresh_vault: bool,
+    pub request_save_active_to_vault: bool,
+    pub save_project_name_input: String,
     // Phase 27: BIM Family Catalog & Parameter Inspector fields
     pub families: Vec<BimFamilyItem>,
     pub selected_family_idx: usize,
@@ -36,6 +41,11 @@ impl Default for MyProjectView {
             show_dossier_modal: false,
             export_success_msg: None,
             custom_vault_override: String::new(),
+            pending_open_vault_project: None,
+            request_open_settings_vault: false,
+            request_refresh_vault: false,
+            request_save_active_to_vault: false,
+            save_project_name_input: "Workspace_Project".to_string(),
             families: Vec::new(),
             selected_family_idx: 0,
             family_search_query: String::new(),
@@ -50,6 +60,7 @@ impl MyProjectView {
         ui: &mut Ui,
         theme: &MacTheme,
         projects: &[ProjectItem],
+        vault_projects: &[crate::core::vault::PersonalVaultProjectEntry],
         active_pillar: &mut NavigationPillar,
         features: &mut FeatureRegistry,
     ) {
@@ -65,10 +76,10 @@ impl MyProjectView {
                     "my_library_mode_subtabs",
                     &mut self.library_mode,
                     &[
-                        (LibraryViewMode::ProjectsAndPortfolios, "📁 Project Portfolios & Vault"),
-                        (LibraryViewMode::GlobalBimFamilyCatalog, "🧱 Global BIM Families & Parameters"),
-                        (LibraryViewMode::Iso19650CdeHub, "📂 ISO 19650 CDE Hub"),
-                        (LibraryViewMode::TypologyTemplateLauncher, "🏛️ Structural Templates"),
+                        (LibraryViewMode::ProjectsAndPortfolios, "Personal Vault Projects"),
+                        (LibraryViewMode::GlobalBimFamilyCatalog, "Global BIM Families & Parameters"),
+                        (LibraryViewMode::Iso19650CdeHub, "ISO 19650 CDE Hub"),
+                        (LibraryViewMode::TypologyTemplateLauncher, "Structural Templates"),
                     ],
                 );
 
@@ -111,18 +122,18 @@ impl MyProjectView {
 
                         ui.add_space(16.0);
 
-                        // 1B. SELF-CONTAINED PACKAGE VAULT & SELF-LEARNING MEMORY PANEL
-                        self.render_internal_vault_panel(ui, theme, features);
+                        // 1B. PERSONAL VAULT SUMMARY BAR (Vault folder settings live in Settings)
+                        self.render_internal_vault_panel(ui, theme, vault_projects.len(), features);
 
-                        ui.add_space(20.0);
+                        ui.add_space(14.0);
 
-                        // 2. CATEGORY FILTER PILLS
+                        // 2. CATEGORY & SEARCH BAR
                         self.render_category_bar(ui, theme);
 
-                        ui.add_space(16.0);
+                        ui.add_space(12.0);
 
-                        // 3. CURATED PROJECT CARDS (Responsive 1-col / 2-col grid)
-                        self.render_projects_grid(ui, theme, projects, active_pillar);
+                        // 3. PERSONAL VAULT PROJECTS & WORKSPACE CARDS
+                        self.render_projects_grid(ui, theme, projects, vault_projects, active_pillar);
                     }
                 }
 
@@ -292,215 +303,124 @@ impl MyProjectView {
         &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
-        features: &mut FeatureRegistry,
+        vault_projects_count: usize,
+        _features: &mut FeatureRegistry,
     ) {
-        ui_kit::feature_slot_card(ui, theme, features, FeatureId::BrowserIndexedDbPersistence, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Storage Engine: Browser IndexedDB");
-                let _ = ui.selectable_label(false, "Schema: eigengraph_vault_v3");
-                let _ = icons::icon_button(
-                    ui,
-                    AppIcon::SaveDisk,
-                    "Save IndexedDB Snapshot",
-                    11.5,
-                    theme.text_primary,
-                    theme.bg_card,
-                    Stroke::new(1.0, theme.border_subtle),
-                    CornerRadius::same(6),
-                    Vec2::ZERO,
-                );
-                let _ = icons::icon_button(
-                    ui,
-                    AppIcon::UploadImport,
-                    "Restore Offline Workspace",
-                    11.5,
-                    theme.text_primary,
-                    theme.bg_card,
-                    Stroke::new(1.0, theme.border_subtle),
-                    CornerRadius::same(6),
-                    Vec2::ZERO,
-                );
-            });
-        });
-        ui.add_space(12.0);
-
-        let vault_root = crate::core::InternalVault::vault_root_dir();
-        let mem = crate::core::InternalVault::load_knowledge_memory();
-        let categories = crate::core::InternalVault::list_all_vault_categories();
-
+        let status = crate::core::InternalVault::connection_status();
         theme.card_frame().show(ui, |ui| {
+            ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
                 icons::icon_label(
                     ui,
                     AppIcon::Database,
                     14.0,
                     theme.accent_blue,
-                    "EIGENGRAPH ENGINEERING VAULT & KNOWLEDGE MEMORY",
+                    "PERSONAL VAULT PROJECT INDEX",
                     13.0,
                     theme.accent_blue,
                     true,
                 );
+                let (badge_txt, badge_col) = if status.connected && status.needs_permission {
+                    ("PERMISSION REQUIRED IN SETTINGS", theme.accent_orange)
+                } else if status.connected {
+                    ("CONNECTED", theme.accent_green)
+                } else if status.guest_mode {
+                    ("GUEST EXPLORE SESSION", theme.accent_orange)
+                } else {
+                    ("VAULT DISCONNECTED", theme.text_muted)
+                };
+                Frame::new()
+                    .fill(badge_col.gamma_multiply(0.18))
+                    .stroke(Stroke::new(1.0, badge_col.gamma_multiply(0.55)))
+                    .corner_radius(CornerRadius::same(6))
+                    .inner_margin(Margin::symmetric(8, 3))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(badge_txt).size(10.0).strong().color(badge_col));
+                    });
+
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if icons::icon_button(
                         ui,
-                        AppIcon::Undo,
-                        "Sync & Train ARI Memory",
-                        11.5,
-                        Color32::WHITE,
-                        theme.accent_green,
-                        Stroke::NONE,
+                        AppIcon::SettingsGear,
+                        "Manage Vault in Settings",
+                        11.0,
+                        theme.text_primary,
+                        theme.bg_sidebar,
+                        Stroke::new(1.0, theme.border_subtle),
                         CornerRadius::same(6),
                         Vec2::ZERO,
-                    ).clicked() {
-                        let mut engine = crate::core::ParametricEngine::new();
-                        if let Ok(mut model) = engine.generate_warren_truss() {
-                            model.name = "Active_Warren_Project".to_string();
-                            if let Ok(path) = crate::core::InternalVault::autosave_project_model("Active_Warren_Project.eigen", &model) {
-                                self.export_success_msg = Some(format!(
-                                    "AI Memory & Project Archive updated in Vault: {}",
-                                    path
-                                ));
-                            }
-                        }
+                    )
+                    .clicked()
+                    {
+                        self.request_open_settings_vault = true;
+                    }
+                    if status.connected
+                        && icons::icon_button(
+                            ui,
+                            AppIcon::Undo,
+                            "Refresh Vault List",
+                            11.0,
+                            theme.text_primary,
+                            theme.bg_sidebar,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
+                    {
+                        crate::core::web_bridge::vault_refresh();
+                        self.request_refresh_vault = true;
                     }
                 });
             });
 
             ui.add_space(6.0);
             ui.horizontal_wrapped(|ui| {
-                icons::draw_icon(ui, AppIcon::Folder, 13.0, theme.accent_blue);
+                icons::draw_icon(ui, AppIcon::Folder, 12.5, theme.accent_blue);
                 ui.label(
-                    RichText::new(format!(
-                        "Active Vault Location: {}",
-                        vault_root.display()
-                    ))
+                    RichText::new(if status.connected {
+                        format!(
+                            "Vault: {} ({}) • {} indexed project files",
+                            status.vault_name, status.location_label, vault_projects_count
+                        )
+                    } else {
+                        "Connect an existing Vault or create a new Vault in Settings to list your personal `.eigen` projects here.".to_string()
+                    })
                     .size(11.5)
-                    .monospace()
                     .color(theme.text_secondary),
                 );
             });
 
-            ui.add_space(8.0);
-            let best_sec = mem
-                .learned_optimal_sections
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("RC Column 500x500");
-            let stats = [
-                (
-                    "ORGANIZED CATEGORIES",
-                    format!("{} Category Folders", categories.len()),
-                    "Auto-Taxonomy Routing".to_string(),
-                    theme.accent_blue,
-                ),
-                (
-                    "AI LEARNING CYCLES",
-                    format!("{} Evaluations", mem.total_ari_evaluations),
-                    format!("Best ARI: {:.3}", mem.best_recorded_system_ari),
-                    theme.accent_green,
-                ),
-                (
-                    "SEAMLESS AUTOSAVE",
-                    format!("{}x Saved", mem.total_autosaves_count),
-                    format!("{} Parametric Components", mem.total_parametric_mutations),
-                    theme.accent_orange,
-                ),
-                (
-                    "OPTIMIZED SECTIONS",
-                    best_sec.to_string(),
-                    "Historical Memory Recommendation".to_string(),
-                    Color32::WHITE,
-                ),
-            ];
-            ui_kit::responsive_grid_n(ui, stats.len(), 190.0, |ui, idx| {
-                let (title, value, sub, col) = &stats[idx];
-                Frame::new()
-                    .fill(theme.bg_sidebar)
-                    .corner_radius(CornerRadius::same(8))
-                    .inner_margin(Margin::same(10))
-                    .show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.label(RichText::new(*title).size(10.0).strong().color(theme.text_muted));
-                        ui.label(RichText::new(value).size(14.5).strong().color(*col));
-                        ui.label(RichText::new(sub).size(10.5).color(theme.text_secondary));
-                    });
-            });
-
-            ui.add_space(8.0);
-            let dir_input_w = (ui.available_width() - 80.0).clamp(160.0, 320.0);
-            ui.horizontal_wrapped(|ui| {
-                icons::icon_label(
-                    ui,
-                    AppIcon::Target,
-                    12.5,
-                    theme.accent_blue,
-                    "Switch Target Vault Directory:",
-                    11.0,
-                    theme.text_muted,
-                    false,
-                );
-                let resp = ui.add(egui::TextEdit::singleline(&mut self.custom_vault_override)
-                    .hint_text("Enter custom folder path...")
-                    .desired_width(dir_input_w));
-                if resp.lost_focus() && !self.custom_vault_override.trim().is_empty() {
-                    let path = std::path::PathBuf::from(self.custom_vault_override.trim());
-                    let _ = crate::core::InternalVault::set_custom_vault_dir(path);
-                }
-                if ui.button(RichText::new("Apply").size(11.0)).clicked() && !self.custom_vault_override.trim().is_empty() {
-                    let path = std::path::PathBuf::from(self.custom_vault_override.trim());
-                    let _ = crate::core::InternalVault::set_custom_vault_dir(path);
-                }
-            });
-
-            ui.add_space(10.0);
-            ui.separator();
-            ui.add_space(8.0);
-
-            // Multi-LOD Redundancy Convergence Engine Table (LOD 100 -> LOD 200 -> LOD 300)
-            let conv = crate::core::InternalVault::evaluate_nvw_multi_lod_convergence();
-            ui.horizontal_wrapped(|ui| {
-                icons::icon_label(
-                    ui,
-                    AppIcon::ChartLine,
-                    13.0,
-                    theme.accent_green,
-                    "MULTI-LOD REDUNDANCY CONVERGENCE AUDIT (LOD 100 -> LOD 200 -> LOD 300)",
-                    11.5,
-                    theme.accent_green,
-                    true,
-                );
-                ui.label(RichText::new(format!("• ΔARI: +{:.1}% • κ(K) Reduction: {:.1}x", conv.ari_gain_lod100_to_lod300_pct, conv.kappa_reduction_ratio)).size(11.0).strong().color(theme.accent_blue));
-            });
-            ui.add_space(4.0);
-            ScrollArea::horizontal()
-                .id_salt("multi_lod_convergence_scroll")
-                .show(ui, |ui| {
-                    egui::Grid::new("multi_lod_convergence_grid")
-                        .striped(true)
-                        .min_col_width(95.0)
-                        .show(ui, |ui| {
-                            ui.label(RichText::new("LOD Stage").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("IFC File").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Nodes / Elements").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Indeterminacy (DSI)").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Condition κ(K)").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Avg ARI").size(10.5).strong().color(theme.text_muted));
-                            ui.label(RichText::new("Min ARI").size(10.5).strong().color(theme.text_muted));
-                            ui.end_row();
-
-                            for st in &conv.stages {
-                                ui.label(RichText::new(&st.lod_level).size(11.0).strong().color(theme.text_primary));
-                                ui.label(RichText::new(&st.ifc_filename).size(10.5).monospace().color(theme.accent_blue));
-                                ui.label(RichText::new(format!("{} / {}", st.nodes_count, st.elements_count)).size(10.5).color(theme.text_secondary));
-                                ui.label(RichText::new(format!("{} DOF", st.static_indeterminacy_dsi)).size(10.5).color(theme.text_secondary));
-                                ui.label(RichText::new(format!("{:.2e}", st.condition_number_kappa)).size(10.5).monospace().color(theme.accent_orange));
-                                ui.label(RichText::new(format!("{:.3}", st.avg_ari)).size(11.0).strong().color(theme.text_primary));
-                                let min_col = if st.min_system_ari >= 0.75 { theme.accent_green } else { theme.accent_orange };
-                                ui.label(RichText::new(format!("{:.3}", st.min_system_ari)).size(11.0).strong().color(min_col));
-                                ui.end_row();
-                            }
-                        });
+            if status.connected {
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        RichText::new("Save Active Workspace Model as `.eigen`:")
+                            .size(11.0)
+                            .color(theme.text_muted),
+                    );
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.save_project_name_input)
+                            .hint_text("Project Name")
+                            .desired_width(180.0),
+                    );
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::SaveDisk,
+                        "Save Model to Vault/Projects",
+                        11.0,
+                        Color32::WHITE,
+                        theme.accent_blue,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        self.request_save_active_to_vault = true;
+                    }
                 });
+            }
         });
     }
 
@@ -625,8 +545,92 @@ impl MyProjectView {
         });
     }
 
-    fn render_projects_grid(&self, ui: &mut Ui, theme: &MacTheme, projects: &[ProjectItem], active_pillar: &mut NavigationPillar) {
-        if projects.is_empty() {
+    fn render_projects_grid(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        projects: &[ProjectItem],
+        vault_projects: &[crate::core::vault::PersonalVaultProjectEntry],
+        active_pillar: &mut NavigationPillar,
+    ) {
+        let query = self.search_query.trim().to_lowercase();
+        let filtered_vault: Vec<&crate::core::vault::PersonalVaultProjectEntry> = vault_projects
+            .iter()
+            .filter(|vp| {
+                query.is_empty()
+                    || vp.name.to_lowercase().contains(&query)
+                    || vp.filename.to_lowercase().contains(&query)
+            })
+            .collect();
+
+        if !filtered_vault.is_empty() {
+            ui.label(
+                RichText::new(format!("PERSONAL VAULT PROJECTS ({})", filtered_vault.len()))
+                    .size(11.5)
+                    .strong()
+                    .color(theme.accent_blue),
+            );
+            ui.add_space(6.0);
+            ui_kit::responsive_grid_n(ui, filtered_vault.len(), 320.0, |ui, idx| {
+                let entry = filtered_vault[idx];
+                theme.card_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        icons::draw_icon(ui, AppIcon::Cube3D, 14.0, theme.accent_blue);
+                        ui.label(RichText::new(&entry.name).size(14.0).strong().color(theme.text_primary));
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            Frame::new()
+                                .fill(theme.bg_sidebar)
+                                .corner_radius(CornerRadius::same(5))
+                                .inner_margin(Margin::symmetric(6, 2))
+                                .show(ui, |ui| {
+                                    ui.label(RichText::new(&entry.category).size(10.0).color(theme.text_muted));
+                                });
+                        });
+                    });
+                    ui.add_space(4.0);
+                    ui.label(
+                        RichText::new(&entry.rel_path)
+                            .size(11.0)
+                            .monospace()
+                            .color(theme.accent_blue),
+                    );
+                    ui.label(
+                        RichText::new(format!(
+                            "Nodes: {} • Members: {} • {:.1} KB • {}",
+                            entry.node_count,
+                            entry.member_count,
+                            (entry.size_bytes as f32) / 1024.0,
+                            entry.updated_label
+                        ))
+                        .size(11.0)
+                        .color(theme.text_secondary),
+                    );
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::ArrowRight,
+                            "Open from Personal Vault",
+                            11.5,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
+                        {
+                            self.pending_open_vault_project = Some(entry.clone());
+                        }
+                    });
+                });
+            });
+            ui.add_space(12.0);
+        }
+
+        if filtered_vault.is_empty() && projects.is_empty() {
+            let has_vault = crate::core::InternalVault::has_connected_vault();
             theme.card_frame().show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.vertical_centered(|ui| {
@@ -636,19 +640,43 @@ impl MyProjectView {
                         AppIcon::Globe,
                         16.0,
                         theme.accent_blue,
-                        "Blank Workspace — No Demo Projects Loaded",
+                        if has_vault {
+                            "Personal Vault Ready — No Saved `.eigen` Projects Found Yet"
+                        } else {
+                            "No Personal Vault Connected Yet"
+                        },
                         14.0,
                         theme.text_primary,
                         true,
                     );
                     ui.add_space(6.0);
                     ui.label(
-                        RichText::new("Start from the frozen World Map Ground Canvas above: click Unfreeze to pan/zoom anywhere on Earth, set your ground origin, and author parametric or 3D BIM models directly on the terrain.")
-                            .size(12.0)
-                            .color(theme.text_secondary),
+                        RichText::new(if has_vault {
+                            "Author models on the World Ground Canvas in Parametric or Geometry, or click 'Save Model to Vault/Projects' above to index your first personal project."
+                        } else {
+                            "Open Settings -> Personal Engineering Vault Connection to connect an existing folder, create a new Vault, or continue in Guest Mode."
+                        })
+                        .size(12.0)
+                        .color(theme.text_secondary),
                     );
                     ui.add_space(10.0);
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        if !has_vault
+                            && icons::icon_button(
+                                ui,
+                                AppIcon::SettingsGear,
+                                "Connect Vault in Settings",
+                                11.5,
+                                Color32::WHITE,
+                                theme.accent_blue,
+                                Stroke::NONE,
+                                CornerRadius::same(6),
+                                Vec2::ZERO,
+                            )
+                            .clicked()
+                        {
+                            self.request_open_settings_vault = true;
+                        }
                         if icons::icon_button(
                             ui,
                             AppIcon::Compass,
@@ -659,7 +687,9 @@ impl MyProjectView {
                             Stroke::NONE,
                             CornerRadius::same(6),
                             Vec2::ZERO,
-                        ).clicked() {
+                        )
+                        .clicked()
+                        {
                             *active_pillar = NavigationPillar::ParametricDED;
                         }
                         if icons::icon_button(
@@ -672,7 +702,9 @@ impl MyProjectView {
                             Stroke::new(1.0, theme.border_subtle),
                             CornerRadius::same(6),
                             Vec2::ZERO,
-                        ).clicked() {
+                        )
+                        .clicked()
+                        {
                             *active_pillar = NavigationPillar::GeometryAssembly;
                         }
                     });
@@ -681,9 +713,11 @@ impl MyProjectView {
             });
             return;
         }
-        ui_kit::responsive_grid_n(ui, projects.len(), 320.0, |ui, idx| {
-            self.render_project_card(ui, theme, &projects[idx], active_pillar);
-        });
+        if !projects.is_empty() {
+            ui_kit::responsive_grid_n(ui, projects.len(), 320.0, |ui, idx| {
+                self.render_project_card(ui, theme, &projects[idx], active_pillar);
+            });
+        }
     }
 
     fn render_dossier_modal(&mut self, ui: &mut Ui, theme: &MacTheme) {

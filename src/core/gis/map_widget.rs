@@ -277,6 +277,123 @@ async fn fetch_tile_wasm(url: &str) -> Option<Vec<u8>> {
 }
 
 /// Triangulates a simple concave 2D screen polygon via ear-clipping for clean continent landmass fills.
+pub fn ear_clip_polygon(pts: &[Pos2], fill_color: Color32) -> Option<egui::epaint::Mesh> {
+    triangulate_polygon_2d(pts, fill_color)
+}
+
+/// Geographical tile quad ready for 2D or 3D perspective ground rendering.
+#[derive(Debug, Clone, Copy)]
+pub struct TileGeoQuad {
+    pub tex_id: egui::TextureId,
+    pub north_lat: f64,
+    pub west_lon: f64,
+    pub south_lat: f64,
+    pub east_lon: f64,
+    pub uv_rect: Rect,
+}
+
+/// Low-dependency global coastline & continent polygons (lat, lon) shared by 2D and 3D Earth views.
+pub const WORLD_LANDMASSES: &[&[(f64, f64)]] = &[
+    // North & Central America
+    &[
+        (70.0, -162.0), (71.3, -156.0), (70.0, -135.0), (68.0, -95.0), (62.0, -78.0),
+        (58.0, -64.0), (52.0, -56.0), (45.0, -61.0), (42.0, -70.0), (35.0, -76.0),
+        (25.2, -80.2), (29.5, -84.0), (29.0, -95.0), (22.0, -97.5), (19.0, -96.0),
+        (21.4, -87.0), (16.0, -88.5), (15.0, -83.5), (9.0, -80.0), (8.5, -77.5),
+        (7.5, -80.5), (10.5, -85.5), (14.5, -92.5), (16.5, -100.0), (23.0, -106.5),
+        (31.5, -114.0), (23.5, -110.0), (32.5, -117.1), (38.0, -123.0), (48.5, -124.7),
+        (56.0, -133.0), (60.5, -145.0), (58.0, -156.0), (63.5, -166.0),
+    ],
+    // Greenland
+    &[
+        (82.5, -32.0), (81.5, -18.0), (76.0, -19.0), (70.0, -22.0), (60.0, -43.0),
+        (65.0, -52.0), (73.0, -56.0), (78.0, -72.0), (81.5, -62.0),
+    ],
+    // South America
+    &[
+        (12.2, -71.5), (10.5, -62.0), (5.0, -52.0), (0.0, -50.0), (-5.5, -35.0),
+        (-13.0, -38.5), (-23.0, -42.0), (-34.0, -53.5), (-41.0, -64.0), (-52.0, -68.5),
+        (-55.5, -67.5), (-52.5, -74.5), (-42.0, -74.0), (-33.0, -71.6), (-18.5, -70.5),
+        (-12.0, -77.2), (-4.5, -81.2), (1.0, -79.5), (9.0, -77.0),
+    ],
+    // Europe Mainland + Scandinavia
+    &[
+        (36.0, -5.6), (37.0, -9.0), (43.5, -9.2), (43.5, -1.8), (48.4, -4.7),
+        (51.0, 2.0), (54.0, 8.5), (57.2, 8.6), (55.5, 11.5), (59.5, 10.5),
+        (62.5, 5.5), (69.0, 16.0), (71.1, 26.0), (69.5, 32.0), (65.0, 25.5),
+        (60.0, 22.0), (59.5, 28.0), (55.0, 20.5), (54.0, 13.5), (53.5, 10.0),
+        (45.5, 13.8), (40.0, 18.4), (38.0, 15.6), (44.0, 9.5), (43.0, 5.5),
+        (41.4, 2.2), (36.8, -2.5),
+    ],
+    // Great Britain & Ireland
+    &[
+        (50.0, -5.5), (51.5, -4.5), (54.0, -3.2), (58.6, -5.0), (58.6, -3.0),
+        (56.0, -2.5), (52.8, 1.7), (51.1, 1.4), (50.6, -1.5),
+    ],
+    &[(51.5, -9.8), (54.3, -10.0), (55.2, -6.5), (52.2, -6.3)],
+    // Africa Mainland
+    &[
+        (35.8, -5.5), (37.2, 10.5), (32.5, 15.0), (31.2, 32.3), (22.0, 36.8),
+        (15.5, 39.5), (12.0, 43.5), (11.9, 51.3), (2.0, 45.3), (-4.0, 39.7),
+        (-11.0, 40.6), (-20.0, 34.8), (-26.0, 32.9), (-34.8, 20.0), (-33.9, 18.4),
+        (-22.5, 14.4), (-12.5, 13.4), (-4.5, 11.8), (4.0, 9.5), (4.5, 3.5),
+        (4.7, -7.5), (8.5, -13.2), (14.7, -17.5), (21.0, -17.0), (30.5, -9.6),
+    ],
+    // Madagascar
+    &[(-12.0, 49.2), (-16.0, 50.0), (-25.2, 47.0), (-25.0, 44.0), (-16.5, 44.4)],
+    // Asia + Middle East + India + Indochina + Siberia
+    &[
+        (69.5, 32.0), (73.5, 70.0), (77.5, 104.0), (72.5, 128.0), (70.0, 162.0),
+        (66.0, 179.0), (60.0, 165.0), (52.0, 156.5), (60.0, 150.0), (54.0, 138.0),
+        (43.0, 132.0), (38.5, 128.5), (35.1, 129.0), (35.0, 126.5), (39.5, 124.0),
+        (37.5, 121.0), (31.2, 121.8), (22.3, 114.2), (20.5, 107.0), (12.5, 109.4),
+        (8.6, 105.0), (13.5, 100.5), (1.3, 103.8), (6.5, 100.2), (16.5, 96.2),
+        (22.0, 91.5), (16.0, 81.0), (8.1, 77.5), (19.0, 72.8), (24.5, 67.0),
+        (25.5, 57.5), (30.0, 48.0), (24.0, 52.0), (22.5, 59.8), (12.6, 43.5),
+        (28.0, 34.5), (36.5, 36.0), (41.0, 29.0), (46.5, 31.0), (42.0, 41.5),
+        (45.5, 48.0), (54.0, 38.0),
+    ],
+    // Sri Lanka, Taiwan, Philippines, Japan
+    &[(9.8, 80.2), (7.5, 81.8), (6.0, 80.5), (7.8, 79.8)],
+    &[(25.2, 121.6), (22.0, 120.8), (23.8, 120.2)],
+    &[(18.5, 121.0), (18.2, 122.3), (13.0, 124.0), (6.0, 126.2), (6.8, 122.0), (14.5, 120.4)],
+    &[
+        (45.5, 141.9), (43.0, 145.5), (38.0, 141.0), (35.0, 139.8), (31.0, 130.7),
+        (34.0, 130.9), (37.5, 137.0), (41.5, 140.2),
+    ],
+    // Indonesia: Sumatra
+    &[(5.5, 95.3), (4.0, 98.5), (2.0, 100.5), (-0.5, 103.5), (-3.0, 106.0), (-5.8, 105.8), (-5.0, 103.5), (-3.5, 102.0), (-0.5, 99.5), (2.5, 96.5)],
+    // Indonesia: Java
+    &[(-6.0, 105.2), (-5.9, 106.8), (-6.2, 108.5), (-6.8, 111.5), (-7.0, 114.6), (-7.8, 114.5), (-8.3, 113.2), (-8.4, 110.5), (-7.7, 108.5), (-7.0, 106.5), (-6.8, 105.1)],
+    // Indonesia / Malaysia: Kalimantan / Borneo
+    &[(7.0, 116.5), (4.5, 118.5), (1.5, 119.0), (-1.2, 117.2), (-3.5, 116.0), (-4.2, 114.5), (-3.5, 110.5), (-1.0, 109.0), (1.5, 109.5), (4.0, 114.0)],
+    // Indonesia: Sulawesi
+    &[(1.8, 125.0), (0.5, 120.0), (-1.0, 119.5), (-5.5, 119.5), (-5.0, 120.5), (-3.0, 121.5), (-5.0, 123.0), (-3.0, 123.0), (-1.0, 121.5), (0.8, 123.5)],
+    // Indonesia: Bali & Nusa Tenggara
+    &[(-8.1, 114.4), (-8.1, 115.7), (-8.8, 115.6), (-8.7, 114.5)],
+    &[(-8.2, 115.9), (-8.2, 119.2), (-8.9, 119.0), (-8.9, 116.0)],
+    &[(-8.3, 119.5), (-8.3, 123.5), (-9.2, 123.4), (-9.0, 119.7)],
+    &[(-8.4, 123.6), (-8.4, 127.3), (-10.4, 123.6), (-9.2, 123.4)],
+    // Papua / New Guinea
+    &[(-0.8, 131.0), (-2.5, 140.0), (-6.5, 147.8), (-10.5, 150.7), (-8.5, 141.0), (-8.0, 137.5), (-4.5, 135.0), (-3.0, 131.5)],
+    // Australia & Tasmania
+    &[
+        (-11.0, 130.0), (-12.5, 136.8), (-15.0, 136.0), (-10.7, 142.5), (-19.0, 147.0),
+        (-25.0, 153.2), (-33.8, 151.3), (-37.8, 149.9), (-38.5, 144.0), (-35.0, 135.5),
+        (-31.7, 128.0), (-35.1, 117.8), (-32.0, 115.7), (-22.0, 114.0), (-16.0, 123.0),
+    ],
+    &[(-40.8, 144.7), (-41.0, 148.3), (-43.5, 147.2), (-43.0, 145.5)],
+    // New Zealand
+    &[(-34.5, 172.7), (-37.7, 178.5), (-41.3, 175.3), (-41.1, 174.0), (-36.8, 174.3)],
+    &[(-40.7, 172.5), (-42.4, 173.7), (-46.5, 168.5), (-45.8, 166.5)],
+    // Antarctica Continental Rim
+    &[
+        (-65.0, -179.9), (-77.5, -165.0), (-73.0, -100.0), (-63.5, -58.0),
+        (-70.0, -5.0), (-68.5, 45.0), (-66.5, 95.0), (-66.5, 140.0),
+        (-72.0, 170.0), (-65.0, 179.9), (-84.5, 179.9), (-84.5, -179.9),
+    ],
+];
+
 fn triangulate_polygon_2d(pts: &[Pos2], fill_color: Color32) -> Option<egui::epaint::Mesh> {
     if pts.len() < 3 {
         return None;
@@ -605,6 +722,164 @@ impl SlippyMapState {
         Pos2::new(rect.center().x + dx, rect.center().y + dy)
     }
 
+    /// Returns 2D Mercator pixel offsets relative to `self.center_lat_lon` without clipping to a rectangle.
+    pub fn lat_lon_to_map_px_offset(&self, lat: f64, lon: f64) -> Vec2 {
+        let clamped_lat = WebMercator::clamp_lat(lat);
+        let n = 2.0_f64.powf(self.zoom_level as f64);
+
+        let (center_x, center_y) = WebMercator::lat_lon_to_tile_coords(
+            self.center_lat_lon.0,
+            self.center_lat_lon.1,
+            self.zoom_level,
+        );
+
+        let target_x = (lon + 180.0) / 360.0 * n;
+        let lat_rad = clamped_lat.to_radians();
+        let target_y = (1.0 - (lat_rad.tan() + 1.0 / lat_rad.cos()).ln() / PI) * 0.5 * n;
+
+        Vec2::new(
+            ((target_x - center_x) * 256.0) as f32,
+            ((target_y - center_y) * 256.0) as f32,
+        )
+    }
+
+    /// Returns `(ocean_color, land_color, coast_color)` matching the active basemap style and theme.
+    pub fn basemap_colors(&self, theme: &crate::theme::MacTheme) -> (Color32, Color32, Color32) {
+        let ocean_color = match self.tile_provider {
+            TileSource::CartoDbDarkMatter => Color32::from_rgb(11, 16, 24),
+            TileSource::EsriWorldImagery => Color32::from_rgb(13, 27, 46),
+            TileSource::OpenTopoMap => Color32::from_rgb(184, 214, 232),
+            TileSource::OpenStreetMap if !theme.is_dark() => Color32::from_rgb(170, 211, 223),
+            TileSource::OpenStreetMap => Color32::from_rgb(18, 30, 44),
+            TileSource::SyntheticVectorTerrain if !theme.is_dark() => Color32::from_rgb(206, 224, 236),
+            TileSource::SyntheticVectorTerrain => Color32::from_rgb(17, 25, 36),
+        };
+        let (land_color, coast_color) = match self.tile_provider {
+            TileSource::CartoDbDarkMatter => (
+                Color32::from_rgb(28, 34, 46),
+                Color32::from_rgb(64, 78, 98),
+            ),
+            TileSource::EsriWorldImagery => (
+                Color32::from_rgb(38, 58, 42),
+                Color32::from_rgb(76, 108, 82),
+            ),
+            TileSource::OpenTopoMap => (
+                Color32::from_rgb(228, 224, 198),
+                Color32::from_rgb(154, 148, 122),
+            ),
+            TileSource::OpenStreetMap if !theme.is_dark() => (
+                Color32::from_rgb(236, 233, 222),
+                Color32::from_rgb(168, 165, 152),
+            ),
+            TileSource::OpenStreetMap => (
+                Color32::from_rgb(36, 48, 60),
+                Color32::from_rgb(72, 92, 112),
+            ),
+            TileSource::SyntheticVectorTerrain if !theme.is_dark() => (
+                Color32::from_rgb(230, 234, 224),
+                Color32::from_rgb(142, 156, 146),
+            ),
+            TileSource::SyntheticVectorTerrain => (
+                Color32::from_rgb(34, 46, 56),
+                Color32::from_rgb(68, 88, 104),
+            ),
+        };
+        (ocean_color, land_color, coast_color)
+    }
+
+    /// Requests visible Web Mercator tiles and collects textured geographic quads for 2D/3D ground projection.
+    pub fn collect_visible_tile_quads(
+        &self,
+        ctx: &egui::Context,
+        view_w: f32,
+        view_h: f32,
+    ) -> Vec<TileGeoQuad> {
+        if self.tile_provider == TileSource::SyntheticVectorTerrain {
+            return Vec::new();
+        }
+        let max_z = self.tile_provider.max_zoom();
+        let z_int = (self.zoom_level.floor() as i32).clamp(1, max_z) as u8;
+        let n_tiles = 1_i64 << z_int;
+        let scale = 2.0_f64.powf(self.zoom_level as f64 - z_int as f64);
+
+        let (cx, cy) = WebMercator::lat_lon_to_tile_coords(
+            self.center_lat_lon.0,
+            self.center_lat_lon.1,
+            self.zoom_level,
+        );
+        let tile_px = (256.0 * scale) as f32;
+        if tile_px <= 1.0 {
+            return Vec::new();
+        }
+
+        let half_w = (view_w.max(240.0) * 0.72) as f64;
+        let half_h = (view_h.max(200.0) * 0.72) as f64;
+
+        let min_tx = ((cx - half_w / 256.0) / scale).floor() as i64;
+        let max_tx = ((cx + half_w / 256.0) / scale).floor() as i64;
+        let min_ty = (((cy - half_h / 256.0) / scale).floor() as i64).clamp(0, n_tiles - 1);
+        let max_ty = (((cy + half_h / 256.0) / scale).floor() as i64).clamp(0, n_tiles - 1);
+
+        let mut out = Vec::new();
+        let mut budget = 0usize;
+        let n_f = n_tiles as f64;
+
+        for ty_i in min_ty..=max_ty {
+            let ty = ty_i as u32;
+            let (north_lat, _) = WebMercator::tile_coords_to_lat_lon(0.0, ty_i as f64, z_int as f32);
+            let (south_lat, _) = WebMercator::tile_coords_to_lat_lon(0.0, (ty_i + 1) as f64, z_int as f32);
+            for tx_raw in min_tx..=max_tx {
+                if budget >= 64 {
+                    break;
+                }
+                budget += 1;
+                let tx_wrapped = tx_raw.rem_euclid(n_tiles) as u32;
+                let west_lon = (tx_raw as f64 / n_f) * 360.0 - 180.0;
+                let east_lon = ((tx_raw + 1) as f64 / n_f) * 360.0 - 180.0;
+
+                self.tile_cache.request_tile(ctx, self.tile_provider, z_int, tx_wrapped, ty);
+
+                if let Some(tex_id) =
+                    self.tile_cache.get_or_upload_texture(ctx, self.tile_provider, z_int, tx_wrapped, ty)
+                {
+                    out.push(TileGeoQuad {
+                        tex_id,
+                        north_lat,
+                        west_lon,
+                        south_lat,
+                        east_lon,
+                        uv_rect: Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                    });
+                } else {
+                    for ancestor in 1..=2_u8 {
+                        if z_int <= ancestor {
+                            break;
+                        }
+                        let pz = z_int - ancestor;
+                        let factor = 1_u32 << ancestor;
+                        let px = tx_wrapped / factor;
+                        let py = ty / factor;
+                        if let Some(ptex) = self.tile_cache.get_or_upload_texture(ctx, self.tile_provider, pz, px, py) {
+                            let sx = (tx_wrapped % factor) as f32 / factor as f32;
+                            let sy = (ty % factor) as f32 / factor as f32;
+                            let sw = 1.0 / factor as f32;
+                            out.push(TileGeoQuad {
+                                tex_id: ptex,
+                                north_lat,
+                                west_lon,
+                                south_lat,
+                                east_lon,
+                                uv_rect: Rect::from_min_max(Pos2::new(sx, sy), Pos2::new(sx + sw, sy + sw)),
+                            });
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
     /// Converts local CAD ground offset `[east_mm, north_mm]` around `origin_lat_lon` to `(lat, lon)`.
     pub fn world_mm_to_lat_lon(origin_lat_lon: (f64, f64), world_mm: [f64; 2]) -> (f64, f64) {
         let origin_lat = WebMercator::clamp_lat(origin_lat_lon.0);
@@ -863,153 +1138,12 @@ impl SlippyMapState {
         rect: Rect,
         theme: &crate::theme::MacTheme,
     ) {
-        // 1. Deep oceanic background fill (adapts cleanly to chosen basemap or app theme)
-        let ocean_color = match self.tile_provider {
-            TileSource::CartoDbDarkMatter => Color32::from_rgb(11, 16, 24),
-            TileSource::EsriWorldImagery => Color32::from_rgb(13, 27, 46),
-            TileSource::OpenTopoMap => Color32::from_rgb(184, 214, 232),
-            TileSource::OpenStreetMap if !theme.is_dark() => Color32::from_rgb(170, 211, 223),
-            TileSource::OpenStreetMap => Color32::from_rgb(18, 30, 44),
-            TileSource::SyntheticVectorTerrain if !theme.is_dark() => Color32::from_rgb(206, 224, 236),
-            TileSource::SyntheticVectorTerrain => Color32::from_rgb(17, 25, 36),
-        };
+        let (ocean_color, land_color, coast_color) = self.basemap_colors(theme);
         painter.rect_filled(rect, CornerRadius::same(8), ocean_color);
 
         // 2. Global Vector Continents & Islands (triangulated for concave shapes + wrap offsets)
-        let (land_color, coast_color) = match self.tile_provider {
-            TileSource::CartoDbDarkMatter => (
-                Color32::from_rgb(28, 34, 46),
-                Color32::from_rgb(64, 78, 98),
-            ),
-            TileSource::EsriWorldImagery => (
-                Color32::from_rgb(38, 58, 42),
-                Color32::from_rgb(76, 108, 82),
-            ),
-            TileSource::OpenTopoMap => (
-                Color32::from_rgb(228, 224, 198),
-                Color32::from_rgb(154, 148, 122),
-            ),
-            TileSource::OpenStreetMap if !theme.is_dark() => (
-                Color32::from_rgb(236, 233, 222),
-                Color32::from_rgb(168, 165, 152),
-            ),
-            TileSource::OpenStreetMap => (
-                Color32::from_rgb(36, 48, 60),
-                Color32::from_rgb(72, 92, 112),
-            ),
-            TileSource::SyntheticVectorTerrain if !theme.is_dark() => (
-                Color32::from_rgb(230, 234, 224),
-                Color32::from_rgb(142, 156, 146),
-            ),
-            TileSource::SyntheticVectorTerrain => (
-                Color32::from_rgb(34, 46, 56),
-                Color32::from_rgb(68, 88, 104),
-            ),
-        };
-
-        let world_landmasses: &[&[(f64, f64)]] = &[
-            // North & Central America
-            &[
-                (70.0, -162.0), (71.3, -156.0), (70.0, -135.0), (68.0, -95.0), (62.0, -78.0),
-                (58.0, -64.0), (52.0, -56.0), (45.0, -61.0), (42.0, -70.0), (35.0, -76.0),
-                (25.2, -80.2), (29.5, -84.0), (29.0, -95.0), (22.0, -97.5), (19.0, -96.0),
-                (21.4, -87.0), (16.0, -88.5), (15.0, -83.5), (9.0, -80.0), (8.5, -77.5),
-                (7.5, -80.5), (10.5, -85.5), (14.5, -92.5), (16.5, -100.0), (23.0, -106.5),
-                (31.5, -114.0), (23.5, -110.0), (32.5, -117.1), (38.0, -123.0), (48.5, -124.7),
-                (56.0, -133.0), (60.5, -145.0), (58.0, -156.0), (63.5, -166.0),
-            ],
-            // Greenland
-            &[
-                (82.5, -32.0), (81.5, -18.0), (76.0, -19.0), (70.0, -22.0), (60.0, -43.0),
-                (65.0, -52.0), (73.0, -56.0), (78.0, -72.0), (81.5, -62.0),
-            ],
-            // South America
-            &[
-                (12.2, -71.5), (10.5, -62.0), (5.0, -52.0), (0.0, -50.0), (-5.5, -35.0),
-                (-13.0, -38.5), (-23.0, -42.0), (-34.0, -53.5), (-41.0, -64.0), (-52.0, -68.5),
-                (-55.5, -67.5), (-52.5, -74.5), (-42.0, -74.0), (-33.0, -71.6), (-18.5, -70.5),
-                (-12.0, -77.2), (-4.5, -81.2), (1.0, -79.5), (9.0, -77.0),
-            ],
-            // Europe Mainland + Scandinavia
-            &[
-                (36.0, -5.6), (37.0, -9.0), (43.5, -9.2), (43.5, -1.8), (48.4, -4.7),
-                (51.0, 2.0), (54.0, 8.5), (57.2, 8.6), (55.5, 11.5), (59.5, 10.5),
-                (62.5, 5.5), (69.0, 16.0), (71.1, 26.0), (69.5, 32.0), (65.0, 25.5),
-                (60.0, 22.0), (59.5, 28.0), (55.0, 20.5), (54.0, 13.5), (53.5, 10.0),
-                (45.5, 13.8), (40.0, 18.4), (38.0, 15.6), (44.0, 9.5), (43.0, 5.5),
-                (41.4, 2.2), (36.8, -2.5),
-            ],
-            // Great Britain & Ireland
-            &[
-                (50.0, -5.5), (51.5, -4.5), (54.0, -3.2), (58.6, -5.0), (58.6, -3.0),
-                (56.0, -2.5), (52.8, 1.7), (51.1, 1.4), (50.6, -1.5),
-            ],
-            &[(51.5, -9.8), (54.3, -10.0), (55.2, -6.5), (52.2, -6.3)],
-            // Africa Mainland
-            &[
-                (35.8, -5.5), (37.2, 10.5), (32.5, 15.0), (31.2, 32.3), (22.0, 36.8),
-                (15.5, 39.5), (12.0, 43.5), (11.9, 51.3), (2.0, 45.3), (-4.0, 39.7),
-                (-11.0, 40.6), (-20.0, 34.8), (-26.0, 32.9), (-34.8, 20.0), (-33.9, 18.4),
-                (-22.5, 14.4), (-12.5, 13.4), (-4.5, 11.8), (4.0, 9.5), (4.5, 3.5),
-                (4.7, -7.5), (8.5, -13.2), (14.7, -17.5), (21.0, -17.0), (30.5, -9.6),
-            ],
-            // Madagascar
-            &[(-12.0, 49.2), (-16.0, 50.0), (-25.2, 47.0), (-25.0, 44.0), (-16.5, 44.4)],
-            // Asia + Middle East + India + Indochina + Siberia
-            &[
-                (69.5, 32.0), (73.5, 70.0), (77.5, 104.0), (72.5, 128.0), (70.0, 162.0),
-                (66.0, 179.0), (60.0, 165.0), (52.0, 156.5), (60.0, 150.0), (54.0, 138.0),
-                (43.0, 132.0), (38.5, 128.5), (35.1, 129.0), (35.0, 126.5), (39.5, 124.0),
-                (37.5, 121.0), (31.2, 121.8), (22.3, 114.2), (20.5, 107.0), (12.5, 109.4),
-                (8.6, 105.0), (13.5, 100.5), (1.3, 103.8), (6.5, 100.2), (16.5, 96.2),
-                (22.0, 91.5), (16.0, 81.0), (8.1, 77.5), (19.0, 72.8), (24.5, 67.0),
-                (25.5, 57.5), (30.0, 48.0), (24.0, 52.0), (22.5, 59.8), (12.6, 43.5),
-                (28.0, 34.5), (36.5, 36.0), (41.0, 29.0), (46.5, 31.0), (42.0, 41.5),
-                (45.5, 48.0), (54.0, 38.0),
-            ],
-            // Sri Lanka, Taiwan, Philippines, Japan
-            &[(9.8, 80.2), (7.5, 81.8), (6.0, 80.5), (7.8, 79.8)],
-            &[(25.2, 121.6), (22.0, 120.8), (23.8, 120.2)],
-            &[(18.5, 121.0), (18.2, 122.3), (13.0, 124.0), (6.0, 126.2), (6.8, 122.0), (14.5, 120.4)],
-            &[
-                (45.5, 141.9), (43.0, 145.5), (38.0, 141.0), (35.0, 139.8), (31.0, 130.7),
-                (34.0, 130.9), (37.5, 137.0), (41.5, 140.2),
-            ],
-            // Indonesia: Sumatra
-            &[(5.5, 95.3), (4.0, 98.5), (2.0, 100.5), (-0.5, 103.5), (-3.0, 106.0), (-5.8, 105.8), (-5.0, 103.5), (-3.5, 102.0), (-0.5, 99.5), (2.5, 96.5)],
-            // Indonesia: Java
-            &[(-6.0, 105.2), (-5.9, 106.8), (-6.2, 108.5), (-6.8, 111.5), (-7.0, 114.6), (-7.8, 114.5), (-8.3, 113.2), (-8.4, 110.5), (-7.7, 108.5), (-7.0, 106.5), (-6.8, 105.1)],
-            // Indonesia / Malaysia: Kalimantan / Borneo
-            &[(7.0, 116.5), (4.5, 118.5), (1.5, 119.0), (-1.2, 117.2), (-3.5, 116.0), (-4.2, 114.5), (-3.5, 110.5), (-1.0, 109.0), (1.5, 109.5), (4.0, 114.0)],
-            // Indonesia: Sulawesi
-            &[(1.8, 125.0), (0.5, 120.0), (-1.0, 119.5), (-5.5, 119.5), (-5.0, 120.5), (-3.0, 121.5), (-5.0, 123.0), (-3.0, 123.0), (-1.0, 121.5), (0.8, 123.5)],
-            // Indonesia: Bali & Nusa Tenggara
-            &[(-8.1, 114.4), (-8.1, 115.7), (-8.8, 115.6), (-8.7, 114.5)],
-            &[(-8.2, 115.9), (-8.2, 119.2), (-8.9, 119.0), (-8.9, 116.0)],
-            &[(-8.3, 119.5), (-8.3, 123.5), (-9.2, 123.4), (-9.0, 119.7)],
-            &[(-8.4, 123.6), (-8.4, 127.3), (-10.4, 123.6), (-9.2, 123.4)],
-            // Papua / New Guinea
-            &[(-0.8, 131.0), (-2.5, 140.0), (-6.5, 147.8), (-10.5, 150.7), (-8.5, 141.0), (-8.0, 137.5), (-4.5, 135.0), (-3.0, 131.5)],
-            // Australia & Tasmania
-            &[
-                (-11.0, 130.0), (-12.5, 136.8), (-15.0, 136.0), (-10.7, 142.5), (-19.0, 147.0),
-                (-25.0, 153.2), (-33.8, 151.3), (-37.8, 149.9), (-38.5, 144.0), (-35.0, 135.5),
-                (-31.7, 128.0), (-35.1, 117.8), (-32.0, 115.7), (-22.0, 114.0), (-16.0, 123.0),
-            ],
-            &[(-40.8, 144.7), (-41.0, 148.3), (-43.5, 147.2), (-43.0, 145.5)],
-            // New Zealand
-            &[(-34.5, 172.7), (-37.7, 178.5), (-41.3, 175.3), (-41.1, 174.0), (-36.8, 174.3)],
-            &[(-40.7, 172.5), (-42.4, 173.7), (-46.5, 168.5), (-45.8, 166.5)],
-            // Antarctica Continental Rim
-            &[
-                (-65.0, -179.9), (-77.5, -165.0), (-73.0, -100.0), (-63.5, -58.0),
-                (-70.0, -5.0), (-68.5, 45.0), (-66.5, 95.0), (-66.5, 140.0),
-                (-72.0, 170.0), (-65.0, 179.9), (-84.5, 179.9), (-84.5, -179.9),
-            ],
-        ];
-
         for &wrap_deg in &[-360.0_f64, 0.0_f64, 360.0_f64] {
-            for land in world_landmasses {
+            for land in WORLD_LANDMASSES {
                 let pts: Vec<Pos2> = land
                     .iter()
                     .map(|&(lat, lon)| self.lat_lon_to_screen_unwrapped(lat, lon + wrap_deg, rect))

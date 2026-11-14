@@ -213,10 +213,10 @@ impl Default for ParametricView {
             dragging_node_id: None,
             last_canvas_rect: None,
             sketch_overlay_synced: true,
-            floating_properties_open: true,
-            floating_project_open: true,
+            floating_properties_open: false,
+            floating_project_open: false,
             floating_right_tab: ParametricFloatingTab::Properties,
-            show_cli_float: true,
+            show_cli_float: false,
             sketch_draw_mode: false,
             last_floating_rects: Vec::new(),
         }
@@ -271,12 +271,13 @@ impl ParametricView {
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
 
-                // 1. Universal-style Top Canvas HUD Toolbar + Drafting Strip
+                // 1. In-Canvas Top HUD Toolbar, Inline Levels + CAD Command Bar & Docked Inspectors
                 self.render_drafting_ribbon(
                     ui,
                     theme,
                     db_components,
                     active_pillar,
+                    features,
                     universal_canvas,
                     members,
                     workspace_settings.clone(),
@@ -286,7 +287,7 @@ impl ParametricView {
                 // Dismissible Status Toast (shared across Universal, Parametric & Geometry)
                 UniversalCanvasState::render_toast_bar(ui, theme, &mut self.save_notification);
 
-                // 2. Full-Width Drawing Viewport with Floating Properties / Project / CLI Inside
+                // 2. Full-Width Unobstructed World-Grounded Drawing Viewport
                 self.render_drawing_canvas(
                     ui,
                     theme,

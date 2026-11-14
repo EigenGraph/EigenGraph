@@ -29,7 +29,47 @@ pub static TEST_VAULT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// Persistent Vault Configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VaultConfig {
+    #[serde(default)]
     pub custom_vault_path: Option<String>,
+    #[serde(default)]
+    pub vault_initialized: bool,
+    #[serde(default)]
+    pub vault_name: Option<String>,
+    #[serde(default)]
+    pub guest_explore_mode: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PersonalVaultProjectEntry {
+    pub name: String,
+    pub filename: String,
+    pub rel_path: String,
+    pub abs_path: String,
+    pub category: String,
+    pub node_count: usize,
+    pub member_count: usize,
+    pub size_bytes: usize,
+    pub updated_label: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VaultBackendKind {
+    Unbound,
+    LocalFilesystem,
+    WebDirectoryPicker,
+    BrowserIndexedDb,
+}
+
+#[derive(Debug, Clone)]
+pub struct VaultConnectionStatus {
+    pub connected: bool,
+    pub guest_mode: bool,
+    pub backend: VaultBackendKind,
+    pub vault_name: String,
+    pub location_label: String,
+    pub needs_permission: bool,
+    pub status_msg: String,
+    pub error_msg: String,
 }
 
 /// Persistent self-learning memory stored inside `<Vault>/KnowledgeBase/ari_learning_memory.json`
@@ -210,17 +250,353 @@ impl InternalVault {
 
     /// Sets a user-chosen custom vault path and saves it to configuration.
     pub fn set_custom_vault_dir(path: PathBuf) -> Result<PathBuf, String> {
-        let _ = std::fs::create_dir_all(&path);
-        Self::ensure_vault_notice(&path);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = std::fs::create_dir_all(&path);
+            Self::ensure_vault_notice(&path);
+        }
 
         let mut cfg = Self::load_config();
+        let folder_name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .filter(|s| !s.is_empty())
+            .unwrap_or("EigenGraph Vault")
+            .to_string();
         cfg.custom_vault_path = Some(path.to_string_lossy().to_string());
+        cfg.vault_initialized = true;
+        cfg.guest_explore_mode = false;
+        cfg.vault_name = Some(folder_name);
         let _ = Self::save_config(&cfg);
 
         if let Ok(mut lock) = RUNTIME_VAULT_OVERRIDE.write() {
             *lock = Some(path.clone());
         }
         Ok(path)
+    }
+
+    /// Returns true if a personal Vault is currently connected (on disk on native, or Directory Picker / IndexedDB on Web).
+    pub fn has_connected_vault() -> bool {
+        #[cfg(target_arch = "wasm32")]
+        {
+            return crate::core::web_bridge::vault_state_snapshot().connected;
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            #[cfg(test)]
+            {
+                if let Ok(lock) = RUNTIME_VAULT_OVERRIDE.read() {
+                    if lock.is_some() {
+                        return true;
+                    }
+                }
+            }
+            let cfg = Self::load_config();
+            cfg.vault_initialized || cfg.custom_vault_path.is_some()
+        }
+    }
+
+    /// Returns a unified status descriptor of the current Vault backend & connection state.
+    pub fn connection_status() -> VaultConnectionStatus {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let snap = crate::core::web_bridge::vault_state_snapshot();
+            let backend = match snap.backend.as_str() {
+                "fs_access" => VaultBackendKind::WebDirectoryPicker,
+                "indexeddb" => VaultBackendKind::BrowserIndexedDb,
+                _ => VaultBackendKind::Unbound,
+            };
+            let location_label = match backend {
+                VaultBackendKind::WebDirectoryPicker => {
+                    format!("Local Folder (FS Access): {}", snap.vault_name)
+                }
+                VaultBackendKind::BrowserIndexedDb => {
+                    format!("Browser IndexedDB: {}", snap.vault_name)
+                }
+                _ => "Not connected".to_string(),
+            };
+            return VaultConnectionStatus {
+                connected: snap.connected,
+                guest_mode: snap.guest_mode,
+                backend,
+                vault_name: snap.vault_name,
+                location_label,
+                needs_permission: snap.needs_permission,
+                status_msg: snap.status_msg,
+                error_msg: snap.error_msg,
+            };
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let cfg = Self::load_config();
+            let connected = Self::has_connected_vault();
+            let root = Self::vault_root_dir();
+            let vault_name = cfg.vault_name.unwrap_or_else(|| {
+                root.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("EigenGraph Vault")
+                    .to_string()
+            });
+            VaultConnectionStatus {
+                connected,
+                guest_mode: cfg.guest_explore_mode && !connected,
+                backend: if connected {
+                    VaultBackendKind::LocalFilesystem
+                } else {
+                    VaultBackendKind::Unbound
+                },
+                vault_name,
+                location_label: if connected {
+                    root.to_string_lossy().to_string()
+                } else {
+                    "No Vault connected (Startup setup pending)".to_string()
+                },
+                needs_permission: false,
+                status_msg: if connected {
+                    "Local Vault synchronized.".to_string()
+                } else {
+                    "Select or create a Vault directory to enable personal project indexing.".to_string()
+                },
+                error_msg: String::new(),
+            }
+        }
+    }
+
+    /// Connects an existing local Vault directory (or triggers Web Directory Picker / IndexedDB on wasm32).
+    pub fn connect_existing_vault(path: PathBuf) -> Result<PathBuf, String> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = path;
+            crate::core::web_bridge::vault_connect_existing();
+            return Ok(PathBuf::from("browser://EigenGraph_Vault"));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if !path.exists() || !path.is_dir() {
+                return Err(format!(
+                    "Directory does not exist: {}. Use 'Create New Vault' to initialize a new folder.",
+                    path.display()
+                ));
+            }
+            Self::set_custom_vault_dir(path)
+        }
+    }
+
+    /// Creates a brand new personal Vault directory structure and connects it.
+    pub fn create_new_vault(
+        path: PathBuf,
+        vault_name: Option<String>,
+        force_indexeddb: bool,
+    ) -> Result<PathBuf, String> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = path;
+            let name = vault_name.unwrap_or_else(|| "EigenGraph_Vault".to_string());
+            crate::core::web_bridge::vault_create_new(&name, force_indexeddb);
+            return Ok(PathBuf::from(format!("browser://{}", name)));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = force_indexeddb;
+            std::fs::create_dir_all(&path)
+                .map_err(|e| format!("Failed to create Vault directory {}: {}", path.display(), e))?;
+            Self::ensure_vault_notice(&path);
+            let mut cfg = Self::load_config();
+            let resolved_name = vault_name
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| {
+                    path.file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("EigenGraph_Vault")
+                        .to_string()
+                });
+            cfg.custom_vault_path = Some(path.to_string_lossy().to_string());
+            cfg.vault_initialized = true;
+            cfg.guest_explore_mode = false;
+            cfg.vault_name = Some(resolved_name);
+            Self::save_config(&cfg)?;
+
+            if let Ok(mut lock) = RUNTIME_VAULT_OVERRIDE.write() {
+                *lock = Some(path.clone());
+            }
+            let _ = Self::ensure_subdirectories();
+            Ok(path)
+        }
+    }
+
+    /// Disconnects the currently bound personal Vault without deleting user files.
+    pub fn disconnect_vault() -> Result<(), String> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::core::web_bridge::vault_disconnect();
+            return Ok(());
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Self::reset_runtime_vault_dir();
+            let cfg = VaultConfig {
+                custom_vault_path: None,
+                vault_initialized: false,
+                vault_name: None,
+                guest_explore_mode: false,
+            };
+            Self::save_config(&cfg)
+        }
+    }
+
+    /// Switches into guest exploration mode for the active session without binding a persistent Vault.
+    pub fn enter_guest_explore_mode() {
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::core::web_bridge::vault_enter_guest_mode();
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let mut cfg = Self::load_config();
+            cfg.guest_explore_mode = true;
+            let _ = Self::save_config(&cfg);
+        }
+    }
+
+    /// Lists project models found inside the connected personal Vault (`Projects/` and Vault root `.eigen` / `.json`).
+    pub fn list_personal_vault_projects() -> Vec<PersonalVaultProjectEntry> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let snap = crate::core::web_bridge::vault_state_snapshot();
+            if !snap.connected {
+                return Vec::new();
+            }
+            return snap
+                .projects
+                .into_iter()
+                .map(|p| PersonalVaultProjectEntry {
+                    name: p.name,
+                    filename: p.filename,
+                    rel_path: p.rel_path,
+                    abs_path: String::new(),
+                    category: p.category,
+                    node_count: p.node_count,
+                    member_count: p.member_count,
+                    size_bytes: p.size_bytes,
+                    updated_label: p.updated_at,
+                })
+                .collect();
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if !Self::has_connected_vault() {
+                return Vec::new();
+            }
+            let root = Self::vault_root_dir();
+            let mut out = Vec::new();
+            let scan_dirs: Vec<(PathBuf, &str, bool)> = vec![
+                (root.join("Projects"), "Projects", false),
+                (root.clone(), "Vault Root", true),
+            ];
+            for (dir, cat_label, eigen_only) in scan_dirs {
+                let Ok(entries) = std::fs::read_dir(&dir) else {
+                    continue;
+                };
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !path.is_file() {
+                        continue;
+                    }
+                    let Some(fname) = path.file_name().and_then(|s| s.to_str()) else {
+                        continue;
+                    };
+                    if fname.starts_with('.') {
+                        continue;
+                    }
+                    let lower = fname.to_lowercase();
+                    let is_eigen = lower.ends_with(".eigen") || lower.ends_with(".eigen.json");
+                    let is_json = lower.ends_with(".json");
+                    if eigen_only && !is_eigen {
+                        continue;
+                    }
+                    if !is_eigen && !is_json {
+                        continue;
+                    }
+                    let Ok(raw) = std::fs::read_to_string(&path) else {
+                        continue;
+                    };
+                    let size_bytes = raw.len();
+                    let mut display_name = fname
+                        .trim_end_matches(".eigen.json")
+                        .trim_end_matches(".eigen")
+                        .trim_end_matches(".json")
+                        .to_string();
+                    let mut node_count = 0usize;
+                    let mut member_count = 0usize;
+
+                    if let Ok(model) = EigenProjectArchive::deserialize_from_eigen_json(&raw) {
+                        if !model.name.trim().is_empty() {
+                            display_name = model.name.clone();
+                        }
+                        node_count = model.nodes.len();
+                        member_count = model.elements.len();
+                    } else if let Ok(model) = serde_json::from_str::<StructuralModel>(&raw) {
+                        if !model.name.trim().is_empty() {
+                            display_name = model.name.clone();
+                        }
+                        node_count = model.nodes.len();
+                        member_count = model.elements.len();
+                    } else if is_json && fname != "active_live_project.json" {
+                        // Try lightweight JSON inspection for BIM project snapshots
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw) {
+                            if let Some(pname) = val.get("project_name").and_then(|v| v.as_str()) {
+                                if !pname.trim().is_empty() {
+                                    display_name = pname.to_string();
+                                }
+                            }
+                            let cols = val.get("columns").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            let runs = val.get("runs").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            member_count = cols + runs;
+                        }
+                    }
+
+                    let rel_path = if cat_label == "Projects" {
+                        format!("Projects/{fname}")
+                    } else {
+                        fname.to_string()
+                    };
+
+                    out.push(PersonalVaultProjectEntry {
+                        name: display_name,
+                        filename: fname.to_string(),
+                        rel_path,
+                        abs_path: path.to_string_lossy().to_string(),
+                        category: cat_label.to_string(),
+                        node_count,
+                        member_count,
+                        size_bytes,
+                        updated_label: "Local Disk".to_string(),
+                    });
+                }
+            }
+            out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+            out
+        }
+    }
+
+    /// Loads a `StructuralModel` from a personal Vault project entry.
+    pub fn load_personal_vault_project_model(
+        entry: &PersonalVaultProjectEntry,
+    ) -> Result<StructuralModel, String> {
+        #[cfg(target_arch = "wasm32")]
+        let raw = crate::core::web_bridge::vault_read_file(&entry.rel_path)
+            .ok_or_else(|| format!("Project file '{}' not found in Web Vault cache.", entry.rel_path))?;
+
+        #[cfg(not(target_arch = "wasm32"))]
+        let raw = std::fs::read_to_string(&entry.abs_path)
+            .map_err(|e| format!("Failed to read {}: {}", entry.abs_path, e))?;
+
+        if let Ok(model) = EigenProjectArchive::deserialize_from_eigen_json(&raw) {
+            return Ok(model);
+        }
+        serde_json::from_str::<StructuralModel>(&raw)
+            .map_err(|e| format!("Failed to parse project model '{}': {}", entry.filename, e))
     }
 
     /// Default vault location in the user's official Documents folder.
@@ -396,8 +772,18 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
         };
         let file_path = dir.join(&filename);
         let json = serde_json::to_string_pretty(item).map_err(|e| e.to_string())?;
-        std::fs::write(&file_path, json).map_err(|e| e.to_string())?;
-        Ok(file_path)
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(sub) = dir.file_name().and_then(|s| s.to_str()) {
+                crate::core::web_bridge::vault_write_file(&format!("{sub}/{filename}"), &json);
+            }
+            return Ok(file_path);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            std::fs::write(&file_path, json).map_err(|e| e.to_string())?;
+            Ok(file_path)
+        }
     }
 
     /// Generic Vault Item Loader: loads and deserializes an item from its category subfolder.
@@ -408,7 +794,15 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
         } else {
             format!("{}.json", item_name)
         };
+        #[cfg(not(target_arch = "wasm32"))]
         let file_path = dir.join(&filename);
+        #[cfg(target_arch = "wasm32")]
+        let content = {
+            let sub = dir.file_name().and_then(|s| s.to_str()).unwrap_or(category);
+            crate::core::web_bridge::vault_read_file(&format!("{sub}/{filename}"))
+                .ok_or_else(|| format!("Web Vault item not found: {sub}/{filename}"))?
+        };
+        #[cfg(not(target_arch = "wasm32"))]
         let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
         let item = serde_json::from_str::<T>(&content).map_err(|e| e.to_string())?;
         Ok(item)
@@ -679,13 +1073,20 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
         };
 
         if let Ok(json) = serde_json::to_string_pretty(&ai_state) {
-            let _ = std::fs::write(ai_dir.join("live_design_state.json"), json);
+            #[cfg(target_arch = "wasm32")]
+            {
+                crate::core::web_bridge::vault_write_file("AI_Context/live_design_state.json", &json);
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let _ = std::fs::write(ai_dir.join("live_design_state.json"), json);
+            }
         }
 
         // 9. Update Self-Learning Knowledge Memory
         let mut mem = Self::load_knowledge_memory();
         mem.total_autosaves_count += 1;
-        let audit = format!("[Live Auto-Sync] {}: {} elemen", last_action, total_elems);
+        let audit = format!("[Live Auto-Sync] {}: {} elements", last_action, total_elems);
         if mem.recent_audit_log.last() != Some(&audit) {
             mem.recent_audit_log.push(audit);
             if mem.recent_audit_log.len() > 25 {
@@ -1059,10 +1460,17 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
         components: &[DatabaseComponent],
     ) -> Result<String, String> {
         let dir = Self::parametric_dir();
-        let _ = std::fs::create_dir_all(&dir);
         let file_path = dir.join("parametric_components.json");
         let json = serde_json::to_string_pretty(components).map_err(|e| e.to_string())?;
-        std::fs::write(&file_path, json).map_err(|e| e.to_string())?;
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::core::web_bridge::vault_write_file("ParametricLibrary/parametric_components.json", &json);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = std::fs::create_dir_all(&dir);
+            std::fs::write(&file_path, json).map_err(|e| e.to_string())?;
+        }
 
         // Also route individual components to their respective auto-routed category folder
         for comp in components {
@@ -1096,13 +1504,20 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
         model: &StructuralModel,
     ) -> Result<String, String> {
         let dir = Self::projects_dir();
-        let _ = std::fs::create_dir_all(&dir);
         let target = dir.join(filename);
-        if let Some(parent) = target.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
         let json = EigenProjectArchive::serialize_to_eigen_json(model)?;
-        std::fs::write(&target, json).map_err(|e| format!("Write failed to {}: {}", target.display(), e))?;
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::core::web_bridge::vault_write_file(&format!("Projects/{filename}"), &json);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = std::fs::create_dir_all(&dir);
+            if let Some(parent) = target.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            std::fs::write(&target, json).map_err(|e| format!("Write failed to {}: {}", target.display(), e))?;
+        }
 
         let mut mem = Self::load_knowledge_memory();
         mem.total_autosaves_count += 1;
@@ -1112,20 +1527,40 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
     }
 
     pub fn load_knowledge_memory() -> AriKnowledgeMemory {
-        let path = Self::knowledge_dir().join("ari_learning_memory.json");
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if let Ok(mem) = serde_json::from_str::<AriKnowledgeMemory>(&content) {
-                return mem;
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(content) = crate::core::web_bridge::vault_read_file("KnowledgeBase/ari_learning_memory.json") {
+                if let Ok(mem) = serde_json::from_str::<AriKnowledgeMemory>(&content) {
+                    return mem;
+                }
             }
+            return AriKnowledgeMemory::default();
         }
-        AriKnowledgeMemory::default()
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let path = Self::knowledge_dir().join("ari_learning_memory.json");
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(mem) = serde_json::from_str::<AriKnowledgeMemory>(&content) {
+                    return mem;
+                }
+            }
+            AriKnowledgeMemory::default()
+        }
     }
 
     pub fn save_knowledge_memory(mem: &AriKnowledgeMemory) -> Result<String, String> {
-        let path = Self::knowledge_dir().join("ari_learning_memory.json");
         let json = serde_json::to_string_pretty(mem).map_err(|e| e.to_string())?;
-        std::fs::write(&path, json).map_err(|e| e.to_string())?;
-        Ok(path.display().to_string())
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::core::web_bridge::vault_write_file("KnowledgeBase/ari_learning_memory.json", &json);
+            return Ok("browser://KnowledgeBase/ari_learning_memory.json".to_string());
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let path = Self::knowledge_dir().join("ari_learning_memory.json");
+            std::fs::write(&path, json).map_err(|e| e.to_string())?;
+            Ok(path.display().to_string())
+        }
     }
 
     /// Blank startup structural member list (no demo data seeded).
@@ -1437,6 +1872,43 @@ mod tests {
 
         // Cleanup
         InternalVault::reset_runtime_vault_dir();
+        let _ = std::fs::remove_dir_all(&temp_vault);
+    }
+
+    #[test]
+    fn test_personal_vault_connect_create_list_and_disconnect() {
+        let _guard = TEST_VAULT_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let temp_vault = std::env::temp_dir().join(format!("eigengraph_test_personal_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_vault);
+        let _ = std::fs::remove_file(InternalVault::config_path());
+
+        assert!(!InternalVault::has_connected_vault());
+        assert!(InternalVault::connect_existing_vault(temp_vault.clone()).is_err());
+
+        InternalVault::create_new_vault(temp_vault.clone(), Some("TestPersonalVault".to_string()), false)
+            .expect("Creating a new personal Vault should succeed");
+        assert!(InternalVault::has_connected_vault());
+        assert!(temp_vault.join("Projects").is_dir());
+
+        let mut engine = ParametricEngine::new();
+        let model = engine.generate_warren_truss().unwrap();
+        let _ = InternalVault::autosave_project_model("MyPersonalTruss.eigen", &model)
+            .expect("Saving project to personal Vault should succeed");
+
+        let listed = InternalVault::list_personal_vault_projects();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].filename, "MyPersonalTruss.eigen");
+        assert!(listed[0].node_count > 0);
+
+        let loaded = InternalVault::load_personal_vault_project_model(&listed[0])
+            .expect("Loading personal Vault project should succeed");
+        assert_eq!(loaded.nodes.len(), model.nodes.len());
+
+        InternalVault::disconnect_vault().expect("Disconnect should succeed");
+        assert!(!InternalVault::has_connected_vault());
+        assert!(InternalVault::list_personal_vault_projects().is_empty());
+
+        let _ = std::fs::remove_file(InternalVault::config_path());
         let _ = std::fs::remove_dir_all(&temp_vault);
     }
 }

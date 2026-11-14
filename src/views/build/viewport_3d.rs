@@ -157,14 +157,8 @@ impl BuildView {
                         26.0,
                     );
 
-                    // Floating Overlay Panel Toggles inside 3D Viewport
-                    let proj_active = if is_wide {
-                        self.floating_project_open
-                    } else {
-                        self.floating_properties_open
-                            && !self.properties_canvas_sync_tab
-                            && self.active_sidebar_tab == SidebarTab::ProjectBrowser
-                    };
+                    // Top-Toolbar Dockable Inspector Toggles (open inside top dock above canvas)
+                    let proj_active = self.floating_project_open;
                     if icons::icon_button(
                         ui,
                         AppIcon::Folder,
@@ -176,22 +170,13 @@ impl BuildView {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
-                    .on_hover_text("Toggle floating Project & Model Tree overlay inside 3D viewport")
+                    .on_hover_text("Toggle Project & Model Tree drawer in the top toolbar dock")
                     .clicked()
                     {
-                        if is_wide {
-                            self.floating_project_open = !self.floating_project_open;
-                        } else {
-                            self.floating_properties_open = !proj_active;
-                            self.properties_canvas_sync_tab = false;
-                            self.active_sidebar_tab = SidebarTab::ProjectBrowser;
-                        }
+                        self.floating_project_open = !self.floating_project_open;
                     }
 
-                    let prop_active = self.floating_properties_open
-                        && (is_wide
-                            || self.properties_canvas_sync_tab
-                            || self.active_sidebar_tab != SidebarTab::ProjectBrowser);
+                    let prop_active = self.floating_properties_open;
                     if icons::icon_button(
                         ui,
                         AppIcon::SlidersPanel,
@@ -203,24 +188,10 @@ impl BuildView {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
-                    .on_hover_text("Toggle floating 3D Properties, Clash, Audit, Geometry & Layers overlay")
+                    .on_hover_text("Toggle Properties, Clash, Audit, Geometry & Layers drawer in the top toolbar dock")
                     .clicked()
                     {
-                        if !is_wide
-                            && self.floating_properties_open
-                            && !self.properties_canvas_sync_tab
-                            && self.active_sidebar_tab == SidebarTab::ProjectBrowser
-                        {
-                            self.active_sidebar_tab = SidebarTab::Properties;
-                        } else {
-                            self.floating_properties_open = !self.floating_properties_open;
-                            if !is_wide
-                                && !self.properties_canvas_sync_tab
-                                && self.active_sidebar_tab == SidebarTab::ProjectBrowser
-                            {
-                                self.active_sidebar_tab = SidebarTab::Properties;
-                            }
-                        }
+                        self.floating_properties_open = !self.floating_properties_open;
                     }
 
                     if icons::icon_button(
@@ -234,7 +205,7 @@ impl BuildView {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
-                    .on_hover_text("Toggle floating Schedules QTO, 4D Simulation, Clash & BIM Console overlay")
+                    .on_hover_text("Toggle Schedules QTO, 4D Simulation, Clash & BIM Console drawer in the top toolbar dock")
                     .clicked()
                     {
                         self.floating_deck_open = !self.floating_deck_open;
@@ -359,6 +330,9 @@ impl BuildView {
                 });
             });
 
+        // 1B. Row 2: Levels, Scale, Detail (LOD), Visual Toggles & BIM Command Line (inside Top Toolbar)
+        self.render_top_toolbar_row2_and_cmd(ui, theme, universal_canvas);
+
         // 2. Conditional Universal Ink Sketch Bar (when Ground Sketch Mode is active)
         if self.sketch_mode_active {
             Frame::new()
@@ -387,82 +361,41 @@ impl BuildView {
             self.render_bim_master_ribbon(ui, theme, 0.0);
         }
 
+        // 3B. Top-Toolbar Dockable Inspector Area (Project Browser, Properties, Data Deck — never floats over canvas)
+        if self.floating_project_open || self.floating_properties_open || self.floating_deck_open {
+            self.render_top_dock_drawers(
+                ui,
+                theme,
+                members,
+                db_components,
+                features,
+                universal_canvas,
+                parametric_variables,
+                &workspace_settings,
+                avail_w,
+            );
+        }
+
         // 4. Shared Status Toast Banner
         UniversalCanvasState::render_toast_bar(ui, theme, &mut self.modify_status_msg);
 
-        // 5. Full-Width 3D Drawing Viewport matching Universal Canvas height
+        // 5. Full-Width 3D Earth Ground Viewport matching Universal Canvas height
         let canvas_height = universal_canvas.preferred_canvas_height(ui.ctx());
         let (response, painter) =
             ui.allocate_painter(Vec2::new(avail_w, canvas_height), Sense::click_and_drag());
         let rect = response.rect;
         self.last_viewport_rect = Some(rect);
         self.last_floating_rects.clear();
+        let _ = is_wide;
+        let _ = has_floating_room;
 
         painter.rect_filled(rect, CornerRadius::ZERO, UniversalCanvasState::canvas_bg(theme));
+        let pointer_in_floating = false;
 
-        // Compute non-overlapping floating HUD rects inside the 3D viewport
-        let floating_props_rect = if self.floating_properties_open && has_floating_room {
-            let w = (avail_w * 0.27).clamp(250.0, 305.0);
-            let h = (rect.height() - 26.0).max(200.0);
-            let r = Rect::from_min_size(
-                Pos2::new(rect.right() - w - 12.0, rect.top() + 12.0),
-                Vec2::new(w, h),
-            );
-            self.last_floating_rects.push(r);
-            Some(r)
-        } else {
-            None
-        };
+        // Geometry Definitions & Model Centers
+        let (center_3d, base_scale_unit, raw_members) = self.build_model_geometry(members);
 
-        let floating_project_rect = if self.floating_project_open && is_wide {
-            let w = 240.0_f32.min((avail_w * 0.24).max(200.0));
-            let bottom_clearance = if self.show_axes { 86.0 } else { 44.0 };
-            let h = (rect.height() - 36.0 - bottom_clearance).max(160.0);
-            let r = Rect::from_min_size(
-                Pos2::new(rect.left() + 12.0, rect.top() + 36.0),
-                Vec2::new(w, h),
-            );
-            self.last_floating_rects.push(r);
-            Some(r)
-        } else {
-            None
-        };
-
-        let floating_deck_rect = if self.floating_deck_open && has_floating_room {
-            let deck_left = floating_project_rect
-                .map(|pr| pr.right() + 10.0)
-                .unwrap_or_else(|| {
-                    if self.show_axes {
-                        rect.left() + 86.0
-                    } else {
-                        rect.left() + 12.0
-                    }
-                });
-            let deck_right = floating_props_rect
-                .map(|pr| pr.left() - 10.0)
-                .unwrap_or(rect.right() - 12.0);
-            let deck_w = (deck_right - deck_left).min(640.0);
-            if deck_w >= 260.0 {
-                let deck_h = (rect.height() * 0.44).clamp(185.0, 260.0);
-                let r = Rect::from_min_size(
-                    Pos2::new(deck_left, rect.bottom() - deck_h - 14.0),
-                    Vec2::new(deck_w, deck_h),
-                );
-                self.last_floating_rects.push(r);
-                Some(r)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let pointer_in_floating = ui
-            .ctx()
-            .input(|i| i.pointer.hover_pos().or(i.pointer.interact_pos()))
-            .is_some_and(|p| self.last_floating_rects.iter().any(|r| r.contains(p)));
-
-        // Mouse Orbit, Pan, and Zoom Controls (respecting floating overlays & Freeze Canvas)
+        // Mouse Orbit, Earth Pan, and Map/Camera Zoom Controls (respecting Freeze Canvas)
         let is_frozen_now =
             universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx());
         let allow_sketch_drag = self.sketch_mode_active
@@ -473,7 +406,22 @@ impl BuildView {
                 || response.dragged_by(egui::PointerButton::Middle)
                 || (response.dragged() && ui.input(|i| i.modifiers.shift))
             {
-                self.cam_pan += response.drag_delta();
+                let delta = response.drag_delta();
+                if self.cam_pitch.abs() >= 0.18 {
+                    let cos_y = self.cam_yaw.cos();
+                    let sin_y = self.cam_yaw.sin();
+                    let sin_eff = if self.cam_pitch >= 0.0 {
+                        self.cam_pitch.sin().max(0.32)
+                    } else {
+                        self.cam_pitch.sin().min(-0.32)
+                    };
+                    let dz_cam = delta.y / sin_eff;
+                    let map_dx = delta.x * cos_y - dz_cam * sin_y;
+                    let map_dy = delta.x * sin_y + dz_cam * cos_y;
+                    universal_canvas.world_map.pan_by_pixels(map_dx, map_dy);
+                } else {
+                    self.cam_pan += delta;
+                }
             } else if !allow_sketch_drag && response.dragged_by(egui::PointerButton::Primary) {
                 self.cam_yaw = (self.cam_yaw + response.drag_delta().x * 0.008)
                     .rem_euclid(2.0 * std::f32::consts::PI);
@@ -483,22 +431,25 @@ impl BuildView {
 
             if response.hovered() {
                 let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
-                if scroll_y.abs() > 0.0 {
-                    self.cam_zoom = (self.cam_zoom * (1.0 + scroll_y * 0.0025)).clamp(0.15, 8.0);
+                if scroll_y.abs() > 0.2 {
+                    let dz = scroll_y * 0.0028;
+                    universal_canvas.world_map.zoom_level =
+                        (universal_canvas.world_map.zoom_level + dz).clamp(1.2, 20.0);
+                    if !raw_members.is_empty() {
+                        self.cam_zoom = (self.cam_zoom * 2.0_f32.powf(dz)).clamp(0.20, 8.0);
+                    }
                 }
             }
         }
 
-        // Geometry Definitions & Model Centers
-        let (center_3d, base_scale_unit, raw_members) = self.build_model_geometry(members);
-
-        // 3D Projector Function with Camera Transformations and Z-depth
-        let is_persp = self.perspective;
+        // 3D Projector Function with Camera Transformations & Positive-Into-Screen Depth
+        let is_persp = self.perspective && self.cam_pitch.abs() < 1.45;
         let cam_yaw = self.cam_yaw;
         let cam_pitch = self.cam_pitch;
         let cam_zoom = self.cam_zoom;
         let cam_pan = self.cam_pan;
         let center_screen = rect.center();
+        let d_cam = 55.0_f32;
 
         let project_3d = move |x: f32, y: f32, z: f32| -> (Pos2, f32) {
             let dx = x - center_3d.0;
@@ -511,16 +462,15 @@ impl BuildView {
             let x1 = dx * cos_y + dz * sin_y;
             let z1 = -dx * sin_y + dz * cos_y;
 
-            // Pitch rotation around X axis
+            // Pitch rotation around X axis (+y2 = screen up, +depth = into screen away from camera)
             let cos_p = cam_pitch.cos();
             let sin_p = cam_pitch.sin();
             let y2 = dy * cos_p - z1 * sin_p;
-            let z2 = dy * sin_p + z1 * cos_p;
+            let depth = -(dy * sin_p + z1 * cos_p);
 
-            // Camera distance & perspective factor
-            let d_cam = 55.0;
+            // Perspective projection with safe near-plane clamp
             let persp_factor = if is_persp {
-                (d_cam / (d_cam + z2)).clamp(0.3, 3.0)
+                (d_cam / (d_cam + depth).max(4.0)).clamp(0.05, 4.0)
             } else {
                 1.0
             };
@@ -529,11 +479,69 @@ impl BuildView {
             let sx = center_screen.x + cam_pan.x + x1 * scale;
             let sy = center_screen.y + cam_pan.y - y2 * scale;
 
-            (Pos2::new(sx, sy), z2)
+            (Pos2::new(sx, sy), depth)
         };
+
+        // Live Earth Lat/Lon Cursor Tracking on 3D Ground Plane (y = 0.0)
+        if let Some(hover) = response.hover_pos() {
+            let cos_y = cam_yaw.cos();
+            let sin_y = cam_yaw.sin();
+            let cos_p = cam_pitch.cos();
+            let sin_p = cam_pitch.sin();
+            let dy_g = 0.0_f32 - center_3d.1;
+            let mut depth_est = 0.0_f32;
+            let mut x1 = 0.0_f32;
+            let mut z1 = 0.0_f32;
+            for _ in 0..4 {
+                let pf = if is_persp {
+                    (d_cam / (d_cam + depth_est).max(4.0)).clamp(0.05, 4.0)
+                } else {
+                    1.0
+                };
+                let sc = (base_scale_unit * cam_zoom * pf).max(0.01);
+                x1 = (hover.x - center_screen.x - cam_pan.x) / sc;
+                let y2 = (center_screen.y + cam_pan.y - hover.y) / sc;
+                if sin_p.abs() > 0.08 {
+                    z1 = (dy_g * cos_p - y2) / sin_p;
+                }
+                depth_est = -(dy_g * sin_p + z1 * cos_p);
+            }
+            let ground_dx = x1 * cos_y - z1 * sin_y;
+            let ground_dz = x1 * sin_y + z1 * cos_y;
+            let map_px_x = ground_dx * base_scale_unit * cam_zoom;
+            let map_px_y = ground_dz * base_scale_unit * cam_zoom;
+            let (cx, cy) = crate::core::gis::WebMercator::lat_lon_to_tile_coords(
+                universal_canvas.world_map.center_lat_lon.0,
+                universal_canvas.world_map.center_lat_lon.1,
+                universal_canvas.world_map.zoom_level,
+            );
+            universal_canvas.cursor_lat_lon = crate::core::gis::WebMercator::tile_coords_to_lat_lon(
+                cx + (map_px_x as f64) / 256.0,
+                cy + (map_px_y as f64) / 256.0,
+                universal_canvas.world_map.zoom_level,
+            );
+        }
 
         let offset_x = center_3d.0 - 6.0;
         let offset_z = center_3d.2 - 4.5;
+
+        // 2. 3D Earth World Map & Geodetic Ground Plane (`y = 0.0`) rendered BEFORE strokes and 3D BIM geometry
+        self.render_3d_earth_ground_map(
+            ui.ctx(),
+            &painter,
+            rect,
+            theme,
+            universal_canvas,
+            center_3d,
+            base_scale_unit,
+            cam_yaw,
+            cam_pitch,
+            cam_zoom,
+            cam_pan,
+            is_persp,
+            d_cam,
+            &project_3d,
+        );
 
         // Ground-plane (y=0.02) Universal Ink Sketch authoring when Sketch Mode is active
         if allow_sketch_drag
@@ -547,12 +555,12 @@ impl BuildView {
             let sin_p = cam_pitch.sin();
             let dy = 0.02_f32 - center_3d.1;
             let screen_to_ground_mm = |screen: Pos2| -> [f64; 2] {
-                let mut z2_est = 0.0_f32;
+                let mut depth_est = 0.0_f32;
                 let mut x1 = 0.0_f32;
                 let mut z1 = 0.0_f32;
                 for _ in 0..4 {
                     let pf = if is_persp {
-                        (55.0 / (55.0 + z2_est)).clamp(0.3, 3.0)
+                        (d_cam / (d_cam + depth_est).max(4.0)).clamp(0.05, 4.0)
                     } else {
                         1.0
                     };
@@ -564,7 +572,7 @@ impl BuildView {
                     } else {
                         0.0
                     };
-                    z2_est = dy * sin_p + z1 * cos_p;
+                    depth_est = -(dy * sin_p + z1 * cos_p);
                 }
                 let dx = x1 * cos_y - z1 * sin_y;
                 let dz = x1 * sin_y + z1 * cos_y;
@@ -599,61 +607,6 @@ impl BuildView {
                 &ground_to_screen,
             );
         }
-
-        // 2. 3D Earth Ground Terrain Plane (`y = 0.0`), Cardinal Compass & Real Geodetic Coordinates
-                    if self.show_grid {
-                        let ground_patch = [
-                            project_3d(-24.0, -0.02, -24.0).0,
-                            project_3d(24.0, -0.02, -24.0).0,
-                            project_3d(24.0, -0.02, 24.0).0,
-                            project_3d(-24.0, -0.02, 24.0).0,
-                        ];
-                        let terrain_fill = match universal_canvas.world_map.tile_provider {
-                            crate::core::gis::TileSource::EsriWorldImagery => Color32::from_rgba_unmultiplied(32, 52, 38, 120),
-                            crate::core::gis::TileSource::OpenTopoMap => Color32::from_rgba_unmultiplied(110, 125, 95, 65),
-                            _ => Color32::from_rgba_unmultiplied(24, 38, 48, 110),
-                        };
-                        painter.add(egui::Shape::convex_polygon(
-                            ground_patch.to_vec(),
-                            terrain_fill,
-                            Stroke::new(1.0, theme.border_subtle.gamma_multiply(0.7)),
-                        ));
-
-                        let grid_size = 6;
-                        let grid_step = 4.0;
-                        for i in -grid_size..=grid_size {
-                            let fi = i as f32 * grid_step;
-                            let (p1, _) = project_3d(fi, 0.0, -grid_size as f32 * grid_step);
-                            let (p2, _) = project_3d(fi, 0.0, grid_size as f32 * grid_step);
-                            let alpha = if i == 0 { 65 } else { 22 };
-                            painter.line_segment([p1, p2], Stroke::new(0.7, Color32::from_rgba_premultiplied(100, 175, 220, alpha)));
-
-                            let (p3, _) = project_3d(-grid_size as f32 * grid_step, 0.0, fi);
-                            let (p4, _) = project_3d(grid_size as f32 * grid_step, 0.0, fi);
-                            painter.line_segment([p3, p4], Stroke::new(0.7, Color32::from_rgba_premultiplied(100, 175, 220, alpha)));
-                        }
-
-                        // Cardinal North / East markers & Earth origin coordinates on ground plane
-                        let (north_p, _) = project_3d(0.0, 0.0, -25.5);
-                        let (east_p, _) = project_3d(25.5, 0.0, 0.0);
-                        painter.text(north_p, Align2::CENTER_BOTTOM, "N (+Lat)", egui::FontId::monospace(10.0), theme.accent_blue);
-                        painter.text(east_p, Align2::LEFT_CENTER, "E (+Lon)", egui::FontId::monospace(10.0), theme.accent_green);
-
-                        let (origin_p, _) = project_3d(0.0, 0.05, 0.0);
-                        painter.circle_filled(origin_p, 4.0, theme.accent_blue);
-                        let site_coords = if universal_canvas.ground_origin_anchored {
-                            universal_canvas.ground_origin_lat_lon
-                        } else {
-                            universal_canvas.world_map.center_lat_lon
-                        };
-                        painter.text(
-                            origin_p + Vec2::new(8.0, -8.0),
-                            Align2::LEFT_BOTTOM,
-                            format!("Earth Ground ({:.4}°, {:.4}°)", site_coords.0, site_coords.1),
-                            egui::FontId::monospace(9.5),
-                            theme.text_muted,
-                        );
-                    }
 
                     // Phase 26: 3D Level Elevation Datums from Live Project (zero hardcoded demo levels)
                     if self.show_level_datums && self.bim_bus.project.levels.len() > 1 {
@@ -1409,36 +1362,22 @@ impl BuildView {
             }
         }
 
-        // 8. Floating In-Canvas HUD Overlays (Project Browser, Properties/Inspector, Data Deck)
-        if let Some(proj_rect) = floating_project_rect {
-            ui.scope_builder(egui::UiBuilder::new().max_rect(proj_rect), |ui| {
-                self.render_floating_project_card(ui, theme, members, db_components, true);
-            });
-        }
-        if let Some(props_rect) = floating_props_rect {
-            ui.scope_builder(egui::UiBuilder::new().max_rect(props_rect), |ui| {
-                self.render_floating_properties_card(
-                    ui,
-                    theme,
-                    members,
-                    db_components,
-                    features,
-                    universal_canvas,
-                    parametric_variables,
-                    workspace_settings.clone(),
-                    avail_w,
-                    true,
-                );
-            });
-        }
-        if let Some(deck_rect) = floating_deck_rect {
-            ui.scope_builder(egui::UiBuilder::new().max_rect(deck_rect), |ui| {
-                self.render_floating_deck_card(ui, theme, members, features, true);
-            });
-        }
-
-        // 9. Universal-style Bottom Viewport Control & Status Strip
+        // 8. Sleek Earth & BIM Telemetry Footer Bar below the 3D Viewport
         let synced_count = universal_canvas.entities.len();
+        let map_telem = universal_canvas.world_map.telemetry();
+        let active_lvl_lbl = self
+            .bim_bus
+            .project
+            .levels
+            .iter()
+            .min_by(|a, b| {
+                ((a.elevation_mm as f32 * 0.001) - self.draft_node_y as f32)
+                    .abs()
+                    .total_cmp(&((b.elevation_mm as f32 * 0.001) - self.draft_node_y as f32).abs())
+            })
+            .map(|l| format!("{} ({:+.2}m)", l.name, l.elevation_mm / 1000.0))
+            .unwrap_or_else(|| "Ground (+0.00m)".to_string());
+
         Frame::new()
             .fill(theme.bg_card)
             .stroke(Stroke::new(1.0, theme.border_subtle))
@@ -1446,13 +1385,141 @@ impl BuildView {
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal_wrapped(|ui| {
+                    icons::draw_icon(ui, AppIcon::Globe, 12.0, theme.accent_blue);
+                    ui.label(
+                        RichText::new(format!(
+                            "Earth {:.4}°, {:.4}°  •  Map z{:.1} ({:.1} m/px)  •  {}  •  Scale {}  •  {}",
+                            universal_canvas.cursor_lat_lon.0,
+                            universal_canvas.cursor_lat_lon.1,
+                            universal_canvas.world_map.zoom_level,
+                            map_telem.ground_resolution_m_px,
+                            active_lvl_lbl,
+                            self.view_scale,
+                            self.lod_level,
+                        ))
+                        .size(10.0)
+                        .monospace()
+                        .color(theme.text_muted),
+                    );
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        icons::icon_label(
+                            ui,
+                            AppIcon::CheckCircle,
+                            11.0,
+                            theme.accent_green,
+                            format!("{} Elements • {} Synced Drawings", members.len(), synced_count),
+                            10.0,
+                            theme.accent_green,
+                            true,
+                        );
+                    });
+                });
+            });
+    }
+
+    /// Second organized Top Toolbar row inside Geometry canvas:
+    /// Datum Level selector (+ Lvl), View Scale, Detail (LOD), Visual Toggles & Inline BIM Command Line.
+    fn render_top_toolbar_row2_and_cmd(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        universal_canvas: &mut UniversalCanvasState,
+    ) {
+        Frame::new()
+            .fill(theme.bg_sidebar)
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .inner_margin(Margin::symmetric(12, 6))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal_wrapped(|ui| {
+                    // Datum Levels Selector + Quick Add Level
+                    ui.label(RichText::new("Level:").size(10.0).color(theme.text_muted));
+                    let current_lvl_text = self
+                        .bim_bus
+                        .project
+                        .levels
+                        .iter()
+                        .min_by(|a, b| {
+                            ((a.elevation_mm / 1000.0) - self.draft_node_y)
+                                .abs()
+                                .total_cmp(&((b.elevation_mm / 1000.0) - self.draft_node_y).abs())
+                        })
+                        .map(|l| format!("{} ({:+.2}m)", l.name, l.elevation_mm / 1000.0))
+                        .unwrap_or_else(|| "Ground Level (+0.00m)".to_string());
+
+                    let levels_clone = self.bim_bus.project.levels.clone();
+                    egui::ComboBox::from_id_salt("geometry_top_level_combo")
+                        .width(142.0)
+                        .selected_text(RichText::new(current_lvl_text).size(10.0).color(theme.text_primary))
+                        .show_ui(ui, |ui| {
+                            for lvl in &levels_clone {
+                                let elev_m = lvl.elevation_mm / 1000.0;
+                                let is_cur = (elev_m - self.draft_node_y).abs() < 0.05;
+                                if ui
+                                    .selectable_label(
+                                        is_cur,
+                                        format!("{} ({:+.2} m)", lvl.name, elev_m),
+                                    )
+                                    .clicked()
+                                {
+                                    self.draft_node_y = elev_m;
+                                    self.section_box_max_z_m = (elev_m as f32) + 4.0;
+                                    self.modify_status_msg = Some(format!(
+                                        "Active working datum set to {} ({:+.2} m)",
+                                        lvl.name, elev_m
+                                    ));
+                                }
+                            }
+                        });
+
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Plus,
+                        "Lvl",
+                        10.0,
+                        theme.accent_blue,
+                        theme.bg_card,
+                        Stroke::NONE,
+                        CornerRadius::same(4),
+                        Vec2::new(0.0, 22.0),
+                    )
+                    .on_hover_text("Add next storey level (+3.50 m above highest datum)")
+                    .clicked()
+                    {
+                        let next_num = self.bim_bus.project.levels.len() + 1;
+                        let max_elev = self
+                            .bim_bus
+                            .project
+                            .levels
+                            .iter()
+                            .map(|l| l.elevation_mm)
+                            .fold(0.0_f64, f64::max);
+                        let next_elev = if self.bim_bus.project.levels.is_empty() {
+                            0.0
+                        } else {
+                            max_elev + 3500.0
+                        };
+                        let name = format!("Level {} (+{:.2}m)", next_num, next_elev / 1000.0);
+                        match self.bim_bus.execute(crate::core::BimCommand::AddLevel {
+                            name,
+                            elevation_mm: next_elev,
+                        }) {
+                            Ok(msg) => {
+                                self.draft_node_y = next_elev / 1000.0;
+                                self.section_box_max_z_m = (next_elev as f32 / 1000.0) + 4.0;
+                                self.modify_status_msg = Some(msg);
+                            }
+                            Err(e) => self.modify_status_msg = Some(e),
+                        }
+                    }
+
+                    ui.separator();
+
+                    // Scale & Detail Level
                     ui.label(RichText::new("Scale:").size(10.0).color(theme.text_muted));
                     egui::ComboBox::from_id_salt("viewport_scale_combo")
-                        .selected_text(
-                            RichText::new(&self.view_scale)
-                                .size(10.0)
-                                .color(theme.text_primary),
-                        )
+                        .width(64.0)
+                        .selected_text(RichText::new(&self.view_scale).size(10.0).color(theme.text_primary))
                         .show_ui(ui, |ui| {
                             for s in ["1:50", "1:100", "1:200", "1:500"] {
                                 if ui.selectable_label(self.view_scale == s, s).clicked() {
@@ -1461,14 +1528,10 @@ impl BuildView {
                             }
                         });
 
-                    ui.separator();
                     ui.label(RichText::new("Detail:").size(10.0).color(theme.text_muted));
                     egui::ComboBox::from_id_salt("viewport_lod_combo")
-                        .selected_text(
-                            RichText::new(&self.lod_level)
-                                .size(10.0)
-                                .color(theme.accent_blue),
-                        )
+                        .width(118.0)
+                        .selected_text(RichText::new(&self.lod_level).size(10.0).color(theme.accent_blue))
                         .show_ui(ui, |ui| {
                             for l in [
                                 "LOD 100 (Massing)",
@@ -1483,183 +1546,719 @@ impl BuildView {
                         });
 
                     ui.separator();
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::Sun,
-                        "Sun",
-                        10.0,
-                        if self.show_sun_shadows {
-                            Color32::WHITE
-                        } else {
-                            theme.text_secondary
-                        },
-                        if self.show_sun_shadows {
-                            theme.accent_blue
-                        } else {
-                            theme.bg_card
-                        },
-                        Stroke::NONE,
-                        CornerRadius::same(4),
-                        Vec2::new(0.0, 22.0),
-                    )
-                    .clicked()
-                    {
-                        self.show_sun_shadows = !self.show_sun_shadows;
-                    }
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::RulerSquare,
-                        "Datums",
-                        10.0,
-                        if self.show_level_datums {
-                            Color32::WHITE
-                        } else {
-                            theme.text_secondary
-                        },
-                        if self.show_level_datums {
-                            theme.accent_blue
-                        } else {
-                            theme.bg_card
-                        },
-                        Stroke::NONE,
-                        CornerRadius::same(4),
-                        Vec2::new(0.0, 22.0),
-                    )
-                    .clicked()
-                    {
-                        self.show_level_datums = !self.show_level_datums;
-                    }
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::Grid,
-                        "Grids",
-                        10.0,
-                        if self.show_grid_bubbles {
-                            Color32::WHITE
-                        } else {
-                            theme.text_secondary
-                        },
-                        if self.show_grid_bubbles {
-                            theme.accent_blue
-                        } else {
-                            theme.bg_card
-                        },
-                        Stroke::NONE,
-                        CornerRadius::same(4),
-                        Vec2::new(0.0, 22.0),
-                    )
-                    .clicked()
-                    {
-                        self.show_grid_bubbles = !self.show_grid_bubbles;
-                    }
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::BoxPackage,
-                        "Section Box",
-                        10.0,
-                        if self.section_box_enabled {
-                            Color32::WHITE
-                        } else {
-                            theme.text_secondary
-                        },
-                        if self.section_box_enabled {
-                            theme.accent_blue
-                        } else {
-                            theme.bg_card
-                        },
-                        Stroke::NONE,
-                        CornerRadius::same(4),
-                        Vec2::new(0.0, 22.0),
-                    )
-                    .clicked()
-                    {
-                        self.section_box_enabled = !self.section_box_enabled;
-                    }
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::Target,
-                        "Isolate",
-                        10.0,
-                        if self.temporary_isolate_active {
-                            Color32::WHITE
-                        } else {
-                            theme.text_secondary
-                        },
-                        if self.temporary_isolate_active {
-                            theme.accent_blue
-                        } else {
-                            theme.bg_card
-                        },
-                        Stroke::NONE,
-                        CornerRadius::same(4),
-                        Vec2::new(0.0, 22.0),
-                    )
-                    .clicked()
-                    {
-                        self.temporary_isolate_active = !self.temporary_isolate_active;
-                    }
-                    if icons::icon_button(
-                        ui,
-                        AppIcon::AlertTriangle,
-                        "Clashes",
-                        10.0,
-                        if self.show_3d_clash_markers {
-                            Color32::WHITE
-                        } else {
-                            theme.text_secondary
-                        },
-                        if self.show_3d_clash_markers {
-                            theme.accent_blue
-                        } else {
-                            theme.bg_card
-                        },
-                        Stroke::NONE,
-                        CornerRadius::same(4),
-                        Vec2::new(0.0, 22.0),
-                    )
-                    .clicked()
-                    {
-                        self.show_3d_clash_markers = !self.show_3d_clash_markers;
+
+                    // Visual Display Toggles
+                    let toggles: [(&mut bool, AppIcon, &str); 7] = [
+                        (&mut self.show_sun_shadows, AppIcon::Sun, "Sun"),
+                        (&mut self.show_level_datums, AppIcon::RulerSquare, "Datums"),
+                        (&mut self.show_grid_bubbles, AppIcon::Grid, "Grids"),
+                        (&mut self.section_box_enabled, AppIcon::BoxPackage, "Section"),
+                        (&mut self.temporary_isolate_active, AppIcon::Target, "Isolate"),
+                        (&mut self.show_3d_clash_markers, AppIcon::AlertTriangle, "Clashes"),
+                        (&mut self.show_axes, AppIcon::Compass, "Axes"),
+                    ];
+                    for (flag, icon, lbl) in toggles {
+                        let active = *flag;
+                        if icons::icon_button(
+                            ui,
+                            icon,
+                            lbl,
+                            10.0,
+                            if active { Color32::WHITE } else { theme.text_secondary },
+                            if active { theme.accent_blue } else { theme.bg_card },
+                            Stroke::NONE,
+                            CornerRadius::same(4),
+                            Vec2::new(0.0, 22.0),
+                        )
+                        .clicked()
+                        {
+                            *flag = !*flag;
+                        }
                     }
 
                     ui.separator();
-                    icons::icon_label(
-                        ui,
-                        AppIcon::CheckCircle,
-                        11.0,
-                        theme.accent_green,
-                        format!("{} Elements • {} Synced Drawings", members.len(), synced_count),
-                        10.0,
-                        theme.accent_green,
-                        true,
+
+                    // Inline BIM / CAD Command Line inside Top Toolbar
+                    ui.label(RichText::new("BIM Cmd:").size(10.0).strong().color(theme.accent_blue));
+                    let cmd_resp = ui.add(
+                        egui::TextEdit::singleline(&mut self.bim_console_input)
+                            .hint_text("wall 0,0->6000,0 | col 0,0 | level L2 3500 | clear")
+                            .desired_width(190.0),
                     );
+                    let run_clicked = icons::icon_button(
+                        ui,
+                        AppIcon::Play,
+                        "Run",
+                        10.0,
+                        Color32::WHITE,
+                        theme.accent_green,
+                        Stroke::NONE,
+                        CornerRadius::same(4),
+                        Vec2::new(0.0, 22.0),
+                    )
+                    .clicked();
+                    if run_clicked
+                        || (cmd_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))
+                    {
+                        let raw = self.bim_console_input.trim().to_string();
+                        if !raw.is_empty() {
+                            self.run_inline_bim_command(&raw, universal_canvas);
+                            self.bim_console_input.clear();
+                        }
+                    }
                 });
             });
+    }
 
-        // 10. Stacked Drawers on Mobile (< 720px) or whenever a floating deck couldn't overlay cleanly
-        if !has_floating_room {
-            Frame::new()
-                .inner_margin(Margin::symmetric(10, 8))
-                .show(ui, |ui| {
-                    self.render_stacked_drawers_mobile(
-                        ui,
-                        theme,
-                        members,
-                        db_components,
-                        features,
-                        universal_canvas,
-                        parametric_variables,
-                        workspace_settings,
-                        avail_w,
-                    );
-                });
-        } else if self.floating_deck_open && floating_deck_rect.is_none() {
-            Frame::new()
-                .inner_margin(Margin::symmetric(10, 8))
-                .show(ui, |ui| {
-                    self.render_floating_deck_card(ui, theme, members, features, false);
-                });
+    /// Renders open Project Browser, Properties, and Data Deck cleanly inside the Top Toolbar Dock Area
+    /// above the 3D Earth viewport (never overlapping or obscuring the drawing canvas).
+    #[allow(clippy::too_many_arguments)]
+    fn render_top_dock_drawers(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        members: &[StructuralMember],
+        db_components: &[DatabaseComponent],
+        features: &mut FeatureRegistry,
+        universal_canvas: &mut UniversalCanvasState,
+        parametric_variables: &[ParametricVariable],
+        workspace_settings: &WorkspaceCanvasSettings,
+        avail_w: f32,
+    ) {
+        let open_count = usize::from(self.floating_project_open)
+            + usize::from(self.floating_properties_open)
+            + usize::from(self.floating_deck_open);
+        if open_count == 0 {
+            return;
         }
+
+        Frame::new()
+            .fill(theme.bg_sidebar)
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .inner_margin(Margin::symmetric(10, 8))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                if avail_w >= 960.0 && open_count > 1 {
+                    let flags = [
+                        self.floating_project_open,
+                        self.floating_properties_open,
+                        self.floating_deck_open,
+                    ];
+                    let active_slots: Vec<usize> = flags
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, &on)| on.then_some(i))
+                        .collect();
+                    let col_w = (ui.available_width() / active_slots.len() as f32).max(260.0);
+                    ui.columns(active_slots.len(), |cols| {
+                        for (col_idx, &slot) in active_slots.iter().enumerate() {
+                            cols[col_idx].set_max_height(265.0);
+                            match slot {
+                                0 => self.render_floating_project_card(
+                                    &mut cols[col_idx],
+                                    theme,
+                                    members,
+                                    db_components,
+                                    false,
+                                ),
+                                1 => self.render_floating_properties_card(
+                                    &mut cols[col_idx],
+                                    theme,
+                                    members,
+                                    db_components,
+                                    features,
+                                    universal_canvas,
+                                    parametric_variables,
+                                    workspace_settings.clone(),
+                                    col_w,
+                                    false,
+                                ),
+                                _ => self.render_floating_deck_card(
+                                    &mut cols[col_idx],
+                                    theme,
+                                    members,
+                                    features,
+                                    false,
+                                ),
+                            }
+                        }
+                    });
+                } else {
+                    if self.floating_project_open {
+                        ui.push_id("top_dock_project", |ui| {
+                            ui.set_max_height(240.0);
+                            self.render_floating_project_card(ui, theme, members, db_components, false);
+                        });
+                        ui.add_space(6.0);
+                    }
+                    if self.floating_properties_open {
+                        ui.push_id("top_dock_props", |ui| {
+                            ui.set_max_height(260.0);
+                            self.render_floating_properties_card(
+                                ui,
+                                theme,
+                                members,
+                                db_components,
+                                features,
+                                universal_canvas,
+                                parametric_variables,
+                                workspace_settings.clone(),
+                                avail_w,
+                                false,
+                            );
+                        });
+                        ui.add_space(6.0);
+                    }
+                    if self.floating_deck_open {
+                        ui.push_id("top_dock_deck", |ui| {
+                            ui.set_max_height(240.0);
+                            self.render_floating_deck_card(ui, theme, members, features, false);
+                        });
+                    }
+                }
+            });
+    }
+
+    /// Executes quick CAD/BIM shortcuts or JSON `BimCommand` strings entered in the Top Toolbar Command Line.
+    fn run_inline_bim_command(&mut self, raw: &str, universal_canvas: &mut UniversalCanvasState) {
+        let trimmed = raw.trim();
+        self.bim_console_logs.push(format!("> {}", trimmed));
+
+        if trimmed.starts_with('{') {
+            match self.bim_bus.execute_json(trimmed) {
+                Ok(msg) => {
+                    self.bim_console_logs.push(msg.clone());
+                    self.modify_status_msg = Some(msg);
+                }
+                Err(e) => {
+                    self.bim_console_logs.push(e.clone());
+                    self.modify_status_msg = Some(e);
+                }
+            }
+            return;
+        }
+
+        let lower = trimmed.to_lowercase();
+        let active_lvl_id = self
+            .bim_bus
+            .project
+            .levels
+            .iter()
+            .min_by(|a, b| {
+                ((a.elevation_mm / 1000.0) - self.draft_node_y)
+                    .abs()
+                    .total_cmp(&((b.elevation_mm / 1000.0) - self.draft_node_y).abs())
+            })
+            .map(|l| l.id)
+            .unwrap_or(1);
+
+        let parse_pair = |s: &str| -> Option<crate::core::P2> {
+            let mut it = s.split(',').filter_map(|p| p.trim().parse::<f64>().ok());
+            Some(crate::core::P2(it.next()?, it.next()?))
+        };
+
+        if lower == "undo" {
+            let msg = self
+                .bim_bus
+                .undo()
+                .unwrap_or_else(|| "Nothing to undo".to_string());
+            self.bim_console_logs.push(msg.clone());
+            self.modify_status_msg = Some(msg);
+        } else if lower == "redo" {
+            let msg = self
+                .bim_bus
+                .redo()
+                .unwrap_or_else(|| "Nothing to redo".to_string());
+            self.bim_console_logs.push(msg.clone());
+            self.modify_status_msg = Some(msg);
+        } else if lower == "clear" {
+            self.bim_bus = crate::core::BimCommandBus::new();
+            let msg = "Cleared active BIM workspace to blank ground plane.".to_string();
+            self.bim_console_logs.push(msg.clone());
+            self.modify_status_msg = Some(msg);
+        } else if lower == "world" {
+            universal_canvas.world_map.reset_to_global_view();
+            self.modify_status_msg = Some("Reset Earth camera to Global World view.".to_string());
+        } else if lower == "ground" {
+            let target = if universal_canvas.ground_origin_anchored {
+                universal_canvas.ground_origin_lat_lon
+            } else {
+                universal_canvas.world_map.center_lat_lon
+            };
+            universal_canvas.ground_origin_lat_lon = target;
+            universal_canvas.ground_origin_anchored = true;
+            universal_canvas
+                .world_map
+                .zoom_to_ground_site(target.0, target.1, 17.5);
+            self.modify_status_msg = Some("Zoomed to 1:200 site ground datum.".to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("wall ").or_else(|| trimmed.strip_prefix("WALL ")) {
+            let arrow_split = rest.replace("->", " ");
+            let parts: Vec<&str> = arrow_split.split_whitespace().collect();
+            if parts.len() >= 2 {
+                if let (Some(p1), Some(p2)) = (parse_pair(parts[0]), parse_pair(parts[1])) {
+                    match self.bim_bus.execute(crate::core::BimCommand::AddWall {
+                        base_level_id: active_lvl_id,
+                        start: p1,
+                        end: p2,
+                        thickness_mm: 200.0,
+                        is_structural: true,
+                    }) {
+                        Ok(msg) => self.modify_status_msg = Some(msg),
+                        Err(e) => self.modify_status_msg = Some(e),
+                    }
+                    return;
+                }
+            }
+            self.modify_status_msg =
+                Some("Usage: wall x1_mm,y1_mm -> x2_mm,y2_mm (e.g. wall 0,0 -> 6000,0)".to_string());
+        } else if let Some(rest) = trimmed
+            .strip_prefix("col ")
+            .or_else(|| trimmed.strip_prefix("column "))
+        {
+            if let Some(pos) = parse_pair(rest.trim()) {
+                let top_id = self
+                    .bim_bus
+                    .project
+                    .levels
+                    .iter()
+                    .find(|l| l.elevation_mm > self.draft_node_y * 1000.0 + 100.0)
+                    .map(|l| l.id)
+                    .unwrap_or(active_lvl_id);
+                match self.bim_bus.execute(crate::core::BimCommand::AddColumn {
+                    base_level_id: active_lvl_id,
+                    top_level_id: top_id,
+                    pos,
+                    width_mm: 400.0,
+                    depth_mm: 400.0,
+                    is_round: false,
+                    profile_name: "RC 400x400".to_string(),
+                }) {
+                    Ok(msg) => self.modify_status_msg = Some(msg),
+                    Err(e) => self.modify_status_msg = Some(e),
+                }
+            } else {
+                self.modify_status_msg =
+                    Some("Usage: col x_mm,y_mm (e.g. col 6000,0)".to_string());
+            }
+        } else if let Some(rest) = trimmed.strip_prefix("level ") {
+            let mut toks = rest.split_whitespace();
+            if let (Some(name), Some(elev_str)) = (toks.next(), toks.next()) {
+                if let Ok(elev_mm) = elev_str.parse::<f64>() {
+                    match self.bim_bus.execute(crate::core::BimCommand::AddLevel {
+                        name: name.to_string(),
+                        elevation_mm: elev_mm,
+                    }) {
+                        Ok(msg) => self.modify_status_msg = Some(msg),
+                        Err(e) => self.modify_status_msg = Some(e),
+                    }
+                    return;
+                }
+            }
+            self.modify_status_msg =
+                Some("Usage: level <Name> <Elevation_mm> (e.g. level Roof 7000)".to_string());
+        } else {
+            let msg = format!("Command '{}' logged to BIM Console.", trimmed);
+            self.bim_console_logs.push(msg.clone());
+            self.modify_status_msg = Some(msg);
+        }
+    }
+
+    /// Renders true Earth World Map (sky horizon, ocean, global vector continents & coastlines,
+    /// lat/lon graticules, live streamed Web Mercator raster tiles, local surveying grid, and site origin)
+    /// directly onto the 3D ground plane (`y = 0.0`) with near-plane perspective clipping.
+    #[allow(clippy::too_many_arguments)]
+    fn render_3d_earth_ground_map<F>(
+        &self,
+        ctx: &egui::Context,
+        painter: &egui::Painter,
+        rect: Rect,
+        theme: &MacTheme,
+        universal_canvas: &UniversalCanvasState,
+        center_3d: (f32, f32, f32),
+        base_scale_unit: f32,
+        cam_yaw: f32,
+        cam_pitch: f32,
+        cam_zoom: f32,
+        cam_pan: Vec2,
+        is_persp: bool,
+        d_cam: f32,
+        project_3d: &F,
+    ) where
+        F: Fn(f32, f32, f32) -> (Pos2, f32),
+    {
+        use crate::core::gis::map_widget::{ear_clip_polygon, WORLD_LANDMASSES};
+
+        let map_painter = painter.with_clip_rect(rect);
+        let (ocean_color, land_color, coast_color) = universal_canvas.world_map.basemap_colors(theme);
+        let cos_y = cam_yaw.cos();
+        let sin_y = cam_yaw.sin();
+        let cos_p = cam_pitch.cos();
+        let sin_p = cam_pitch.sin();
+        let center_screen = rect.center();
+        let world_per_map_px = 1.0 / (base_scale_unit * cam_zoom).max(1.0);
+        let min_depth = -d_cam + 8.0;
+        let dy_ground = 0.0_f32 - center_3d.1;
+
+        let map_px_to_cam = |offset: Vec2| -> (f32, f32, f32) {
+            let dx = offset.x * world_per_map_px;
+            let dz = offset.y * world_per_map_px;
+            let x1 = dx * cos_y + dz * sin_y;
+            let z1 = -dx * sin_y + dz * cos_y;
+            let y2 = dy_ground * cos_p - z1 * sin_p;
+            let depth = -(dy_ground * sin_p + z1 * cos_p);
+            (x1, y2, depth)
+        };
+
+        let cam_to_screen = |x1: f32, y2: f32, depth: f32| -> Pos2 {
+            let pf = if is_persp {
+                (d_cam / (d_cam + depth).max(8.0)).clamp(0.05, 4.0)
+            } else {
+                1.0
+            };
+            let sc = base_scale_unit * cam_zoom * pf;
+            Pos2::new(
+                center_screen.x + cam_pan.x + x1 * sc,
+                center_screen.y + cam_pan.y - y2 * sc,
+            )
+        };
+
+        // 1. Atmospheric Horizon Sky + Ocean Ground Plane
+        let sky_color = match universal_canvas.world_map.tile_provider {
+            crate::core::gis::TileSource::CartoDbDarkMatter => Color32::from_rgb(7, 10, 17),
+            crate::core::gis::TileSource::EsriWorldImagery => Color32::from_rgb(10, 20, 36),
+            _ if theme.is_dark() => Color32::from_rgb(15, 23, 38),
+            _ => Color32::from_rgb(206, 228, 248),
+        };
+        if is_persp && cos_p > 0.02 {
+            let horizon_sy = center_screen.y
+                + cam_pan.y
+                - d_cam * base_scale_unit * cam_zoom * (sin_p / cos_p);
+            if cam_pitch >= 0.0 {
+                let split_y = horizon_sy.clamp(rect.top(), rect.bottom());
+                if split_y > rect.top() {
+                    map_painter.rect_filled(
+                        Rect::from_min_max(rect.min, Pos2::new(rect.max.x, split_y)),
+                        CornerRadius::ZERO,
+                        sky_color,
+                    );
+                }
+                if split_y < rect.bottom() {
+                    map_painter.rect_filled(
+                        Rect::from_min_max(Pos2::new(rect.min.x, split_y), rect.max),
+                        CornerRadius::ZERO,
+                        ocean_color,
+                    );
+                }
+                if horizon_sy > rect.top() && horizon_sy < rect.bottom() {
+                    map_painter.line_segment(
+                        [Pos2::new(rect.left(), horizon_sy), Pos2::new(rect.right(), horizon_sy)],
+                        Stroke::new(1.5, theme.accent_blue.gamma_multiply(0.5)),
+                    );
+                }
+            } else {
+                let split_y = horizon_sy.clamp(rect.top(), rect.bottom());
+                if split_y > rect.top() {
+                    map_painter.rect_filled(
+                        Rect::from_min_max(rect.min, Pos2::new(rect.max.x, split_y)),
+                        CornerRadius::ZERO,
+                        ocean_color.gamma_multiply(0.85),
+                    );
+                }
+                if split_y < rect.bottom() {
+                    map_painter.rect_filled(
+                        Rect::from_min_max(Pos2::new(rect.min.x, split_y), rect.max),
+                        CornerRadius::ZERO,
+                        sky_color,
+                    );
+                }
+            }
+        } else {
+            map_painter.rect_filled(rect, CornerRadius::ZERO, ocean_color);
+        }
+
+        // 2. Global Vector Continents & Islands on Ground Plane (y = 0.0) across longitudinal wraps
+        for &wrap_deg in &[-360.0_f64, 0.0_f64, 360.0_f64] {
+            for land in WORLD_LANDMASSES {
+                let cam_poly: Vec<(f32, f32, f32)> = land
+                    .iter()
+                    .map(|&(lat, lon)| {
+                        let off = universal_canvas
+                            .world_map
+                            .lat_lon_to_map_px_offset(lat, lon + wrap_deg);
+                        map_px_to_cam(off)
+                    })
+                    .collect();
+
+                let clipped_cam = Self::near_clip_cam_poly(&cam_poly, min_depth);
+                if clipped_cam.len() >= 3 {
+                    let screen_pts: Vec<Pos2> = clipped_cam
+                        .iter()
+                        .map(|&(x1, y2, depth)| cam_to_screen(x1, y2, depth))
+                        .collect();
+                    let mut bounds = Rect::NOTHING;
+                    for &p in &screen_pts {
+                        bounds.extend_with(p);
+                    }
+                    if bounds.intersects(rect) {
+                        if let Some(mesh) = ear_clip_polygon(&screen_pts, land_color) {
+                            map_painter.add(egui::Shape::mesh(mesh));
+                        }
+                    }
+                }
+
+                // Stroke true coastline segments cleanly without spurious near-plane cap lines
+                let n_pts = cam_poly.len();
+                for i in 0..n_pts {
+                    let a = cam_poly[i];
+                    let b = cam_poly[(i + 1) % n_pts];
+                    if let Some((ca, cb)) = Self::near_clip_segment(a, b, min_depth) {
+                        let pa = cam_to_screen(ca.0, ca.1, ca.2);
+                        let pb = cam_to_screen(cb.0, cb.1, cb.2);
+                        let seg_bounds = Rect::from_two_pos(pa, pb);
+                        if seg_bounds.intersects(rect) {
+                            map_painter.line_segment([pa, pb], Stroke::new(1.1, coast_color));
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. 3D Geodetic Graticule Grid (Equator + 20-deg Parallels + 30-deg Meridians)
+        let grat_alpha = if universal_canvas.world_map.zoom_level >= 11.0 { 22 } else { 46 };
+        let grat_stroke = Stroke::new(0.8, Color32::from_rgba_unmultiplied(180, 205, 232, grat_alpha));
+        let eq_stroke = Stroke::new(1.3, theme.accent_blue.gamma_multiply(0.55));
+        for lat in [-60.0_f64, -40.0, -20.0, 0.0, 20.0, 40.0, 60.0] {
+            let stroke = if lat.abs() < 1e-3 { eq_stroke } else { grat_stroke };
+            let mut lon = -540.0_f64;
+            while lon < 540.0 {
+                let next_lon = lon + 20.0;
+                let a = map_px_to_cam(universal_canvas.world_map.lat_lon_to_map_px_offset(lat, lon));
+                let b = map_px_to_cam(universal_canvas.world_map.lat_lon_to_map_px_offset(lat, next_lon));
+                if let Some((ca, cb)) = Self::near_clip_segment(a, b, min_depth) {
+                    let pa = cam_to_screen(ca.0, ca.1, ca.2);
+                    let pb = cam_to_screen(cb.0, cb.1, cb.2);
+                    if Rect::from_two_pos(pa, pb).intersects(rect) {
+                        map_painter.line_segment([pa, pb], stroke);
+                    }
+                }
+                lon = next_lon;
+            }
+        }
+        for &wrap_deg in &[-360.0_f64, 0.0_f64, 360.0_f64] {
+            for lon_i in (-180..180).step_by(30) {
+                let lon = lon_i as f64 + wrap_deg;
+                let mut lat = -78.0_f64;
+                while lat < 78.0 {
+                    let next_lat = (lat + 13.0).min(78.0);
+                    let a = map_px_to_cam(universal_canvas.world_map.lat_lon_to_map_px_offset(lat, lon));
+                    let b = map_px_to_cam(universal_canvas.world_map.lat_lon_to_map_px_offset(next_lat, lon));
+                    if let Some((ca, cb)) = Self::near_clip_segment(a, b, min_depth) {
+                        let pa = cam_to_screen(ca.0, ca.1, ca.2);
+                        let pb = cam_to_screen(cb.0, cb.1, cb.2);
+                        if Rect::from_two_pos(pa, pb).intersects(rect) {
+                            map_painter.line_segment([pa, pb], grat_stroke);
+                        }
+                    }
+                    lat = next_lat;
+                }
+            }
+        }
+
+        // 4. Live Streamed Web Mercator Raster Tiles Subdivided in 3D Perspective (4x4 Mesh per Tile)
+        let tile_span_mult = if cam_pitch.abs() < 1.25 { 1.55 } else { 1.15 };
+        let quads = universal_canvas.world_map.collect_visible_tile_quads(
+            ctx,
+            rect.width() * tile_span_mult,
+            rect.height() * tile_span_mult,
+        );
+        const TILE_SUB: usize = 4;
+        for quad in quads {
+            let nw_px = universal_canvas
+                .world_map
+                .lat_lon_to_map_px_offset(quad.north_lat, quad.west_lon);
+            let se_px = universal_canvas
+                .world_map
+                .lat_lon_to_map_px_offset(quad.south_lat, quad.east_lon);
+            let mut mesh = egui::epaint::Mesh::with_texture(quad.tex_id);
+
+            let corner_sample = |ix: usize, iy: usize| -> ([f32; 3], Pos2) {
+                let fx = ix as f32 / TILE_SUB as f32;
+                let fy = iy as f32 / TILE_SUB as f32;
+                let off = Vec2::new(
+                    nw_px.x + (se_px.x - nw_px.x) * fx,
+                    nw_px.y + (se_px.y - nw_px.y) * fy,
+                );
+                let c = map_px_to_cam(off);
+                let uv = Pos2::new(
+                    quad.uv_rect.min.x + quad.uv_rect.width() * fx,
+                    quad.uv_rect.min.y + quad.uv_rect.height() * fy,
+                );
+                ([c.0, c.1, c.2], uv)
+            };
+
+            for iy in 0..TILE_SUB {
+                for ix in 0..TILE_SUB {
+                    let cell = [
+                        corner_sample(ix, iy),
+                        corner_sample(ix + 1, iy),
+                        corner_sample(ix + 1, iy + 1),
+                        corner_sample(ix, iy + 1),
+                    ];
+                    let clipped = Self::near_clip_uv_poly(&cell, min_depth);
+                    if clipped.len() < 3 {
+                        continue;
+                    }
+                    let start_idx = mesh.vertices.len() as u32;
+                    for (cam_p, uv) in &clipped {
+                        let sp = cam_to_screen(cam_p[0], cam_p[1], cam_p[2]);
+                        mesh.vertices.push(egui::epaint::Vertex {
+                            pos: sp,
+                            uv: *uv,
+                            color: Color32::WHITE,
+                        });
+                    }
+                    for k in 1..(clipped.len() as u32 - 1) {
+                        mesh.indices.push(start_idx);
+                        mesh.indices.push(start_idx + k);
+                        mesh.indices.push(start_idx + k + 1);
+                    }
+                }
+            }
+            if !mesh.indices.is_empty() {
+                map_painter.add(egui::Shape::mesh(mesh));
+            }
+        }
+
+        // 5. Local Site Surveying Grid, Cardinal N/E Markers & Geodetic Ground Origin Marker
+        if self.show_grid {
+            let grid_size = 6;
+            let grid_step = 4.0_f32;
+            let half_span = grid_size as f32 * grid_step;
+            for i in -grid_size..=grid_size {
+                let fi = i as f32 * grid_step;
+                let (p1, _) = project_3d(fi, 0.0, -half_span);
+                let (p2, _) = project_3d(fi, 0.0, half_span);
+                let alpha = if i == 0 { 85 } else { 28 };
+                let st = Stroke::new(0.8, Color32::from_rgba_premultiplied(110, 185, 235, alpha));
+                map_painter.line_segment([p1, p2], st);
+
+                let (p3, _) = project_3d(-half_span, 0.0, fi);
+                let (p4, _) = project_3d(half_span, 0.0, fi);
+                map_painter.line_segment([p3, p4], st);
+            }
+
+            let (north_p, _) = project_3d(0.0, 0.0, -(half_span + 1.5));
+            let (east_p, _) = project_3d(half_span + 1.5, 0.0, 0.0);
+            map_painter.text(north_p, Align2::CENTER_BOTTOM, "N (+Lat)", egui::FontId::monospace(10.0), theme.accent_blue);
+            map_painter.text(east_p, Align2::LEFT_CENTER, "E (+Lon)", egui::FontId::monospace(10.0), theme.accent_green);
+
+            let (origin_p, _) = project_3d(0.0, 0.05, 0.0);
+            map_painter.circle_filled(origin_p, 4.0, theme.accent_blue);
+            let site_coords = if universal_canvas.ground_origin_anchored {
+                universal_canvas.ground_origin_lat_lon
+            } else {
+                universal_canvas.world_map.center_lat_lon
+            };
+            map_painter.text(
+                origin_p + Vec2::new(8.0, -8.0),
+                Align2::LEFT_BOTTOM,
+                format!("Earth Ground ({:.4}°, {:.4}°)", site_coords.0, site_coords.1),
+                egui::FontId::monospace(9.5),
+                theme.text_muted,
+            );
+        }
+    }
+
+    fn near_clip_cam_poly(pts: &[(f32, f32, f32)], min_depth: f32) -> Vec<(f32, f32, f32)> {
+        let n = pts.len();
+        if n < 3 {
+            return Vec::new();
+        }
+        let mut out = Vec::with_capacity(n + 2);
+        for i in 0..n {
+            let a = pts[i];
+            let b = pts[(i + 1) % n];
+            let a_in = a.2 >= min_depth;
+            let b_in = b.2 >= min_depth;
+            if a_in && b_in {
+                out.push(b);
+            } else if a_in && !b_in {
+                let denom = b.2 - a.2;
+                let t = if denom.abs() > 1e-6 { ((min_depth - a.2) / denom).clamp(0.0, 1.0) } else { 0.0 };
+                out.push((a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t, min_depth));
+            } else if !a_in && b_in {
+                let denom = b.2 - a.2;
+                let t = if denom.abs() > 1e-6 { ((min_depth - a.2) / denom).clamp(0.0, 1.0) } else { 0.0 };
+                out.push((a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t, min_depth));
+                out.push(b);
+            }
+        }
+        out
+    }
+
+    fn near_clip_segment(
+        a: (f32, f32, f32),
+        b: (f32, f32, f32),
+        min_depth: f32,
+    ) -> Option<((f32, f32, f32), (f32, f32, f32))> {
+        let a_in = a.2 >= min_depth;
+        let b_in = b.2 >= min_depth;
+        match (a_in, b_in) {
+            (true, true) => Some((a, b)),
+            (false, false) => None,
+            (true, false) => {
+                let denom = b.2 - a.2;
+                let t = if denom.abs() > 1e-6 { ((min_depth - a.2) / denom).clamp(0.0, 1.0) } else { 0.0 };
+                Some((a, (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t, min_depth)))
+            }
+            (false, true) => {
+                let denom = b.2 - a.2;
+                let t = if denom.abs() > 1e-6 { ((min_depth - a.2) / denom).clamp(0.0, 1.0) } else { 0.0 };
+                Some(((a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t, min_depth), b))
+            }
+        }
+    }
+
+    fn near_clip_uv_poly(verts: &[([f32; 3], Pos2)], min_depth: f32) -> Vec<([f32; 3], Pos2)> {
+        let n = verts.len();
+        if n < 3 {
+            return Vec::new();
+        }
+        let lerp_v = |a: &([f32; 3], Pos2), b: &([f32; 3], Pos2)| -> ([f32; 3], Pos2) {
+            let denom = b.0[2] - a.0[2];
+            let t = if denom.abs() > 1e-6 {
+                ((min_depth - a.0[2]) / denom).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            (
+                [
+                    a.0[0] + (b.0[0] - a.0[0]) * t,
+                    a.0[1] + (b.0[1] - a.0[1]) * t,
+                    min_depth,
+                ],
+                Pos2::new(
+                    a.1.x + (b.1.x - a.1.x) * t,
+                    a.1.y + (b.1.y - a.1.y) * t,
+                ),
+            )
+        };
+        let mut out = Vec::with_capacity(n + 2);
+        for i in 0..n {
+            let a = &verts[i];
+            let b = &verts[(i + 1) % n];
+            let a_in = a.0[2] >= min_depth;
+            let b_in = b.0[2] >= min_depth;
+            if a_in && b_in {
+                out.push(*b);
+            } else if a_in && !b_in {
+                out.push(lerp_v(a, b));
+            } else if !a_in && b_in {
+                out.push(lerp_v(a, b));
+                out.push(*b);
+            }
+        }
+        out
     }
 
     /// Builds 3D coordinates and elements based on active architectural archetype.

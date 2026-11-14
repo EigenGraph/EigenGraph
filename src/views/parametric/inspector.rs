@@ -351,7 +351,88 @@ impl ParametricView {
         }
     }
 
-    /// Floating HUD card for Project Browser & Storey Levels inside the 2D canvas.
+    /// Organized Top-Toolbar Docked Inspector Strip (replaces floating panels over the canvas).
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn render_top_toolbar_inspector_dock(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        db_components: &mut Vec<DatabaseComponent>,
+        active_pillar: &mut NavigationPillar,
+        features: &mut FeatureRegistry,
+        universal_canvas: &mut UniversalCanvasState,
+        members: &[crate::models::StructuralMember],
+        workspace_settings: WorkspaceCanvasSettings,
+    ) {
+        if !self.floating_project_open && !self.floating_properties_open && !self.show_cli_float {
+            return;
+        }
+        ui.add_space(6.0);
+        Frame::new()
+            .fill(theme.bg_card)
+            .stroke(Stroke::new(1.0, theme.border_subtle))
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::symmetric(10, 8))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                let show_two_cols = self.floating_project_open && self.floating_properties_open;
+                let avail = ui.available_width();
+                if show_two_cols && avail >= 820.0 {
+                    ui.columns(2, |cols| {
+                        cols[0].push_id("param_dock_project", |ui| {
+                            self.render_floating_project_card(ui, theme, db_components, false);
+                        });
+                        cols[1].push_id("param_dock_props", |ui| {
+                            self.render_floating_properties_card(
+                                ui,
+                                theme,
+                                db_components,
+                                active_pillar,
+                                features,
+                                universal_canvas,
+                                members,
+                                workspace_settings.clone(),
+                                avail * 0.5,
+                                false,
+                            );
+                        });
+                    });
+                } else {
+                    if self.floating_project_open {
+                        ui.push_id("param_dock_project_solo", |ui| {
+                            self.render_floating_project_card(ui, theme, db_components, false);
+                        });
+                        if self.floating_properties_open {
+                            ui.add_space(6.0);
+                        }
+                    }
+                    if self.floating_properties_open {
+                        ui.push_id("param_dock_props_solo", |ui| {
+                            self.render_floating_properties_card(
+                                ui,
+                                theme,
+                                db_components,
+                                active_pillar,
+                                features,
+                                universal_canvas,
+                                members,
+                                workspace_settings.clone(),
+                                avail,
+                                false,
+                            );
+                        });
+                    }
+                }
+                if self.show_cli_float {
+                    ui.add_space(6.0);
+                    ui.push_id("param_dock_cli", |ui| {
+                        self.render_floating_cli_card(ui, theme, false);
+                    });
+                }
+            });
+    }
+
+    /// Docked card for Project Browser & Storey Levels inside the top toolbar.
     pub(super) fn render_floating_project_card(
         &mut self,
         ui: &mut Ui,
@@ -575,44 +656,5 @@ impl ParametricView {
                 }
             });
         });
-    }
-
-    /// Responsive stacked drawers rendered cleanly below the footer on phones (`< 720 px`).
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn render_stacked_drawers_mobile(
-        &mut self,
-        ui: &mut Ui,
-        theme: &MacTheme,
-        db_components: &mut Vec<DatabaseComponent>,
-        active_pillar: &mut NavigationPillar,
-        features: &mut FeatureRegistry,
-        universal_canvas: &mut UniversalCanvasState,
-        members: &[crate::models::StructuralMember],
-        workspace_settings: WorkspaceCanvasSettings,
-        avail_w: f32,
-    ) {
-        if self.floating_project_open {
-            ui.add_space(6.0);
-            self.render_floating_project_card(ui, theme, db_components, false);
-        }
-        if self.floating_properties_open {
-            ui.add_space(6.0);
-            self.render_floating_properties_card(
-                ui,
-                theme,
-                db_components,
-                active_pillar,
-                features,
-                universal_canvas,
-                members,
-                workspace_settings,
-                avail_w,
-                false,
-            );
-        }
-        if self.show_cli_float {
-            ui.add_space(6.0);
-            self.render_floating_cli_card(ui, theme, false);
-        }
     }
 }

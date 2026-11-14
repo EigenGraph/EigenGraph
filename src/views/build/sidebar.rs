@@ -228,45 +228,6 @@ impl BuildView {
         });
     }
 
-    /// Responsive stacked cards below the 3D canvas footer on narrower screens (`< 720 px`).
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn render_stacked_drawers_mobile(
-        &mut self,
-        ui: &mut Ui,
-        theme: &MacTheme,
-        members: &[StructuralMember],
-        db_components: &[DatabaseComponent],
-        features: &mut FeatureRegistry,
-        universal_canvas: &mut UniversalCanvasState,
-        parametric_variables: &[ParametricVariable],
-        workspace_settings: WorkspaceCanvasSettings,
-        avail_w: f32,
-    ) {
-        if self.floating_deck_open {
-            ui.add_space(6.0);
-            self.render_floating_deck_card(ui, theme, members, features, false);
-        }
-        if self.floating_project_open {
-            ui.add_space(6.0);
-            self.render_floating_project_card(ui, theme, members, db_components, false);
-        }
-        if self.floating_properties_open {
-            ui.add_space(6.0);
-            self.render_floating_properties_card(
-                ui,
-                theme,
-                members,
-                db_components,
-                features,
-                universal_canvas,
-                parametric_variables,
-                workspace_settings,
-                avail_w,
-                false,
-            );
-        }
-    }
-
     fn render_properties_tab(&mut self, ui: &mut Ui, theme: &MacTheme, members: &[StructuralMember]) {
         ui.label(RichText::new("PROPERTIES INSPECTOR & FRAME 3D ARI").size(12.0).strong().color(theme.text_secondary));
         ui.add_space(6.0);

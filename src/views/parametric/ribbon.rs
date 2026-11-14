@@ -23,13 +23,14 @@ impl ParametricView {
         ui: &mut Ui,
         theme: &MacTheme,
         db_components: &mut Vec<DatabaseComponent>,
-        _active_pillar: &mut NavigationPillar,
+        active_pillar: &mut NavigationPillar,
+        features: &mut FeatureRegistry,
         universal_canvas: &mut UniversalCanvasState,
         members: &[crate::models::StructuralMember],
         workspace_settings: WorkspaceCanvasSettings,
         sidebar_toggle_inset_px: f32,
     ) {
-        let avail_w = ui.available_width();
+        let _avail_w = ui.available_width();
         Frame::new()
             .fill(theme.bg_sidebar)
             .stroke(Stroke::new(1.0, theme.border_subtle))
@@ -207,70 +208,45 @@ impl ParametricView {
                         );
 
                         // Floating HUD Overlays inside Canvas
-                        let proj_active = if avail_w >= 960.0 {
-                            self.floating_project_open
-                        } else {
-                            self.floating_properties_open
-                                && self.floating_right_tab == ParametricFloatingTab::Project
-                        };
+                        // Phase 36: Top Toolbar Dock Panel Toggles (no canvas-blocking floating HUD)
                         if icons::icon_button(
                             ui,
                             AppIcon::Folder,
-                            "Project",
+                            "Project & Levels",
                             10.5,
-                            if proj_active { Color32::WHITE } else { theme.text_secondary },
-                            if proj_active { theme.accent_green } else { theme.bg_card },
+                            if self.floating_project_open { Color32::WHITE } else { theme.text_secondary },
+                            if self.floating_project_open { theme.accent_green } else { theme.bg_card },
                             Stroke::NONE,
                             CornerRadius::same(6),
                             Vec2::new(0.0, 26.0),
                         )
-                        .on_hover_text("Show or hide floating Project, Storey Levels & Rooms overlay inside canvas")
+                        .on_hover_text("Toggle docked Project Browser & Storey Levels strip inside top toolbar")
                         .clicked()
                         {
-                            if avail_w >= 960.0 {
-                                self.floating_project_open = !self.floating_project_open;
-                            } else {
-                                self.floating_properties_open = !proj_active;
-                                self.floating_right_tab = ParametricFloatingTab::Project;
-                            }
+                            self.floating_project_open = !self.floating_project_open;
                         }
 
-                        let prop_active = self.floating_properties_open
-                            && (avail_w >= 960.0
-                                || self.floating_right_tab != ParametricFloatingTab::Project);
                         if icons::icon_button(
                             ui,
                             AppIcon::SlidersPanel,
                             "Properties",
                             10.5,
-                            if prop_active { Color32::WHITE } else { theme.text_secondary },
-                            if prop_active { theme.accent_green } else { theme.bg_card },
+                            if self.floating_properties_open { Color32::WHITE } else { theme.text_secondary },
+                            if self.floating_properties_open { theme.accent_green } else { theme.bg_card },
                             Stroke::NONE,
                             CornerRadius::same(6),
                             Vec2::new(0.0, 26.0),
                         )
-                        .on_hover_text("Show or hide floating Properties, Driving Parameters & Canvas Inspector inside canvas")
+                        .on_hover_text("Toggle docked Properties, Driving Parameters & Canvas Sync inside top toolbar")
                         .clicked()
                         {
-                            if avail_w < 960.0
-                                && self.floating_properties_open
-                                && self.floating_right_tab == ParametricFloatingTab::Project
-                            {
-                                self.floating_right_tab = ParametricFloatingTab::Properties;
-                            } else {
-                                self.floating_properties_open = !self.floating_properties_open;
-                                if self.floating_right_tab == ParametricFloatingTab::Project
-                                    && avail_w < 960.0
-                                {
-                                    self.floating_right_tab = ParametricFloatingTab::Properties;
-                                }
-                            }
+                            self.floating_properties_open = !self.floating_properties_open;
                         }
 
                         if icons::icon_button(
                             ui,
                             AppIcon::Cpu,
-                            "CLI",
+                            "CLI Log",
                             10.5,
                             if self.show_cli_float { Color32::WHITE } else { theme.text_secondary },
                             if self.show_cli_float { theme.accent_blue.gamma_multiply(0.85) } else { theme.bg_card },
@@ -278,7 +254,7 @@ impl ParametricView {
                             CornerRadius::same(6),
                             Vec2::new(0.0, 26.0),
                         )
-                        .on_hover_text("Show or hide floating Command Line input inside canvas")
+                        .on_hover_text("Expand or collapse CAD Command Line history inside top toolbar")
                         .clicked()
                         {
                             self.show_cli_float = !self.show_cli_float;
@@ -326,7 +302,7 @@ impl ParametricView {
                                 &self.bim_bus.project,
                                 members,
                                 &self.variables,
-                                workspace_settings,
+                                workspace_settings.clone(),
                             );
                             self.save_notification = universal_canvas.status_message.clone();
                         }
@@ -572,6 +548,117 @@ impl ParametricView {
                             });
                         });
                     }
+
+                    // Row 2B: Organized Levels Quick Bar + Inline CAD Command Line inside Top Toolbar
+                    ui.add_space(4.0);
+                    ui.horizontal_wrapped(|ui| {
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Layers,
+                            12.0,
+                            theme.accent_blue,
+                            "Level:",
+                            10.5,
+                            theme.text_secondary,
+                            true,
+                        );
+                        let active_lvl_text = self
+                            .bim_bus
+                            .project
+                            .levels
+                            .get(self.active_level_idx)
+                            .map(|l| format!("{} ({:+.1} m)", l.name, l.elevation_mm * 1e-3))
+                            .unwrap_or_else(|| "Level 1 (+0.0 m)".to_string());
+                        egui::ComboBox::from_id_salt("param_top_level_combo")
+                            .selected_text(RichText::new(active_lvl_text).size(10.5).color(theme.text_primary))
+                            .show_ui(ui, |ui| {
+                                for (idx, lvl) in self.bim_bus.project.levels.iter().enumerate() {
+                                    let label = format!("{} ({:+.1} m)", lvl.name, lvl.elevation_mm * 1e-3);
+                                    if ui.selectable_label(self.active_level_idx == idx, label).clicked() {
+                                        self.active_level_idx = idx;
+                                    }
+                                }
+                            });
+                        if ui
+                            .add(
+                                egui::Button::new(RichText::new("+ Lvl").size(10.0).color(theme.accent_green))
+                                    .fill(theme.bg_card)
+                                    .corner_radius(CornerRadius::same(5))
+                                    .min_size(Vec2::new(0.0, 22.0)),
+                            )
+                            .on_hover_text("Add a new storey level (+3.5 m)")
+                            .clicked()
+                        {
+                            let next_num = self.bim_bus.project.levels.len() + 1;
+                            let next_elev = self
+                                .bim_bus
+                                .project
+                                .levels
+                                .last()
+                                .map(|l| l.elevation_mm + 3500.0)
+                                .unwrap_or(0.0);
+                            let _ = self.bim_bus.execute(BimCommand::AddLevel {
+                                name: format!("Level {}", next_num),
+                                elevation_mm: next_elev,
+                            });
+                            self.active_level_idx = self.bim_bus.project.levels.len().saturating_sub(1);
+                            self.refresh_live_ari();
+                        }
+
+                        ui.separator();
+
+                        icons::icon_label(
+                            ui,
+                            AppIcon::Cpu,
+                            12.0,
+                            theme.accent_blue,
+                            "CAD Cmd:",
+                            10.5,
+                            theme.accent_blue,
+                            true,
+                        );
+                        let cli_resp = ui.add(
+                            egui::TextEdit::singleline(&mut self.command_line_input)
+                                .desired_width(210.0)
+                                .hint_text("WA, BM, CL, DR, WN, RM, RF, UNDO..."),
+                        );
+                        if ((cli_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))
+                            || ui
+                                .add(
+                                    egui::Button::new(RichText::new("Run").size(10.5).color(Color32::WHITE))
+                                        .fill(theme.accent_blue)
+                                        .corner_radius(CornerRadius::same(5))
+                                        .min_size(Vec2::new(0.0, 22.0)),
+                                )
+                                .clicked())
+                            && !self.command_line_input.trim().is_empty()
+                        {
+                            let raw = self.command_line_input.trim().to_string();
+                            self.command_history.push(format!("Command: {raw}"));
+                            self.execute_cad_command(&raw);
+                            self.command_line_input.clear();
+                            cli_resp.request_focus();
+                        }
+                        if let Some(last_log) = self.command_history.last() {
+                            ui.label(
+                                RichText::new(last_log)
+                                    .size(10.0)
+                                    .color(theme.text_muted),
+                            );
+                        }
+                    });
+
+                    // Row 3: Expandable Top-Toolbar Docked Inspectors (Project/Levels, Properties/Variables/Canvas, CLI Log)
+                    self.render_top_toolbar_inspector_dock(
+                        ui,
+                        theme,
+                        db_components,
+                        active_pillar,
+                        features,
+                        universal_canvas,
+                        members,
+                        workspace_settings,
+                    );
                 });
             });
     }

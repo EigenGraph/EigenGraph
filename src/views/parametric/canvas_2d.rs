@@ -8,25 +8,17 @@ impl ParametricView {
         &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
-        db_components: &mut Vec<DatabaseComponent>,
-        active_pillar: &mut NavigationPillar,
+        _db_components: &mut Vec<DatabaseComponent>,
+        _active_pillar: &mut NavigationPillar,
         features: &mut FeatureRegistry,
         universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
-        members: &[crate::models::StructuralMember],
-        workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
+        _members: &[crate::models::StructuralMember],
+        _workspace_settings: crate::views::universal_canvas::WorkspaceCanvasSettings,
     ) {
         ui_kit::set_canvas_frozen(ui.ctx(), universal_canvas.is_frozen);
 
         let avail_w = ui.available_width().max(260.0);
         let canvas_h = universal_canvas.preferred_canvas_height(ui.ctx());
-        let is_wide = avail_w >= 960.0;
-        let has_floating_room = avail_w >= 720.0;
-        let is_painter_mode = matches!(
-            self.view_mode,
-            DraftingViewMode::FloorPlanViewRange
-                | DraftingViewMode::LiveSectionCutPoche
-                | DraftingViewMode::SheetLayoutA101
-        );
         self.last_floating_rects.clear();
 
         if self.view_mode == DraftingViewMode::VisualNodeGraphDynamo {
@@ -58,63 +50,7 @@ impl ParametricView {
                 UniversalCanvasState::canvas_bg(theme),
             );
 
-            // Compute non-overlapping floating panel bounds inside canvas (desktop & tablet >= 720px)
-            let floating_props_rect = if self.floating_properties_open && has_floating_room {
-                let w = (avail_w * 0.27).clamp(248.0, 296.0);
-                let h = (rect.height() - 26.0).max(200.0);
-                let r = Rect::from_min_size(
-                    Pos2::new(rect.right() - w - 12.0, rect.top() + 12.0),
-                    Vec2::new(w, h),
-                );
-                self.last_floating_rects.push(r);
-                Some(r)
-            } else {
-                None
-            };
-
-            let floating_project_rect =
-                if self.floating_project_open && is_wide {
-                    let w = 238.0_f32.min((avail_w * 0.24).max(200.0));
-                    let bottom_clearance = if universal_canvas.is_frozen { 46.0 } else { 14.0 };
-                    let h = (rect.height() - 36.0 - bottom_clearance).max(160.0);
-                    let r = Rect::from_min_size(
-                        Pos2::new(rect.left() + 12.0, rect.top() + 36.0),
-                        Vec2::new(w, h),
-                    );
-                    self.last_floating_rects.push(r);
-                    Some(r)
-                } else {
-                    None
-                };
-
-            let floating_cli_rect = if self.show_cli_float && has_floating_room {
-                let cli_left = floating_project_rect
-                    .map(|pr| pr.right() + 12.0)
-                    .unwrap_or(rect.left() + 12.0);
-                let cli_right_limit = floating_props_rect
-                    .map(|pr| pr.left() - 12.0)
-                    .unwrap_or(rect.right() - 12.0);
-                let cli_w = (cli_right_limit - cli_left).min(480.0);
-                if cli_w >= 210.0 {
-                    let cli_h = 104.0_f32.min((rect.height() * 0.28).max(88.0));
-                    let r = Rect::from_min_size(
-                        Pos2::new(cli_left, rect.bottom() - cli_h - 12.0),
-                        Vec2::new(cli_w, cli_h),
-                    );
-                    self.last_floating_rects.push(r);
-                    Some(r)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            let pointer_in_floating = ui
-                .ctx()
-                .input(|i| i.pointer.hover_pos().or(i.pointer.interact_pos()))
-                .is_some_and(|p| self.last_floating_rects.iter().any(|r| r.contains(p)));
-
+            let pointer_in_floating = false;
             let is_frozen_now =
                 universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx());
 
@@ -171,41 +107,7 @@ impl ParametricView {
             }
 
             if universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx()) {
-                let bottom_offset = if floating_cli_rect.is_some() && floating_project_rect.is_none()
-                {
-                    124.0
-                } else {
-                    14.0
-                };
-                UniversalCanvasState::paint_frozen_badge(&painter, rect, theme, bottom_offset);
-            }
-
-            // Render Floating In-Canvas HUD Overlays
-            if let Some(proj_rect) = floating_project_rect {
-                ui.scope_builder(egui::UiBuilder::new().max_rect(proj_rect), |ui| {
-                    self.render_floating_project_card(ui, theme, db_components, true);
-                });
-            }
-            if let Some(props_rect) = floating_props_rect {
-                ui.scope_builder(egui::UiBuilder::new().max_rect(props_rect), |ui| {
-                    self.render_floating_properties_card(
-                        ui,
-                        theme,
-                        db_components,
-                        active_pillar,
-                        features,
-                        universal_canvas,
-                        members,
-                        workspace_settings.clone(),
-                        avail_w,
-                        true,
-                    );
-                });
-            }
-            if let Some(cli_rect) = floating_cli_rect {
-                ui.scope_builder(egui::UiBuilder::new().max_rect(cli_rect), |ui| {
-                    self.render_floating_cli_card(ui, theme, true);
-                });
+                UniversalCanvasState::paint_frozen_badge(&painter, rect, theme, 14.0);
             }
         }
 
@@ -273,25 +175,6 @@ impl ParametricView {
                     );
                 });
             });
-
-        // Stacked Drawers on Narrow Screens (< 720px) or Non-Painter Tabs (Dynamo / Rebar / Elevations)
-        if !has_floating_room || !is_painter_mode {
-            Frame::new()
-                .inner_margin(Margin::symmetric(10, 8))
-                .show(ui, |ui| {
-                    self.render_stacked_drawers_mobile(
-                        ui,
-                        theme,
-                        db_components,
-                        active_pillar,
-                        features,
-                        universal_canvas,
-                        members,
-                        workspace_settings,
-                        avail_w,
-                    );
-                });
-        }
     }
 
     pub(super) fn draw_interactive_floor_plan(

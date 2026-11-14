@@ -266,7 +266,7 @@ impl Default for UniversalCanvasState {
             show_domain_overlay: true,
             sync_all_layers: true,
             inspector_open: false,
-            canvas_height_ratio: 0.74,
+            canvas_height_ratio: 0.82,
             callout_draft: "Note".to_string(),
             entities: Vec::new(),
             next_entity_id: 1,
@@ -303,7 +303,7 @@ impl UniversalCanvasState {
     pub fn preferred_canvas_height(&self, ctx: &egui::Context) -> f32 {
         let vp = MacTheme::viewport_size(ctx);
         let is_mobile = vp.x < MacTheme::MOBILE_BREAKPOINT;
-        (vp.y * self.canvas_height_ratio).clamp(if is_mobile { 340.0 } else { 440.0 }, 780.0)
+        (vp.y * self.canvas_height_ratio).clamp(if is_mobile { 380.0 } else { 540.0 }, 960.0)
     }
 
     /// Frosted translucent floating HUD overlay frame (matches Universal Canvas inspector).
@@ -608,7 +608,7 @@ impl UniversalCanvasState {
         self.canvas_height_ratio = archive
             .workspace_settings
             .canvas_height_ratio
-            .clamp(0.45, 0.90);
+            .clamp(0.45, 1.15);
         self.show_grid = archive.workspace_settings.show_grid;
         self.snap_to_grid = archive.workspace_settings.snap_to_grid;
         self.grid_spacing_mm = archive.workspace_settings.grid_spacing_mm.max(100.0);
@@ -2339,7 +2339,7 @@ impl UniversalCanvasState {
 
         ui.horizontal(|ui| {
             ui.label(RichText::new("Canvas H:").size(11.0).color(theme.text_secondary));
-            ui.add(egui::Slider::new(&mut self.canvas_height_ratio, 0.45..=0.88));
+            ui.add(egui::Slider::new(&mut self.canvas_height_ratio, 0.45..=1.15));
         });
 
         ui.add_space(6.0);

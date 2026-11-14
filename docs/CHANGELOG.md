@@ -7,6 +7,27 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.6] - 2026-11-14 — Phase 36: Personal Vault Onboarding, Web FS/IndexedDB Bridge, Top-Toolbar Inspectors & Geometry 3D Earth Map
+
+### Added & Changed
+- **Startup Personal Vault Onboarding Pop-Up (`src/app.rs`, `src/core/vault.rs`, `src/core/web_bridge.rs`, `index.html`)**:
+  - Displayed a modal prompt on launch whenever no personal Vault is connected (`!vault_config.has_connected_vault() && !vault_config.guest_explore_mode`) with three clear choices: **Connect Existing Vault**, **Create New Vault**, and **Explore Workspace First (Guest Mode)**.
+  - Added browser persistence in `index.html` (`window.EigenGraphVaultBridge`) and `src/core/web_bridge.rs` (`wasm_bindgen`) combining the HTML5 **File System Access API** (`showDirectoryPicker`, `readwrite` handles persisted in IndexedDB) with an automatic **IndexedDB** virtual Vault fallback for Safari/Firefox/restricted contexts, plus live project index scanning (`Projects/`, `.eigen`, `.json`) and synchronous `localStorage` snapshot caching.
+  - Added native desktop folder-picker support (`pick_folder_native` via macOS/Linux/Windows OS dialogs) and clean Vault lifecycle methods (`connect_existing_vault`, `create_new_vault`, `disconnect_vault`, `enter_guest_explore_mode`, `list_personal_vault_projects`, `load_personal_vault_project_model`).
+- **Settings-Consolidated Vault Management & Focused `My Library` (`src/views/settings.rs`, `src/views/my_project.rs`)**:
+  - Consolidated all Vault path configuration, Browse Folder, Connect Existing, Create New Vault, Browser Local Folder / IndexedDB connection controls, and Disconnect actions inside **Settings → Workspace & Units** (`render_vault_settings_card`), widening the workspace canvas height slider to `0.45..=1.15` (`0.82` default).
+  - Refocused `My Library` to display Vault connection status (with one-click link to Settings) and index/open/save `.eigen` / `.eigen.json` projects stored inside the connected personal Vault.
+- **Sidebar Cleanup (`src/app.rs`)**:
+  - Removed numeric feature count badges (`{active}/{total}`) from sidebar navigation module rows for a cleaner engineering workspace.
+- **Parametric & Geometry Top-Toolbar Dockable Inspectors & Taller Canvas (`src/views/parametric/`, `src/views/build/`, `src/views/universal_canvas.rs`)**:
+  - Removed floating HUD overlays from inside the Parametric 2D and Geometry 3D canvases and organized **Levels** (`+ Lvl`), **Properties**, **Project Browser**, **CAD / BIM Command Line**, **Scale**, **Detail (LOD)**, visual toggles, and **Data Deck** neatly inside multi-row collapsible Top Toolbars inside each canvas container.
+  - Raised `UniversalCanvasState` default `canvas_height_ratio` to `0.82` (`380px/540px .. 960px` clamp) for generous drawing space under richer top toolbars.
+- **Geometry 3D Earth World Map Fix (`src/views/build/viewport_3d.rs`, `src/core/gis/map_widget.rs`)**:
+  - Fixed 3D camera depth sign (`depth = -(dy * sin_p + z1 * cos_p)`) and added near-plane frustum clipping (`near_clip_cam_poly`, `near_clip_segment`, `near_clip_uv_poly`) so horizon sky, ocean fills, ear-clipped vector `WORLD_LANDMASSES` continents & coastlines across `[-360°, 0°, +360°]`, 3D lat/lon graticules, and `4x4`-subdivided live Web Mercator raster tiles (`TileGeoQuad`) render directly on the `y = 0.0` ground plane in both `Top` plan and 3D oblique/perspective views with coupled globe pan and scroll-wheel zoom.
+- **Version Bump**: Incremented crate version sequentially from `0.3.5` to `0.3.6` in `Cargo.toml`, `README.md`, `src/views/settings.rs`, and `docs/CHANGELOG.md`.
+
+---
+
 ## [v0.3.5] - 2026-11-14 — Phase 35: Default-Frozen World Map Ground Canvas & Zero-Demo Blank Workspace
 
 ### Added & Changed
