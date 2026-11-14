@@ -12,8 +12,15 @@
   <script>
     (function () {
       const STORAGE_KEY = "eigengraph_vault_state_v1";
+      const AUTOSAVE_KEY = "eigengraph_workspace_autosave_v1";
       const DB_NAME = "EigenGraphVaultDB";
       const DB_VERSION = 1;
+      let cachedAutosaveJson = "";
+      try {
+        cachedAutosaveJson = window.localStorage.getItem(AUTOSAVE_KEY) || "";
+      } catch (_) {}
+      let pendingPickedFileJson = "";
+      let activeFileInput = null;
       const VAULT_FOLDERS = [
         "Projects", "ParametricLibrary", "Columns", "Beams", "Slabs",
         "Walls", "Footings", "Rebar", "Materials", "Hydraulic_Structures",
@@ -148,15 +155,33 @@
         let memberCount = 0;
         try {
           const parsed = JSON.parse(content);
-          const model = parsed && parsed.model ? parsed.model : parsed;
-          if (model && typeof model === "object") {
-            if (typeof model.name === "string" && model.name.trim()) displayName = model.name.trim();
-            if (Array.isArray(model.nodes)) nodeCount = model.nodes.length;
-            else if (model.nodes && typeof model.nodes === "object") nodeCount = Object.keys(model.nodes).length;
-            if (Array.isArray(model.elements)) memberCount = model.elements.length;
-            else if (Array.isArray(model.members)) memberCount = model.members.length;
-            else if (model.elements && typeof model.elements === "object") memberCount = Object.keys(model.elements).length;
-            else if (model.members && typeof model.members === "object") memberCount = Object.keys(model.members).length;
+          if (parsed && typeof parsed === "object" && (parsed.bim_project || typeof parsed.project_name === "string")) {
+            if (typeof parsed.project_name === "string" && parsed.project_name.trim()) {
+              displayName = parsed.project_name.trim();
+            }
+            const bim = parsed.bim_project || {};
+            const walls = Array.isArray(bim.walls) ? bim.walls.length : 0;
+            const cols = Array.isArray(bim.columns) ? bim.columns.length : 0;
+            const runs = Array.isArray(bim.runs) ? bim.runs.length : 0;
+            const slabs = Array.isArray(bim.slabs) ? bim.slabs.length : 0;
+            const footings = Array.isArray(bim.footings) ? bim.footings.length : 0;
+            const levels = Array.isArray(bim.levels) ? bim.levels.length : 0;
+            const grids = Array.isArray(bim.grid_lines) ? bim.grid_lines.length : 0;
+            const extMembers = Array.isArray(parsed.members) ? parsed.members.length : 0;
+            const canvasEnts = Array.isArray(parsed.canvas_entities) ? parsed.canvas_entities.length : 0;
+            nodeCount = levels + grids + canvasEnts;
+            memberCount = walls + cols + runs + slabs + footings + extMembers;
+          } else {
+            const model = parsed && parsed.model ? parsed.model : parsed;
+            if (model && typeof model === "object") {
+              if (typeof model.name === "string" && model.name.trim()) displayName = model.name.trim();
+              if (Array.isArray(model.nodes)) nodeCount = model.nodes.length;
+              else if (model.nodes && typeof model.nodes === "object") nodeCount = Object.keys(model.nodes).length;
+              if (Array.isArray(model.elements)) memberCount = model.elements.length;
+              else if (Array.isArray(model.members)) memberCount = model.members.length;
+              else if (model.elements && typeof model.elements === "object") memberCount = Object.keys(model.elements).length;
+              else if (model.members && typeof model.members === "object") memberCount = Object.keys(model.members).length;
+            }
           }
         } catch (_) {}
 
@@ -402,6 +427,14 @@
 
       async function hydrateOnStartup() {
         try {
+          const autosaveRec = await idbGet("meta", "workspace_autosave");
+          if (autosaveRec && typeof autosaveRec.json === "string" && autosaveRec.json.length > 0) {
+            cachedAutosaveJson = autosaveRec.json;
+            try { window.localStorage.setItem(AUTOSAVE_KEY, autosaveRec.json); } catch (_) {}
+            persistSnapshot();
+          }
+        } catch (_) {}
+        try {
           const meta = await idbGet("meta", "vault_meta");
           if (meta && meta.connected) {
             if (meta.backend === "fs_access") {
@@ -476,8 +509,72 @@
           rebuildProjectsFromCache();
           persistSnapshot();
           void idbDelete("files", norm).catch(() => {});
+        },
+        saveAutosaveArchive: (json) => {
+          const str = String(json || "");
+          cachedAutosaveJson = str;
+          try { window.localStorage.setItem(AUTOSAVE_KEY, str); } catch (_) {}
+          void idbPut("meta", { json: str, updated_at: Date.now() }, "workspace_autosave").catch(() => {});
+        },
+        loadAutosaveArchive: () => cachedAutosaveJson || "",
+        openFilePicker: (accept) => {
+          if (!activeFileInput) {
+            activeFileInput = document.createElement("input");
+            activeFileInput.type = "file";
+            activeFileInput.style.display = "none";
+            document.body.appendChild(activeFileInput);
+            activeFileInput.addEventListener("change", async () => {
+              try {
+                const file = activeFileInput.files && activeFileInput.files[0];
+                if (!file) return;
+                if (file.size <= 32 * 1024 * 1024) {
+                  const text = await file.text();
+                  pendingPickedFileJson = JSON.stringify({ filename: file.name, content: text });
+                  state.status_msg = `Imported '${file.name}' (${Math.round(file.size / 1024)} KB).`;
+                  persistSnapshot();
+                } else {
+                  state.error_msg = `File '${file.name}' exceeds 32 MB import limit.`;
+                  persistSnapshot();
+                }
+              } catch (err) {
+                state.error_msg = (err && err.message) ? err.message : String(err);
+                persistSnapshot();
+              } finally {
+                activeFileInput.value = "";
+              }
+            });
+          }
+          activeFileInput.accept = accept || ".ifc,.eigen,.json,.csv,.xyz,.e2k";
+          activeFileInput.click();
+        },
+        pollPickedFileJson: () => {
+          const out = pendingPickedFileJson;
+          pendingPickedFileJson = "";
+          return out || "";
         }
       };
+
+      window.addEventListener("dragover", (e) => {
+        if (e && e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
+          e.preventDefault();
+        }
+      });
+      window.addEventListener("drop", async (e) => {
+        if (!e || !e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+        e.preventDefault();
+        try {
+          const file = e.dataTransfer.files[0];
+          if (file && file.size <= 32 * 1024 * 1024) {
+            const text = await file.text();
+            pendingPickedFileJson = JSON.stringify({ filename: file.name, content: text });
+            state.status_msg = `Dropped '${file.name}' (${Math.round(file.size / 1024)} KB).`;
+            persistSnapshot();
+          }
+        } catch (err) {
+          state.error_msg = (err && err.message) ? err.message : String(err);
+          persistSnapshot();
+        }
+      });
 
       void hydrateOnStartup();
     })();

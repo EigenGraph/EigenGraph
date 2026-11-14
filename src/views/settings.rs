@@ -1542,7 +1542,7 @@ impl SettingsView {
                 ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
                 ui.label(
                     RichText::new(format!(
-                        "v{} — Phase 36 Personal Vault Bridge, Docked CAD Toolbars & 3D World Ground",
+                        "v{} — Phase 37 Complete 1-File Vault Archives, 3D Earth Authoring, Live BIM Sync & File Drop",
                         env!("CARGO_PKG_VERSION")
                     ))
                     .size(13.0)

@@ -210,19 +210,34 @@ impl AnalyzeView {
             ui_kit::responsive_grid_n(ui, 4, 190.0, |ui, idx| match idx {
                 0 => {
                     ui.label(RichText::new("Analytical Source Bus").size(10.5).strong().color(theme.text_muted));
-                    let _ = ui.selectable_label(true, "Active BimProject (3D Frame + Shells)");
+                    ui.label(
+                        RichText::new(format!(
+                            "Active BimProject ({} analytical members synced)",
+                            self.synced_bim_element_count
+                        ))
+                        .size(10.5)
+                        .color(theme.text_primary),
+                    );
                 }
                 1 => {
                     ui.label(RichText::new("Mesh & Diaphragm Coupling").size(10.5).strong().color(theme.text_muted));
-                    let _ = ui.selectable_label(false, "Auto Rigid Diaphragm + 0.5m Mesh");
+                    ui.label(
+                        RichText::new("Auto Rigid Diaphragm + Nodal Connectivity")
+                            .size(10.5)
+                            .color(theme.text_secondary),
+                    );
                 }
                 2 => {
-                    ui.label(RichText::new("1D GIS Seismic Coupling").size(10.5).strong().color(theme.text_muted));
-                    let _ = ui.selectable_label(false, "Live pusGen Ss/S1 -> SNI 1726");
+                    ui.label(RichText::new("Sync Status").size(10.5).strong().color(theme.text_muted));
+                    ui.label(
+                        RichText::new(&self.last_bim_sync_label)
+                            .size(10.5)
+                            .color(theme.accent_green),
+                    );
                 }
                 _ => {
                     ui.label(RichText::new("Reactive Solver Trigger").size(10.5).strong().color(theme.text_muted));
-                    let _ = icons::icon_button(
+                    if icons::icon_button(
                         ui,
                         AppIcon::Bolt,
                         "Compile & Solve Live BIM -> FEM",
@@ -232,7 +247,11 @@ impl AnalyzeView {
                         Stroke::NONE,
                         CornerRadius::same(6),
                         Vec2::ZERO,
-                    );
+                    )
+                    .clicked()
+                    {
+                        self.request_bim_fem_sync = true;
+                    }
                 }
             });
         });

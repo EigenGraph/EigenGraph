@@ -530,21 +530,37 @@ impl InternalVault {
                     let mut node_count = 0usize;
                     let mut member_count = 0usize;
 
-                    if let Ok(model) = EigenProjectArchive::deserialize_from_eigen_json(&raw) {
-                        if !model.name.trim().is_empty() {
-                            display_name = model.name.clone();
-                        }
-                        node_count = model.nodes.len();
-                        member_count = model.elements.len();
-                    } else if let Ok(model) = serde_json::from_str::<StructuralModel>(&raw) {
-                        if !model.name.trim().is_empty() {
-                            display_name = model.name.clone();
-                        }
-                        node_count = model.nodes.len();
-                        member_count = model.elements.len();
-                    } else if is_json && fname != "active_live_project.json" {
-                        // Try lightweight JSON inspection for BIM project snapshots
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw) {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw) {
+                        if let Some(bim) = val.get("bim_project") {
+                            if let Some(pname) = val.get("project_name").and_then(|v| v.as_str()) {
+                                if !pname.trim().is_empty() {
+                                    display_name = pname.trim().to_string();
+                                }
+                            }
+                            let walls = bim.get("walls").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            let cols = bim.get("columns").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            let runs = bim.get("runs").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            let slabs = bim.get("slabs").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            let footings = bim.get("footings").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            let levels = bim.get("levels").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            let grids = bim.get("grid_lines").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            let members_len = val.get("members").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            let canvas_len = val.get("canvas_entities").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                            node_count = levels + grids + canvas_len;
+                            member_count = walls + cols + runs + slabs + footings + members_len;
+                        } else if let Ok(model) = EigenProjectArchive::deserialize_from_eigen_json(&raw) {
+                            if !model.name.trim().is_empty() {
+                                display_name = model.name.clone();
+                            }
+                            node_count = model.nodes.len();
+                            member_count = model.elements.len();
+                        } else if let Ok(model) = serde_json::from_str::<StructuralModel>(&raw) {
+                            if !model.name.trim().is_empty() {
+                                display_name = model.name.clone();
+                            }
+                            node_count = model.nodes.len();
+                            member_count = model.elements.len();
+                        } else if is_json && fname != "active_live_project.json" {
                             if let Some(pname) = val.get("project_name").and_then(|v| v.as_str()) {
                                 if !pname.trim().is_empty() {
                                     display_name = pname.to_string();
@@ -597,6 +613,84 @@ impl InternalVault {
         }
         serde_json::from_str::<StructuralModel>(&raw)
             .map_err(|e| format!("Failed to parse project model '{}': {}", entry.filename, e))
+    }
+
+    /// Reads the raw serialized archive string for a personal Vault project entry.
+    pub fn load_personal_vault_raw(entry: &PersonalVaultProjectEntry) -> Result<String, String> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::core::web_bridge::vault_read_file(&entry.rel_path)
+                .ok_or_else(|| format!("Project file '{}' not found in Web Vault cache.", entry.rel_path))
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            std::fs::read_to_string(&entry.abs_path)
+                .map_err(|e| format!("Failed to read {}: {}", entry.abs_path, e))
+        }
+    }
+
+    /// Saves a full serialized workspace JSON string (`UnifiedWorkspaceArchive`) into `Projects/`.
+    pub fn save_project_archive_json(filename: &str, json: &str) -> Result<String, String> {
+        let dir = Self::projects_dir();
+        let target = dir.join(filename);
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::core::web_bridge::vault_write_file(&format!("Projects/{filename}"), json);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = std::fs::create_dir_all(&dir);
+            if let Some(parent) = target.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            std::fs::write(&target, json)
+                .map_err(|e| format!("Write failed to {}: {}", target.display(), e))?;
+        }
+
+        let mut mem = Self::load_knowledge_memory();
+        mem.total_autosaves_count += 1;
+        let _ = Self::save_knowledge_memory(&mem);
+
+        Ok(target.display().to_string())
+    }
+
+    /// Persists reactive background workspace snapshot into IndexedDB (wasm32) or connected Vault KnowledgeBase.
+    pub fn autosave_workspace_json(json: &str) -> Result<(), String> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::core::web_bridge::workspace_autosave_save(json);
+            return Ok(());
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if Self::has_connected_vault() {
+                let kdir = Self::knowledge_dir();
+                let _ = std::fs::create_dir_all(&kdir);
+                std::fs::write(kdir.join(".workspace_autosave.eigen"), json)
+                    .map_err(|e| e.to_string())?;
+            }
+            Ok(())
+        }
+    }
+
+    /// Loads reactive background workspace snapshot on startup if available.
+    pub fn load_autosaved_workspace_json() -> Option<String> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::core::web_bridge::workspace_autosave_load()
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if Self::has_connected_vault() {
+                let path = Self::knowledge_dir().join(".workspace_autosave.eigen");
+                if let Ok(raw) = std::fs::read_to_string(path) {
+                    if !raw.trim().is_empty() {
+                        return Some(raw);
+                    }
+                }
+            }
+            None
+        }
     }
 
     /// Default vault location in the user's official Documents folder.
@@ -1908,6 +2002,58 @@ mod tests {
         assert!(!InternalVault::has_connected_vault());
         assert!(InternalVault::list_personal_vault_projects().is_empty());
 
+        let _ = std::fs::remove_file(InternalVault::config_path());
+        let _ = std::fs::remove_dir_all(&temp_vault);
+    }
+
+    #[test]
+    fn test_unified_project_save_and_raw_load_isolated_in_temp_dir() {
+        let _guard = TEST_VAULT_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        InternalVault::reset_runtime_vault_dir();
+
+        let temp_vault = std::env::temp_dir().join("EigenGraph_Test_Unified_Save");
+        let _ = std::fs::remove_dir_all(&temp_vault);
+
+        InternalVault::create_new_vault(temp_vault.clone(), Some("Unified_Test_Vault".to_string()), false)
+            .expect("Temp unified vault creation should succeed");
+
+        let archive_json = serde_json::json!({
+            "format_version": "1.0",
+            "engine_version": "0.3.7",
+            "project_name": "Palu_Hospital_Archive",
+            "bim_project": {
+                "walls": [{"id": "W1"}],
+                "columns": [{"id": "C1"}, {"id": "C2"}],
+                "runs": [],
+                "slabs": [],
+                "footings": [],
+                "levels": [{"id": "L1"}],
+                "grid_lines": [{"id": "G1"}]
+            },
+            "members": [{"id": 1}],
+            "canvas_entities": [{"id": 1}, {"id": 2}]
+        })
+        .to_string();
+
+        InternalVault::save_project_archive_json("Palu_Hospital_Archive.eigen", &archive_json)
+            .expect("Saving unified archive json should succeed");
+
+        let listed = InternalVault::list_personal_vault_projects();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].name, "Palu_Hospital_Archive");
+        assert_eq!(listed[0].member_count, 4); // 1 wall + 2 cols + 1 member
+        assert_eq!(listed[0].node_count, 4); // 1 level + 1 grid + 2 canvas entities
+
+        let raw_back = InternalVault::load_personal_vault_raw(&listed[0])
+            .expect("Raw archive load should succeed");
+        assert!(raw_back.contains("Palu_Hospital_Archive"));
+
+        let _ = InternalVault::autosave_workspace_json(&archive_json);
+        let restored = InternalVault::load_autosaved_workspace_json()
+            .expect("Autosave should restore inside connected temp vault");
+        assert!(restored.contains("Palu_Hospital_Archive"));
+
+        InternalVault::disconnect_vault().expect("Disconnect should succeed");
         let _ = std::fs::remove_file(InternalVault::config_path());
         let _ = std::fs::remove_dir_all(&temp_vault);
     }

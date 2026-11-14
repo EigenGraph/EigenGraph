@@ -7,6 +7,28 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.7] - 2026-11-14 — Phase 37: Full 1-File Workspace Save/Load, 3D Earth BIM Authoring, Reactive BIM-to-FEM & Clash Sync, Browser File Drop & Text-to-BIM
+
+### Added & Changed
+- **Full 1-File Workspace Archive & Auto-Save Sync (`LIB-03`: `index.html`, `src/core/web_bridge.rs`, `src/core/vault.rs`, `src/views/my_project.rs`, `src/app.rs`)**:
+  - Upgraded Personal Vault save/load in `My Library` to store and restore complete `UnifiedWorkspaceArchive` `.eigen` files (all 15-module `UniversalCanvasState` drawings, `BimProject`, `StructuralMember[]`, `ParametricVariable[]`, Earth map origin/camera/zoom, and `WorkspaceCanvasSettings`) via File System Access API, IndexedDB, and native files.
+  - Added browser IndexedDB + localStorage + native disk auto-save hydration and throttled background snapshot persistence (`autosave_workspace_json`, `load_autosaved_workspace_json`).
+- **Interactive 3D Earth Ground BIM Authoring, Location Search & WGS84 Measurement (`1D-04`, `2D-04`: `src/core/gis/map_widget.rs`, `src/views/universal_canvas.rs`, `src/views/parametric/canvas_2d.rs`, `src/views/build/mod.rs`, `src/views/build/viewport_3d.rs`, `src/views/research.rs`)**:
+  - Added `Ground3DAuthorTool` (`Orbit`, `+Col`, `+Wall`, `+Beam`, `+Foot`) inside `Geometry` with active datum plane raycasting, magnetic 450mm structural node / 500mm grid snapping, cyan targeting reticle, and orange 2-click rubber-band preview.
+  - Added offline global city / `"lat, lon"` location search and geodesic Distance (`m`/`km`) & Area (`m^2`/`ha`) measurement tools across Universal Canvas, Parametric 2D, and Geometry 3D Earth viewports.
+  - Synchronized Earth camera coordinates, zoom levels, and basemap tile sources bidirectionally between `Research` and all ground drawing canvases, plus `.csv`/`.xyz` survey point cloud TIN ingestion.
+- **Reactive BIM-to-FEM/ARI Sync & Real `Aabb3D` Spatial Clash Engine (`SIM-05`, `3D-04`: `src/core/csg.rs`, `src/views/build/clash_bcf.rs`, `src/views/analyze/header.rs`, `src/views/analyze/mod.rs`)**:
+  - Wired automatic bidirectional 2D `<->` 3D `BimProject` synchronization and live `BimProject -> StructuralMember[]` + `AriEngine::evaluate_redundancy` updates alongside the `Compile & Solve Live BIM -> FEM` trigger in `Analysis`.
+  - Replaced clash placeholder actions with real 3D bounding-box interference computation (`Aabb3D::overlap_with_tolerance`) across active walls, columns, beams, MEP runs, and footings, mapped accurately to 3D wireframe markers.
+- **Browser Local File Picker & Global Drag-and-Drop Importer (`10D-03`: `index.html`, `src/core/web_bridge.rs`, `src/views/industrialized/openbim_studio.rs`, `src/app.rs`)**:
+  - Added HTML5 file input & global `dragover`/`drop` listeners plus native OS file dialogs for importing `.ifc` OpenBIM models into OpenBIM Studio, `.eigen`/`.json` archives into the active workspace, and `.csv`/`.xyz` survey clouds into Research TIN.
+- **Text-to-BIM Command Synthesizer & Live Multi-Pillar QTO/LCA/DED Sync (`AI-03`, `4D-02`, `5D-02`, `6D-02`, `PUB-03`: `src/core/bim.rs`, `src/views/ai_assistant.rs`, `src/views/ai_firm.rs`, `src/views/planning.rs`, `src/views/sustainability.rs`, `src/views/results.rs`)**:
+  - Implemented deterministic `BimCommandBus::execute_natural_language` (`portal 3x2 @6m 2floors`, `box 8x6`, `grid 3x2 @5m`, `wall`, `col`, `beam`, `footing`, `level`, `rebar`, `clear`) wired into `BIM Cmd:`, Dynamic Island AI Copilot, and AI Firm.
+  - Connected `Time & Scheduling`, `Cost & Budgeting`, `Sustainability & Energy`, and `Report` drawing sheets directly to live active `BimProject` quantities, rebar BBS, A1-A5 CO2e footprints, and framing plan / schedule projections with zero synthetic demo fallbacks.
+- **Version Bump**: Incremented crate version sequentially from `0.3.6` to `0.3.7` in `Cargo.toml`, `README.md`, `src/views/settings.rs`, and `docs/CHANGELOG.md`.
+
+---
+
 ## [v0.3.6] - 2026-11-14 — Phase 36: Personal Vault Onboarding, Web FS/IndexedDB Bridge, Top-Toolbar Inspectors & Geometry 3D Earth Map
 
 ### Added & Changed

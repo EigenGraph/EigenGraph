@@ -240,6 +240,10 @@ pub struct UniversalCanvasState {
     pub world_map: crate::core::gis::SlippyMapState,
     pub ground_origin_lat_lon: (f64, f64),
     pub ground_origin_anchored: bool,
+    pub earth_search_query: String,
+    pub measure_active: bool,
+    pub measure_area_mode: bool,
+    pub measure_points_lat_lon: Vec<(f64, f64)>,
     last_canvas_rect: Option<Rect>,
     last_inspector_rect: Option<Rect>,
     pub status_message: Option<String>,
@@ -278,6 +282,10 @@ impl Default for UniversalCanvasState {
             world_map: crate::core::gis::SlippyMapState::default(),
             ground_origin_lat_lon: (0.0, 0.0),
             ground_origin_anchored: false,
+            earth_search_query: String::new(),
+            measure_active: false,
+            measure_area_mode: false,
+            measure_points_lat_lon: Vec::new(),
             last_canvas_rect: None,
             last_inspector_rect: None,
             status_message: None,
@@ -865,6 +873,10 @@ impl UniversalCanvasState {
                 }
                 self.paint_entities(&painter, rect, theme, active_pillar, &world_to_screen);
                 self.paint_live_preview(&painter, rect, theme, &world_to_screen);
+                let map_ref = &self.world_map;
+                self.render_geodetic_measure_overlay(&painter, rect, theme, &|lat, lon| {
+                    map_ref.lat_lon_to_screen(lat, lon, rect)
+                });
 
                 // Highlight geodetic site anchor when zoomed out on World Map
                 if self.world_map.zoom_level < 12.5
@@ -1243,6 +1255,108 @@ impl UniversalCanvasState {
                 center.0, center.1
             ));
         }
+
+        // Phase 37 (1D-04): Earth City / Geodetic Coordinate Search & Distance/Area Measurement
+        let search_resp = ui.add(
+            egui::TextEdit::singleline(&mut self.earth_search_query)
+                .hint_text("City or lat,lon...")
+                .desired_width(115.0),
+        );
+        let search_enter =
+            search_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+        let search_click = icons::icon_button(
+            ui,
+            AppIcon::Search,
+            "Go",
+            10.5,
+            theme.text_primary,
+            theme.bg_card,
+            Stroke::new(1.0, theme.border_subtle),
+            CornerRadius::same(6),
+            Vec2::new(0.0, btn_h),
+        )
+        .on_hover_text("Jump Earth map to a city (e.g. Jakarta, Tokyo, London) or 'lat, lon'")
+        .clicked();
+
+        if search_enter || search_click {
+            if let Some((label, lat, lon, zoom)) =
+                crate::core::gis::SlippyMapState::resolve_location_query(&self.earth_search_query)
+            {
+                self.world_map.zoom_to_ground_site(lat, lon, zoom);
+                self.ground_origin_lat_lon = (lat, lon);
+                self.ground_origin_anchored = true;
+                self.status_message = Some(format!(
+                    "Located '{}' -> {:.4}°, {:.4}° (Origin anchored)",
+                    label, lat, lon
+                ));
+            } else if !self.earth_search_query.trim().is_empty() {
+                self.status_message = Some(
+                    "Location not matched; enter 'lat, lon' (e.g. -6.2088, 106.8456) or city name."
+                        .to_string(),
+                );
+            }
+        }
+
+        if icons::icon_button(
+            ui,
+            AppIcon::DimensionRuler,
+            "Measure",
+            10.5,
+            if self.measure_active {
+                Color32::WHITE
+            } else {
+                theme.text_secondary
+            },
+            if self.measure_active {
+                theme.accent_orange
+            } else {
+                theme.bg_card
+            },
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(0.0, btn_h),
+        )
+        .on_hover_text("Click Earth surface points to measure geodesic distance (m/km) or parcel area (m²/ha)")
+        .clicked()
+        {
+            self.measure_active = !self.measure_active;
+        }
+
+        if self.measure_active || !self.measure_points_lat_lon.is_empty() {
+            let area_lbl = if self.measure_area_mode { "Area" } else { "Dist" };
+            if ui
+                .add(
+                    egui::Button::new(RichText::new(area_lbl).size(10.0).color(Color32::WHITE))
+                        .fill(if self.measure_area_mode {
+                            theme.accent_green
+                        } else {
+                            theme.accent_blue
+                        })
+                        .corner_radius(CornerRadius::same(5))
+                        .min_size(Vec2::new(0.0, btn_h)),
+                )
+                .on_hover_text("Switch between Geodesic Distance and Closed Parcel Area mode")
+                .clicked()
+            {
+                self.measure_area_mode = !self.measure_area_mode;
+            }
+            if !self.measure_points_lat_lon.is_empty()
+                && icons::icon_button(
+                    ui,
+                    AppIcon::Trash,
+                    "Clear Meas",
+                    10.0,
+                    theme.accent_red,
+                    theme.bg_card,
+                    Stroke::NONE,
+                    CornerRadius::same(5),
+                    Vec2::new(0.0, btn_h),
+                )
+                .clicked()
+            {
+                self.measure_points_lat_lon.clear();
+            }
+        }
     }
 
     /// Fits either the active site drawing footprint (if non-empty) or resets to the Global World Map overview.
@@ -1397,6 +1511,14 @@ impl UniversalCanvasState {
             return;
         }
 
+        if self.measure_active && response.clicked_by(egui::PointerButton::Primary) {
+            if let Some(pos) = response.interact_pointer_pos() {
+                let lat_lon = self.world_map.screen_to_lat_lon(pos, rect);
+                self.measure_points_lat_lon.push(lat_lon);
+            }
+            return;
+        }
+
         if self.active_tool == UniversalCanvasTool::SelectPan {
             if response.dragged_by(egui::PointerButton::Primary) {
                 let delta = response.drag_delta();
@@ -1423,6 +1545,104 @@ impl UniversalCanvasState {
             world_map_snapshot.screen_to_world_mm(origin_lat_lon, pos, rect)
         };
         self.handle_world_sketch_interaction(response, active_pillar, hit_radius_mm, &to_world);
+    }
+
+    /// Renders interactive WGS84 geodesic polyline/parcel area measurement overlay across 2D & 3D World canvases.
+    pub fn render_geodetic_measure_overlay(
+        &self,
+        painter: &egui::Painter,
+        rect: Rect,
+        theme: &MacTheme,
+        lat_lon_to_screen: &impl Fn(f64, f64) -> Pos2,
+    ) {
+        if self.measure_points_lat_lon.is_empty() && !self.measure_active {
+            return;
+        }
+        let clip = painter.with_clip_rect(rect);
+        let pts: Vec<Pos2> = self
+            .measure_points_lat_lon
+            .iter()
+            .map(|&(lat, lon)| lat_lon_to_screen(lat, lon))
+            .collect();
+
+        if self.measure_area_mode && pts.len() >= 3 {
+            clip.add(egui::Shape::convex_polygon(
+                pts.clone(),
+                theme.accent_orange.gamma_multiply(0.16),
+                Stroke::new(2.0, theme.accent_orange),
+            ));
+        } else if pts.len() >= 2 {
+            for win in pts.windows(2) {
+                clip.line_segment([win[0], win[1]], Stroke::new(2.4, theme.accent_orange));
+            }
+        }
+
+        for (idx, p) in pts.iter().enumerate() {
+            clip.circle_filled(*p, 4.5, theme.accent_orange);
+            clip.circle_stroke(*p, 4.5, Stroke::new(1.5, Color32::WHITE));
+            if idx > 0 {
+                let seg_m = crate::core::gis::SlippyMapState::geodetic_distance_m(
+                    self.measure_points_lat_lon[idx - 1],
+                    self.measure_points_lat_lon[idx],
+                );
+                let mid = Pos2::new(0.5 * (pts[idx - 1].x + p.x), 0.5 * (pts[idx - 1].y + p.y));
+                let lbl = if seg_m >= 1000.0 {
+                    format!("{:.2} km", seg_m / 1000.0)
+                } else {
+                    format!("{:.1} m", seg_m)
+                };
+                clip.text(
+                    mid + Vec2::new(0.0, -8.0),
+                    Align2::CENTER_BOTTOM,
+                    lbl,
+                    egui::FontId::monospace(10.0),
+                    theme.accent_orange,
+                );
+            }
+        }
+
+        let total_m = crate::core::gis::SlippyMapState::geodetic_polyline_length_m(&self.measure_points_lat_lon);
+        let summary = if self.measure_points_lat_lon.is_empty() {
+            "Geodesic Measure Active: Click points on Earth ground".to_string()
+        } else if self.measure_area_mode && self.measure_points_lat_lon.len() >= 3 {
+            let area_m2 = crate::core::gis::SlippyMapState::geodetic_polygon_area_m2(
+                &self.measure_points_lat_lon,
+            );
+            format!(
+                "Parcel Area: {:.1} m² ({:.3} ha) • Perimeter {:.1} m ({} pts)",
+                area_m2,
+                area_m2 / 10_000.0,
+                total_m,
+                self.measure_points_lat_lon.len()
+            )
+        } else if total_m >= 1000.0 {
+            format!(
+                "Geodesic Distance: {:.3} km ({:.0} m) • {} pts",
+                total_m / 1000.0,
+                total_m,
+                self.measure_points_lat_lon.len()
+            )
+        } else {
+            format!(
+                "Geodesic Distance: {:.2} m • {} pts",
+                total_m,
+                self.measure_points_lat_lon.len()
+            )
+        };
+
+        let chip_pos = Pos2::new(rect.left() + 14.0, rect.bottom() - 26.0);
+        clip.rect_filled(
+            Rect::from_min_size(chip_pos, Vec2::new((summary.len() as f32 * 6.4 + 20.0).min(rect.width() - 28.0), 22.0)),
+            CornerRadius::same(6),
+            theme.bg_card.gamma_multiply(0.90),
+        );
+        clip.text(
+            chip_pos + Vec2::new(8.0, 11.0),
+            Align2::LEFT_CENTER,
+            summary,
+            egui::FontId::monospace(10.5),
+            theme.accent_orange,
+        );
     }
 
     /// Interactive drawing & erasing handler for synchronized Universal Canvas shapes using any 2D/3D ground projection.

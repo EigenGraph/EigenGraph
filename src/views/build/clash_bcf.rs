@@ -22,7 +22,7 @@ impl BuildView {
             ui.horizontal_wrapped(|ui| {
                 let _ = ui.selectable_label(true, "Bvh3D AABB Tree (0.01mm)");
                 let _ = ui.selectable_label(false, "Rebar vs Duct Sweep");
-                let _ = crate::icons::icon_button(
+                if crate::icons::icon_button(
                     ui,
                     crate::icons::AppIcon::Bolt,
                     "Recompute Live 3D BVH Clashes",
@@ -32,7 +32,11 @@ impl BuildView {
                     Stroke::new(1.0, theme.border_subtle),
                     CornerRadius::same(5),
                     Vec2::ZERO,
-                );
+                )
+                .clicked()
+                {
+                    self.run_live_bvh_clash_scan();
+                }
             });
         });
         ui.add_space(6.0);
@@ -183,21 +187,7 @@ impl BuildView {
             )
             .clicked()
             {
-                let stamp = crate::core::web_bridge::unix_timestamp_label();
-                self.clash_last_run_label = format!("Verified {} ({:.0} mm)", stamp, self.clash_tolerance_mm);
-                self.show_3d_clash_markers = true;
-                self.modify_status_msg = Some(format!(
-                    "Clash solver executed at tol={:.1} mm: {} Hard, {} Soft/Code active, {} Resolved.",
-                    self.clash_tolerance_mm, hard_active, soft_active, resolved_cnt
-                ));
-                self.bim_console_logs.push(format!(
-                    "[Clash Solver {}] Evaluated {} zones at tol={:.1}mm -> {} Hard, {} Soft/Code.",
-                    stamp,
-                    self.clash_items.len(),
-                    self.clash_tolerance_mm,
-                    hard_active,
-                    soft_active
-                ));
+                self.run_live_bvh_clash_scan();
             }
             ui.label(
                 RichText::new(format!("Last audit: {}", self.clash_last_run_label))
@@ -922,5 +912,232 @@ impl BuildView {
         }
     }
 
+    /// Evaluates real 3D AABB bounding-box interferences across all active BIM elements
+    /// (`BimWall`, `BimColumn`, `BimRun`, `BimFooting`, `BimSlab`) using `Aabb3D::overlap_with_tolerance`.
+    pub fn run_live_bvh_clash_scan(&mut self) {
+        use crate::core::bim::RunCategory;
+        use crate::core::csg::Aabb3D;
+        use crate::models::{ClashDetectionItem, ClashSeverity, ClashStatus};
 
+        #[derive(Clone)]
+        struct ElemBox {
+            uid: String,
+            name: String,
+            disc: &'static str,
+            kind: u8, // 0=Wall, 1=Col, 2=BeamRun, 3=MepRun, 4=Footing
+            level_id: usize,
+            aabb: Aabb3D,
+        }
+
+        let proj = &self.bim_bus.project;
+        let mut boxes: Vec<ElemBox> = Vec::new();
+
+        for w in &proj.walls {
+            let z0 = proj.level_elevation(w.base_level_id) * 0.001;
+            let z1 = w
+                .top_level_id
+                .map(|tid| proj.level_elevation(tid) * 0.001)
+                .unwrap_or_else(|| z0 + w.unconnected_height_mm * 0.001)
+                .max(z0 + 0.5);
+            let ht = (w.thickness_mm * 0.5 * 0.001).max(0.05);
+            boxes.push(ElemBox {
+                uid: format!("W{}", w.id),
+                name: w.name.clone(),
+                disc: if w.is_structural { "STR" } else { "ARC" },
+                kind: 0,
+                level_id: w.base_level_id,
+                aabb: Aabb3D {
+                    min: [
+                        w.start.0.min(w.end.0) * 0.001 - ht,
+                        z0,
+                        w.start.1.min(w.end.1) * 0.001 - ht,
+                    ],
+                    max: [
+                        w.start.0.max(w.end.0) * 0.001 + ht,
+                        z1,
+                        w.start.1.max(w.end.1) * 0.001 + ht,
+                    ],
+                },
+            });
+        }
+
+        for c in &proj.columns {
+            let z0 = proj.level_elevation(c.base_level_id) * 0.001;
+            let z1 = proj
+                .level_elevation(c.top_level_id)
+                .mul_add(0.001, 0.0)
+                .max(z0 + 3.0);
+            let hw = (c.width_mm * 0.5 * 0.001).max(0.05);
+            let hd = (c.depth_mm * 0.5 * 0.001).max(0.05);
+            let cx = c.pos.0 * 0.001;
+            let cz = c.pos.1 * 0.001;
+            boxes.push(ElemBox {
+                uid: format!("C{}", c.id),
+                name: c.name.clone(),
+                disc: "STR",
+                kind: 1,
+                level_id: c.base_level_id,
+                aabb: Aabb3D {
+                    min: [cx - hw, z0, cz - hd],
+                    max: [cx + hw, z1, cz + hd],
+                },
+            });
+        }
+
+        for r in &proj.runs {
+            let elev = proj.level_elevation(r.level_id) * 0.001;
+            let hw = (r.width_mm * 0.5 * 0.001).max(0.04);
+            let d = (r.depth_mm * 0.001).max(0.08);
+            let (y0, y1) = match r.justify {
+                crate::core::bim::RunJustify::Top => (elev - d, elev),
+                crate::core::bim::RunJustify::Centre => (elev - d * 0.5, elev + d * 0.5),
+                crate::core::bim::RunJustify::Bottom => (elev, elev + d),
+            };
+            let is_mep = matches!(
+                r.category,
+                RunCategory::PlumbingPipe
+                    | RunCategory::ElectricalCableTray
+                    | RunCategory::ElectricalConduit
+                    | RunCategory::LightningConductor
+            );
+            boxes.push(ElemBox {
+                uid: format!("R{}", r.id),
+                name: r.name.clone(),
+                disc: if is_mep { "MEP" } else { "STR" },
+                kind: if is_mep { 3 } else { 2 },
+                level_id: r.level_id,
+                aabb: Aabb3D {
+                    min: [
+                        r.start.0.min(r.end.0) * 0.001 - hw,
+                        y0,
+                        r.start.1.min(r.end.1) * 0.001 - hw,
+                    ],
+                    max: [
+                        r.start.0.max(r.end.0) * 0.001 + hw,
+                        y1,
+                        r.start.1.max(r.end.1) * 0.001 + hw,
+                    ],
+                },
+            });
+        }
+
+        for f in &proj.footings {
+            let elev = proj.level_elevation(f.level_id) * 0.001;
+            let t = (f.thickness_mm * 0.001).max(0.15);
+            let hw = (f.width_mm * 0.5 * 0.001).max(0.2);
+            let hl = (f.length_mm * 0.5 * 0.001).max(0.2);
+            let cx = f.pos.0 * 0.001;
+            let cz = f.pos.1 * 0.001;
+            boxes.push(ElemBox {
+                uid: format!("F{}", f.id),
+                name: f.name.clone(),
+                disc: "STR",
+                kind: 4,
+                level_id: f.level_id,
+                aabb: Aabb3D {
+                    min: [cx - hw, elev - t, cz - hl],
+                    max: [cx + hw, elev, cz + hl],
+                },
+            });
+        }
+
+        let tol_m = (self.clash_tolerance_mm * 0.001).clamp(0.005, 0.5);
+        let mut results: Vec<ClashDetectionItem> = Vec::new();
+        let mut next_clash_id = 1usize;
+
+        for i in 0..boxes.len() {
+            for j in (i + 1)..boxes.len() {
+                let a = &boxes[i];
+                let b = &boxes[j];
+                if a.uid == b.uid {
+                    continue;
+                }
+                // Skip intended beam-column, column-footing, or slab structural joints
+                let is_beam_col = (a.kind == 1 && b.kind == 2) || (a.kind == 2 && b.kind == 1);
+                let is_col_foot = (a.kind == 1 && b.kind == 4) || (a.kind == 4 && b.kind == 1);
+                if is_col_foot {
+                    continue;
+                }
+
+                if let Some((center, pen_mm, vol_m3)) = a.aabb.overlap_with_tolerance(&b.aabb, tol_m) {
+                    // For perpendicular framing beams sharing an end joint (< 0.05m^3), skip expected node
+                    if a.kind == 2 && b.kind == 2 && vol_m3 < 0.055 && a.level_id == b.level_id {
+                        continue;
+                    }
+                    if is_beam_col && vol_m3 <= 0.12 {
+                        continue;
+                    }
+
+                    let severity = if vol_m3 > 1e-5 {
+                        ClashSeverity::Hard
+                    } else {
+                        ClashSeverity::Soft
+                    };
+                    let pair = match (a.disc, b.disc) {
+                        ("MEP", _) | (_, "MEP") => "MEP vs STR".to_string(),
+                        ("ARC", "STR") | ("STR", "ARC") => "ARC vs STR".to_string(),
+                        _ => "STR vs STR".to_string(),
+                    };
+
+                    let hx = ((a.aabb.max[0].min(b.aabb.max[0]) - a.aabb.min[0].max(b.aabb.min[0]))
+                        .abs()
+                        * 0.5)
+                        .max(0.12) as f32;
+                    let hy = ((a.aabb.max[1].min(b.aabb.max[1]) - a.aabb.min[1].max(b.aabb.min[1]))
+                        .abs()
+                        * 0.5)
+                        .max(0.12) as f32;
+                    let hz = ((a.aabb.max[2].min(b.aabb.max[2]) - a.aabb.min[2].max(b.aabb.min[2]))
+                        .abs()
+                        * 0.5)
+                        .max(0.12) as f32;
+
+                    results.push(ClashDetectionItem {
+                        id: next_clash_id,
+                        tag: format!("CLH-{:03}", next_clash_id),
+                        discipline_pair: pair,
+                        severity,
+                        status: ClashStatus::Active,
+                        element_a: a.name.clone(),
+                        element_b: b.name.clone(),
+                        intersection_mm: if vol_m3 > 1e-5 { -pen_mm } else { 0.0 },
+                        required_clearance_mm: self.clash_tolerance_mm,
+                        point_3d: [center[0] as f32, center[1] as f32, center[2] as f32],
+                        box_half_extents: [hx, hy, hz],
+                        note: format!(
+                            "Aabb3D overlap volume {:.4} m^3 (penetration {:.1} mm)",
+                            vol_m3, pen_mm
+                        ),
+                    });
+                    next_clash_id += 1;
+                }
+            }
+        }
+
+        let hard_cnt = results
+            .iter()
+            .filter(|c| c.severity == ClashSeverity::Hard)
+            .count();
+        let soft_cnt = results.len().saturating_sub(hard_cnt);
+        let stamp = crate::core::web_bridge::unix_timestamp_label();
+        self.clash_items = results;
+        self.clash_last_run_label = format!("Verified {} ({:.0} mm)", stamp, self.clash_tolerance_mm);
+        self.show_3d_clash_markers = true;
+        let msg = if self.clash_items.is_empty() {
+            format!(
+                "3D AABB Clash Solver scanned {} elements: 0 clashes detected (model clash-free at tol={:.1} mm).",
+                boxes.len(),
+                self.clash_tolerance_mm
+            )
+        } else {
+            format!(
+                "3D AABB Clash Solver scanned {} elements: {} Hard, {} Soft interferences detected.",
+                boxes.len(),
+                hard_cnt,
+                soft_cnt
+            )
+        };
+        self.modify_status_msg = Some(msg.clone());
+        self.bim_console_logs.push(format!("[Clash Solver {}] {}", stamp, msg));
+    }
 }

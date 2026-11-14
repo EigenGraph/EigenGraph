@@ -61,12 +61,32 @@ pub struct EigenGraphApp {
     pub vault_modal_feedback: Option<String>,
     pub personal_vault_projects: Vec<crate::core::vault::PersonalVaultProjectEntry>,
     pub last_vault_bridge_version: u64,
+    autosave_hydrated: bool,
+    last_autosave_time: f64,
+    last_autosave_hash: u64,
+    last_bim_sig: (usize, usize, usize, usize, usize, usize, usize),
+    last_uc_earth: (f64, f64, f32, crate::core::gis::TileSource),
+    last_res_earth: (f64, f64, f32, crate::core::gis::TileSource),
 }
 
 impl Default for EigenGraphApp {
     fn default() -> Self {
         let has_vault = crate::core::InternalVault::has_connected_vault();
         let personal_vault_projects = crate::core::InternalVault::list_personal_vault_projects();
+        let universal_canvas = UniversalCanvasState::default();
+        let research_view = ResearchConceptView::default();
+        let uc_earth = (
+            universal_canvas.world_map.center_lat_lon.0,
+            universal_canvas.world_map.center_lat_lon.1,
+            universal_canvas.world_map.zoom_level,
+            universal_canvas.world_map.tile_provider,
+        );
+        let res_earth = (
+            research_view.slippy_map.center_lat_lon.0,
+            research_view.slippy_map.center_lat_lon.1,
+            research_view.slippy_map.zoom_level,
+            research_view.slippy_map.tile_provider,
+        );
         Self {
             theme: MacTheme::default(),
             active_pillar: NavigationPillar::MyLibrary,
@@ -81,7 +101,7 @@ impl Default for EigenGraphApp {
 
             my_project_view: MyProjectView::default(),
             ai_firm_view: AiFirmView::default(),
-            research_view: ResearchConceptView::default(),
+            research_view,
             parametric_view: ParametricView::default(),
             build_view: BuildView::default(),
             analyze_view: AnalyzeView::default(),
@@ -94,7 +114,7 @@ impl Default for EigenGraphApp {
             prediction_view: PredictionView::default(),
             results_view: ResultsView::default(),
             settings_view: SettingsView::default(),
-            universal_canvas: UniversalCanvasState::default(),
+            universal_canvas,
             ai_assistant_view: AiAssistantView::default(),
 
             projects: crate::core::InternalVault::default_nvw_dcr_lod_projects(),
@@ -109,6 +129,12 @@ impl Default for EigenGraphApp {
             vault_modal_feedback: None,
             personal_vault_projects,
             last_vault_bridge_version: crate::core::web_bridge::vault_bridge_version(),
+            autosave_hydrated: false,
+            last_autosave_time: 0.0,
+            last_autosave_hash: 0,
+            last_bim_sig: (0, 0, 0, 0, 0, 1, 0),
+            last_uc_earth: uc_earth,
+            last_res_earth: res_earth,
         }
     }
 }
@@ -384,6 +410,151 @@ impl App for EigenGraphApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(120));
         }
 
+        // Hydrate workspace autosave snapshot once on startup (or once IndexedDB finishes async hydration)
+        if !self.autosave_hydrated {
+            let workspace_blank = self.build_view.bim_bus.project.is_empty()
+                && self.parametric_view.bim_bus.project.is_empty()
+                && self.members.is_empty()
+                && self.universal_canvas.entities.is_empty();
+            if !workspace_blank {
+                self.autosave_hydrated = true;
+            } else if let Some(json) = crate::core::InternalVault::load_autosaved_workspace_json() {
+                if let Ok(ws_cfg) = self.universal_canvas.apply_unified_archive(
+                    &json,
+                    &mut self.build_view.bim_bus.project,
+                    &mut self.members,
+                    &mut self.parametric_view.variables,
+                ) {
+                    self.settings_view.apply_workspace_settings(
+                        &ws_cfg,
+                        &mut self.theme,
+                        &mut self.ai_assistant_view.is_visible,
+                    );
+                    self.parametric_view.bim_bus.project = self.build_view.bim_bus.project.clone();
+                    self.sync_bim_to_fem();
+                    self.sync_earth_maps();
+                }
+                self.autosave_hydrated = true;
+            } else {
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    self.autosave_hydrated = true;
+                }
+                #[cfg(target_arch = "wasm32")]
+                if !crate::core::web_bridge::vault_state_snapshot().busy && cur_vault_ver > 0 {
+                    self.autosave_hydrated = true;
+                }
+            }
+        }
+
+        // Handle Text-to-BIM commands dispatched from Dynamic Island Copilot or AI Firm
+        if let Some(cmd) = self.ai_assistant_view.pending_bim_nl_command.take() {
+            let result_msg = match self.build_view.bim_bus.execute_natural_language(&cmd) {
+                Ok(msg) => {
+                    self.parametric_view.bim_bus.project = self.build_view.bim_bus.project.clone();
+                    self.build_view.bim_console_logs.push(msg.clone());
+                    self.build_view.modify_status_msg = Some(msg.clone());
+                    msg
+                }
+                Err(err) => err,
+            };
+            self.ai_assistant_view
+                .chat_history
+                .push(crate::models::ChatMessage {
+                    is_user: false,
+                    message: format!("[BIM Bus Result]: {}", result_msg),
+                    time: crate::core::web_bridge::unix_timestamp_label(),
+                });
+        }
+        if let Some(cmd) = self.ai_firm_view.pending_bim_nl_command.take() {
+            match self.build_view.bim_bus.execute_natural_language(&cmd) {
+                Ok(msg) => {
+                    self.parametric_view.bim_bus.project = self.build_view.bim_bus.project.clone();
+                    self.build_view.bim_console_logs.push(msg.clone());
+                    self.build_view.modify_status_msg = Some(msg.clone());
+                    self.ai_firm_view.live_logs.push(crate::views::ai_firm::AgentLogEntry {
+                        timestamp: crate::core::web_bridge::unix_timestamp_label(),
+                        role: crate::views::ai_firm::FirmRole::ProjectManager,
+                        message: msg,
+                        tag: "BIM-SYNC".to_string(),
+                        is_critical: false,
+                    });
+                }
+                Err(err) => {
+                    self.ai_firm_view.live_logs.push(crate::views::ai_firm::AgentLogEntry {
+                        timestamp: crate::core::web_bridge::unix_timestamp_label(),
+                        role: crate::views::ai_firm::FirmRole::SeniorDrafter,
+                        message: err,
+                        tag: "BIM-ERR".to_string(),
+                        is_critical: true,
+                    });
+                }
+            }
+        }
+
+        // Poll local file picker imports & OS drag-and-drop files
+        let mut incoming_files: Vec<crate::core::web_bridge::ImportedFilePayload> = Vec::new();
+        while let Some(payload) = crate::core::web_bridge::poll_imported_file() {
+            incoming_files.push(payload);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let dropped = ctx.input(|i| i.raw.dropped_files.clone());
+            for df in dropped {
+                let p = df.path();
+                let fname = p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "dropped_file".to_string());
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    incoming_files.push(crate::core::web_bridge::ImportedFilePayload {
+                        filename: fname,
+                        content,
+                    });
+                }
+            }
+        }
+        for payload in incoming_files {
+            self.handle_imported_file(payload);
+        }
+
+        // Keep 2D/3D BIM models, analytical FEM members, and Research <-> Ground Earth map bidirectionally synced
+        if self.active_pillar == NavigationPillar::ParametricDED {
+            let p2d = &self.parametric_view.bim_bus.project;
+            let p3d = &self.build_view.bim_bus.project;
+            if (p2d.walls.len(), p2d.columns.len(), p2d.runs.len(), p2d.footings.len(), p2d.slabs.len(), p2d.levels.len(), p2d.rebars.len())
+                != (p3d.walls.len(), p3d.columns.len(), p3d.runs.len(), p3d.footings.len(), p3d.slabs.len(), p3d.levels.len(), p3d.rebars.len())
+            {
+                self.build_view.bim_bus.project = p2d.clone();
+            }
+        } else {
+            let p2d = &self.parametric_view.bim_bus.project;
+            let p3d = &self.build_view.bim_bus.project;
+            if (p2d.walls.len(), p2d.columns.len(), p2d.runs.len(), p2d.footings.len(), p2d.slabs.len(), p2d.levels.len(), p2d.rebars.len())
+                != (p3d.walls.len(), p3d.columns.len(), p3d.runs.len(), p3d.footings.len(), p3d.slabs.len(), p3d.levels.len(), p3d.rebars.len())
+            {
+                self.parametric_view.bim_bus.project = p3d.clone();
+            }
+        }
+
+        let p = &self.build_view.bim_bus.project;
+        let cur_bim_sig = (
+            p.walls.len(),
+            p.columns.len(),
+            p.runs.len(),
+            p.footings.len(),
+            p.slabs.len(),
+            p.levels.len(),
+            p.rebars.len(),
+        );
+        if cur_bim_sig != self.last_bim_sig
+            || std::mem::take(&mut self.analyze_view.request_bim_fem_sync)
+        {
+            self.last_bim_sig = cur_bim_sig;
+            self.sync_bim_to_fem();
+        }
+        self.sync_earth_maps();
+
         // Keyboard shortcut (Cmd+,) toggles Settings modal
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Comma)) {
             self.show_settings = !self.show_settings;
@@ -518,14 +689,15 @@ impl App for EigenGraphApp {
                             } else {
                                 raw_name
                             };
-                            let mut model = if !self.build_view.bim_bus.project.is_empty() {
-                                self.build_view.bim_bus.project.to_structural_model()
-                            } else if !self.parametric_view.bim_bus.project.is_empty() {
-                                self.parametric_view.bim_bus.project.to_structural_model()
-                            } else {
-                                crate::core::model::StructuralModel::new(proj_name)
-                            };
-                            model.name = proj_name.to_string();
+                            self.build_view.bim_bus.project.project_name = proj_name.to_string();
+                            self.parametric_view.bim_bus.project.project_name = proj_name.to_string();
+                            let mut archive = self.universal_canvas.build_unified_archive(
+                                &self.build_view.bim_bus.project,
+                                &self.members,
+                                &self.parametric_view.variables,
+                                workspace_snapshot.clone(),
+                            );
+                            archive.project_name = proj_name.to_string();
                             let safe_file: String = proj_name
                                 .chars()
                                 .map(|c| {
@@ -537,49 +709,99 @@ impl App for EigenGraphApp {
                                 })
                                 .collect();
                             let fname = format!("{}.eigen", safe_file);
-                            match crate::core::InternalVault::autosave_project_model(&fname, &model) {
-                                Ok(saved) => {
-                                    self.my_project_view.export_success_msg = Some(format!(
-                                        "Saved '{}' to personal Vault ({})",
-                                        proj_name, saved
-                                    ));
-                                    self.personal_vault_projects =
-                                        crate::core::InternalVault::list_personal_vault_projects();
-                                }
+                            match serde_json::to_string_pretty(&archive) {
+                                Ok(json) => match crate::core::InternalVault::save_project_archive_json(&fname, &json) {
+                                    Ok(saved) => {
+                                        self.my_project_view.export_success_msg = Some(format!(
+                                            "Saved complete workspace '{}' ({} BIM elems, {} drawings) to Vault ({})",
+                                            proj_name,
+                                            self.build_view.bim_bus.project.element_count(),
+                                            self.universal_canvas.entities.len(),
+                                            saved
+                                        ));
+                                        self.personal_vault_projects =
+                                            crate::core::InternalVault::list_personal_vault_projects();
+                                    }
+                                    Err(err) => {
+                                        self.my_project_view.export_success_msg =
+                                            Some(format!("Vault save failed: {}", err));
+                                    }
+                                },
                                 Err(err) => {
                                     self.my_project_view.export_success_msg =
-                                        Some(format!("Vault save failed: {}", err));
+                                        Some(format!("Archive serialization failed: {}", err));
                                 }
                             }
+                        }
+                        if std::mem::take(&mut self.my_project_view.request_export_active_archive) {
+                            self.universal_canvas.export_unified_file(
+                                &self.build_view.bim_bus.project,
+                                &self.members,
+                                &self.parametric_view.variables,
+                                workspace_snapshot.clone(),
+                            );
+                            self.my_project_view.export_success_msg =
+                                self.universal_canvas.status_message.clone();
                         }
                         if let Some(entry) =
                             self.my_project_view.pending_open_vault_project.take()
                         {
-                            match crate::core::InternalVault::load_personal_vault_project_model(
-                                &entry,
-                            ) {
-                                Ok(model) => {
-                                    self.members = model
-                                        .elements
-                                        .iter()
-                                        .map(|el| StructuralMember {
-                                            id: el.id,
-                                            name: el.name.clone(),
-                                            section: el.section.name.clone(),
-                                            ..Default::default()
-                                        })
-                                        .collect();
-                                    self.my_project_view.export_success_msg = Some(format!(
-                                        "Loaded '{}' ({} nodes, {} elements) from personal Vault.",
-                                        model.name,
-                                        model.nodes.len(),
-                                        model.elements.len()
-                                    ));
-                                    self.active_pillar = NavigationPillar::GeometryAssembly;
+                            match crate::core::InternalVault::load_personal_vault_raw(&entry) {
+                                Ok(raw) => {
+                                    if let Ok(ws_cfg) = self.universal_canvas.apply_unified_archive(
+                                        &raw,
+                                        &mut self.build_view.bim_bus.project,
+                                        &mut self.members,
+                                        &mut self.parametric_view.variables,
+                                    ) {
+                                        self.settings_view.apply_workspace_settings(
+                                            &ws_cfg,
+                                            &mut self.theme,
+                                            &mut self.ai_assistant_view.is_visible,
+                                        );
+                                        self.parametric_view.bim_bus.project =
+                                            self.build_view.bim_bus.project.clone();
+                                        self.sync_bim_to_fem();
+                                        self.sync_earth_maps();
+                                        self.my_project_view.export_success_msg = Some(format!(
+                                            "Loaded workspace '{}' ({} BIM elements, {} drawings, {} FEM members) from Vault.",
+                                            entry.name,
+                                            self.build_view.bim_bus.project.element_count(),
+                                            self.universal_canvas.entities.len(),
+                                            self.members.len(),
+                                        ));
+                                        self.active_pillar = NavigationPillar::GeometryAssembly;
+                                    } else {
+                                        match crate::core::InternalVault::load_personal_vault_project_model(&entry) {
+                                            Ok(model) => {
+                                                self.members = model
+                                                    .elements
+                                                    .iter()
+                                                    .map(|el| StructuralMember {
+                                                        id: el.id,
+                                                        name: el.name.clone(),
+                                                        section: el.section.name.clone(),
+                                                        ..Default::default()
+                                                    })
+                                                    .collect();
+                                                self.my_project_view.export_success_msg = Some(format!(
+                                                    "Loaded legacy structural model '{}' ({} nodes, {} elements) from personal Vault.",
+                                                    model.name,
+                                                    model.nodes.len(),
+                                                    model.elements.len()
+                                                ));
+                                                self.active_pillar = NavigationPillar::GeometryAssembly;
+                                            }
+                                            Err(err) => {
+                                                self.my_project_view.export_success_msg =
+                                                    Some(format!("Failed to load Vault project: {}", err));
+                                            }
+                                        }
+                                    }
                                 }
                                 Err(err) => {
                                     self.my_project_view.export_success_msg =
-                                        Some(format!("Failed to load Vault project: {}", err));
+                                        Some(format!("Failed to read Vault file: {}", err));
                                 }
                             }
                         }
@@ -652,6 +874,7 @@ impl App for EigenGraphApp {
                             &self.theme,
                             &self.parametric_view.variables,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &mut self.feature_registry,
                             &mut self.active_pillar,
                         );
@@ -674,6 +897,7 @@ impl App for EigenGraphApp {
                             &self.theme,
                             &self.parametric_view.variables,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &mut self.feature_registry,
                             &mut self.active_pillar,
                         );
@@ -683,6 +907,7 @@ impl App for EigenGraphApp {
                             ui,
                             &self.theme,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &mut self.feature_registry,
                         );
                     }
@@ -731,6 +956,7 @@ impl App for EigenGraphApp {
                             ui,
                             &self.theme,
                             &self.members,
+                            &self.build_view.bim_bus.project,
                             &mut self.feature_registry,
                         );
                     }
@@ -738,6 +964,8 @@ impl App for EigenGraphApp {
                         });
                     });
             });
+
+        self.maybe_autosave_workspace(&ctx, &workspace_snapshot);
 
         // Floating top-left sidebar reopen toggle when the navigation menu is closed
         if !self.sidebar_open {
@@ -1309,6 +1537,266 @@ impl EigenGraphApp {
 
         if close_guest {
             self.show_vault_startup_modal = false;
+        }
+    }
+
+    fn sync_bim_to_fem(&mut self) {
+        let proj = &self.build_view.bim_bus.project;
+        if proj.is_empty() {
+            self.members.clear();
+            self.analyze_view.synced_bim_element_count = 0;
+            self.analyze_view.last_bim_sync_label = "Idle (0 BIM elements)".to_string();
+            return;
+        }
+        let fem = proj.to_structural_model();
+        if fem.elements.is_empty() {
+            self.members.clear();
+            self.analyze_view.synced_bim_element_count = 0;
+            self.analyze_view.last_bim_sync_label = "Waiting for frame/wall FEM elements".to_string();
+            return;
+        }
+        let stamp = crate::core::web_bridge::unix_timestamp_label();
+        match crate::core::AriEngine::evaluate_redundancy(&fem) {
+            Ok(assessment) => {
+                self.members = fem
+                    .elements
+                    .iter()
+                    .map(|el| {
+                        let res = assessment.member_results.iter().find(|r| r.member_id == el.id);
+                        let ari_val = res.map(|r| r.ari).unwrap_or(0.0);
+                        let util_val = res.map(|r| r.utilization_initial).unwrap_or(0.0);
+                        StructuralMember {
+                            id: el.id,
+                            name: el.name.clone(),
+                            section: el.section.name.clone(),
+                            force_kn: res.map(|r| r.force_kn).unwrap_or(0.0),
+                            capacity_kn: res.map(|r| r.capacity_kn).unwrap_or(0.0),
+                            utilization: util_val,
+                            is_critical: res.map(|r| r.is_critical).unwrap_or(false),
+                            is_active: true,
+                            ari_score: ari_val,
+                            ari: ari_val,
+                            svd_sensitivity: res.map(|r| 1.0 - r.svd_margin.clamp(0.0, 1.0)).unwrap_or(0.0),
+                            svd_margin: res.map(|r| r.svd_margin).unwrap_or(0.0),
+                            ci: res.map(|r| r.ci).unwrap_or(0.0),
+                            rr: res.map(|r| r.rr).unwrap_or(0.0),
+                            dcr_interaction: res.map(|r| r.second_order_dcr).unwrap_or(util_val),
+                            ..Default::default()
+                        }
+                    })
+                    .collect();
+                self.analyze_view.synced_bim_element_count = self.members.len();
+                self.analyze_view.last_bim_sync_label = format!(
+                    "ARI={:.3} | {} FEM members ({})",
+                    assessment.average_ari,
+                    self.members.len(),
+                    stamp
+                );
+            }
+            Err(_) => {
+                self.members = fem
+                    .elements
+                    .iter()
+                    .map(|el| StructuralMember {
+                        id: el.id,
+                        name: el.name.clone(),
+                        section: el.section.name.clone(),
+                        ..Default::default()
+                    })
+                    .collect();
+                self.analyze_view.synced_bim_element_count = self.members.len();
+                self.analyze_view.last_bim_sync_label = format!(
+                    "Synced {} elems (partial frame) at {}",
+                    self.members.len(),
+                    stamp
+                );
+            }
+        }
+    }
+
+    fn sync_earth_maps(&mut self) {
+        let cur_uc = (
+            self.universal_canvas.world_map.center_lat_lon.0,
+            self.universal_canvas.world_map.center_lat_lon.1,
+            self.universal_canvas.world_map.zoom_level,
+            self.universal_canvas.world_map.tile_provider,
+        );
+        let cur_res = (
+            self.research_view.slippy_map.center_lat_lon.0,
+            self.research_view.slippy_map.center_lat_lon.1,
+            self.research_view.slippy_map.zoom_level,
+            self.research_view.slippy_map.tile_provider,
+        );
+        let differs = |a: (f64, f64, f32, crate::core::gis::TileSource),
+                       b: (f64, f64, f32, crate::core::gis::TileSource)| -> bool {
+            (a.0 - b.0).abs() > 1e-5
+                || (a.1 - b.1).abs() > 1e-5
+                || (a.2 - b.2).abs() > 1e-3
+                || a.3 != b.3
+        };
+        if differs(cur_uc, self.last_uc_earth) {
+            self.research_view.slippy_map.set_center(cur_uc.0, cur_uc.1);
+            self.research_view.slippy_map.zoom_level = cur_uc.2;
+            self.research_view.slippy_map.tile_provider = cur_uc.3;
+        } else if differs(cur_res, self.last_res_earth) {
+            self.universal_canvas.world_map.set_center(cur_res.0, cur_res.1);
+            self.universal_canvas.world_map.zoom_level = cur_res.2;
+            self.universal_canvas.world_map.tile_provider = cur_res.3;
+        }
+        let synced = (
+            self.universal_canvas.world_map.center_lat_lon.0,
+            self.universal_canvas.world_map.center_lat_lon.1,
+            self.universal_canvas.world_map.zoom_level,
+            self.universal_canvas.world_map.tile_provider,
+        );
+        self.last_uc_earth = synced;
+        self.last_res_earth = synced;
+    }
+
+    fn handle_imported_file(&mut self, payload: crate::core::web_bridge::ImportedFilePayload) {
+        let lower = payload.filename.to_lowercase();
+        let trimmed = payload.content.trim_start();
+        if lower.ends_with(".ifc") || trimmed.starts_with("ISO-10303-21") {
+            match crate::core::ifc::IfcModel::parse(&payload.content) {
+                Ok(m) => {
+                    self.industrialized_view.export_status = Some(format!(
+                        "Imported IFC '{}' ({} entities, {} elements).",
+                        payload.filename,
+                        m.health_report.total_entities,
+                        m.elements.len()
+                    ));
+                    self.industrialized_view.selected_element_id =
+                        m.elements.first().map(|e| e.step_id);
+                    self.industrialized_view.baseline_model = Some(m.clone());
+                    self.industrialized_view.ifc_model = Some(m);
+                    self.industrialized_view.clash_report = None;
+                    self.industrialized_view.model_diff = None;
+                    self.industrialized_view.ids_report = None;
+                    self.industrialized_view.active_subtab =
+                        crate::views::industrialized::IndustrializedSubTab::OpenBimIfcStudio;
+                    self.active_pillar = NavigationPillar::IndustrializedAutomation;
+                }
+                Err(e) => {
+                    self.industrialized_view.export_status =
+                        Some(format!("IFC parse error for '{}': {}", payload.filename, e));
+                }
+            }
+            return;
+        }
+
+        if lower.ends_with(".csv") || lower.ends_with(".xyz") || lower.ends_with(".pts") {
+            match self.research_view.import_survey_points_csv_xyz(&payload.content) {
+                Ok(cnt) => {
+                    self.universal_canvas.status_message = Some(format!(
+                        "Imported {} survey points from '{}' into Research TIN terrain.",
+                        cnt, payload.filename
+                    ));
+                    self.active_pillar = NavigationPillar::ResearchConcept;
+                }
+                Err(e) => {
+                    self.universal_canvas.status_message =
+                        Some(format!("Survey import error '{}': {}", payload.filename, e));
+                }
+            }
+            return;
+        }
+
+        let settings_snap = self.settings_view.workspace_settings_snapshot(
+            &self.theme,
+            &self.universal_canvas,
+            self.ai_assistant_view.is_visible,
+        );
+        if let Ok(ws_cfg) = self.universal_canvas.apply_unified_archive(
+            &payload.content,
+            &mut self.build_view.bim_bus.project,
+            &mut self.members,
+            &mut self.parametric_view.variables,
+        ) {
+            self.settings_view.apply_workspace_settings(
+                &ws_cfg,
+                &mut self.theme,
+                &mut self.ai_assistant_view.is_visible,
+            );
+            self.parametric_view.bim_bus.project = self.build_view.bim_bus.project.clone();
+            self.sync_bim_to_fem();
+            self.sync_earth_maps();
+            let msg = format!(
+                "Loaded workspace archive '{}' ({} BIM elems, {} drawings).",
+                payload.filename,
+                self.build_view.bim_bus.project.element_count(),
+                self.universal_canvas.entities.len()
+            );
+            self.my_project_view.export_success_msg = Some(msg.clone());
+            self.universal_canvas.status_message = Some(msg);
+            self.active_pillar = NavigationPillar::GeometryAssembly;
+        } else if let Ok(model) =
+            serde_json::from_str::<crate::core::model::StructuralModel>(&payload.content)
+        {
+            self.members = model
+                .elements
+                .iter()
+                .map(|el| StructuralMember {
+                    id: el.id,
+                    name: el.name.clone(),
+                    section: el.section.name.clone(),
+                    ..Default::default()
+                })
+                .collect();
+            let msg = format!(
+                "Loaded structural JSON '{}' ({} nodes, {} elements).",
+                payload.filename,
+                model.nodes.len(),
+                model.elements.len()
+            );
+            self.my_project_view.export_success_msg = Some(msg.clone());
+            self.universal_canvas.status_message = Some(msg);
+        } else {
+            let _ = settings_snap;
+            self.my_project_view.export_success_msg = Some(format!(
+                "Unrecognized archive format in '{}'. Supported: .eigen, .json, .ifc, .csv, .xyz.",
+                payload.filename
+            ));
+        }
+    }
+
+    fn maybe_autosave_workspace(
+        &mut self,
+        ctx: &egui::Context,
+        workspace_snapshot: &crate::views::universal_canvas::WorkspaceCanvasSettings,
+    ) {
+        if !self.autosave_hydrated {
+            return;
+        }
+        let now = ctx.input(|i| i.time);
+        if (now - self.last_autosave_time) < 2.5 {
+            return;
+        }
+        self.last_autosave_time = now;
+
+        let is_blank = self.build_view.bim_bus.project.is_empty()
+            && self.members.is_empty()
+            && self.universal_canvas.entities.is_empty()
+            && self.parametric_view.variables.is_empty();
+        if is_blank && self.last_autosave_hash == 0 {
+            return;
+        }
+
+        let archive = self.universal_canvas.build_unified_archive(
+            &self.build_view.bim_bus.project,
+            &self.members,
+            &self.parametric_view.variables,
+            workspace_snapshot.clone(),
+        );
+        if let Ok(json) = serde_json::to_string(&archive) {
+            let mut h: u64 = 0xcbf29ce484222325;
+            for b in json.as_bytes() {
+                h ^= *b as u64;
+                h = h.wrapping_mul(0x100000001b3);
+            }
+            if h != self.last_autosave_hash {
+                self.last_autosave_hash = h;
+                let _ = crate::core::InternalVault::autosave_workspace_json(&json);
+            }
         }
     }
 }

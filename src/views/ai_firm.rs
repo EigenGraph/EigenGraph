@@ -94,6 +94,8 @@ pub struct AiFirmView {
     pub wind_params: CopilotWindParams,
     pub carbon_params: CopilotCarbonParams,
     pub copilot_export_status: Option<String>,
+    pub nl_bim_prompt: String,
+    pub pending_bim_nl_command: Option<String>,
 }
 
 impl Default for AiFirmView {
@@ -138,6 +140,8 @@ impl Default for AiFirmView {
             wind_params: CopilotWindParams::default(),
             carbon_params: CopilotCarbonParams::default(),
             copilot_export_status: None,
+            nl_bim_prompt: String::new(),
+            pending_bim_nl_command: None,
         }
     }
 }
@@ -317,46 +321,68 @@ impl AiFirmView {
             features,
             FeatureId::LiveGeminiToolOrchestrator,
             |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("Endpoint: Gemini 2.5 Flash • Function Calling (BimCommandBus)")
-                            .size(11.0)
-                            .strong()
-                            .color(theme.text_primary),
-                    );
-                    let _ = icons::icon_button(
-                        ui,
-                        AppIcon::LinkChain,
-                        "Connect API Key",
-                        11.0,
-                        theme.text_primary,
-                        theme.bg_canvas,
-                        Stroke::new(1.0, theme.border_subtle),
-                        CornerRadius::same(6),
-                        egui::Vec2::ZERO,
-                    );
-                    let _ = icons::icon_button(
-                        ui,
-                        AppIcon::Wrench,
-                        "Preview Tool Schema (12 BIM Commands)",
-                        11.0,
-                        theme.text_primary,
-                        theme.bg_canvas,
-                        Stroke::new(1.0, theme.border_subtle),
-                        CornerRadius::same(6),
-                        egui::Vec2::ZERO,
-                    );
-                    let _ = icons::icon_button(
-                        ui,
-                        AppIcon::Sparkles,
-                        "Dispatch Live Agent Orchestration",
-                        11.0,
-                        Color32::WHITE,
-                        theme.accent_blue,
-                        Stroke::NONE,
-                        CornerRadius::same(6),
-                        egui::Vec2::ZERO,
-                    );
+                ui.vertical(|ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(
+                            RichText::new("Text-to-BIM Deterministic Tool Synthesizer (BimCommandBus)")
+                                .size(11.0)
+                                .strong()
+                                .color(theme.text_primary),
+                        );
+                        let resp = ui.add(
+                            egui::TextEdit::singleline(&mut self.nl_bim_prompt)
+                                .hint_text("e.g. portal 3x2 @6m 2floors | box 8x6 | rebar")
+                                .desired_width(250.0),
+                        );
+                        let run_clicked = icons::icon_button(
+                            ui,
+                            AppIcon::Sparkles,
+                            "Synthesize into BIM",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            egui::Vec2::ZERO,
+                        )
+                        .clicked();
+                        if (run_clicked
+                            || (resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))))
+                            && !self.nl_bim_prompt.trim().is_empty()
+                        {
+                            let cmd = self.nl_bim_prompt.trim().to_string();
+                            self.pending_bim_nl_command = Some(cmd.clone());
+                            self.live_logs.push(AgentLogEntry {
+                                timestamp: crate::core::web_bridge::unix_timestamp_label(),
+                                role: FirmRole::SeniorDrafter,
+                                message: format!("Synthesizing Text-to-BIM instruction: '{}'", cmd),
+                                tag: "BIM-BUS".to_string(),
+                                is_critical: false,
+                            });
+                            self.nl_bim_prompt.clear();
+                        }
+                    });
+                    ui.add_space(4.0);
+                    ui.horizontal_wrapped(|ui| {
+                        for preset in [
+                            "portal 2x2 @6m 2floors",
+                            "box 8x6",
+                            "grid 3x2 @5m",
+                            "rebar",
+                        ] {
+                            if ui
+                                .add(
+                                    egui::Button::new(RichText::new(preset).size(10.0))
+                                        .fill(theme.bg_canvas)
+                                        .stroke(Stroke::new(1.0, theme.border_subtle))
+                                        .corner_radius(CornerRadius::same(4)),
+                                )
+                                .clicked()
+                            {
+                                self.pending_bim_nl_command = Some(preset.to_string());
+                            }
+                        }
+                    });
                 });
             },
         );

@@ -65,6 +65,16 @@ pub fn unix_timestamp_label() -> String {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ImportedFilePayload {
+    pub filename: String,
+    pub content: String,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+static PENDING_NATIVE_IMPORTED_FILE: std::sync::Mutex<Option<ImportedFilePayload>> =
+    std::sync::Mutex::new(None);
+
 #[cfg(target_arch = "wasm32")]
 mod js_vault {
     use wasm_bindgen::prelude::*;
@@ -106,6 +116,18 @@ mod js_vault {
 
         #[wasm_bindgen(js_namespace = EigenGraphVaultBridge, js_name = deleteFileAsync)]
         pub fn delete_file_async(rel_path: &str);
+
+        #[wasm_bindgen(js_namespace = EigenGraphVaultBridge, js_name = saveAutosaveArchive)]
+        pub fn save_autosave_archive(json: &str);
+
+        #[wasm_bindgen(js_namespace = EigenGraphVaultBridge, js_name = loadAutosaveArchive)]
+        pub fn load_autosave_archive() -> String;
+
+        #[wasm_bindgen(js_namespace = EigenGraphVaultBridge, js_name = openFilePicker)]
+        pub fn open_file_picker(accept: &str);
+
+        #[wasm_bindgen(js_namespace = EigenGraphVaultBridge, js_name = pollPickedFileJson)]
+        pub fn poll_picked_file_json() -> String;
     }
 }
 
@@ -200,6 +222,151 @@ pub fn vault_delete_file(rel_path: &str) {
     js_vault::delete_file_async(rel_path);
     #[cfg(not(target_arch = "wasm32"))]
     let _ = rel_path;
+}
+
+pub fn workspace_autosave_save(json: &str) {
+    #[cfg(target_arch = "wasm32")]
+    js_vault::save_autosave_archive(json);
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = json;
+}
+
+pub fn workspace_autosave_load() -> Option<String> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let raw = js_vault::load_autosave_archive();
+        if raw.trim().is_empty() {
+            None
+        } else {
+            Some(raw)
+        }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        None
+    }
+}
+
+pub fn trigger_file_picker(accept: &str) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        js_vault::open_file_picker(accept);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = accept;
+        if let Some((filename, content)) = pick_file_native("Open EigenGraph File (.ifc, .eigen, .json, .csv)") {
+            if let Ok(mut guard) = PENDING_NATIVE_IMPORTED_FILE.lock() {
+                *guard = Some(ImportedFilePayload { filename, content });
+            }
+        }
+    }
+}
+
+pub fn poll_imported_file() -> Option<ImportedFilePayload> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let raw = js_vault::poll_picked_file_json();
+        if raw.trim().is_empty() {
+            return None;
+        }
+        serde_json::from_str::<ImportedFilePayload>(&raw).ok()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if let Ok(mut guard) = PENDING_NATIVE_IMPORTED_FILE.lock() {
+            guard.take()
+        } else {
+            None
+        }
+    }
+}
+
+/// Opens a native OS file picker dialog and reads the selected file into UTF-8 text.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn pick_file_native(prompt_title: &str) -> Option<(String, String)> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            "POSIX path of (choose file with prompt \"{}\")",
+            prompt_title.replace('"', "")
+        );
+        if let Ok(out) = std::process::Command::new("osascript")
+            .args(["-e", &script])
+            .output()
+        {
+            if out.status.success() {
+                let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !path_str.is_empty() {
+                    let path = std::path::PathBuf::from(&path_str);
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let fname = path
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("imported_file")
+                            .to_string();
+                        return Some((fname, content));
+                    }
+                }
+            }
+        }
+        None
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(out) = std::process::Command::new("zenity")
+            .args(["--file-selection", &format!("--title={prompt_title}")])
+            .output()
+        {
+            if out.status.success() {
+                let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !path_str.is_empty() {
+                    let path = std::path::PathBuf::from(&path_str);
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let fname = path
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("imported_file")
+                            .to_string();
+                        return Some((fname, content));
+                    }
+                }
+            }
+        }
+        None
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let ps_cmd = format!(
+            "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.OpenFileDialog; $f.Title = '{}'; if($f.ShowDialog() -eq 'OK'){{ $f.FileName }}",
+            prompt_title.replace('\'', "")
+        );
+        if let Ok(out) = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command", &ps_cmd])
+            .output()
+        {
+            if out.status.success() {
+                let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !path_str.is_empty() {
+                    let path = std::path::PathBuf::from(&path_str);
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let fname = path
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("imported_file")
+                            .to_string();
+                        return Some((fname, content));
+                    }
+                }
+            }
+        }
+        None
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        let _ = prompt_title;
+        None
+    }
 }
 
 /// Opens a native OS folder selection dialog when running natively on desktop.

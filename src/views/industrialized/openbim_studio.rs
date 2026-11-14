@@ -214,8 +214,9 @@ impl IndustrializedView {
                             }
                             #[cfg(target_arch = "wasm32")]
                             {
+                                crate::core::web_bridge::trigger_file_picker(".ifc,.eigen,.json,.e2k");
                                 self.export_status = Some(
-                                    "Browser WebAssembly sandbox cannot read local file paths directly; switch to 'Paste STEP SPF' above."
+                                    "Opened browser file picker for local .ifc / .eigen / .json import."
                                         .to_string(),
                                 );
                             }
@@ -224,7 +225,7 @@ impl IndustrializedView {
                 }
 
                 ui.add_space(10.0);
-                // Phase 31+ Locked Preview Slot: WASM Browser File Picker & Drag-and-Drop IFC
+                // Live WASM Browser File Picker & Drag-and-Drop IFC (10D-03)
                 ui_kit::feature_slot_card(
                     ui,
                     theme,
@@ -232,9 +233,26 @@ impl IndustrializedView {
                     FeatureId::WasmLocalIfcFileDropPicker,
                     |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Folder, "Choose Local .IFC / .E2K / .JSON File...", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
-                            let _ = ui.selectable_label(true, "Drag-and-Drop Zone Active");
-                            let _ = ui.selectable_label(false, "Auto-Detect IFC2x3 / IFC4.3 Schema");
+                            if crate::icons::icon_button(
+                                ui,
+                                crate::icons::AppIcon::Folder,
+                                "Choose Local .IFC / .EIGEN / .JSON File...",
+                                12.0,
+                                Color32::WHITE,
+                                theme.accent_blue,
+                                Stroke::NONE,
+                                CornerRadius::same(6),
+                                Vec2::ZERO,
+                            )
+                            .clicked()
+                            {
+                                crate::core::web_bridge::trigger_file_picker(".ifc,.eigen,.json,.e2k");
+                            }
+                            ui.label(
+                                RichText::new("Drag-and-Drop Zone Active (Drop .ifc / .eigen anywhere onto canvas)")
+                                    .size(11.0)
+                                    .color(theme.accent_green),
+                            );
                         });
                     },
                 );

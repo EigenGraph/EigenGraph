@@ -199,9 +199,9 @@ impl FeatureRegistry {
                 code: "LIB-03",
                 title: "Browser IndexedDB & LocalStorage Vault Sync",
                 description: "Automatic client-side WASM persistence across browser reloads with JSON archive import/export.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Active,
                 module_hint: "src/core/web_bridge.rs + src/core/vault.rs",
-                prioritized: true,
+                prioritized: false,
             },
             FeatureEntry {
                 id: FeatureId::CdeIso19650DocumentHub,
@@ -253,7 +253,7 @@ impl FeatureRegistry {
                 code: "AI-03",
                 title: "Live LLM Tool-Calling BIM Orchestrator",
                 description: "Async Gemini REST integration executing validated BimCommand edits against the live structural model.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/core/web_bridge.rs + src/views/ai_assistant.rs",
                 prioritized: false,
             },
@@ -317,9 +317,9 @@ impl FeatureRegistry {
                 code: "1D-04",
                 title: "Live Raster Tile Cache & GeoTIFF/CSV DEM Importer",
                 description: "Async OSM/Esri raster tile texture streaming and browser survey point-cloud CSV/XYZ ingestion.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Active,
                 module_hint: "src/core/gis/map_widget.rs + src/core/web_bridge.rs",
-                prioritized: true,
+                prioritized: false,
             },
             FeatureEntry {
                 id: FeatureId::GeotechBoreholeStratigraphy,
@@ -381,9 +381,9 @@ impl FeatureRegistry {
                 code: "2D-04",
                 title: "Bidirectional 2D/Dynamo <-> 3D BIM Bus Sync",
                 description: "Shares one unified BimCommandBus between Parametric 2D/Dynamo authoring and Geometry 3D viewport.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Active,
                 module_hint: "src/app.rs + src/core/bim.rs",
-                prioritized: true,
+                prioritized: false,
             },
             FeatureEntry {
                 id: FeatureId::AutomatedRcRebarBbsDrafter,
@@ -445,9 +445,9 @@ impl FeatureRegistry {
                 code: "3D-04",
                 title: "Live Bvh3D Spatial Clash Detection Engine",
                 description: "Real-time BVH/AABB collision solver across active walls, columns, beams, MEP runs, and rebar cages.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Active,
                 module_hint: "src/core/csg.rs + src/views/build/clash_bcf.rs",
-                prioritized: true,
+                prioritized: false,
             },
             FeatureEntry {
                 id: FeatureId::FederatedLayersAxisSlicer,
@@ -519,9 +519,9 @@ impl FeatureRegistry {
                 code: "SIM-05",
                 title: "Live BimProject -> FemSolver Reactive Sync",
                 description: "Automatically converts active 3D BIM geometry & 1D GIS seismic parameters into live FEA runs.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Active,
                 module_hint: "src/core/bim.rs + src/views/analyze/mod.rs",
-                prioritized: true,
+                prioritized: false,
             },
             FeatureEntry {
                 id: FeatureId::BridgeMovingLoadInfluence,
@@ -573,7 +573,7 @@ impl FeatureRegistry {
                 code: "4D-02",
                 title: "Element-Linked 4D WBS & 3D Erection Coupling",
                 description: "Binds WBS tasks directly to active BimProject element IDs to isolate active erection phases in 3D.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/core/schedule.rs + src/views/planning.rs",
                 prioritized: false,
             },
@@ -617,7 +617,7 @@ impl FeatureRegistry {
                 code: "5D-02",
                 title: "Live BimProject Volume & Rebar QTO Ledger Sync",
                 description: "Extracts concrete, structural steel, wall area, and rebar tonnage dynamically from active 3D BIM.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/core/cost.rs + src/views/planning.rs",
                 prioritized: false,
             },
@@ -661,7 +661,7 @@ impl FeatureRegistry {
                 code: "6D-02",
                 title: "Live BIM Material Embodied Carbon Sync",
                 description: "Computes real-time A1-A3 CO2e intensity directly from active BimProject volumes and steel profiles.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/core/carbon.rs + src/views/sustainability.rs",
                 prioritized: false,
             },
@@ -847,9 +847,9 @@ impl FeatureRegistry {
                 code: "10D-03",
                 title: "WASM Browser File Picker & Drag-and-Drop IFC",
                 description: "Imports local .ifc, .json, and .e2k files directly in browser via HTML5 file picker and drop events.",
-                status: Locked { target_phase: "Phase 32" },
+                status: Active,
                 module_hint: "src/core/web_bridge.rs + src/views/industrialized/openbim_studio.rs",
-                prioritized: true,
+                prioritized: false,
             },
             FeatureEntry {
                 id: FeatureId::PrecastTrailerJointTolerance,
@@ -945,7 +945,7 @@ impl FeatureRegistry {
                 code: "PUB-03",
                 title: "Auto-Projected DED Sheets from Active BimProject",
                 description: "Dynamically projects active plans, section cuts, and rebar/column schedules onto printable sheets.",
-                status: Locked { target_phase: "Phase 33" },
+                status: Active,
                 module_hint: "src/core/bim.rs + src/views/results.rs",
                 prioritized: false,
             },
@@ -1136,31 +1136,31 @@ mod tests {
             );
         }
         assert_eq!(reg.total_count(), 74);
-        assert_eq!(reg.active_count(), 28);
-        assert_eq!(reg.locked_count(), 46);
+        assert_eq!(reg.active_count(), 39);
+        assert_eq!(reg.locked_count(), 35);
     }
 
     #[test]
     fn test_feature_registry_phases_and_json_export() {
         let mut reg = FeatureRegistry::new();
-        assert_eq!(reg.locked_by_phase_count("Phase 32"), 6);
-        assert_eq!(reg.locked_by_phase_count("Phase 33"), 10);
+        assert_eq!(reg.locked_by_phase_count("Phase 32"), 0);
+        assert_eq!(reg.locked_by_phase_count("Phase 33"), 5);
         assert_eq!(reg.locked_by_phase_count("Phase 34"), 18);
         assert_eq!(reg.locked_by_phase_count("Phase 35"), 12);
 
         let before = reg
-            .entry(FeatureId::LiveGeminiToolOrchestrator)
+            .entry(FeatureId::ParetoMultiObjectiveOptimizer)
             .expect("entry exists")
             .prioritized;
-        reg.toggle_prioritized(FeatureId::LiveGeminiToolOrchestrator);
+        reg.toggle_prioritized(FeatureId::ParetoMultiObjectiveOptimizer);
         let after = reg
-            .entry(FeatureId::LiveGeminiToolOrchestrator)
+            .entry(FeatureId::ParetoMultiObjectiveOptimizer)
             .expect("entry exists")
             .prioritized;
         assert_ne!(before, after);
 
         let md = reg.export_unlock_backlog_markdown();
-        assert!(md.contains("AI-03"));
+        assert!(md.contains("AI-05"));
         assert!(md.contains("10D-05"));
 
         let json_str = reg.export_unlock_roadmap_json();

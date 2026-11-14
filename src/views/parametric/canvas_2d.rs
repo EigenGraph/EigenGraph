@@ -216,11 +216,16 @@ impl ParametricView {
             universal_canvas.cursor_lat_lon = world_map_view.screen_to_lat_lon(hover, rect);
         }
 
-        // Primary drag pans World Map when in non-sketch BIM mode (clicking places elements)
         if !self.sketch_draw_mode && !is_frozen_now && !pointer_in_floating {
             if response.dragged_by(egui::PointerButton::Primary) {
                 let delta = response.drag_delta();
                 universal_canvas.world_map.pan_by_pixels(delta.x, delta.y);
+            }
+            if universal_canvas.measure_active && response.clicked_by(egui::PointerButton::Primary) {
+                if let Some(pos) = response.interact_pointer_pos() {
+                    let lat_lon = world_map_view.screen_to_lat_lon(pos, rect);
+                    universal_canvas.measure_points_lat_lon.push(lat_lon);
+                }
             }
         }
 
@@ -641,7 +646,7 @@ impl ParametricView {
             }
 
             // Handle Left Click to Place/Draw BIM Elements
-            if response.clicked() {
+            if response.clicked() && !universal_canvas.measure_active {
                 let active_lvl_id = self
                     .bim_bus
                     .project
@@ -779,6 +784,10 @@ impl ParametricView {
         if self.sketch_draw_mode {
             universal_canvas.paint_live_preview_world(painter, rect, theme, &to_screen_mm);
         }
+        let world_map_for_measure = &universal_canvas.world_map;
+        universal_canvas.render_geodetic_measure_overlay(painter, rect, theme, &|lat, lon| {
+            world_map_for_measure.lat_lon_to_screen(lat, lon, rect)
+        });
 
         // Top-Left HUD Overlay
         painter.text(

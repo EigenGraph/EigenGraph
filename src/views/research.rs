@@ -110,6 +110,56 @@ impl Default for ResearchConceptView {
 }
 
 impl ResearchConceptView {
+    /// Parses CSV / XYZ survey point clouds (`x, y, z` or whitespace-delimited) into the TIN surface mesh.
+    pub fn import_survey_points_csv_xyz(&mut self, content: &str) -> Result<usize, String> {
+        let mut raw_pts: Vec<(f32, f32, f32)> = Vec::new();
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            let cleaned = trimmed.replace([',', ';', '\t'], " ");
+            let nums: Vec<f32> = cleaned
+                .split_whitespace()
+                .filter_map(|t| t.parse::<f32>().ok())
+                .collect();
+            if nums.len() >= 3 {
+                raw_pts.push((nums[0], nums[1], nums[2]));
+            }
+        }
+        if raw_pts.len() < 3 {
+            return Err("CSV/XYZ survey file requires at least 3 numeric X, Y, Z rows.".to_string());
+        }
+        let min_x = raw_pts.iter().map(|p| p.0).fold(f32::INFINITY, f32::min);
+        let min_y = raw_pts.iter().map(|p| p.1).fold(f32::INFINITY, f32::min);
+        let max_pts = 900;
+        let step = (raw_pts.len() / max_pts).max(1);
+        let pts: Vec<crate::core::gis::TinPoint> = raw_pts
+            .into_iter()
+            .step_by(step)
+            .enumerate()
+            .map(|(id, (x, y, z))| crate::core::gis::TinPoint {
+                id,
+                x: x - min_x,
+                y: y - min_y,
+                z: z * self.tin_vertical_exaggeration,
+            })
+            .collect();
+        let count = pts.len();
+        self.tin_mesh = TinSurfaceMesh::triangulate_bowyer_watson(pts);
+        self.tin_datum_elevation_m = self.tin_datum_elevation_m.clamp(
+            self.tin_mesh.min_elevation,
+            self.tin_mesh.max_elevation,
+        );
+        self.tin_contours = self
+            .tin_mesh
+            .extract_contours(self.tin_minor_contour_m, self.tin_major_contour_m);
+        self.tin_cut_fill_report = self
+            .tin_mesh
+            .compute_cut_fill_report(self.tin_datum_elevation_m, self.tin_slope_hazard_deg);
+        Ok(count)
+    }
+
     fn rebuild_tin_mesh(&mut self) {
         self.tin_mesh = TinSurfaceMesh::generate_from_dem_preset(
             self.tin_preset,
@@ -571,46 +621,51 @@ impl ResearchConceptView {
 
         ui.add_space(10.0);
 
-        // Phase 31+ Preview Slot: Live Raster Map Tile Cache & GeoTIFF/CSV DEM Importer
+        // Phase 37 (1D-04): Live Raster Map Tile Cache & CSV/XYZ Survey DEM Importer
+        let (ready_tiles, cached_total) = self.slippy_map.tile_cache.stats();
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::LiveRasterMapTileFetcher, |ui| {
             ui.horizontal_wrapped(|ui| {
-                let _ = icons::icon_button(
+                if icons::icon_button(
                     ui,
                     AppIcon::Globe,
-                    "Stream OSM / Esri Live Raster Tiles (0 / 512 MB Cache)",
+                    &format!("Live Raster Tiles ({ready_tiles}/{cached_total} cached)"),
                     11.5,
-                    theme.text_primary,
-                    theme.bg_canvas,
-                    Stroke::new(1.0, theme.border_subtle),
+                    Color32::WHITE,
+                    theme.accent_blue,
+                    Stroke::NONE,
                     CornerRadius::same(6),
                     Vec2::ZERO,
-                );
-                let _ = icons::icon_button(
-                    ui,
-                    AppIcon::Layers,
-                    "Import GeoTIFF DEM (.tif)",
-                    11.5,
-                    theme.text_primary,
-                    theme.bg_canvas,
-                    Stroke::new(1.0, theme.border_subtle),
-                    CornerRadius::same(6),
-                    Vec2::ZERO,
-                );
-                let _ = icons::icon_button(
+                )
+                .clicked()
+                {
+                    if self.slippy_map.tile_provider == TileSource::SyntheticVectorTerrain {
+                        self.slippy_map.tile_provider = TileSource::OpenStreetMap;
+                    }
+                    self.slippy_map.tile_cache.clear();
+                }
+                if icons::icon_button(
                     ui,
                     AppIcon::Document,
-                    "Load Survey Point Cloud (.csv / .xyz)",
+                    "Load Survey Point Cloud (.csv / .xyz)...",
                     11.5,
                     theme.text_primary,
                     theme.bg_canvas,
                     Stroke::new(1.0, theme.border_subtle),
                     CornerRadius::same(6),
                     Vec2::ZERO,
-                );
+                )
+                .clicked()
+                {
+                    crate::core::web_bridge::trigger_file_picker(".csv,.xyz,.txt");
+                }
                 ui.label(
-                    RichText::new("Pipeline ready for async WASM fetch + DEM resampling into the 72×72 TIN grid")
-                        .size(11.0)
-                        .color(theme.text_muted),
+                    RichText::new(format!(
+                        "Provider: {} • TIN Vertices: {}",
+                        self.slippy_map.tile_provider.display_name(),
+                        self.tin_mesh.points.len()
+                    ))
+                    .size(11.0)
+                    .color(theme.accent_green),
                 );
             });
         });

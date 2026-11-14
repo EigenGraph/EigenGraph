@@ -24,6 +24,7 @@ pub struct MyProjectView {
     pub request_open_settings_vault: bool,
     pub request_refresh_vault: bool,
     pub request_save_active_to_vault: bool,
+    pub request_export_active_archive: bool,
     pub save_project_name_input: String,
     // Phase 27: BIM Family Catalog & Parameter Inspector fields
     pub families: Vec<BimFamilyItem>,
@@ -45,6 +46,7 @@ impl Default for MyProjectView {
             request_open_settings_vault: false,
             request_refresh_vault: false,
             request_save_active_to_vault: false,
+            request_export_active_archive: false,
             save_project_name_input: "Workspace_Project".to_string(),
             families: Vec::new(),
             selected_family_idx: 0,
@@ -204,22 +206,16 @@ impl MyProjectView {
 
             if icons::icon_button(
                 ui,
-                AppIcon::Lock,
-                "Autosave to InternalVault (.eigen)",
+                AppIcon::SaveDisk,
+                "Save Workspace to Vault (.eigen)",
                 12.0,
                 theme.text_primary,
                 theme.bg_card,
                 Stroke::new(1.0, theme.border_subtle),
                 CornerRadius::same(8),
-                egui::Vec2::new(180.0, 32.0),
+                egui::Vec2::new(196.0, 32.0),
             ).clicked() {
-                let mut engine = crate::core::ParametricEngine::new();
-                if let Ok(mut model) = engine.generate_warren_truss() {
-                    model.name = "EigenGraph_Workspace_Model".to_string();
-                    if let Ok(path) = crate::core::InternalVault::autosave_project_model("EigenGraph_Workspace_Model.eigen", &model) {
-                        self.export_success_msg = Some(format!("Saved automatically to Package Contents: {}", path));
-                    }
-                }
+                self.request_save_active_to_vault = true;
             }
         });
     }
@@ -304,7 +300,7 @@ impl MyProjectView {
         ui: &mut Ui,
         theme: &MacTheme,
         vault_projects_count: usize,
-        _features: &mut FeatureRegistry,
+        features: &mut FeatureRegistry,
     ) {
         let status = crate::core::InternalVault::connection_status();
         theme.card_frame().show(ui, |ui| {
@@ -395,7 +391,7 @@ impl MyProjectView {
                 ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui| {
                     ui.label(
-                        RichText::new("Save Active Workspace Model as `.eigen`:")
+                        RichText::new("Save Complete 1-File Workspace Archive (`.eigen`):")
                             .size(11.0)
                             .color(theme.text_muted),
                     );
@@ -407,7 +403,7 @@ impl MyProjectView {
                     if icons::icon_button(
                         ui,
                         AppIcon::SaveDisk,
-                        "Save Model to Vault/Projects",
+                        "Save Workspace to Vault",
                         11.0,
                         Color32::WHITE,
                         theme.accent_blue,
@@ -421,6 +417,53 @@ impl MyProjectView {
                     }
                 });
             }
+
+            ui.add_space(10.0);
+            ui_kit::feature_slot_card(
+                ui,
+                theme,
+                features,
+                crate::features::FeatureId::BrowserIndexedDbPersistence,
+                |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Folder,
+                            "Import .eigen / .ifc / .json...",
+                            11.0,
+                            theme.text_primary,
+                            theme.bg_sidebar,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
+                        {
+                            crate::core::web_bridge::trigger_file_picker(".eigen,.json,.ifc,.csv");
+                        }
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::SaveDisk,
+                            "Export / Download 1-File .eigen Archive",
+                            11.0,
+                            Color32::WHITE,
+                            theme.accent_green,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        )
+                        .clicked()
+                        {
+                            self.request_export_active_archive = true;
+                        }
+                        ui.label(
+                            RichText::new("Auto-Save Active (IndexedDB & Vault Sync)")
+                                .size(10.5)
+                                .color(theme.accent_green),
+                        );
+                    });
+                },
+            );
         });
     }
 

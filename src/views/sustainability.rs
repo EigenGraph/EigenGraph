@@ -29,6 +29,7 @@ pub struct SustainabilityView {
     pub lca_stages: Vec<LcaStageEmission>,
     pub green_credits: Vec<GreenBuildingCredit>,
     pub selected_credit_standard: Option<String>,
+    pub lca_sync_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +56,7 @@ impl Default for SustainabilityView {
             lca_stages: LcaStageEmission::default_stages(),
             green_credits: GreenBuildingCredit::default_credits(),
             selected_credit_standard: None,
+            lca_sync_status: None,
         }
     }
 }
@@ -65,6 +67,7 @@ impl SustainabilityView {
         ui: &mut Ui,
         theme: &MacTheme,
         members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
         let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
@@ -80,7 +83,7 @@ impl SustainabilityView {
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
                     SustainabilitySubTab::EmbodiedCarbon => {
-                        self.render_embodied_carbon(ui, theme, members, features)
+                        self.render_embodied_carbon(ui, theme, members, bim_project, features)
                     }
                     SustainabilitySubTab::CarbonAriTradeoff => {
                         self.render_carbon_ari_tradeoff(ui, theme)
@@ -120,59 +123,76 @@ impl SustainabilityView {
         &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
-        _members: &[StructuralMember],
+        members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
-        let mut engine = crate::core::ParametricEngine::new();
-        let lca = engine.generate_warren_truss().ok().map(|m| {
-            let route = match self.steel_production_route {
-                SteelProductionRoute::ElectricArcFurnace => crate::core::CarbonSteelRoute::EafRecycled,
-                SteelProductionRoute::BlastFurnaceBof => crate::core::CarbonSteelRoute::BfBofStandard,
-                SteelProductionRoute::HydrogenDri => crate::core::CarbonSteelRoute::GreenHydrogenDri,
-            };
-            crate::core::CarbonEngine::calculate_lca(&m, route, Some(65.0), Some(0.942))
-        });
+        let concrete_m3 = bim_project.total_concrete_volume_m3();
+        let rebar_tons = bim_project.total_rebar_weight_kg() / 1000.0;
+        let steel_frame_tons: f64 = members
+            .iter()
+            .filter(|m| m.is_active && (m.section.starts_with('W') || m.section.contains("HSS") || m.section.contains("WF")))
+            .count() as f64
+            * 0.42;
+        let total_steel_tons = rebar_tons + steel_frame_tons;
 
-        let (total_co2, total_steel_tons, reduction_pct, _tier_str, eco_eff) = match lca.as_ref() {
-            Some(r) => (
-                r.total_embodied_carbon_ton,
-                r.steel_tonnage,
-                r.carbon_reduction_pct,
-                r.greenship_leed_tier.as_str(),
-                r.eco_redundancy_efficiency,
-            ),
-            None => (48.5 * 1.15, 48.5, 35.0, "LEED Silver", 0.017),
-        };
-
-        let _factor = match self.steel_production_route {
+        let route_factor = match self.steel_production_route {
             SteelProductionRoute::ElectricArcFurnace => 1.15,
             SteelProductionRoute::BlastFurnaceBof => 2.35,
             SteelProductionRoute::HydrogenDri => 0.45,
         };
-        let _steel_co2 = total_steel_tons * _factor;
-        let _concrete_co2 = 72.0 * 0.28;
-        let _coating_co2 = 340.0 * 0.008;
-        let _transport_co2 = total_steel_tons * 0.045;
+        let concrete_co2 = concrete_m3 * 0.285;
+        let steel_co2 = total_steel_tons * route_factor;
+        let transport_co2 = (concrete_m3 * 0.012) + (total_steel_tons * 0.045);
+        let baseline_co2 = concrete_co2 + (total_steel_tons * 2.35) + transport_co2;
+        let total_co2 = concrete_co2 + steel_co2 + transport_co2;
+        let reduction_pct = if baseline_co2 > 1e-6 {
+            ((baseline_co2 - total_co2) / baseline_co2 * 100.0).max(0.0)
+        } else {
+            0.0
+        };
+        let avg_ari = if members.is_empty() {
+            0.0
+        } else {
+            members.iter().map(|m| if m.ari > 0.0 { m.ari } else { m.ari_score }).sum::<f64>()
+                / members.len() as f64
+        };
+        let eco_eff = if total_co2 > 1e-6 { avg_ari / total_co2 } else { 0.0 };
+        let floor_area_m2: f64 = bim_project
+            .slabs
+            .iter()
+            .filter(|s| !s.is_roof && s.boundary.len() >= 3)
+            .map(|s| {
+                let mut sum = 0.0;
+                for i in 0..s.boundary.len() {
+                    let a = s.boundary[i];
+                    let b = s.boundary[(i + 1) % s.boundary.len()];
+                    sum += a.0 * b.1 - b.0 * a.1;
+                }
+                sum.abs() * 0.5 * 1e-6
+            })
+            .sum::<f64>()
+            .max(1.0);
 
         // Responsive Metric Cards Row
         let cards = [
             (
                 "TOTAL EMBODIED CARBON",
-                format!("{:.1} t CO₂e", total_co2),
-                format!("Steel Mass: {:.1} Tons (A1–A5)", total_steel_tons),
+                format!("{:.2} t CO₂e", total_co2),
+                format!("Concrete: {:.1} m³ | Steel: {:.2} t (A1–A5)", concrete_m3, total_steel_tons),
                 theme.accent_green,
             ),
             (
                 "CARBON INTENSITY",
-                format!("{:.1} kg/m²", (total_co2 * 1000.0) / 288.0),
-                "24m Span x 12m Floor".to_string(),
+                format!("{:.1} kg/m²", (total_co2 * 1000.0) / floor_area_m2),
+                format!("Area Basis: {:.1} m²", floor_area_m2),
                 theme.accent_blue,
             ),
             (
                 "EMISSIONS SAVINGS",
                 format!("-{:.1}%", reduction_pct),
                 "vs. Baseline BF-BOF".to_string(),
-                if reduction_pct > 30.0 {
+                if reduction_pct > 25.0 {
                     theme.accent_green
                 } else {
                     theme.accent_orange
@@ -192,12 +212,34 @@ impl SustainabilityView {
 
         ui.add_space(12.0);
 
-        // Phase 32 Locked Slot: Live BIM Material Embodied Carbon Sync
+        // Live BIM Material Embodied Carbon Sync
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::BimMaterialLcaAutoSync, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                let _ = ui.selectable_label(true, "Source: Active BimProject Steel + Slab Volumes");
-                let _ = ui.selectable_label(false, "EPD Factor Database (A1-A3)");
-                let _ = icons::icon_button(ui, AppIcon::Recycle, "Recompute Live Model CO₂e Footprint", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+            ui.vertical(|ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "Active BimProject LCA: {:.2} m³ Concrete ({:.2} tCO₂e) + {:.2} t Steel ({:.2} tCO₂e)",
+                            concrete_m3, concrete_co2, total_steel_tons, steel_co2,
+                        ))
+                        .size(11.0)
+                        .strong()
+                        .color(theme.text_primary),
+                    );
+                    if icons::icon_button(ui, AppIcon::Recycle, "Recompute Live Model CO₂e Footprint", 11.5, Color32::WHITE, theme.accent_green, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
+                        self.lca_sync_status = Some(format!(
+                            "Computed A1–A5 Embodied Carbon from {} BIM elements: {:.2} tCO₂e (Concrete {:.2} t + Steel {:.2} t + Transport {:.2} t).",
+                            bim_project.element_count(),
+                            total_co2,
+                            concrete_co2,
+                            steel_co2,
+                            transport_co2,
+                        ));
+                    }
+                });
+                if let Some(ref st) = self.lca_sync_status {
+                    ui.add_space(4.0);
+                    ui.label(RichText::new(st).size(10.5).color(theme.accent_green));
+                }
             });
         });
 

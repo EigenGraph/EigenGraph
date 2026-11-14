@@ -64,6 +64,37 @@ impl ModelArchetype {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ground3DAuthorTool {
+    Orbit,
+    Column,
+    Wall,
+    Beam,
+    Footing,
+}
+
+impl Ground3DAuthorTool {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Orbit => "Orbit",
+            Self::Column => "+Col",
+            Self::Wall => "+Wall",
+            Self::Beam => "+Beam",
+            Self::Footing => "+Foot",
+        }
+    }
+
+    pub fn app_icon(&self) -> AppIcon {
+        match self {
+            Self::Orbit => AppIcon::CursorPan,
+            Self::Column => AppIcon::Column,
+            Self::Wall => AppIcon::LineSeg,
+            Self::Beam => AppIcon::Beam,
+            Self::Footing => AppIcon::BoxPackage,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Render3DMode {
     CsgSolidBrep,     // True 3D CSG B-Rep Triangulated Mesh (Boolean Openings, WF Flanges & Rebar)
     SolidShaded,      // 3D Extruded Shaded Polygonal Beams with Lighting
@@ -252,6 +283,9 @@ pub struct BuildView {
     pub sketch_overlay_synced: bool,
     pub properties_canvas_sync_tab: bool,
     pub last_floating_rects: Vec<Rect>,
+    pub ground_author_tool: Ground3DAuthorTool,
+    pub pending_3d_start_mm: Option<[f64; 2]>,
+    pub hover_3d_ground_snap_mm: Option<[f64; 2]>,
 }
 
 impl Default for BuildView {
@@ -353,6 +387,9 @@ impl Default for BuildView {
             sketch_overlay_synced: true,
             properties_canvas_sync_tab: false,
             last_floating_rects: Vec::new(),
+            ground_author_tool: Ground3DAuthorTool::Orbit,
+            pending_3d_start_mm: None,
+            hover_3d_ground_snap_mm: None,
         }
     }
 }

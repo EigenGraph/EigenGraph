@@ -261,6 +261,7 @@ impl PlanningView {
         theme: &MacTheme,
         variables: &[ParametricVariable],
         members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
         active_pillar: &mut NavigationPillar,
     ) {
@@ -289,10 +290,10 @@ impl PlanningView {
                         self.render_qto_takeoff(ui, theme, &takeoff, members)
                     }
                     PlanningSubTab::DynamicRab => {
-                        self.render_dynamic_rab(ui, theme, &takeoff, features)
+                        self.render_dynamic_rab(ui, theme, &takeoff, bim_project, features)
                     }
                     PlanningSubTab::Schedule4d => {
-                        self.render_schedule_4d(ui, theme, &takeoff, features)
+                        self.render_schedule_4d(ui, theme, &takeoff, bim_project, features)
                     }
                     PlanningSubTab::CostAriTradeoff => {
                         self.render_cost_ari_tradeoff(ui, theme, &takeoff)
@@ -504,10 +505,11 @@ impl PlanningView {
     // SUB-TAB 1: DYNAMIC RAB (5D Cost Estimation)
     // -------------------------------------------------------------
     fn render_dynamic_rab(
-        &self,
+        &mut self,
         ui: &mut Ui,
         theme: &MacTheme,
         t: &Parametric5DTakeoff,
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
         // 4 Responsive KPI Metric Cards
@@ -628,16 +630,61 @@ impl PlanningView {
             features,
             FeatureId::LiveBimQtoBoqSync,
             |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("Target Source: Active 3D BimProject Volume & Rebar BBS")
+                let conc_m3 = bim_project.total_concrete_volume_m3();
+                let rebar_kg = bim_project.total_rebar_weight_kg();
+                let elem_cnt = bim_project.element_count();
+                let est_bim_cost = conc_m3 * t.price_concrete_m3 + rebar_kg * t.price_steel_kg;
+                ui.vertical(|ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(
+                            RichText::new(format!(
+                                "Live BIM QTO: {} elements | Concrete: {:.2} m3 | Rebar: {:.1} kg ({:.2} t) | Est. BIM BOQ: IDR {}",
+                                elem_cnt,
+                                conc_m3,
+                                rebar_kg,
+                                rebar_kg / 1000.0,
+                                format_idr(est_bim_cost),
+                            ))
                             .size(11.0)
                             .strong()
                             .color(theme.text_primary),
-                    );
-                    let _ = icons::icon_button(ui, AppIcon::RulerSquare, "Extract Concrete m³", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
-                    let _ = icons::icon_button(ui, AppIcon::Wrench, "Extract Rebar Tonnage", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
-                    let _ = icons::icon_button(ui, AppIcon::Recycle, "Sync Active BIM Quantities -> BoQ", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                        );
+                    });
+                    ui.add_space(4.0);
+                    ui.horizontal_wrapped(|ui| {
+                        if icons::icon_button(ui, AppIcon::RulerSquare, "Extract Concrete m³", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO).clicked() {
+                            self.export_status = Some(format!(
+                                "Extracted live BIM concrete QTO: {:.2} m3 ({} walls, {} cols, {} beams, {} footings, {} slabs).",
+                                conc_m3,
+                                bim_project.walls.len(),
+                                bim_project.columns.len(),
+                                bim_project.runs.len(),
+                                bim_project.footings.len(),
+                                bim_project.slabs.len(),
+                            ));
+                        }
+                        if icons::icon_button(ui, AppIcon::Wrench, "Extract Rebar Tonnage", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO).clicked() {
+                            self.export_status = Some(format!(
+                                "Extracted live BIM Rebar BBS: {:.1} kg ({:.3} tonnes) across {} bar groups.",
+                                rebar_kg,
+                                rebar_kg / 1000.0,
+                                bim_project.rebars.len(),
+                            ));
+                        }
+                        if icons::icon_button(ui, AppIcon::Recycle, "Sync Active BIM Quantities -> BoQ", 11.5, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
+                            self.export_status = Some(format!(
+                                "Synchronized {} active BIM elements -> 5D BOQ: Concrete IDR {} + Rebar IDR {} = IDR {}.",
+                                elem_cnt,
+                                format_idr(conc_m3 * t.price_concrete_m3),
+                                format_idr(rebar_kg * t.price_steel_kg),
+                                format_idr(est_bim_cost),
+                            ));
+                        }
+                    });
+                    if let Some(ref st) = self.export_status {
+                        ui.add_space(4.0);
+                        ui.label(RichText::new(st).size(10.5).color(theme.accent_green));
+                    }
                 });
             },
         );
@@ -715,6 +762,7 @@ impl PlanningView {
         ui: &mut Ui,
         theme: &MacTheme,
         _t: &Parametric5DTakeoff,
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
         // Top 4 Responsive Metrics
@@ -997,15 +1045,48 @@ impl PlanningView {
             features,
             FeatureId::BimDriven4DCriticalPathSync,
             |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new("3D Sequencing Bindings: IFC Element GlobalId <-> WBS Phases")
+                let substruct_cnt = bim_project.footings.len();
+                let vert_cnt = bim_project.columns.len() + bim_project.walls.len();
+                let super_cnt = bim_project.runs.len() + bim_project.slabs.len();
+                ui.vertical(|ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(
+                            RichText::new(format!(
+                                "Live 4D WBS Binding ({} Levels): Foundations={} | Vertical Core={} | Beams & Slabs={}",
+                                bim_project.levels.len(),
+                                substruct_cnt,
+                                vert_cnt,
+                                super_cnt,
+                            ))
                             .size(11.0)
                             .strong()
                             .color(theme.text_primary),
-                    );
-                    let _ = icons::icon_button(ui, AppIcon::LinkChain, "Map Selected 3D Elements to WBS", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
-                    let _ = icons::icon_button(ui, AppIcon::Cube3D, "Highlight Erection Stage in 3D Viewport", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                        );
+                    });
+                    ui.add_space(4.0);
+                    ui.horizontal_wrapped(|ui| {
+                        if icons::icon_button(ui, AppIcon::LinkChain, "Map Selected 3D Elements to WBS", 11.5, theme.text_primary, theme.bg_canvas, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO).clicked() {
+                            self.export_status = Some(format!(
+                                "Mapped {} BIM elements to 4D WBS stages (Stage 1 Foundation: {}, Stage 2 Core: {}, Stage 3 Frame/Slab: {}).",
+                                substruct_cnt + vert_cnt + super_cnt,
+                                substruct_cnt,
+                                vert_cnt,
+                                super_cnt,
+                            ));
+                        }
+                        if icons::icon_button(ui, AppIcon::Cube3D, "Advance 4D Erection Stage", 11.5, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
+                            self.simulation_day = (self.simulation_day + 30) % 361;
+                            self.export_status = Some(format!(
+                                "Advanced 4D construction simulation clock to Day {} / 360 across {} active storeys.",
+                                self.simulation_day,
+                                bim_project.levels.len(),
+                            ));
+                        }
+                    });
+                    if let Some(ref st) = self.export_status {
+                        ui.add_space(4.0);
+                        ui.label(RichText::new(st).size(10.5).color(theme.accent_green));
+                    }
                 });
             },
         );

@@ -332,6 +332,9 @@ pub struct AnalyzeView {
     pub fire_moment_demand_knm: f32,
     pub fire_axial_demand_kn: f32,
     pub fire_thermal_restraint: crate::core::ThermalRestraintKind,
+    pub request_bim_fem_sync: bool,
+    pub last_bim_sync_label: String,
+    pub synced_bim_element_count: usize,
 }
 
 impl Default for AnalyzeView {
@@ -507,6 +510,9 @@ impl Default for AnalyzeView {
             fire_moment_demand_knm: 240.0,
             fire_axial_demand_kn: 600.0,
             fire_thermal_restraint: crate::core::ThermalRestraintKind::ModeratelyRestrained,
+            request_bim_fem_sync: false,
+            last_bim_sync_label: "Auto-sync active".to_string(),
+            synced_bim_element_count: 0,
         }
     }
 }

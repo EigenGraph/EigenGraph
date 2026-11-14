@@ -75,6 +75,7 @@ impl ResultsView {
         ui: &mut Ui,
         theme: &MacTheme,
         members: &[StructuralMember],
+        bim_project: &crate::core::BimProject,
         features: &mut FeatureRegistry,
     ) {
         let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
@@ -118,7 +119,7 @@ impl ResultsView {
                 // 2. ACTIVE SUB-TAB CONTENT
                 match self.active_subtab {
                     ResultsSubTab::ExecutiveSummary => self.render_executive_summary(ui, theme, members),
-                    ResultsSubTab::DrawingSheets => self.render_drawing_sheets(ui, theme, features),
+                    ResultsSubTab::DrawingSheets => self.render_drawing_sheets(ui, theme, bim_project, features),
                     ResultsSubTab::LivingDocs => self.render_living_docs(ui, theme, members),
                     ResultsSubTab::DynamicSheets => self.render_dynamic_sheets(ui, theme),
                     ResultsSubTab::PresentationSlides => self.render_presentation_slides(ui, theme),
@@ -150,7 +151,13 @@ impl ResultsView {
         ui_kit::subtab_bar(ui, theme, "results_subtab_bar", &mut self.active_subtab, &tabs);
     }
 
-    fn render_drawing_sheets(&mut self, ui: &mut Ui, theme: &MacTheme, features: &mut FeatureRegistry) {
+    fn render_drawing_sheets(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        bim_project: &crate::core::BimProject,
+        features: &mut FeatureRegistry,
+    ) {
         // Top Sheet Controls & Ribbon Bar
         Frame::new()
             .fill(theme.bg_card)
@@ -206,15 +213,40 @@ impl ResultsView {
 
         ui.add_space(10.0);
 
-        // Phase 32+ Preview Slot: Auto-Projected DED Sheets from Active BimProject
+        // Auto-Projected DED Sheets from Active BimProject
         ui_kit::feature_slot_card(ui, theme, features, FeatureId::AutoProjectedBimDedSheets, |ui| {
             ui.horizontal_wrapped(|ui| {
-                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::RulerSquare, "Auto-Project Framing Plan from BimProject", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
-                let _ = crate::icons::icon_button(ui, crate::icons::AppIcon::Wrench, "Link Column & Footing Schedule to Active Model", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO);
+                if crate::icons::icon_button(ui, crate::icons::AppIcon::RulerSquare, "Auto-Project Framing Plan from BimProject", 12.0, Color32::WHITE, theme.accent_blue, Stroke::NONE, CornerRadius::same(6), Vec2::ZERO).clicked() {
+                    self.export_status = Some(format!(
+                        "Projected active BimProject ({} grids, {} walls, {} beams, {} columns, {} footings) to sheet {}.",
+                        bim_project.grids.len(),
+                        bim_project.walls.len(),
+                        bim_project.runs.len(),
+                        bim_project.columns.len(),
+                        bim_project.footings.len(),
+                        self.drawing_sheets.get(self.selected_sheet_idx).map(|s| s.sheet_number.as_str()).unwrap_or("S-101"),
+                    ));
+                }
+                if crate::icons::icon_button(ui, crate::icons::AppIcon::Wrench, "Link Column & Footing Schedule to Active Model", 12.0, theme.text_primary, theme.bg_card, Stroke::new(1.0, theme.border_subtle), CornerRadius::same(6), Vec2::ZERO).clicked() {
+                    self.export_status = Some(format!(
+                        "Linked {} columns & {} footings (Rebar BBS: {:.1} kg | Concrete: {:.2} m3) into sheet schedule viewport.",
+                        bim_project.columns.len(),
+                        bim_project.footings.len(),
+                        bim_project.total_rebar_weight_kg(),
+                        bim_project.total_concrete_volume_m3(),
+                    ));
+                }
                 ui.label(
-                    RichText::new("Live BIM-to-Sheet projection locked until Phase 32 • Sheet preview active")
-                        .size(11.0)
-                        .color(theme.text_muted),
+                    RichText::new(format!(
+                        "Active BimProject synced: {} grids | {} walls | {} cols | {} beams | {} footings",
+                        bim_project.grids.len(),
+                        bim_project.walls.len(),
+                        bim_project.columns.len(),
+                        bim_project.runs.len(),
+                        bim_project.footings.len(),
+                    ))
+                    .size(11.0)
+                    .color(theme.accent_green),
                 );
             });
         });
@@ -271,86 +303,113 @@ impl ResultsView {
                             Color32::from_rgb(20, 30, 60),
                         );
 
-                        // Viewport 1 Geometry: Structural Grids, Columns, Girders & Dims
-                        let grid_cols = 4;
-                        let grid_rows = 4;
+                        // Viewport 1 Geometry: Auto-Projected Active BimProject Framing Plan (or Clean Empty State)
                         let grid_area = vp1_rect.shrink(38.0);
-                        let col_spacing = grid_area.width() / (grid_cols - 1) as f32;
-                        let row_spacing = grid_area.height() / (grid_rows - 1) as f32;
+                        if bim_project.is_empty() {
+                            painter.text(
+                                grid_area.center(),
+                                Align2::CENTER_CENTER,
+                                "EMPTY BIM MODEL\nDraw on Earth Ground Map or run Text-to-BIM (e.g. 'portal 3x2 @6m 2floors') to auto-project DED sheets.",
+                                egui::FontId::proportional(11.0),
+                                Color32::from_rgb(100, 110, 125),
+                            );
+                        } else {
+                            let mut min_x = f64::INFINITY;
+                            let mut max_x = f64::NEG_INFINITY;
+                            let mut min_y = f64::INFINITY;
+                            let mut max_y = f64::NEG_INFINITY;
+                            let mut expand = |px: f64, py: f64| {
+                                min_x = min_x.min(px);
+                                max_x = max_x.max(px);
+                                min_y = min_y.min(py);
+                                max_y = max_y.max(py);
+                            };
+                            for g in &bim_project.grids {
+                                expand(g.start.0, g.start.1);
+                                expand(g.end.0, g.end.1);
+                            }
+                            for w in &bim_project.walls {
+                                expand(w.start.0, w.start.1);
+                                expand(w.end.0, w.end.1);
+                            }
+                            for r in &bim_project.runs {
+                                expand(r.start.0, r.start.1);
+                                expand(r.end.0, r.end.1);
+                            }
+                            for c in &bim_project.columns {
+                                expand(c.pos.0, c.pos.1);
+                            }
+                            for f in &bim_project.footings {
+                                expand(f.pos.0, f.pos.1);
+                            }
+                            if !min_x.is_finite() {
+                                min_x = -2000.0;
+                                max_x = 12000.0;
+                                min_y = -2000.0;
+                                max_y = 9000.0;
+                            }
+                            let span_x = (max_x - min_x).max(2000.0);
+                            let span_y = (max_y - min_y).max(2000.0);
+                            let scale = ((grid_area.width() as f64 / span_x)
+                                .min(grid_area.height() as f64 / span_y)
+                                * 0.86) as f32;
+                            let cx_mid = 0.5 * (min_x + max_x);
+                            let cy_mid = 0.5 * (min_y + max_y);
+                            let to_sheet = |p: crate::core::P2| -> Pos2 {
+                                Pos2::new(
+                                    grid_area.center().x + ((p.0 - cx_mid) as f32) * scale,
+                                    grid_area.center().y - ((p.1 - cy_mid) as f32) * scale,
+                                )
+                            };
 
-                        // Structural Grids & Bubbles
-                        let grid_letters = ["A", "B", "C", "D"];
-                        for c in 0..grid_cols {
-                            let gx = grid_area.min.x + c as f32 * col_spacing;
                             if self.show_grid_bubbles_sheet {
-                                // Vertical Grid Line
-                                painter.line_segment(
-                                    [Pos2::new(gx, grid_area.min.y - 12.0), Pos2::new(gx, grid_area.max.y + 12.0)],
-                                    Stroke::new(0.8, Color32::from_rgb(0, 100, 200)),
-                                );
-                                // Top Grid Bubble
-                                let bubble_center = Pos2::new(gx, grid_area.min.y - 14.0);
-                                painter.circle_filled(bubble_center, 8.0, Color32::from_rgb(235, 245, 255));
-                                painter.circle_stroke(bubble_center, 8.0, Stroke::new(1.0, Color32::from_rgb(0, 100, 200)));
-                                painter.text(bubble_center, Align2::CENTER_CENTER, grid_letters[c], egui::FontId::proportional(9.0), Color32::from_rgb(0, 80, 180));
-                            }
-
-                            // Dimension chain on top
-                            if self.show_annotation_dimensions && c > 0 {
-                                let prev_gx = grid_area.min.x + (c - 1) as f32 * col_spacing;
-                                let dim_y = grid_area.min.y - 28.0;
-                                painter.line_segment([Pos2::new(prev_gx, dim_y), Pos2::new(gx, dim_y)], Stroke::new(0.8, Color32::BLACK));
-                                painter.line_segment([Pos2::new(prev_gx - 2.0, dim_y - 3.0), Pos2::new(prev_gx + 2.0, dim_y + 3.0)], Stroke::new(1.0, Color32::BLACK));
-                                painter.line_segment([Pos2::new(gx - 2.0, dim_y - 3.0), Pos2::new(gx + 2.0, dim_y + 3.0)], Stroke::new(1.0, Color32::BLACK));
-                                painter.text(Pos2::new((prev_gx + gx) * 0.5, dim_y - 6.0), Align2::CENTER_CENTER, "8,000", egui::FontId::proportional(8.0), Color32::BLACK);
-                            }
-                        }
-
-                        for r in 0..grid_rows {
-                            let gy = grid_area.min.y + r as f32 * row_spacing;
-                            if self.show_grid_bubbles_sheet {
-                                // Horizontal Grid Line
-                                painter.line_segment(
-                                    [Pos2::new(grid_area.min.x - 12.0, gy), Pos2::new(grid_area.max.x + 12.0, gy)],
-                                    Stroke::new(0.8, Color32::from_rgb(0, 100, 200)),
-                                );
-                                // Left Grid Bubble
-                                let bubble_center = Pos2::new(grid_area.min.x - 14.0, gy);
-                                painter.circle_filled(bubble_center, 8.0, Color32::from_rgb(235, 245, 255));
-                                painter.circle_stroke(bubble_center, 8.0, Stroke::new(1.0, Color32::from_rgb(0, 100, 200)));
-                                painter.text(bubble_center, Align2::CENTER_CENTER, format!("{}", r + 1), egui::FontId::proportional(9.0), Color32::from_rgb(0, 80, 180));
-                            }
-                        }
-
-                        // Framing Members (Primary Girders & Secondary Infill Joists)
-                        for r in 0..grid_rows {
-                            let gy = grid_area.min.y + r as f32 * row_spacing;
-                            for c in 0..(grid_cols - 1) {
-                                let x1 = grid_area.min.x + c as f32 * col_spacing;
-                                let x2 = x1 + col_spacing;
-                                // Girder double line
-                                painter.line_segment([Pos2::new(x1, gy - 2.0), Pos2::new(x2, gy - 2.0)], Stroke::new(1.2, Color32::from_rgb(10, 80, 180)));
-                                painter.line_segment([Pos2::new(x1, gy + 2.0), Pos2::new(x2, gy + 2.0)], Stroke::new(1.2, Color32::from_rgb(10, 80, 180)));
-                                // Tag
-                                if r == 1 && c == 1 {
-                                    painter.text(Pos2::new((x1 + x2) * 0.5, gy + 8.0), Align2::CENTER_CENTER, "W14x90 [G1]", egui::FontId::proportional(8.0), Color32::from_rgb(10, 70, 160));
+                                for g in &bim_project.grids {
+                                    let p1 = to_sheet(g.start);
+                                    let p2 = to_sheet(g.end);
+                                    painter.line_segment([p1, p2], Stroke::new(0.7, Color32::from_rgb(0, 100, 200)));
+                                    painter.circle_filled(p1, 7.0, Color32::from_rgb(235, 245, 255));
+                                    painter.circle_stroke(p1, 7.0, Stroke::new(0.9, Color32::from_rgb(0, 100, 200)));
+                                    painter.text(p1, Align2::CENTER_CENTER, &g.label, egui::FontId::proportional(7.5), Color32::from_rgb(0, 80, 180));
                                 }
                             }
-                        }
-
-                        // Columns at Intersections
-                        for r in 0..grid_rows {
-                            let gy = grid_area.min.y + r as f32 * row_spacing;
-                            for c in 0..grid_cols {
-                                let gx = grid_area.min.x + c as f32 * col_spacing;
-                                let col_box = Rect::from_center_size(Pos2::new(gx, gy), Vec2::new(11.0, 11.0));
-                                painter.rect_filled(col_box, CornerRadius::ZERO, Color32::from_rgb(30, 30, 40));
-                                painter.line_segment([col_box.left_top(), col_box.right_bottom()], Stroke::new(0.6, Color32::WHITE));
-                                painter.line_segment([col_box.right_top(), col_box.left_bottom()], Stroke::new(0.6, Color32::WHITE));
+                            for f in &bim_project.footings {
+                                let fc = to_sheet(f.pos);
+                                let fw = (f.width_mm as f32 * scale).clamp(10.0, 28.0);
+                                let fl = (f.length_mm as f32 * scale).clamp(10.0, 28.0);
+                                painter.rect_stroke(
+                                    Rect::from_center_size(fc, Vec2::new(fw, fl)),
+                                    CornerRadius::ZERO,
+                                    Stroke::new(0.8, Color32::from_rgb(130, 130, 145)),
+                                    StrokeKind::Inside,
+                                );
+                            }
+                            for r in &bim_project.runs {
+                                let p1 = to_sheet(r.start);
+                                let p2 = to_sheet(r.end);
+                                painter.line_segment([p1, p2], Stroke::new(1.5, Color32::from_rgb(10, 80, 180)));
+                            }
+                            for w in &bim_project.walls {
+                                let p1 = to_sheet(w.start);
+                                let p2 = to_sheet(w.end);
+                                painter.line_segment([p1, p2], Stroke::new(2.6, Color32::from_rgb(45, 55, 72)));
+                            }
+                            for c in &bim_project.columns {
+                                let cc = to_sheet(c.pos);
+                                let col_box = Rect::from_center_size(cc, Vec2::new(9.0, 9.0));
+                                painter.rect_filled(col_box, CornerRadius::ZERO, Color32::from_rgb(25, 30, 45));
+                            }
+                            if self.show_annotation_dimensions {
+                                painter.text(
+                                    Pos2::new(grid_area.center().x, grid_area.min.y - 16.0),
+                                    Align2::CENTER_CENTER,
+                                    format!("OVERALL X: {:.0} mm  |  Y: {:.0} mm", span_x, span_y),
+                                    egui::FontId::proportional(8.0),
+                                    Color32::BLACK,
+                                );
                             }
                         }
 
-                        // VIEWPORT 2: Schedule Table (Top Right 33% of Sheet)
+                        // VIEWPORT 2: Dynamic Schedule Table (Top Right 33% of Sheet)
                         let vp2_rect = Rect::from_min_max(
                             Pos2::new(inner_rect.min.x + inner_rect.width() * 0.66, inner_rect.min.y + 16.0),
                             Pos2::new(inner_rect.max.x - 16.0, inner_rect.min.y + inner_rect.height() * 0.36),
@@ -359,7 +418,7 @@ impl ResultsView {
                         painter.rect_stroke(vp2_rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(180, 180, 190)), StrokeKind::Inside);
                         painter.text(vp2_rect.min + Vec2::new(8.0, 8.0), Align2::LEFT_TOP, "2  COLUMN & FOOTING SCHEDULE", egui::FontId::proportional(9.5), Color32::BLACK);
 
-                        let headers = ["Mark", "Type", "Dimensions", "Rebar", "fc'"];
+                        let headers = ["Mark", "Type", "Dimensions", "Rebar", "Lvl"];
                         let col_w = vp2_rect.width() / headers.len() as f32;
                         for (h_idx, h) in headers.iter().enumerate() {
                             let h_x = vp2_rect.min.x + h_idx as f32 * col_w;
@@ -367,16 +426,45 @@ impl ResultsView {
                             painter.rect_stroke(Rect::from_min_size(Pos2::new(h_x, vp2_rect.min.y + 22.0), Vec2::new(col_w, 14.0)), CornerRadius::ZERO, Stroke::new(0.5, Color32::GRAY), StrokeKind::Inside);
                             painter.text(Pos2::new(h_x + 4.0, vp2_rect.min.y + 24.0), Align2::LEFT_TOP, *h, egui::FontId::proportional(7.5), Color32::BLACK);
                         }
-                        let rows = [
-                            ["C1", "Square RC", "600x600", "12-D25", "40 MPa"],
-                            ["C2", "Wide Flange", "W14x90", "A992", "345 MPa"],
-                            ["F1", "Spread Pad", "2.4x2.4x0.6m", "D19@150", "30 MPa"],
-                        ];
-                        for (r_idx, row) in rows.iter().enumerate() {
-                            let r_y = vp2_rect.min.y + 36.0 + r_idx as f32 * 14.0;
-                            for (c_idx, val) in row.iter().enumerate() {
-                                let c_x = vp2_rect.min.x + c_idx as f32 * col_w;
-                                painter.text(Pos2::new(c_x + 4.0, r_y + 2.0), Align2::LEFT_TOP, *val, egui::FontId::proportional(7.5), Color32::DARK_GRAY);
+                        let mut sched_rows: Vec<[String; 5]> = Vec::new();
+                        for c in bim_project.columns.iter().take(4) {
+                            let has_rb = bim_project.rebars.iter().any(|r| r.host_id == c.id);
+                            sched_rows.push([
+                                c.name.chars().take(10).collect(),
+                                c.profile_name.chars().take(12).collect(),
+                                format!("{:.0}x{:.0}", c.width_mm, c.depth_mm),
+                                if has_rb { "BJTS-420" } else { "Unarmed" }.to_string(),
+                                format!("L{}", c.base_level_id),
+                            ]);
+                        }
+                        for f in bim_project.footings.iter().take(2) {
+                            let has_rb = bim_project.rebars.iter().any(|r| r.host_id == f.id);
+                            sched_rows.push([
+                                f.name.chars().take(10).collect(),
+                                "Spread Pad".to_string(),
+                                format!("{:.1}x{:.1}m", f.width_mm / 1000.0, f.length_mm / 1000.0),
+                                if has_rb { "D16 Mesh" } else { "Unarmed" }.to_string(),
+                                format!("L{}", f.level_id),
+                            ]);
+                        }
+                        if sched_rows.is_empty() {
+                            painter.text(
+                                Pos2::new(vp2_rect.center().x, vp2_rect.min.y + 52.0),
+                                Align2::CENTER_TOP,
+                                "Empty schedule (0 elements modeled)",
+                                egui::FontId::proportional(8.0),
+                                Color32::DARK_GRAY,
+                            );
+                        } else {
+                            for (r_idx, row) in sched_rows.iter().enumerate() {
+                                let r_y = vp2_rect.min.y + 36.0 + r_idx as f32 * 14.0;
+                                if r_y + 14.0 > vp2_rect.max.y {
+                                    break;
+                                }
+                                for (c_idx, val) in row.iter().enumerate() {
+                                    let c_x = vp2_rect.min.x + c_idx as f32 * col_w;
+                                    painter.text(Pos2::new(c_x + 4.0, r_y + 2.0), Align2::LEFT_TOP, val, egui::FontId::proportional(7.5), Color32::DARK_GRAY);
+                                }
                             }
                         }
 

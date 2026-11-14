@@ -422,7 +422,11 @@ impl BuildView {
                 } else {
                     self.cam_pan += delta;
                 }
-            } else if !allow_sketch_drag && response.dragged_by(egui::PointerButton::Primary) {
+            } else if !allow_sketch_drag
+                && self.ground_author_tool == Ground3DAuthorTool::Orbit
+                && !universal_canvas.measure_active
+                && response.dragged_by(egui::PointerButton::Primary)
+            {
                 self.cam_yaw = (self.cam_yaw + response.drag_delta().x * 0.008)
                     .rem_euclid(2.0 * std::f32::consts::PI);
                 self.cam_pitch =
@@ -543,44 +547,48 @@ impl BuildView {
             &project_3d,
         );
 
+        // Ground-plane / Active Datum inverse raycast closure (`y = datum_y_m`)
+        let cos_y = cam_yaw.cos();
+        let sin_y = cam_yaw.sin();
+        let cos_p = cam_pitch.cos();
+        let sin_p = cam_pitch.sin();
+        let datum_y_m = self.draft_node_y as f32;
+        let raycast_plane_mm = |screen: Pos2, plane_y_m: f32| -> [f64; 2] {
+            let dy = plane_y_m - center_3d.1;
+            let mut depth_est = 0.0_f32;
+            let mut x1 = 0.0_f32;
+            let mut z1 = 0.0_f32;
+            for _ in 0..4 {
+                let pf = if is_persp {
+                    (d_cam / (d_cam + depth_est).max(4.0)).clamp(0.05, 4.0)
+                } else {
+                    1.0
+                };
+                let sc = (base_scale_unit * cam_zoom * pf).max(0.01);
+                x1 = (screen.x - center_screen.x - cam_pan.x) / sc;
+                let y2 = (center_screen.y + cam_pan.y - screen.y) / sc;
+                z1 = if sin_p.abs() > 0.02 {
+                    (dy * cos_p - y2) / sin_p
+                } else {
+                    0.0
+                };
+                depth_est = -(dy * sin_p + z1 * cos_p);
+            }
+            let dx = x1 * cos_y - z1 * sin_y;
+            let dz = x1 * sin_y + z1 * cos_y;
+            [
+                ((center_3d.0 + dx - offset_x) * 1000.0) as f64,
+                ((center_3d.2 + dz - offset_z) * 1000.0) as f64,
+            ]
+        };
+
         // Ground-plane (y=0.02) Universal Ink Sketch authoring when Sketch Mode is active
         if allow_sketch_drag
             && !pointer_in_floating
             && !universal_canvas.is_frozen
             && !crate::ui_kit::is_canvas_frozen(ui.ctx())
         {
-            let cos_y = cam_yaw.cos();
-            let sin_y = cam_yaw.sin();
-            let cos_p = cam_pitch.cos();
-            let sin_p = cam_pitch.sin();
-            let dy = 0.02_f32 - center_3d.1;
-            let screen_to_ground_mm = |screen: Pos2| -> [f64; 2] {
-                let mut depth_est = 0.0_f32;
-                let mut x1 = 0.0_f32;
-                let mut z1 = 0.0_f32;
-                for _ in 0..4 {
-                    let pf = if is_persp {
-                        (d_cam / (d_cam + depth_est).max(4.0)).clamp(0.05, 4.0)
-                    } else {
-                        1.0
-                    };
-                    let sc = (base_scale_unit * cam_zoom * pf).max(0.01);
-                    x1 = (screen.x - center_screen.x - cam_pan.x) / sc;
-                    let y2 = (center_screen.y + cam_pan.y - screen.y) / sc;
-                    z1 = if sin_p.abs() > 0.02 {
-                        (dy * cos_p - y2) / sin_p
-                    } else {
-                        0.0
-                    };
-                    depth_est = -(dy * sin_p + z1 * cos_p);
-                }
-                let dx = x1 * cos_y - z1 * sin_y;
-                let dz = x1 * sin_y + z1 * cos_y;
-                [
-                    ((center_3d.0 + dx - offset_x) * 1000.0) as f64,
-                    ((center_3d.2 + dz - offset_z) * 1000.0) as f64,
-                ]
-            };
+            let screen_to_ground_mm = |screen: Pos2| raycast_plane_mm(screen, 0.02);
             let hit_radius_mm = (18.0 / (base_scale_unit * cam_zoom).max(0.05)) as f64 * 1000.0;
             universal_canvas.handle_world_sketch_interaction(
                 &response,
@@ -589,6 +597,211 @@ impl BuildView {
                 &screen_to_ground_mm,
             );
         }
+
+        // Interactive 3D Geodesic Measurement clicks on Earth Ground Plane
+        if universal_canvas.measure_active
+            && !is_frozen_now
+            && !pointer_in_floating
+            && response.clicked_by(egui::PointerButton::Primary)
+        {
+            if let Some(pos) = response.interact_pointer_pos() {
+                universal_canvas.ensure_ground_origin_at_screen(pos, rect);
+                let mm = raycast_plane_mm(pos, 0.0);
+                let ll = crate::core::gis::SlippyMapState::world_mm_to_lat_lon(
+                    universal_canvas.ground_origin_lat_lon,
+                    mm,
+                );
+                universal_canvas.measure_points_lat_lon.push(ll);
+            }
+        } else if !self.sketch_mode_active
+            && self.ground_author_tool != Ground3DAuthorTool::Orbit
+            && !is_frozen_now
+            && !pointer_in_floating
+        {
+            // Interactive 3D Earth Ground BIM Authoring with magnetic snap
+            let snap_mm = |raw: [f64; 2]| -> [f64; 2] {
+                let mut best: Option<([f64; 2], f64)> = None;
+                let thresh = 450.0;
+                for c in &self.bim_bus.project.columns {
+                    let d = (c.pos.0 - raw[0]).hypot(c.pos.1 - raw[1]);
+                    if d < thresh && best.is_none_or(|(_, bd)| d < bd) {
+                        best = Some(([c.pos.0, c.pos.1], d));
+                    }
+                }
+                for w in &self.bim_bus.project.walls {
+                    for p in [w.start, w.end] {
+                        let d = (p.0 - raw[0]).hypot(p.1 - raw[1]);
+                        if d < thresh && best.is_none_or(|(_, bd)| d < bd) {
+                            best = Some(([p.0, p.1], d));
+                        }
+                    }
+                }
+                for r in &self.bim_bus.project.runs {
+                    for p in [r.start, r.end] {
+                        let d = (p.0 - raw[0]).hypot(p.1 - raw[1]);
+                        if d < thresh && best.is_none_or(|(_, bd)| d < bd) {
+                            best = Some(([p.0, p.1], d));
+                        }
+                    }
+                }
+                if let Some((pt, _)) = best {
+                    pt
+                } else {
+                    [(raw[0] / 500.0).round() * 500.0, (raw[1] / 500.0).round() * 500.0]
+                }
+            };
+
+            if let Some(hover) = response.hover_pos() {
+                let raw = raycast_plane_mm(hover, datum_y_m);
+                self.hover_3d_ground_snap_mm = Some(snap_mm(raw));
+            } else {
+                self.hover_3d_ground_snap_mm = None;
+            }
+
+            if response.clicked_by(egui::PointerButton::Primary) {
+                if let Some(pos) = response.interact_pointer_pos() {
+                    universal_canvas.ensure_ground_origin_at_screen(pos, rect);
+                    let pt = snap_mm(raycast_plane_mm(pos, datum_y_m));
+                    let mut sorted_lvls = self.bim_bus.project.levels.clone();
+                    sorted_lvls.sort_by(|a, b| a.elevation_mm.total_cmp(&b.elevation_mm));
+                    let active_lvl_idx = sorted_lvls
+                        .iter()
+                        .enumerate()
+                        .min_by(|(_, a), (_, b)| {
+                            ((a.elevation_mm * 0.001) - self.draft_node_y)
+                                .abs()
+                                .total_cmp(&((b.elevation_mm * 0.001) - self.draft_node_y).abs())
+                        })
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    let base_level_id = sorted_lvls.get(active_lvl_idx).map(|l| l.id).unwrap_or(1);
+                    let top_level_id = sorted_lvls
+                        .get(active_lvl_idx + 1)
+                        .map(|l| l.id)
+                        .unwrap_or(base_level_id);
+                    let p2 = crate::core::P2(pt[0], pt[1]);
+
+                    match self.ground_author_tool {
+                        Ground3DAuthorTool::Column => {
+                            let res = self.bim_bus.execute(crate::core::BimCommand::AddColumn {
+                                base_level_id,
+                                top_level_id,
+                                pos: p2,
+                                width_mm: 400.0,
+                                depth_mm: 400.0,
+                                is_round: false,
+                                profile_name: "C400x400".to_string(),
+                            });
+                            if let Ok(msg) = res {
+                                self.modify_status_msg = Some(msg.clone());
+                                self.bim_console_logs.push(msg);
+                            }
+                        }
+                        Ground3DAuthorTool::Footing => {
+                            let res = self.bim_bus.execute(crate::core::BimCommand::AddFooting {
+                                level_id: base_level_id,
+                                pos: p2,
+                                width_mm: 1600.0,
+                                length_mm: 1600.0,
+                                thickness_mm: 450.0,
+                            });
+                            if let Ok(msg) = res {
+                                self.modify_status_msg = Some(msg.clone());
+                                self.bim_console_logs.push(msg);
+                            }
+                        }
+                        Ground3DAuthorTool::Wall | Ground3DAuthorTool::Beam => {
+                            if let Some(s) = self.pending_3d_start_mm.take() {
+                                if (s[0] - pt[0]).hypot(s[1] - pt[1]) >= 200.0 {
+                                    let cmd = if self.ground_author_tool == Ground3DAuthorTool::Wall {
+                                        crate::core::BimCommand::AddWall {
+                                            base_level_id,
+                                            start: crate::core::P2(s[0], s[1]),
+                                            end: p2,
+                                            thickness_mm: 200.0,
+                                            is_structural: true,
+                                        }
+                                    } else {
+                                        crate::core::BimCommand::AddBeamRun {
+                                            level_id: base_level_id,
+                                            category: crate::core::RunCategory::StructuralBeam,
+                                            start: crate::core::P2(s[0], s[1]),
+                                            end: p2,
+                                            width_mm: 300.0,
+                                            depth_mm: 550.0,
+                                            justify: crate::core::RunJustify::Top,
+                                            profile_name: "B300x550".to_string(),
+                                        }
+                                    };
+                                    if let Ok(msg) = self.bim_bus.execute(cmd) {
+                                        self.modify_status_msg = Some(msg.clone());
+                                        self.bim_console_logs.push(msg);
+                                    }
+                                }
+                            } else {
+                                self.pending_3d_start_mm = Some(pt);
+                            }
+                        }
+                        Ground3DAuthorTool::Orbit => {}
+                    }
+                }
+            }
+            if response.secondary_clicked() {
+                self.pending_3d_start_mm = None;
+            }
+        } else {
+            self.hover_3d_ground_snap_mm = None;
+        }
+
+        // Render 3D Ground Authoring Reticle, Rubber-Band Preview & Geodesic Measurement Overlay
+        if let Some(snap_pt) = self.hover_3d_ground_snap_mm {
+            let (sp, _) = project_3d(
+                snap_pt[0] as f32 * 0.001 + offset_x,
+                datum_y_m + 0.02,
+                snap_pt[1] as f32 * 0.001 + offset_z,
+            );
+            let reticle_col = Color32::from_rgb(0, 240, 255);
+            painter.circle_stroke(sp, 7.0, Stroke::new(1.8, reticle_col));
+            painter.text(
+                sp + Vec2::new(10.0, -10.0),
+                Align2::LEFT_BOTTOM,
+                format!(
+                    "{} ({:.2}m, {:.2}m)",
+                    self.ground_author_tool.label(),
+                    snap_pt[0] * 0.001,
+                    snap_pt[1] * 0.001
+                ),
+                egui::FontId::monospace(10.0),
+                reticle_col,
+            );
+            if let Some(start_mm) = self.pending_3d_start_mm {
+                let (st_sp, _) = project_3d(
+                    start_mm[0] as f32 * 0.001 + offset_x,
+                    datum_y_m + 0.02,
+                    start_mm[1] as f32 * 0.001 + offset_z,
+                );
+                painter.line_segment([st_sp, sp], Stroke::new(2.4, theme.accent_orange));
+                let len_m = (snap_pt[0] - start_mm[0]).hypot(snap_pt[1] - start_mm[1]) * 0.001;
+                let mid = Pos2::new(0.5 * (st_sp.x + sp.x), 0.5 * (st_sp.y + sp.y) - 10.0);
+                painter.text(
+                    mid,
+                    Align2::CENTER_BOTTOM,
+                    format!("L = {:.2} m", len_m),
+                    egui::FontId::monospace(10.5),
+                    theme.accent_orange,
+                );
+            }
+        }
+        let origin_ll_3d = universal_canvas.ground_origin_lat_lon;
+        universal_canvas.render_geodetic_measure_overlay(&painter, rect, theme, &|lat, lon| {
+            let mm = crate::core::gis::SlippyMapState::lat_lon_to_world_mm(origin_ll_3d, lat, lon);
+            project_3d(
+                mm[0] as f32 * 0.001 + offset_x,
+                0.02,
+                mm[1] as f32 * 0.001 + offset_z,
+            )
+            .0
+        });
 
         if self.sketch_overlay_synced || self.sketch_mode_active {
             let ground_to_screen = |mm: [f64; 2]| -> Pos2 {
@@ -1182,7 +1395,9 @@ impl BuildView {
                             };
                             let box_col = Color32::from_rgb(cr, cg, cb);
 
-                            let [cx, cy, cz] = item.point_3d;
+                            let [cx_raw, cy, cz_raw] = item.point_3d;
+                            let cx = cx_raw + offset_x;
+                            let cz = cz_raw + offset_z;
                             let [hx, hy, hz] = item.box_half_extents;
                             let corners_3d = [
                                 (cx - hx, cy - hy, cz - hz),
@@ -1510,6 +1725,37 @@ impl BuildView {
                                 self.modify_status_msg = Some(msg);
                             }
                             Err(e) => self.modify_status_msg = Some(e),
+                        }
+                    }
+
+                    ui.separator();
+
+                    // Phase 37: Direct 3D Earth Ground BIM Authoring Tools
+                    ui.label(RichText::new("Author:").size(10.0).color(theme.text_muted));
+                    for tool in [
+                        Ground3DAuthorTool::Orbit,
+                        Ground3DAuthorTool::Column,
+                        Ground3DAuthorTool::Wall,
+                        Ground3DAuthorTool::Beam,
+                        Ground3DAuthorTool::Footing,
+                    ] {
+                        let sel = self.ground_author_tool == tool;
+                        if icons::icon_button(
+                            ui,
+                            tool.app_icon(),
+                            tool.label(),
+                            10.0,
+                            if sel { Color32::WHITE } else { theme.text_secondary },
+                            if sel { theme.accent_orange } else { theme.bg_card },
+                            Stroke::NONE,
+                            CornerRadius::same(4),
+                            Vec2::new(0.0, 22.0),
+                        )
+                        .on_hover_text("Direct 3D ground placement on active datum elevation (Right-drag pans Earth map)")
+                        .clicked()
+                        {
+                            self.ground_author_tool = tool;
+                            self.pending_3d_start_mm = None;
                         }
                     }
 
@@ -1857,9 +2103,16 @@ impl BuildView {
             self.modify_status_msg =
                 Some("Usage: level <Name> <Elevation_mm> (e.g. level Roof 7000)".to_string());
         } else {
-            let msg = format!("Command '{}' logged to BIM Console.", trimmed);
-            self.bim_console_logs.push(msg.clone());
-            self.modify_status_msg = Some(msg);
+            match self.bim_bus.execute_natural_language(trimmed) {
+                Ok(msg) => {
+                    self.bim_console_logs.push(msg.clone());
+                    self.modify_status_msg = Some(msg);
+                }
+                Err(err) => {
+                    self.bim_console_logs.push(err.clone());
+                    self.modify_status_msg = Some(err);
+                }
+            }
         }
     }
 

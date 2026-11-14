@@ -650,6 +650,32 @@ impl Aabb3D {
         }
         true
     }
+
+    /// Computes overlapping bounding-box interference (`Some((center, penetration_mm, overlap_volume_m3))`)
+    /// when clearance falls below `tolerance_m`.
+    pub fn overlap_with_tolerance(&self, other: &Self, tolerance_m: f64) -> Option<(P3, f64, f64)> {
+        let tol = tolerance_m.max(0.0);
+        let ix0 = (self.min[0] - tol).max(other.min[0] - tol);
+        let ix1 = (self.max[0] + tol).min(other.max[0] + tol);
+        let iy0 = (self.min[1] - tol).max(other.min[1] - tol);
+        let iy1 = (self.max[1] + tol).min(other.max[1] + tol);
+        let iz0 = (self.min[2] - tol).max(other.min[2] - tol);
+        let iz1 = (self.max[2] + tol).min(other.max[2] + tol);
+        if ix1 <= ix0 || iy1 <= iy0 || iz1 <= iz0 {
+            return None;
+        }
+        let hard_dx = (self.max[0].min(other.max[0]) - self.min[0].max(other.min[0])).max(0.0);
+        let hard_dy = (self.max[1].min(other.max[1]) - self.min[1].max(other.min[1])).max(0.0);
+        let hard_dz = (self.max[2].min(other.max[2]) - self.min[2].max(other.min[2])).max(0.0);
+        let vol = hard_dx * hard_dy * hard_dz;
+        let min_pen_m = if vol > 1e-7 {
+            hard_dx.min(hard_dy).min(hard_dz)
+        } else {
+            (ix1 - ix0).min(iy1 - iy0).min(iz1 - iz0) * 0.5
+        };
+        let center = [0.5 * (ix0 + ix1), 0.5 * (iy0 + iy1), 0.5 * (iz0 + iz1)];
+        Some((center, (min_pen_m * 1000.0).max(1.0), vol))
+    }
 }
 
 #[derive(Clone, Debug)]

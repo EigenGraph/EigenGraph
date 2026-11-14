@@ -1402,6 +1402,62 @@ impl BimProject {
         self.rebars.iter().map(|r| r.total_weight_kg()).sum()
     }
 
+    /// Total structural concrete volume in cubic metres across walls, columns, structural runs, footings, and slabs.
+    pub fn total_concrete_volume_m3(&self) -> f64 {
+        let mut vol_m3 = 0.0;
+        for w in &self.walls {
+            let z0 = self.level_elevation(w.base_level_id);
+            let z1 = w
+                .top_level_id
+                .map(|tid| self.level_elevation(tid))
+                .unwrap_or(z0 + w.unconnected_height_mm);
+            let h_m = (z1 - z0).abs().max(w.unconnected_height_mm).max(2500.0) * 0.001;
+            let len_m = w.start.dist(w.end) * 0.001;
+            let t_m = w.thickness_mm * 0.001;
+            vol_m3 += len_m * t_m * h_m;
+        }
+        for c in &self.columns {
+            let h_mm = (self.level_elevation(c.top_level_id) - self.level_elevation(c.base_level_id))
+                .abs()
+                .max(3000.0);
+            vol_m3 += (c.width_mm * 0.001) * (c.depth_mm * 0.001) * (h_mm * 0.001);
+        }
+        for r in &self.runs {
+            if matches!(
+                r.category,
+                RunCategory::StructuralBeam | RunCategory::StructuralBrace | RunCategory::StripFooting
+            ) {
+                let len_m = r.start.dist(r.end) * 0.001;
+                vol_m3 += len_m * (r.width_mm * 0.001) * (r.depth_mm * 0.001);
+            }
+        }
+        for f in &self.footings {
+            vol_m3 += (f.width_mm * 0.001) * (f.length_mm * 0.001) * (f.thickness_mm * 0.001);
+        }
+        for s in &self.slabs {
+            if s.boundary.len() >= 3 {
+                let mut area_mm2 = 0.0;
+                for i in 0..s.boundary.len() {
+                    let a = s.boundary[i];
+                    let b = s.boundary[(i + 1) % s.boundary.len()];
+                    area_mm2 += a.0 * b.1 - b.0 * a.1;
+                }
+                let area_m2 = area_mm2.abs() * 0.5 * 1e-6;
+                vol_m3 += area_m2 * (s.thickness_mm * 0.001);
+            }
+        }
+        vol_m3
+    }
+
+    /// Total number of modeled BIM physical elements.
+    pub fn element_count(&self) -> usize {
+        self.walls.len()
+            + self.columns.len()
+            + self.runs.len()
+            + self.footings.len()
+            + self.slabs.len()
+    }
+
     /// Evaluates Revit-style Object Snaps (`SE, SM, SI, SC, SP, SN`) and 15° Angular Ruler Guides
     /// near `cursor_pt` (within `snap_radius_mm`).
     pub fn find_snap(
@@ -2405,6 +2461,425 @@ impl BimCommandBus {
         Some(msg)
     }
 
+    /// Deterministic Text-to-BIM Command Synthesizer supporting natural-language prompts
+    /// such as `portal 3x2 @6m 2floors`, `grid 3x2 @5m`, `box 8x6`, `wall 0,0->6000,0`,
+    /// `col 0,0`, `beam 0,0->6000,0`, `footing 0,0`, `level Roof 7000`, `rebar`, and `clear`.
+    pub fn execute_natural_language(&mut self, prompt: &str) -> Result<String, String> {
+        let trimmed = prompt.trim();
+        if trimmed.is_empty() {
+            return Err("Empty Text-to-BIM prompt.".to_string());
+        }
+        if trimmed.starts_with('{') {
+            return self.execute_json(trimmed);
+        }
+
+        let lower = trimmed.to_lowercase();
+        let parse_pair = |s: &str| -> Option<P2> {
+            let clean = s.replace(['(', ')'], "");
+            let mut it = clean.split(',').filter_map(|p| p.trim().parse::<f64>().ok());
+            Some(P2(it.next()?, it.next()?))
+        };
+        let parse_dims_token = |tok: &str| -> Option<(f64, f64)> {
+            let clean = tok.trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '.' && c != 'x');
+            let pos = clean.find('x')?;
+            let a_str = clean[..pos].trim_end_matches("mm").trim_end_matches('m');
+            let b_str = clean[pos + 1..].trim_end_matches("mm").trim_end_matches('m');
+            let a = a_str.parse::<f64>().ok()?;
+            let b = b_str.parse::<f64>().ok()?;
+            Some((a, b))
+        };
+        let to_mm = |val: f64| -> f64 {
+            if val.abs() < 200.0 {
+                val * 1000.0
+            } else {
+                val
+            }
+        };
+
+        if matches!(lower.as_str(), "undo") {
+            return self.undo().ok_or_else(|| "Nothing to undo.".to_string());
+        }
+        if matches!(lower.as_str(), "redo") {
+            return self.redo().ok_or_else(|| "Nothing to redo.".to_string());
+        }
+        if lower == "clear" || lower == "reset" || lower == "reset workspace" {
+            let snapshot = self.project.clone();
+            self.project = BimProject::empty();
+            self.undo_stack.push(snapshot);
+            self.redo_stack.clear();
+            let msg = "Cleared active BIM workspace to blank ground plane.".to_string();
+            self.log.push(msg.clone());
+            crate::core::InternalVault::sync_live_bim_state(&self.project, &msg);
+            return Ok(msg);
+        }
+        if lower.contains("rebar") || lower.contains("reinforc") {
+            return self.execute(BimCommand::ReinforceAllConcrete {
+                preset: RebarPreset::default(),
+            });
+        }
+
+        // Single-element explicit CAD/BIM commands
+        if let Some(rest) = lower.strip_prefix("wall ") {
+            let clean = rest.replace("->", " ");
+            let pts: Vec<&str> = clean.split_whitespace().collect();
+            if pts.len() >= 2 {
+                if let (Some(p1), Some(p2)) = (parse_pair(pts[0]), parse_pair(pts[1])) {
+                    let base_level_id = self.project.levels.first().map(|l| l.id).unwrap_or(1);
+                    return self.execute(BimCommand::AddWall {
+                        base_level_id,
+                        start: p1,
+                        end: p2,
+                        thickness_mm: 200.0,
+                        is_structural: true,
+                    });
+                }
+            }
+            return Err("Usage: wall x1_mm,y1_mm -> x2_mm,y2_mm".to_string());
+        }
+        if let Some(rest) = lower.strip_prefix("beam ").or_else(|| lower.strip_prefix("run ")) {
+            let clean = rest.replace("->", " ");
+            let pts: Vec<&str> = clean.split_whitespace().collect();
+            if pts.len() >= 2 {
+                if let (Some(p1), Some(p2)) = (parse_pair(pts[0]), parse_pair(pts[1])) {
+                    let level_id = self.project.levels.last().map(|l| l.id).unwrap_or(1);
+                    return self.execute(BimCommand::AddBeamRun {
+                        level_id,
+                        category: RunCategory::StructuralBeam,
+                        start: p1,
+                        end: p2,
+                        width_mm: 300.0,
+                        depth_mm: 550.0,
+                        justify: RunJustify::Top,
+                        profile_name: "RC 300x550".to_string(),
+                    });
+                }
+            }
+            return Err("Usage: beam x1_mm,y1_mm -> x2_mm,y2_mm".to_string());
+        }
+        if let Some(rest) = lower.strip_prefix("col ").or_else(|| lower.strip_prefix("column ")) {
+            if let Some(pos) = parse_pair(rest) {
+                let base_level_id = self.project.levels.first().map(|l| l.id).unwrap_or(1);
+                let top_level_id = self
+                    .project
+                    .levels
+                    .get(1)
+                    .map(|l| l.id)
+                    .unwrap_or(base_level_id);
+                return self.execute(BimCommand::AddColumn {
+                    base_level_id,
+                    top_level_id,
+                    pos,
+                    width_mm: 400.0,
+                    depth_mm: 400.0,
+                    is_round: false,
+                    profile_name: "RC 400x400".to_string(),
+                });
+            }
+            return Err("Usage: col x_mm,y_mm".to_string());
+        }
+        if let Some(rest) = lower.strip_prefix("foot ").or_else(|| lower.strip_prefix("footing ")) {
+            if let Some(pos) = parse_pair(rest) {
+                let level_id = self.project.levels.first().map(|l| l.id).unwrap_or(1);
+                return self.execute(BimCommand::AddFooting {
+                    level_id,
+                    pos,
+                    width_mm: 1400.0,
+                    length_mm: 1400.0,
+                    thickness_mm: 450.0,
+                });
+            }
+            return Err("Usage: footing x_mm,y_mm".to_string());
+        }
+        if let Some(rest) = trimmed
+            .strip_prefix("level ")
+            .or_else(|| trimmed.strip_prefix("LEVEL "))
+        {
+            let mut toks = rest.split_whitespace();
+            if let (Some(name), Some(elev_raw)) = (toks.next(), toks.next()) {
+                let is_m = elev_raw.to_lowercase().ends_with('m')
+                    && !elev_raw.to_lowercase().ends_with("mm");
+                let num_str = elev_raw
+                    .trim_end_matches(|c: char| !c.is_ascii_digit() && c != '.' && c != '-');
+                if let Ok(v) = num_str.parse::<f64>() {
+                    let elevation_mm = if is_m { v * 1000.0 } else { v };
+                    return self.execute(BimCommand::AddLevel {
+                        name: name.to_string(),
+                        elevation_mm,
+                    });
+                }
+            }
+            return Err("Usage: level <Name> <Elevation_mm> (e.g. level Roof 7000)".to_string());
+        }
+
+        // Parametric Structural Frame Synthesizer: `portal 3x2 @6m 2floors` / `grid 3x2 @5m` / `box 8x6`
+        let is_portal = lower.contains("portal") || lower.contains("frame") || lower.contains("building");
+        let is_grid = lower.contains("grid");
+        let is_box = lower.contains("box") || lower.contains("room") || lower.contains("enclosure");
+
+        if is_portal || is_grid || is_box {
+            let tokens: Vec<&str> = lower.split_whitespace().collect();
+            let dims = tokens.iter().find_map(|t| parse_dims_token(t));
+            let (raw_x, raw_y) = dims.unwrap_or(if is_box { (8.0, 6.0) } else { (2.0, 2.0) });
+
+            let snapshot = self.project.clone();
+            if self.project.levels.is_empty() {
+                let id = self.project.alloc_id();
+                self.project.levels.push(BimLevel {
+                    id,
+                    name: "Ground Level (+0.00m)".to_string(),
+                    elevation_mm: 0.0,
+                });
+            }
+
+            if is_box {
+                let w_mm = to_mm(raw_x).clamp(1500.0, 60000.0);
+                let d_mm = to_mm(raw_y).clamp(1500.0, 60000.0);
+                if self.project.levels.len() < 2 {
+                    let top_elev = self.project.levels.last().map(|l| l.elevation_mm).unwrap_or(0.0) + 3500.0;
+                    let _ = self.apply_command(BimCommand::AddLevel {
+                        name: format!("Roof Deck (+{:.2}m)", top_elev / 1000.0),
+                        elevation_mm: top_elev,
+                    });
+                }
+                let base_id = self.project.levels[0].id;
+                let top_id = self.project.levels[1].id;
+                let corners = [P2(0.0, 0.0), P2(w_mm, 0.0), P2(w_mm, d_mm), P2(0.0, d_mm)];
+                for i in 0..4 {
+                    let a = corners[i];
+                    let b = corners[(i + 1) % 4];
+                    let _ = self.apply_command(BimCommand::AddWall {
+                        base_level_id: base_id,
+                        start: a,
+                        end: b,
+                        thickness_mm: 200.0,
+                        is_structural: true,
+                    });
+                    let _ = self.apply_command(BimCommand::AddColumn {
+                        base_level_id: base_id,
+                        top_level_id: top_id,
+                        pos: a,
+                        width_mm: 350.0,
+                        depth_mm: 350.0,
+                        is_round: false,
+                        profile_name: "RC 350x350".to_string(),
+                    });
+                    let _ = self.apply_command(BimCommand::AddFooting {
+                        level_id: base_id,
+                        pos: a,
+                        width_mm: 1200.0,
+                        length_mm: 1200.0,
+                        thickness_mm: 400.0,
+                    });
+                }
+                let _ = self.apply_command(BimCommand::AddSlab {
+                    level_id: top_id,
+                    boundary: corners.to_vec(),
+                    openings: Vec::new(),
+                    thickness_mm: 150.0,
+                    is_roof: true,
+                    roof_slope_deg: 0.0,
+                });
+                self.project.detect_rooms_on_level(base_id);
+                self.undo_stack.push(snapshot);
+                self.redo_stack.clear();
+                let msg = format!(
+                    "Synthesized {:.1}x{:.1}m structural box enclosure (4 walls, 4 cols, 4 footings, roof slab).",
+                    w_mm / 1000.0,
+                    d_mm / 1000.0
+                );
+                self.log.push(msg.clone());
+                crate::core::InternalVault::sync_live_bim_state(&self.project, &msg);
+                return Ok(msg);
+            }
+
+            let nx = (raw_x.round() as usize).clamp(1, 8);
+            let ny = (raw_y.round() as usize).clamp(1, 8);
+
+            // Parse @6m / @5000mm / span 6
+            let mut span_mm = 6000.0;
+            for (idx, tok) in tokens.iter().enumerate() {
+                if let Some(after_at) = tok.strip_prefix('@') {
+                    let is_mm = after_at.ends_with("mm");
+                    let num = after_at.trim_end_matches("mm").trim_end_matches('m');
+                    if let Ok(v) = num.parse::<f64>() {
+                        span_mm = if is_mm { v } else { to_mm(v) }.clamp(2000.0, 20000.0);
+                    }
+                } else if *tok == "span" {
+                    if let Some(next_tok) = tokens.get(idx + 1) {
+                        let num = next_tok.trim_end_matches("mm").trim_end_matches('m');
+                        if let Ok(v) = num.parse::<f64>() {
+                            span_mm = to_mm(v).clamp(2000.0, 20000.0);
+                        }
+                    }
+                }
+            }
+
+            // Add grids if requested or missing
+            if is_grid || self.project.grids.is_empty() {
+                let total_x = nx as f64 * span_mm;
+                let total_y = ny as f64 * span_mm;
+                for ix in 0..=nx {
+                    let x = ix as f64 * span_mm;
+                    let id = self.project.alloc_id();
+                    self.project.grids.push(BimGrid {
+                        id,
+                        label: format!("{}", ix + 1),
+                        start: P2(x, -1500.0),
+                        end: P2(x, total_y + 1500.0),
+                    });
+                }
+                for iy in 0..=ny {
+                    let y = iy as f64 * span_mm;
+                    let id = self.project.alloc_id();
+                    let ch = (b'A' + (iy % 26) as u8) as char;
+                    self.project.grids.push(BimGrid {
+                        id,
+                        label: ch.to_string(),
+                        start: P2(-1500.0, y),
+                        end: P2(total_x + 1500.0, y),
+                    });
+                }
+            }
+
+            if is_grid && !is_portal {
+                self.undo_stack.push(snapshot);
+                self.redo_stack.clear();
+                let msg = format!(
+                    "Generated {}x{} structural grid ({}x{} bays @ {:.1}m).",
+                    nx + 1,
+                    ny + 1,
+                    nx,
+                    ny,
+                    span_mm / 1000.0
+                );
+                self.log.push(msg.clone());
+                crate::core::InternalVault::sync_live_bim_state(&self.project, &msg);
+                return Ok(msg);
+            }
+
+            // Parse floor count for portal frame
+            let mut floors = 2usize;
+            for (idx, tok) in tokens.iter().enumerate() {
+                for suffix in ["floors", "floor", "stories", "story", "storeys", "storey", "lvl", "f"] {
+                    if let Some(pre) = tok.strip_suffix(suffix) {
+                        if let Ok(n) = pre.parse::<usize>() {
+                            floors = n.clamp(1, 12);
+                        } else if pre.is_empty() && idx > 0 {
+                            if let Ok(n) = tokens[idx - 1].parse::<usize>() {
+                                floors = n.clamp(1, 12);
+                            }
+                        }
+                    }
+                }
+            }
+
+            while self.project.levels.len() < floors + 1 {
+                let lvl_num = self.project.levels.len() + 1;
+                let next_elev = self.project.levels.last().map(|l| l.elevation_mm).unwrap_or(0.0) + 3500.0;
+                let _ = self.apply_command(BimCommand::AddLevel {
+                    name: format!("Level {} (+{:.2}m)", lvl_num, next_elev / 1000.0),
+                    elevation_mm: next_elev,
+                });
+            }
+            self.project
+                .levels
+                .sort_by(|a, b| a.elevation_mm.total_cmp(&b.elevation_mm));
+
+            let ground_lvl_id = self.project.levels[0].id;
+            for ix in 0..=nx {
+                for iy in 0..=ny {
+                    let _ = self.apply_command(BimCommand::AddFooting {
+                        level_id: ground_lvl_id,
+                        pos: P2(ix as f64 * span_mm, iy as f64 * span_mm),
+                        width_mm: 1400.0,
+                        length_mm: 1400.0,
+                        thickness_mm: 450.0,
+                    });
+                }
+            }
+
+            for f in 0..floors {
+                let base_id = self.project.levels[f].id;
+                let top_id = self.project.levels[f + 1].id;
+                for ix in 0..=nx {
+                    for iy in 0..=ny {
+                        let _ = self.apply_command(BimCommand::AddColumn {
+                            base_level_id: base_id,
+                            top_level_id: top_id,
+                            pos: P2(ix as f64 * span_mm, iy as f64 * span_mm),
+                            width_mm: 400.0,
+                            depth_mm: 400.0,
+                            is_round: false,
+                            profile_name: "RC 400x400".to_string(),
+                        });
+                    }
+                }
+                for iy in 0..=ny {
+                    for ix in 0..nx {
+                        let _ = self.apply_command(BimCommand::AddBeamRun {
+                            level_id: top_id,
+                            category: RunCategory::StructuralBeam,
+                            start: P2(ix as f64 * span_mm, iy as f64 * span_mm),
+                            end: P2((ix + 1) as f64 * span_mm, iy as f64 * span_mm),
+                            width_mm: 300.0,
+                            depth_mm: 550.0,
+                            justify: RunJustify::Top,
+                            profile_name: "RC 300x550".to_string(),
+                        });
+                    }
+                }
+                for ix in 0..=nx {
+                    for iy in 0..ny {
+                        let _ = self.apply_command(BimCommand::AddBeamRun {
+                            level_id: top_id,
+                            category: RunCategory::StructuralBeam,
+                            start: P2(ix as f64 * span_mm, iy as f64 * span_mm),
+                            end: P2(ix as f64 * span_mm, (iy + 1) as f64 * span_mm),
+                            width_mm: 300.0,
+                            depth_mm: 550.0,
+                            justify: RunJustify::Top,
+                            profile_name: "RC 300x550".to_string(),
+                        });
+                    }
+                }
+                let _ = self.apply_command(BimCommand::AddSlab {
+                    level_id: top_id,
+                    boundary: vec![
+                        P2(0.0, 0.0),
+                        P2(nx as f64 * span_mm, 0.0),
+                        P2(nx as f64 * span_mm, ny as f64 * span_mm),
+                        P2(0.0, ny as f64 * span_mm),
+                    ],
+                    openings: Vec::new(),
+                    thickness_mm: 160.0,
+                    is_roof: f + 1 == floors,
+                    roof_slope_deg: 0.0,
+                });
+            }
+
+            self.undo_stack.push(snapshot);
+            self.redo_stack.clear();
+            let msg = format!(
+                "Synthesized {}x{} bay RC Portal Frame @ {:.1}m ({} storeys: {} cols, {} beams, {} footings).",
+                nx,
+                ny,
+                span_mm / 1000.0,
+                floors,
+                (nx + 1) * (ny + 1) * floors,
+                ((nx + 1) * ny + (ny + 1) * nx) * floors,
+                (nx + 1) * (ny + 1)
+            );
+            self.log.push(msg.clone());
+            crate::core::InternalVault::sync_live_bim_state(&self.project, &msg);
+            return Ok(msg);
+        }
+
+        Err(format!(
+            "Unrecognized BIM synthesis instruction '{}'. Try: 'portal 3x2 @6m 2floors', 'box 8x6', 'grid 3x2 @5m', 'wall 0,0->6000,0', 'col 0,0', 'rebar', or 'clear'.",
+            trimmed
+        ))
+    }
+
     fn apply_command(&mut self, cmd: BimCommand) -> Result<String, String> {
         match cmd {
             BimCommand::AddLevel { name, elevation_mm } => {
@@ -2916,5 +3391,34 @@ mod tests {
 
         let ifc = bus.project.export_ifc4_spatial();
         assert!(ifc.contains("IFCBUILDINGSTOREY") && ifc.contains("IFCREINFORCINGBAR"));
+    }
+
+    #[test]
+    fn test_natural_language_portal_frame_synthesis() {
+        let _guard = crate::core::vault::TEST_VAULT_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let mut bus = BimCommandBus::new();
+        assert!(bus.project.is_empty());
+
+        let summary = bus
+            .execute_natural_language("portal 3x2 @6m 2floors")
+            .expect("Natural language portal frame synthesis should succeed");
+        assert!(summary.contains("3x2"));
+        assert_eq!(bus.project.levels.len(), 3);
+        assert_eq!(bus.project.footings.len(), 12);
+        assert_eq!(bus.project.columns.len(), 24);
+        assert_eq!(bus.project.runs.len(), 34);
+        assert_eq!(bus.project.slabs.len(), 2);
+
+        let rebar_msg = bus
+            .execute_natural_language("rebar")
+            .expect("Natural language rebar synthesis should succeed");
+        assert!(rebar_msg.contains("Armed"));
+        assert!(!bus.project.rebars.is_empty());
+
+        // Single undo reverts rebar, second undo reverts portal frame back to empty
+        bus.undo().expect("Undo rebar should succeed");
+        assert!(bus.project.rebars.is_empty());
+        bus.undo().expect("Undo portal frame should succeed");
+        assert!(bus.project.is_empty());
     }
 }

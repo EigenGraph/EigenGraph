@@ -115,6 +115,18 @@ impl WorldTileCache {
         }
     }
 
+    pub fn stats(&self) -> (usize, usize) {
+        let Ok(guard) = self.inner.lock() else {
+            return (0, 0);
+        };
+        let total = guard.len();
+        let ready = guard
+            .values()
+            .filter(|v| matches!(v, TileEntryState::Ready { .. }))
+            .count();
+        (ready, total)
+    }
+
     fn request_tile(&self, ctx: &egui::Context, provider: TileSource, z: u8, x: u32, y: u32) {
         if provider == TileSource::SyntheticVectorTerrain {
             return;
@@ -984,6 +996,117 @@ impl SlippyMapState {
         id
     }
 
+    /// Great-circle Haversine distance in metres between two WGS84 `(lat, lon)` points.
+    pub fn geodetic_distance_m(p1: (f64, f64), p2: (f64, f64)) -> f64 {
+        const R_EARTH_M: f64 = 6_371_008.8;
+        let lat1 = p1.0.to_radians();
+        let lat2 = p2.0.to_radians();
+        let dlat = (p2.0 - p1.0).to_radians();
+        let dlon = (p2.1 - p1.1).to_radians();
+        let a = (dlat * 0.5).sin().powi(2)
+            + lat1.cos() * lat2.cos() * (dlon * 0.5).sin().powi(2);
+        let c = 2.0 * a.sqrt().clamp(0.0, 1.0).asin();
+        R_EARTH_M * c
+    }
+
+    /// Total geodesic path distance in metres across an ordered vertex chain.
+    pub fn geodetic_polyline_length_m(pts: &[(f64, f64)]) -> f64 {
+        pts.windows(2)
+            .map(|w| Self::geodetic_distance_m(w[0], w[1]))
+            .sum()
+    }
+
+    /// Tangent-plane parcel polygon area in m² (Shoelace formula around vertex centroid).
+    pub fn geodetic_polygon_area_m2(pts: &[(f64, f64)]) -> f64 {
+        if pts.len() < 3 {
+            return 0.0;
+        }
+        let origin = (
+            pts.iter().map(|p| p.0).sum::<f64>() / pts.len() as f64,
+            pts.iter().map(|p| p.1).sum::<f64>() / pts.len() as f64,
+        );
+        let xy_m: Vec<[f64; 2]> = pts
+            .iter()
+            .map(|&(lat, lon)| {
+                let mm = Self::lat_lon_to_world_mm(origin, lat, lon);
+                [mm[0] * 0.001, mm[1] * 0.001]
+            })
+            .collect();
+        let mut double_area = 0.0;
+        for i in 0..xy_m.len() {
+            let j = (i + 1) % xy_m.len();
+            double_area += xy_m[i][0] * xy_m[j][1] - xy_m[j][0] * xy_m[i][1];
+        }
+        0.5 * double_area.abs()
+    }
+
+    /// Resolves either `"lat, lon"` coordinates or a global engineering city name into `(label, lat, lon, zoom)`.
+    pub fn resolve_location_query(query: &str) -> Option<(String, f64, f64, f32)> {
+        let q = query.trim();
+        if q.is_empty() {
+            return None;
+        }
+        // 1. Direct "lat, lon" or "lat lon" parsing
+        let cleaned = q.replace([',', ';'], " ");
+        let nums: Vec<f64> = cleaned
+            .split_whitespace()
+            .filter_map(|tok| tok.trim_end_matches('°').parse::<f64>().ok())
+            .collect();
+        if nums.len() >= 2 {
+            let lat = nums[0];
+            let lon = nums[1];
+            if (-85.05..=85.05).contains(&lat) && (-180.0..=180.0).contains(&lon) {
+                return Some((format!("{lat:.4}°, {lon:.4}°"), lat, lon, 16.5));
+            }
+        }
+
+        // 2. Curated Global Engineering Cities & Infrastructure Hubs
+        let lower = q.to_lowercase();
+        let catalog: &[(&str, f64, f64, f32)] = &[
+            ("Jakarta", -6.2088, 106.8456, 15.0),
+            ("Bandung", -6.9175, 107.6191, 15.0),
+            ("Surabaya", -7.2575, 112.7521, 15.0),
+            ("Yogyakarta", -7.7956, 110.3695, 15.0),
+            ("Palu", -0.8917, 119.8707, 15.0),
+            ("Nusantara IKN", -0.9730, 116.7090, 15.0),
+            ("Bali Denpasar", -8.6705, 115.2126, 15.0),
+            ("Singapore", 1.3521, 103.8198, 15.0),
+            ("Tokyo", 35.6762, 139.6503, 15.0),
+            ("Osaka", 34.6937, 135.5023, 15.0),
+            ("Seoul", 37.5665, 126.9780, 15.0),
+            ("Taipei", 25.0330, 121.5654, 15.0),
+            ("Kuala Lumpur", 3.1390, 101.6869, 15.0),
+            ("Bangkok", 13.7563, 100.5018, 15.0),
+            ("Manila", 14.5995, 120.9842, 15.0),
+            ("San Francisco", 37.7749, -122.4194, 15.0),
+            ("Los Angeles", 34.0522, -118.2437, 15.0),
+            ("Seattle", 47.6062, -122.3321, 15.0),
+            ("New York", 40.7128, -74.0060, 15.0),
+            ("Chicago", 41.8781, -87.6298, 15.0),
+            ("London", 51.5072, -0.1276, 15.0),
+            ("Zurich", 47.3769, 8.5417, 15.0),
+            ("Paris", 48.8566, 2.3522, 15.0),
+            ("Berlin", 52.5200, 13.4050, 15.0),
+            ("Istanbul", 41.0082, 28.9784, 15.0),
+            ("Dubai", 25.2048, 55.2708, 15.0),
+            ("Riyadh", 24.7136, 46.6753, 15.0),
+            ("Sydney", -33.8688, 151.2093, 15.0),
+            ("Melbourne", -37.8136, 144.9631, 15.0),
+            ("Auckland", -36.8509, 174.7645, 15.0),
+            ("Christchurch", -43.5320, 172.6306, 15.0),
+            ("Santiago", -33.4489, -70.6693, 15.0),
+            ("Mexico City", 19.4326, -99.1332, 15.0),
+            ("Mumbai", 19.0760, 72.8777, 15.0),
+            ("Cairo", 30.0444, 31.2357, 15.0),
+        ];
+        for &(name, lat, lon, z) in catalog {
+            if name.to_lowercase().contains(&lower) {
+                return Some((name.to_string(), lat, lon, z));
+            }
+        }
+        None
+    }
+
     /// Removes a site pin by ID.
     pub fn remove_pin(&mut self, id: usize) {
         self.site_pins.retain(|p| p.id != id);
@@ -1564,5 +1687,22 @@ mod tests {
         let back = SlippyMapState::lat_lon_to_world_mm(origin, lat, lon);
         assert!((back[0] - world_mm[0]).abs() < 1e-3);
         assert!((back[1] - world_mm[1]).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_geodesic_search_and_distance_area() {
+        let found = SlippyMapState::resolve_location_query("Jakarta").expect("city resolves");
+        assert!((found.1 - (-6.2088)).abs() < 1e-3);
+
+        let coord = SlippyMapState::resolve_location_query("-6.9175, 107.6191").expect("coord parses");
+        assert!((coord.1 - (-6.9175)).abs() < 1e-4);
+        assert!((coord.2 - 107.6191).abs() < 1e-4);
+
+        let d = SlippyMapState::geodetic_distance_m((-6.2, 106.8), (-6.2, 106.801));
+        assert!(d > 100.0 && d < 120.0);
+
+        let poly = [(-6.2, 106.8), (-6.2, 106.801), (-6.201, 106.801), (-6.201, 106.8)];
+        let area = SlippyMapState::geodetic_polygon_area_m2(&poly);
+        assert!(area > 11_000.0 && area < 13_000.0);
     }
 }

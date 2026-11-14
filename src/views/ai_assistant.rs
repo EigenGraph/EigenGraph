@@ -10,6 +10,7 @@ pub struct AiAssistantView {
     pub expanded: bool,
     pub chat_history: Vec<ChatMessage>,
     pub input: String,
+    pub pending_bim_nl_command: Option<String>,
     last_vp_width: f32,
     last_expanded: bool,
     last_offset_x: f32,
@@ -28,6 +29,7 @@ impl Default for AiAssistantView {
                 }
             ],
             input: String::new(),
+            pending_bim_nl_command: None,
             last_vp_width: 0.0,
             last_expanded: false,
             last_offset_x: 0.0,
@@ -493,7 +495,25 @@ impl AiAssistantView {
         });
 
         let p_lower = prompt.to_lowercase();
-        let response_msg = if p_lower.contains("inspect vault") || p_lower.contains("inspeksi vault") || p_lower.contains("view vault") || p_lower.contains("lihat vault") || p_lower.contains("open vault") || p_lower.contains("buka vault") || p_lower.contains("isi vault") || p_lower.contains("status vault") || p_lower.contains("vault contents") || p_lower.contains("daftar vault") || p_lower.contains("list vault") {
+        let is_nl_bim = p_lower.starts_with("portal ")
+            || p_lower.starts_with("frame ")
+            || p_lower.starts_with("box ")
+            || p_lower.starts_with("grid ")
+            || p_lower.starts_with("wall ")
+            || p_lower.starts_with("beam ")
+            || p_lower.starts_with("col ")
+            || p_lower.starts_with("column ")
+            || p_lower.starts_with("footing ")
+            || p_lower.starts_with("level ")
+            || p_lower.starts_with("create portal")
+            || matches!(p_lower.trim(), "rebar" | "reinforce" | "clear" | "reset");
+        let response_msg = if is_nl_bim {
+            self.pending_bim_nl_command = Some(prompt.trim().to_string());
+            format!(
+                "[EigenAI Text-to-BIM Bus]: Queued generative command '{}' for live BimCommandBus execution.",
+                prompt.trim()
+            )
+        } else if p_lower.contains("inspect vault") || p_lower.contains("inspeksi vault") || p_lower.contains("view vault") || p_lower.contains("lihat vault") || p_lower.contains("open vault") || p_lower.contains("buka vault") || p_lower.contains("isi vault") || p_lower.contains("status vault") || p_lower.contains("vault contents") || p_lower.contains("daftar vault") || p_lower.contains("list vault") {
             crate::core::InternalVault::inspect_vault_summary()
         } else if p_lower.contains("status live") || p_lower.contains("live context") || p_lower.contains("live state") || p_lower.contains("live vault") {
             let ctx = crate::core::InternalVault::get_live_ai_prompt_context();
