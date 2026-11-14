@@ -3,7 +3,9 @@
 //! Provides mathematically rigorous Web Mercator (EPSG:3857) projection, quadtree tile indexing,
 //! smooth continuous panning/zooming, geodetic site pinning, and interactive cartographic HUD telemetry.
 
+use std::collections::HashMap;
 use std::f64::consts::PI;
+use std::sync::{Arc, Mutex};
 use egui::{Color32, CornerRadius, FontId, Pos2, Rect, Stroke, Ui, Vec2};
 
 /// WGS84 Earth semi-major axis radius in meters (EPSG:3857 / WGS84 ellipsoid spherical approximation).
@@ -45,6 +47,321 @@ impl TileSource {
             Self::CartoDbDarkMatter => "https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
             Self::SyntheticVectorTerrain => "internal://procedural/vector/{z}/{x}/{y}",
         }
+    }
+
+    pub fn provider_id(&self) -> u8 {
+        match self {
+            Self::OpenStreetMap => 1,
+            Self::OpenTopoMap => 2,
+            Self::EsriWorldImagery => 3,
+            Self::CartoDbDarkMatter => 4,
+            Self::SyntheticVectorTerrain => 0,
+        }
+    }
+
+    pub fn attribution_text(&self) -> &'static str {
+        match self {
+            Self::OpenStreetMap => "© OpenStreetMap contributors",
+            Self::OpenTopoMap => "© OpenTopoMap (CC-BY-SA)",
+            Self::EsriWorldImagery => "Tiles © Esri World Imagery",
+            Self::CartoDbDarkMatter => "© OpenStreetMap / CARTO",
+            Self::SyntheticVectorTerrain => "EigenGraph Offline Global Vector Basemap",
+        }
+    }
+
+    pub fn tile_url(&self, z: u8, x: u32, y: u32) -> String {
+        self.url_template()
+            .replace("{z}", &z.to_string())
+            .replace("{x}", &x.to_string())
+            .replace("{y}", &y.to_string())
+    }
+
+    pub fn max_zoom(&self) -> i32 {
+        match self {
+            Self::OpenTopoMap => 17,
+            Self::EsriWorldImagery => 18,
+            _ => 19,
+        }
+    }
+}
+
+#[derive(Clone)]
+enum TileEntryState {
+    Loading,
+    Failed,
+    Ready {
+        image: Option<egui::ColorImage>,
+        texture: Option<egui::TextureHandle>,
+    },
+}
+
+/// Thread-safe / WASM-safe shared raster slippy-tile cache for live web & native map streaming.
+#[derive(Clone, Default)]
+pub struct WorldTileCache {
+    inner: Arc<Mutex<HashMap<(u8, u8, u32, u32), TileEntryState>>>,
+}
+
+impl std::fmt::Debug for WorldTileCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let count = self.inner.lock().map(|g| g.len()).unwrap_or(0);
+        f.debug_struct("WorldTileCache").field("cached_tiles", &count).finish()
+    }
+}
+
+impl WorldTileCache {
+    pub fn clear(&self) {
+        if let Ok(mut guard) = self.inner.lock() {
+            guard.clear();
+        }
+    }
+
+    fn request_tile(&self, ctx: &egui::Context, provider: TileSource, z: u8, x: u32, y: u32) {
+        if provider == TileSource::SyntheticVectorTerrain {
+            return;
+        }
+        let key = (provider.provider_id(), z, x, y);
+        {
+            let Ok(mut guard) = self.inner.lock() else {
+                return;
+            };
+            if guard.contains_key(&key) {
+                return;
+            }
+            let inflight = guard
+                .values()
+                .filter(|s| matches!(s, TileEntryState::Loading))
+                .count();
+            if inflight >= 12 {
+                return;
+            }
+            if guard.len() > 240 {
+                guard.retain(|_, v| matches!(v, TileEntryState::Loading));
+            }
+            guard.insert(key, TileEntryState::Loading);
+        }
+
+        let url = provider.tile_url(z, x, y);
+        #[cfg(test)]
+        {
+            let _ = (ctx, url);
+            if let Ok(mut guard) = self.inner.lock() {
+                guard.insert(key, TileEntryState::Failed);
+            }
+        }
+
+        #[cfg(all(not(target_arch = "wasm32"), not(test)))]
+        {
+            let inner = self.inner.clone();
+            let ctx_clone = ctx.clone();
+            std::thread::spawn(move || {
+                let output = std::process::Command::new("curl")
+                    .args([
+                        "-s",
+                        "-L",
+                        "-f",
+                        "--max-time",
+                        "8",
+                        "-A",
+                        "EigenGraph-BIM/0.3.5 (https://eigengraph.net)",
+                        &url,
+                    ])
+                    .output();
+                let decoded = output.ok().and_then(|out| {
+                    if out.status.success() && !out.stdout.is_empty() {
+                        decode_tile_bytes_to_color_image(&out.stdout)
+                    } else {
+                        None
+                    }
+                });
+                if let Ok(mut guard) = inner.lock() {
+                    if let Some(image) = decoded {
+                        guard.insert(
+                            key,
+                            TileEntryState::Ready {
+                                image: Some(image),
+                                texture: None,
+                            },
+                        );
+                    } else {
+                        guard.insert(key, TileEntryState::Failed);
+                    }
+                }
+                ctx_clone.request_repaint();
+            });
+        }
+
+        #[cfg(all(target_arch = "wasm32", not(test)))]
+        {
+            let inner = self.inner.clone();
+            let ctx_clone = ctx.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let fetched = fetch_tile_wasm(&url).await;
+                let decoded = fetched.and_then(|bytes| decode_tile_bytes_to_color_image(&bytes));
+                if let Ok(mut guard) = inner.lock() {
+                    if let Some(image) = decoded {
+                        guard.insert(
+                            key,
+                            TileEntryState::Ready {
+                                image: Some(image),
+                                texture: None,
+                            },
+                        );
+                    } else {
+                        guard.insert(key, TileEntryState::Failed);
+                    }
+                }
+                ctx_clone.request_repaint();
+            });
+        }
+    }
+
+    fn get_or_upload_texture(
+        &self,
+        ctx: &egui::Context,
+        provider: TileSource,
+        z: u8,
+        x: u32,
+        y: u32,
+    ) -> Option<egui::TextureId> {
+        let p = provider.provider_id();
+        let key = (p, z, x, y);
+        let Ok(mut guard) = self.inner.lock() else {
+            return None;
+        };
+        let entry = guard.get_mut(&key)?;
+        if let TileEntryState::Ready { image, texture } = entry {
+            if let Some(tex) = texture {
+                return Some(tex.id());
+            }
+            if let Some(img) = image.take() {
+                let tex = ctx.load_texture(
+                    format!("eigengraph_tile_{}_{}_{}_{}", p, z, x, y),
+                    img,
+                    egui::TextureOptions::LINEAR,
+                );
+                let id = tex.id();
+                *texture = Some(tex);
+                return Some(id);
+            }
+        }
+        None
+    }
+}
+
+fn decode_tile_bytes_to_color_image(bytes: &[u8]) -> Option<egui::ColorImage> {
+    let img = image::load_from_memory(bytes).ok()?.to_rgba8();
+    let size = [img.width() as usize, img.height() as usize];
+    Some(egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw()))
+}
+
+#[cfg(all(target_arch = "wasm32", not(test)))]
+async fn fetch_tile_wasm(url: &str) -> Option<Vec<u8>> {
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen_futures::JsFuture;
+
+    let window = web_sys::window()?;
+    let opts = web_sys::RequestInit::new();
+    opts.set_method("GET");
+    opts.set_mode(web_sys::RequestMode::Cors);
+
+    let request = web_sys::Request::new_with_str_and_init(url, &opts).ok()?;
+    let resp_val = JsFuture::from(window.fetch_with_request(&request)).await.ok()?;
+    let resp: web_sys::Response = resp_val.dyn_into().ok()?;
+    if !resp.ok() {
+        return None;
+    }
+    let buf_promise = resp.array_buffer().ok()?;
+    let buf_val = JsFuture::from(buf_promise).await.ok()?;
+    let uint8 = js_sys::Uint8Array::new(&buf_val);
+    Some(uint8.to_vec())
+}
+
+/// Triangulates a simple concave 2D screen polygon via ear-clipping for clean continent landmass fills.
+fn triangulate_polygon_2d(pts: &[Pos2], fill_color: Color32) -> Option<egui::epaint::Mesh> {
+    if pts.len() < 3 {
+        return None;
+    }
+    let mut ring: Vec<Pos2> = pts.to_vec();
+    if ring.len() >= 2 && (ring[0] - ring[ring.len() - 1]).length_sq() < 1e-4 {
+        ring.pop();
+    }
+    if ring.len() < 3 {
+        return None;
+    }
+
+    // Signed area (screen coordinates: +y down)
+    let mut area2 = 0.0_f32;
+    for i in 0..ring.len() {
+        let a = ring[i];
+        let b = ring[(i + 1) % ring.len()];
+        area2 += a.x * b.y - b.x * a.y;
+    }
+    if area2.abs() < 1e-3 {
+        return None;
+    }
+    if area2 < 0.0 {
+        ring.reverse();
+    }
+
+    let mut mesh = egui::epaint::Mesh::default();
+    for p in &ring {
+        mesh.vertices.push(egui::epaint::Vertex {
+            pos: *p,
+            uv: egui::epaint::WHITE_UV,
+            color: fill_color,
+        });
+    }
+
+    let mut rem: Vec<u32> = (0..ring.len() as u32).collect();
+    let cross = |a: Pos2, b: Pos2, c: Pos2| -> f32 {
+        (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+    };
+    let point_in_tri = |p: Pos2, a: Pos2, b: Pos2, c: Pos2| -> bool {
+        let c1 = cross(a, b, p);
+        let c2 = cross(b, c, p);
+        let c3 = cross(c, a, p);
+        c1 >= -1e-4 && c2 >= -1e-4 && c3 >= -1e-4
+    };
+
+    let mut guard = 0usize;
+    let max_iters = ring.len() * ring.len() + 8;
+    while rem.len() > 3 && guard < max_iters {
+        guard += 1;
+        let m = rem.len();
+        let mut clipped = false;
+        for i in 0..m {
+            let i0 = rem[(i + m - 1) % m] as usize;
+            let i1 = rem[i] as usize;
+            let i2 = rem[(i + 1) % m] as usize;
+            let (a, b, c) = (ring[i0], ring[i1], ring[i2]);
+            if cross(a, b, c) <= 1e-4 {
+                continue;
+            }
+            let any_inside = rem.iter().enumerate().any(|(k, &idx_u)| {
+                let idx = idx_u as usize;
+                idx != i0 && idx != i1 && idx != i2 && {
+                    let _ = k;
+                    point_in_tri(ring[idx], a, b, c)
+                }
+            });
+            if !any_inside {
+                mesh.indices.extend_from_slice(&[i0 as u32, i1 as u32, i2 as u32]);
+                rem.remove(i);
+                clipped = true;
+                break;
+            }
+        }
+        if !clipped {
+            break;
+        }
+    }
+    if rem.len() == 3 {
+        mesh.indices.extend_from_slice(&[rem[0], rem[1], rem[2]]);
+    }
+    if mesh.indices.is_empty() {
+        None
+    } else {
+        Some(mesh)
     }
 }
 
@@ -171,43 +488,28 @@ pub struct SlippyMapState {
     pub drag_start_mouse: Option<Pos2>,
     pub drag_start_center: (f64, f64),
     pub next_pin_id: usize,
+    pub tile_cache: WorldTileCache,
 }
 
 impl Default for SlippyMapState {
     fn default() -> Self {
-        let mut state = Self {
-            // Default center: Monas National Monument, Jakarta, Indonesia (-6.1754°, 106.8272°)
-            center_lat_lon: (-6.175392, 106.827153),
-            zoom_level: 14.5,
-            tile_provider: TileSource::SyntheticVectorTerrain,
-            active_pin: Some((-6.175392, 106.827153)),
+        Self {
+            // Phase 35: Start zoomed out to Global World Map overview showing all continents
+            center_lat_lon: (15.0, 15.0),
+            zoom_level: 1.85,
+            tile_provider: TileSource::OpenStreetMap,
+            active_pin: None,
             site_pins: Vec::new(),
             crosshair_active: true,
             show_grid: true,
             show_scale_bar: true,
-            show_elevation_contours: true,
+            show_elevation_contours: false,
             is_dragging: false,
             drag_start_mouse: None,
-            drag_start_center: (-6.175392, 106.827153),
+            drag_start_center: (15.0, 15.0),
             next_pin_id: 1,
-        };
-
-        // Preload standard engineering benchmark site pins
-        state.site_pins.push(SiteGeodeticPin {
-            id: 1,
-            label: "Monas Station Benchmark Lot 01".to_string(),
-            lat: -6.175392,
-            lon: 106.827153,
-            elevation_m: 14.2,
-            project_name: "Jakarta North-South Transit Hub".to_string(),
-            soil_class: "Site Class D (Stiff Soil)".to_string(),
-            ss_g: 0.850,
-            s1_g: 0.420,
-            notes: "Design Ground Acceleration Ss=0.85g per SNI 1726:2019 / PusGeN 2017".to_string(),
-        });
-        state.next_pin_id = 2;
-
-        state
+            tile_cache: WorldTileCache::default(),
+        }
     }
 }
 
@@ -269,11 +571,120 @@ impl SlippyMapState {
             self.zoom_level,
         );
         let (target_x, target_y) = WebMercator::lat_lon_to_tile_coords(lat, lon, self.zoom_level);
+        let world_tiles = 2.0_f64.powf(self.zoom_level as f64);
 
-        let dx = ((target_x - center_x) * 256.0) as f32;
+        let mut delta_x = target_x - center_x;
+        if delta_x > world_tiles * 0.5 {
+            delta_x -= world_tiles;
+        } else if delta_x < -world_tiles * 0.5 {
+            delta_x += world_tiles;
+        }
+
+        let dx = (delta_x * 256.0) as f32;
         let dy = ((target_y - center_y) * 256.0) as f32;
 
         Pos2::new(rect.center().x + dx, rect.center().y + dy)
+    }
+
+    /// Converts explicit unwrapped longitude `(lat, lon_deg)` to screen pixel position
+    /// for continent boundary polygons spanning `-180..=180` across wrap shifts.
+    fn lat_lon_to_screen_unwrapped(&self, lat: f64, lon_unwrapped: f64, rect: Rect) -> Pos2 {
+        let (center_x, center_y) = WebMercator::lat_lon_to_tile_coords(
+            self.center_lat_lon.0,
+            self.center_lat_lon.1,
+            self.zoom_level,
+        );
+        let clamped_lat = WebMercator::clamp_lat(lat);
+        let n = 2.0_f64.powf(self.zoom_level as f64);
+        let target_x = ((lon_unwrapped + 180.0) / 360.0) * n;
+        let lat_rad = clamped_lat.to_radians();
+        let target_y = (1.0 - (lat_rad.tan() + 1.0 / lat_rad.cos()).ln() / PI) * 0.5 * n;
+
+        let dx = ((target_x - center_x) * 256.0) as f32;
+        let dy = ((target_y - center_y) * 256.0) as f32;
+        Pos2::new(rect.center().x + dx, rect.center().y + dy)
+    }
+
+    /// Converts local CAD ground offset `[east_mm, north_mm]` around `origin_lat_lon` to `(lat, lon)`.
+    pub fn world_mm_to_lat_lon(origin_lat_lon: (f64, f64), world_mm: [f64; 2]) -> (f64, f64) {
+        let origin_lat = WebMercator::clamp_lat(origin_lat_lon.0);
+        let cos_lat = origin_lat.to_radians().cos().max(0.1);
+        let (ox, oy) = WebMercator::lat_lon_to_meters(origin_lat, origin_lat_lon.1);
+        let mx = ox + (world_mm[0] / 1000.0) / cos_lat;
+        let my = oy + (world_mm[1] / 1000.0) / cos_lat;
+        WebMercator::meters_to_lat_lon(mx, my)
+    }
+
+    /// Converts WGS84 `(lat, lon)` into local ground CAD coordinates `[east_mm, north_mm]` around `origin_lat_lon`.
+    pub fn lat_lon_to_world_mm(origin_lat_lon: (f64, f64), lat: f64, lon: f64) -> [f64; 2] {
+        let origin_lat = WebMercator::clamp_lat(origin_lat_lon.0);
+        let cos_lat = origin_lat.to_radians().cos().max(0.1);
+        let (ox, oy) = WebMercator::lat_lon_to_meters(origin_lat, origin_lat_lon.1);
+        let (mx, my) = WebMercator::lat_lon_to_meters(lat, lon);
+        let mut dmx = mx - ox;
+        if dmx > EARTH_HALF_CIRCUMFERENCE {
+            dmx -= 2.0 * EARTH_HALF_CIRCUMFERENCE;
+        } else if dmx < -EARTH_HALF_CIRCUMFERENCE {
+            dmx += 2.0 * EARTH_HALF_CIRCUMFERENCE;
+        }
+        [dmx * cos_lat * 1000.0, (my - oy) * cos_lat * 1000.0]
+    }
+
+    /// Maps local ground CAD coordinates `[east_mm, north_mm]` onto screen `Pos2`.
+    pub fn world_mm_to_screen(
+        &self,
+        origin_lat_lon: (f64, f64),
+        world_mm: [f64; 2],
+        rect: Rect,
+    ) -> Pos2 {
+        let (lat, lon) = Self::world_mm_to_lat_lon(origin_lat_lon, world_mm);
+        self.lat_lon_to_screen(lat, lon, rect)
+    }
+
+    /// Maps screen `Pos2` onto local ground CAD coordinates `[east_mm, north_mm]` relative to `origin_lat_lon`.
+    pub fn screen_to_world_mm(
+        &self,
+        origin_lat_lon: (f64, f64),
+        pos: Pos2,
+        rect: Rect,
+    ) -> [f64; 2] {
+        let (lat, lon) = self.screen_to_lat_lon(pos, rect);
+        Self::lat_lon_to_world_mm(origin_lat_lon, lat, lon)
+    }
+
+    /// Screen pixels per engineering millimetre (`px / mm`) at the given site origin & map zoom.
+    pub fn pixels_per_mm_at_origin(&self, origin_lat_lon: (f64, f64)) -> f32 {
+        let res_m_px = WebMercator::ground_resolution_m_px(origin_lat_lon.0, self.zoom_level).max(1e-6);
+        (1.0 / (res_m_px * 1000.0)) as f32
+    }
+
+    /// Resets map view to full Global World Map overview showing all continents.
+    pub fn reset_to_global_view(&mut self) {
+        self.center_lat_lon = (15.0, 15.0);
+        self.zoom_level = 1.85;
+    }
+
+    /// Jumps to high-detail surveying / architectural drawing scale over a ground coordinate.
+    pub fn zoom_to_ground_site(&mut self, lat: f64, lon: f64, zoom: f32) {
+        self.set_center(lat, lon);
+        self.zoom_level = zoom.clamp(1.0, 19.0);
+    }
+
+    /// Zooms the map smoothly while keeping `focus_pos` anchored under the pointer.
+    pub fn zoom_at_screen_pos(&mut self, zoom_delta: f32, focus_pos: Option<Pos2>, rect: Rect) {
+        if zoom_delta.abs() <= 1e-6 {
+            return;
+        }
+        if let Some(mouse_pos) = focus_pos {
+            let (mouse_lat, mouse_lon) = self.screen_to_lat_lon(mouse_pos, rect);
+            self.zoom_level = (self.zoom_level + zoom_delta).clamp(1.0, 19.0);
+            let new_mouse_screen = self.lat_lon_to_screen(mouse_lat, mouse_lon, rect);
+            let corr_x = new_mouse_screen.x - mouse_pos.x;
+            let corr_y = new_mouse_screen.y - mouse_pos.y;
+            self.pan_by_pixels(corr_x, corr_y);
+        } else {
+            self.zoom_level = (self.zoom_level + zoom_delta).clamp(1.0, 19.0);
+        }
     }
 
     /// Adds a new site pin at current active coordinates.
@@ -329,170 +740,477 @@ impl SlippyMapState {
         }
     }
 
-    /// Renders the complete interactive slippy map canvas widget with high-performance vector cartography.
+    /// Renders the complete interactive slippy map canvas widget with Freeze protection.
     pub fn render(&mut self, ui: &mut Ui, rect: Rect, theme: &crate::theme::MacTheme) {
+        let is_frozen = crate::ui_kit::is_canvas_frozen(ui.ctx());
+        self.render_with_freeze(ui, rect, theme, is_frozen);
+    }
+
+    /// Renders interactive World Map widget, locking pan, zoom, and pin placement when `is_frozen` is true.
+    pub fn render_with_freeze(
+        &mut self,
+        ui: &mut Ui,
+        rect: Rect,
+        theme: &crate::theme::MacTheme,
+        is_frozen: bool,
+    ) {
         let painter = ui.painter_at(rect);
-        let response = ui.interact(rect, ui.id().with("slippy_map_canvas"), egui::Sense::click_and_drag());
+        let sense = if is_frozen {
+            egui::Sense::hover()
+        } else {
+            egui::Sense::click_and_drag()
+        };
+        let response = ui.interact(rect, ui.id().with("slippy_map_canvas"), sense);
 
-        // 1. Mouse Drag Panning
-        if response.drag_started() {
-            self.is_dragging = true;
-            self.drag_start_mouse = response.interact_pointer_pos();
-            self.drag_start_center = self.center_lat_lon;
-        }
+        if is_frozen {
+            self.is_dragging = false;
+            self.drag_start_mouse = None;
+        } else {
+            // 1. Mouse Drag Panning (only when unfrozen)
+            if response.drag_started() {
+                self.is_dragging = true;
+                self.drag_start_mouse = response.interact_pointer_pos();
+                self.drag_start_center = self.center_lat_lon;
+            }
 
-        if self.is_dragging {
-            if response.dragged() {
-                let delta = response.drag_delta();
-                self.pan_by_pixels(delta.x, delta.y);
+            if self.is_dragging {
+                if response.dragged() {
+                    let delta = response.drag_delta();
+                    self.pan_by_pixels(delta.x, delta.y);
+                }
+                if response.drag_stopped() {
+                    self.is_dragging = false;
+                    self.drag_start_mouse = None;
+                }
             }
-            if response.drag_stopped() {
-                self.is_dragging = false;
-                self.drag_start_mouse = None;
-            }
-        }
 
-        // 2. Mouse Wheel Smooth Zooming (Centering on Cursor)
-        let scroll_delta = ui.input(|i| i.smooth_scroll_delta.y);
-        if response.hovered()
-            && scroll_delta.abs() > 0.5
-            && !crate::ui_kit::is_canvas_frozen(ui.ctx())
-        {
-            let zoom_delta = scroll_delta * 0.003;
-            if let Some(mouse_pos) = response.hover_pos() {
-                let (mouse_lat, mouse_lon) = self.screen_to_lat_lon(mouse_pos, rect);
-                self.zoom_level = (self.zoom_level + zoom_delta).clamp(1.0, 19.0);
-                // Adjust center so mouse position stays anchored
-                let new_mouse_screen = self.lat_lon_to_screen(mouse_lat, mouse_lon, rect);
-                let corr_x = new_mouse_screen.x - mouse_pos.x;
-                let corr_y = new_mouse_screen.y - mouse_pos.y;
-                self.pan_by_pixels(corr_x, corr_y);
-            } else {
-                self.zoom_level = (self.zoom_level + zoom_delta).clamp(1.0, 19.0);
+            // 2. Mouse Wheel Smooth Zooming (Centering on Cursor)
+            let scroll_delta = ui.input(|i| i.smooth_scroll_delta.y);
+            if response.hovered() && scroll_delta.abs() > 0.5 {
+                let zoom_delta = scroll_delta * 0.003;
+                self.zoom_at_screen_pos(zoom_delta, response.hover_pos(), rect);
             }
-        }
 
-        // 3. Double-Click or Click to Drop Pin
-        if response.double_clicked() {
-            if let Some(pos) = response.interact_pointer_pos() {
-                let (lat, lon) = self.screen_to_lat_lon(pos, rect);
-                self.add_pin(lat, lon, &format!("Site Pin #{:02}", self.site_pins.len() + 1));
-            }
-        } else if response.clicked() {
-            if let Some(pos) = response.interact_pointer_pos() {
-                let (lat, lon) = self.screen_to_lat_lon(pos, rect);
-                self.active_pin = Some((lat, lon));
+            // 3. Double-Click or Click to Drop Pin
+            if response.double_clicked() {
+                if let Some(pos) = response.interact_pointer_pos() {
+                    let (lat, lon) = self.screen_to_lat_lon(pos, rect);
+                    self.add_pin(lat, lon, &format!("Site Pin #{:02}", self.site_pins.len() + 1));
+                }
+            } else if response.clicked() {
+                if let Some(pos) = response.interact_pointer_pos() {
+                    let (lat, lon) = self.screen_to_lat_lon(pos, rect);
+                    self.active_pin = Some((lat, lon));
+                }
             }
         }
 
-        // 4. Cartographic Background Rendering (Water & Landmasses)
-        self.render_cartographic_basemap(&painter, rect, theme);
+        let ground_origin = self.active_pin.unwrap_or(self.center_lat_lon);
+        self.render_world_background(ui, &painter, rect, theme, ground_origin, self.show_grid, true);
 
-        // 5. Geodetic Coordinate Grid (Equator, Meridians, Parallels)
-        if self.show_grid {
-            self.render_geodetic_grid(&painter, rect, theme);
-        }
-
-        // 6. Topographic Elevation Iso-Contours (TIN preview simulation)
-        if self.show_elevation_contours && self.zoom_level >= 10.0 {
-            self.render_elevation_contours(&painter, rect, theme);
-        }
-
-        // 7. Render Geodetic Site Pins & Active Pin Highlight
-        self.render_site_pins(&painter, rect, theme);
-
-        // 8. Viewport Crosshair HUD
         if self.crosshair_active {
             self.render_crosshair(&painter, rect, theme);
         }
-
-        // 9. Metric Dynamic Scale Bar
-        if self.show_scale_bar {
-            self.render_scale_bar(&painter, rect, theme);
-        }
     }
 
-    fn render_cartographic_basemap(&self, painter: &egui::Painter, rect: Rect, theme: &crate::theme::MacTheme) {
-        // Deep oceanic background fill
+    /// Renders pure World Map visuals (ocean, global vector continents, streamed raster tiles,
+    /// geodetic & metric site grids, pins, attribution, scale bar) without allocating an overlapping widget input.
+    pub fn render_world_background(
+        &self,
+        ui: &Ui,
+        painter: &egui::Painter,
+        rect: Rect,
+        theme: &crate::theme::MacTheme,
+        ground_origin_lat_lon: (f64, f64),
+        show_grid: bool,
+        draw_pins_and_scale: bool,
+    ) {
+        self.render_cartographic_basemap(ui, painter, rect, theme);
+
+        if show_grid {
+            self.render_geodetic_grid(painter, rect, theme);
+            if self.zoom_level >= 11.5 {
+                self.render_ground_metric_grid(painter, rect, theme, ground_origin_lat_lon);
+            }
+        }
+
+        if self.show_elevation_contours && self.zoom_level >= 12.0 {
+            self.render_elevation_contours(painter, rect, theme);
+        }
+
+        if draw_pins_and_scale {
+            self.render_site_pins(painter, rect, theme);
+            if self.show_scale_bar {
+                self.render_scale_bar(painter, rect, theme);
+            }
+        }
+
+        // Subtle basemap attribution badge (bottom-right)
+        let attr_text = self.tile_provider.attribution_text();
+        painter.text(
+            Pos2::new(rect.max.x - 10.0, rect.max.y - 6.0),
+            egui::Align2::RIGHT_BOTTOM,
+            attr_text,
+            FontId::proportional(9.5),
+            theme.text_muted.gamma_multiply(0.85),
+        );
+    }
+
+    fn render_cartographic_basemap(
+        &self,
+        ui: &Ui,
+        painter: &egui::Painter,
+        rect: Rect,
+        theme: &crate::theme::MacTheme,
+    ) {
+        // 1. Deep oceanic background fill (adapts cleanly to chosen basemap or app theme)
         let ocean_color = match self.tile_provider {
-            TileSource::CartoDbDarkMatter => Color32::from_rgb(10, 14, 20),
-            TileSource::EsriWorldImagery => Color32::from_rgb(18, 28, 42),
-            TileSource::OpenTopoMap => Color32::from_rgb(212, 230, 241),
-            _ => Color32::from_rgb(20, 28, 38),
+            TileSource::CartoDbDarkMatter => Color32::from_rgb(11, 16, 24),
+            TileSource::EsriWorldImagery => Color32::from_rgb(13, 27, 46),
+            TileSource::OpenTopoMap => Color32::from_rgb(184, 214, 232),
+            TileSource::OpenStreetMap if !theme.is_dark() => Color32::from_rgb(170, 211, 223),
+            TileSource::OpenStreetMap => Color32::from_rgb(18, 30, 44),
+            TileSource::SyntheticVectorTerrain if !theme.is_dark() => Color32::from_rgb(206, 224, 236),
+            TileSource::SyntheticVectorTerrain => Color32::from_rgb(17, 25, 36),
         };
         painter.rect_filled(rect, CornerRadius::same(8), ocean_color);
 
-        // Landmass color
-        let land_color = match self.tile_provider {
-            TileSource::CartoDbDarkMatter => Color32::from_rgb(24, 30, 40),
-            TileSource::EsriWorldImagery => Color32::from_rgb(38, 54, 40),
-            TileSource::OpenTopoMap => Color32::from_rgb(245, 238, 220),
-            _ => Color32::from_rgb(32, 42, 54),
+        // 2. Global Vector Continents & Islands (triangulated for concave shapes + wrap offsets)
+        let (land_color, coast_color) = match self.tile_provider {
+            TileSource::CartoDbDarkMatter => (
+                Color32::from_rgb(28, 34, 46),
+                Color32::from_rgb(64, 78, 98),
+            ),
+            TileSource::EsriWorldImagery => (
+                Color32::from_rgb(38, 58, 42),
+                Color32::from_rgb(76, 108, 82),
+            ),
+            TileSource::OpenTopoMap => (
+                Color32::from_rgb(228, 224, 198),
+                Color32::from_rgb(154, 148, 122),
+            ),
+            TileSource::OpenStreetMap if !theme.is_dark() => (
+                Color32::from_rgb(236, 233, 222),
+                Color32::from_rgb(168, 165, 152),
+            ),
+            TileSource::OpenStreetMap => (
+                Color32::from_rgb(36, 48, 60),
+                Color32::from_rgb(72, 92, 112),
+            ),
+            TileSource::SyntheticVectorTerrain if !theme.is_dark() => (
+                Color32::from_rgb(230, 234, 224),
+                Color32::from_rgb(142, 156, 146),
+            ),
+            TileSource::SyntheticVectorTerrain => (
+                Color32::from_rgb(34, 46, 56),
+                Color32::from_rgb(68, 88, 104),
+            ),
         };
 
-        // Procedural continental & major landmass polygons (World & Indonesian Archipelago High-Fidelity)
-        let landmasses: &[&[(f64, f64)]] = &[
-            // Java Island
+        let world_landmasses: &[&[(f64, f64)]] = &[
+            // North & Central America
+            &[
+                (70.0, -162.0), (71.3, -156.0), (70.0, -135.0), (68.0, -95.0), (62.0, -78.0),
+                (58.0, -64.0), (52.0, -56.0), (45.0, -61.0), (42.0, -70.0), (35.0, -76.0),
+                (25.2, -80.2), (29.5, -84.0), (29.0, -95.0), (22.0, -97.5), (19.0, -96.0),
+                (21.4, -87.0), (16.0, -88.5), (15.0, -83.5), (9.0, -80.0), (8.5, -77.5),
+                (7.5, -80.5), (10.5, -85.5), (14.5, -92.5), (16.5, -100.0), (23.0, -106.5),
+                (31.5, -114.0), (23.5, -110.0), (32.5, -117.1), (38.0, -123.0), (48.5, -124.7),
+                (56.0, -133.0), (60.5, -145.0), (58.0, -156.0), (63.5, -166.0),
+            ],
+            // Greenland
+            &[
+                (82.5, -32.0), (81.5, -18.0), (76.0, -19.0), (70.0, -22.0), (60.0, -43.0),
+                (65.0, -52.0), (73.0, -56.0), (78.0, -72.0), (81.5, -62.0),
+            ],
+            // South America
+            &[
+                (12.2, -71.5), (10.5, -62.0), (5.0, -52.0), (0.0, -50.0), (-5.5, -35.0),
+                (-13.0, -38.5), (-23.0, -42.0), (-34.0, -53.5), (-41.0, -64.0), (-52.0, -68.5),
+                (-55.5, -67.5), (-52.5, -74.5), (-42.0, -74.0), (-33.0, -71.6), (-18.5, -70.5),
+                (-12.0, -77.2), (-4.5, -81.2), (1.0, -79.5), (9.0, -77.0),
+            ],
+            // Europe Mainland + Scandinavia
+            &[
+                (36.0, -5.6), (37.0, -9.0), (43.5, -9.2), (43.5, -1.8), (48.4, -4.7),
+                (51.0, 2.0), (54.0, 8.5), (57.2, 8.6), (55.5, 11.5), (59.5, 10.5),
+                (62.5, 5.5), (69.0, 16.0), (71.1, 26.0), (69.5, 32.0), (65.0, 25.5),
+                (60.0, 22.0), (59.5, 28.0), (55.0, 20.5), (54.0, 13.5), (53.5, 10.0),
+                (45.5, 13.8), (40.0, 18.4), (38.0, 15.6), (44.0, 9.5), (43.0, 5.5),
+                (41.4, 2.2), (36.8, -2.5),
+            ],
+            // Great Britain & Ireland
+            &[
+                (50.0, -5.5), (51.5, -4.5), (54.0, -3.2), (58.6, -5.0), (58.6, -3.0),
+                (56.0, -2.5), (52.8, 1.7), (51.1, 1.4), (50.6, -1.5),
+            ],
+            &[(51.5, -9.8), (54.3, -10.0), (55.2, -6.5), (52.2, -6.3)],
+            // Africa Mainland
+            &[
+                (35.8, -5.5), (37.2, 10.5), (32.5, 15.0), (31.2, 32.3), (22.0, 36.8),
+                (15.5, 39.5), (12.0, 43.5), (11.9, 51.3), (2.0, 45.3), (-4.0, 39.7),
+                (-11.0, 40.6), (-20.0, 34.8), (-26.0, 32.9), (-34.8, 20.0), (-33.9, 18.4),
+                (-22.5, 14.4), (-12.5, 13.4), (-4.5, 11.8), (4.0, 9.5), (4.5, 3.5),
+                (4.7, -7.5), (8.5, -13.2), (14.7, -17.5), (21.0, -17.0), (30.5, -9.6),
+            ],
+            // Madagascar
+            &[(-12.0, 49.2), (-16.0, 50.0), (-25.2, 47.0), (-25.0, 44.0), (-16.5, 44.4)],
+            // Asia + Middle East + India + Indochina + Siberia
+            &[
+                (69.5, 32.0), (73.5, 70.0), (77.5, 104.0), (72.5, 128.0), (70.0, 162.0),
+                (66.0, 179.0), (60.0, 165.0), (52.0, 156.5), (60.0, 150.0), (54.0, 138.0),
+                (43.0, 132.0), (38.5, 128.5), (35.1, 129.0), (35.0, 126.5), (39.5, 124.0),
+                (37.5, 121.0), (31.2, 121.8), (22.3, 114.2), (20.5, 107.0), (12.5, 109.4),
+                (8.6, 105.0), (13.5, 100.5), (1.3, 103.8), (6.5, 100.2), (16.5, 96.2),
+                (22.0, 91.5), (16.0, 81.0), (8.1, 77.5), (19.0, 72.8), (24.5, 67.0),
+                (25.5, 57.5), (30.0, 48.0), (24.0, 52.0), (22.5, 59.8), (12.6, 43.5),
+                (28.0, 34.5), (36.5, 36.0), (41.0, 29.0), (46.5, 31.0), (42.0, 41.5),
+                (45.5, 48.0), (54.0, 38.0),
+            ],
+            // Sri Lanka, Taiwan, Philippines, Japan
+            &[(9.8, 80.2), (7.5, 81.8), (6.0, 80.5), (7.8, 79.8)],
+            &[(25.2, 121.6), (22.0, 120.8), (23.8, 120.2)],
+            &[(18.5, 121.0), (18.2, 122.3), (13.0, 124.0), (6.0, 126.2), (6.8, 122.0), (14.5, 120.4)],
+            &[
+                (45.5, 141.9), (43.0, 145.5), (38.0, 141.0), (35.0, 139.8), (31.0, 130.7),
+                (34.0, 130.9), (37.5, 137.0), (41.5, 140.2),
+            ],
+            // Indonesia: Sumatra
+            &[(5.5, 95.3), (4.0, 98.5), (2.0, 100.5), (-0.5, 103.5), (-3.0, 106.0), (-5.8, 105.8), (-5.0, 103.5), (-3.5, 102.0), (-0.5, 99.5), (2.5, 96.5)],
+            // Indonesia: Java
             &[(-6.0, 105.2), (-5.9, 106.8), (-6.2, 108.5), (-6.8, 111.5), (-7.0, 114.6), (-7.8, 114.5), (-8.3, 113.2), (-8.4, 110.5), (-7.7, 108.5), (-7.0, 106.5), (-6.8, 105.1)],
-            // Sumatra Island
-            &[(5.5, 95.3), (4.0, 98.5), (2.0, 100.5), (-0.5, 103.5), (-3.0, 106.0), (-5.8, 105.8), (-5.0, 103.5), (-3.5, 102.0), (-0.5, 99.5), (2.5, 96.5), (5.5, 95.3)],
-            // Kalimantan / Borneo
-            &[(7.0, 116.5), (4.5, 118.5), (1.5, 119.0), (-1.2, 117.2), (-3.5, 116.0), (-4.2, 114.5), (-3.5, 110.5), (-1.0, 109.0), (1.5, 109.5), (4.0, 114.0), (7.0, 116.5)],
-            // Sulawesi
-            &[(1.8, 125.0), (0.5, 120.0), (-1.0, 119.5), (-5.5, 119.5), (-5.0, 120.5), (-3.0, 121.5), (-5.0, 123.0), (-3.0, 123.0), (-1.0, 121.5), (0.8, 123.5), (1.8, 125.0)],
-            // Bali & Nusa Tenggara
+            // Indonesia / Malaysia: Kalimantan / Borneo
+            &[(7.0, 116.5), (4.5, 118.5), (1.5, 119.0), (-1.2, 117.2), (-3.5, 116.0), (-4.2, 114.5), (-3.5, 110.5), (-1.0, 109.0), (1.5, 109.5), (4.0, 114.0)],
+            // Indonesia: Sulawesi
+            &[(1.8, 125.0), (0.5, 120.0), (-1.0, 119.5), (-5.5, 119.5), (-5.0, 120.5), (-3.0, 121.5), (-5.0, 123.0), (-3.0, 123.0), (-1.0, 121.5), (0.8, 123.5)],
+            // Indonesia: Bali & Nusa Tenggara
             &[(-8.1, 114.4), (-8.1, 115.7), (-8.8, 115.6), (-8.7, 114.5)],
             &[(-8.2, 115.9), (-8.2, 119.2), (-8.9, 119.0), (-8.9, 116.0)],
+            &[(-8.3, 119.5), (-8.3, 123.5), (-9.2, 123.4), (-9.0, 119.7)],
+            &[(-8.4, 123.6), (-8.4, 127.3), (-10.4, 123.6), (-9.2, 123.4)],
             // Papua / New Guinea
-            &[(-0.8, 131.0), (-2.5, 140.0), (-8.5, 141.0), (-8.0, 137.5), (-4.5, 135.0), (-3.0, 131.5), (-0.8, 131.0)],
-            // Eurasia & Asia Mainland
-            &[(70.0, 30.0), (70.0, 170.0), (50.0, 140.0), (30.0, 120.0), (15.0, 105.0), (1.0, 103.5), (10.0, 75.0), (25.0, 60.0), (35.0, 40.0), (50.0, 30.0)],
-            // Australia
-            &[(-11.0, 130.0), (-12.0, 142.0), (-25.0, 153.0), (-38.0, 148.0), (-35.0, 115.0), (-22.0, 114.0), (-15.0, 125.0)],
+            &[(-0.8, 131.0), (-2.5, 140.0), (-6.5, 147.8), (-10.5, 150.7), (-8.5, 141.0), (-8.0, 137.5), (-4.5, 135.0), (-3.0, 131.5)],
+            // Australia & Tasmania
+            &[
+                (-11.0, 130.0), (-12.5, 136.8), (-15.0, 136.0), (-10.7, 142.5), (-19.0, 147.0),
+                (-25.0, 153.2), (-33.8, 151.3), (-37.8, 149.9), (-38.5, 144.0), (-35.0, 135.5),
+                (-31.7, 128.0), (-35.1, 117.8), (-32.0, 115.7), (-22.0, 114.0), (-16.0, 123.0),
+            ],
+            &[(-40.8, 144.7), (-41.0, 148.3), (-43.5, 147.2), (-43.0, 145.5)],
+            // New Zealand
+            &[(-34.5, 172.7), (-37.7, 178.5), (-41.3, 175.3), (-41.1, 174.0), (-36.8, 174.3)],
+            &[(-40.7, 172.5), (-42.4, 173.7), (-46.5, 168.5), (-45.8, 166.5)],
+            // Antarctica Continental Rim
+            &[
+                (-65.0, -179.9), (-77.5, -165.0), (-73.0, -100.0), (-63.5, -58.0),
+                (-70.0, -5.0), (-68.5, 45.0), (-66.5, 95.0), (-66.5, 140.0),
+                (-72.0, 170.0), (-65.0, 179.9), (-84.5, 179.9), (-84.5, -179.9),
+            ],
         ];
 
-        for land in landmasses {
-            let pts: Vec<Pos2> = land.iter().map(|&(lat, lon)| self.lat_lon_to_screen(lat, lon, rect)).collect();
-            if pts.len() >= 3 {
-                painter.add(egui::Shape::convex_polygon(pts, land_color, Stroke::new(1.0, theme.border_subtle)));
+        for &wrap_deg in &[-360.0_f64, 0.0_f64, 360.0_f64] {
+            for land in world_landmasses {
+                let pts: Vec<Pos2> = land
+                    .iter()
+                    .map(|&(lat, lon)| self.lat_lon_to_screen_unwrapped(lat, lon + wrap_deg, rect))
+                    .collect();
+                if pts.len() < 3 {
+                    continue;
+                }
+                let mut bounds = Rect::NOTHING;
+                for &p in &pts {
+                    bounds.extend_with(p);
+                }
+                if !bounds.intersects(rect) {
+                    continue;
+                }
+                if let Some(mesh) = triangulate_polygon_2d(&pts, land_color) {
+                    painter.add(egui::Shape::mesh(mesh));
+                }
+                painter.add(egui::epaint::PathShape::closed_line(
+                    pts,
+                    Stroke::new(0.9, coast_color),
+                ));
+            }
+        }
+
+        // 3. Stream live online raster tiles over vector continents (fallback already drawn underneath)
+        if self.tile_provider != TileSource::SyntheticVectorTerrain {
+            self.render_raster_tiles(ui, painter, rect);
+        }
+    }
+
+    fn render_raster_tiles(&self, ui: &Ui, painter: &egui::Painter, rect: Rect) {
+        let max_z = self.tile_provider.max_zoom();
+        let z_int = (self.zoom_level.floor() as i32).clamp(1, max_z) as u8;
+        let n_tiles = 1_i64 << z_int;
+        let scale = 2.0_f64.powf(self.zoom_level as f64 - z_int as f64);
+
+        let (cx, cy) = WebMercator::lat_lon_to_tile_coords(
+            self.center_lat_lon.0,
+            self.center_lat_lon.1,
+            self.zoom_level,
+        );
+        let tile_px = (256.0 * scale) as f32;
+        if tile_px <= 1.0 {
+            return;
+        }
+
+        let min_tx = ((cx + (rect.min.x - rect.center().x) as f64 / 256.0) / scale).floor() as i64;
+        let max_tx = ((cx + (rect.max.x - rect.center().x) as f64 / 256.0) / scale).floor() as i64;
+        let min_ty = (((cy + (rect.min.y - rect.center().y) as f64 / 256.0) / scale).floor() as i64)
+            .clamp(0, n_tiles - 1);
+        let max_ty = (((cy + (rect.max.y - rect.center().y) as f64 / 256.0) / scale).floor() as i64)
+            .clamp(0, n_tiles - 1);
+
+        let mut drawn_budget = 0usize;
+        for ty_i in min_ty..=max_ty {
+            let ty = ty_i as u32;
+            for tx_raw in min_tx..=max_tx {
+                if drawn_budget >= 64 {
+                    break;
+                }
+                drawn_budget += 1;
+                let tx_wrapped = tx_raw.rem_euclid(n_tiles) as u32;
+                let x0 = rect.center().x + ((tx_raw as f64 * scale - cx) * 256.0) as f32;
+                let y0 = rect.center().y + ((ty_i as f64 * scale - cy) * 256.0) as f32;
+                let tile_rect = Rect::from_min_size(Pos2::new(x0, y0), Vec2::splat(tile_px + 0.5));
+                if !tile_rect.intersects(rect) {
+                    continue;
+                }
+
+                self.tile_cache.request_tile(ui.ctx(), self.tile_provider, z_int, tx_wrapped, ty);
+
+                if let Some(tex_id) =
+                    self.tile_cache.get_or_upload_texture(ui.ctx(), self.tile_provider, z_int, tx_wrapped, ty)
+                {
+                    painter.image(
+                        tex_id,
+                        tile_rect,
+                        Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                } else {
+                    // Progressive parent-tile fallback while zooming or waiting for HTTP response
+                    for ancestor in 1..=2_u8 {
+                        if z_int <= ancestor {
+                            break;
+                        }
+                        let pz = z_int - ancestor;
+                        let factor = 1_u32 << ancestor;
+                        let px = tx_wrapped / factor;
+                        let py = ty / factor;
+                        if let Some(ptex) = self.tile_cache.get_or_upload_texture(ui.ctx(), self.tile_provider, pz, px, py) {
+                            let sx = (tx_wrapped % factor) as f32 / factor as f32;
+                            let sy = (ty % factor) as f32 / factor as f32;
+                            let sw = 1.0 / factor as f32;
+                            painter.image(
+                                ptex,
+                                tile_rect,
+                                Rect::from_min_max(Pos2::new(sx, sy), Pos2::new(sx + sw, sy + sw)),
+                                Color32::WHITE,
+                            );
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
 
     fn render_geodetic_grid(&self, painter: &egui::Painter, rect: Rect, theme: &crate::theme::MacTheme) {
-        let grid_stroke = Stroke::new(0.8, Color32::from_white_alpha(35));
-        let equator_stroke = Stroke::new(1.4, theme.accent_blue.gamma_multiply(0.7));
+        let alpha = if self.zoom_level >= 11.0 { 20 } else { 42 };
+        let grid_stroke = Stroke::new(0.8, Color32::from_rgba_unmultiplied(180, 200, 225, alpha));
+        let equator_stroke = Stroke::new(1.3, theme.accent_blue.gamma_multiply(0.55));
 
         // Parallels (Equator, ±20°, ±40°, ±60°)
         for lat in [-60.0, -40.0, -20.0, 0.0, 20.0, 40.0, 60.0] {
-            let p1 = self.lat_lon_to_screen(lat, -180.0, rect);
-            let p2 = self.lat_lon_to_screen(lat, 180.0, rect);
+            let p1 = self.lat_lon_to_screen_unwrapped(lat, 0.0, rect);
             let stroke = if lat.abs() < 1e-3 { equator_stroke } else { grid_stroke };
             if p1.y >= rect.min.y && p1.y <= rect.max.y {
                 painter.line_segment([Pos2::new(rect.min.x, p1.y), Pos2::new(rect.max.x, p1.y)], stroke);
-                painter.text(
-                    Pos2::new(rect.min.x + 8.0, p1.y - 10.0),
-                    egui::Align2::LEFT_BOTTOM,
-                    format!("{:+.0}°", lat),
-                    FontId::monospace(9.0),
-                    theme.text_muted,
-                );
+                if self.zoom_level < 10.0 {
+                    painter.text(
+                        Pos2::new(rect.min.x + 8.0, p1.y - 4.0),
+                        egui::Align2::LEFT_BOTTOM,
+                        format!("{:+.0}°", lat),
+                        FontId::monospace(9.0),
+                        theme.text_muted,
+                    );
+                }
             }
         }
 
-        // Meridians (every 30°)
-        for lon in (-180..=180).step_by(30) {
-            let lon_f = lon as f64;
-            let p = self.lat_lon_to_screen(0.0, lon_f, rect);
-            if p.x >= rect.min.x && p.x <= rect.max.x {
-                painter.line_segment([Pos2::new(p.x, rect.min.y), Pos2::new(p.x, rect.max.y)], grid_stroke);
-                painter.text(
-                    Pos2::new(p.x + 4.0, rect.max.y - 12.0),
-                    egui::Align2::LEFT_BOTTOM,
-                    format!("{:+.0}°", lon_f),
-                    FontId::monospace(9.0),
-                    theme.text_muted,
-                );
+        // Meridians (every 30°, wrapped cleanly across +/- 360°)
+        for &wrap_deg in &[-360.0_f64, 0.0_f64, 360.0_f64] {
+            for lon in (-180..180).step_by(30) {
+                let lon_f = lon as f64;
+                let p = self.lat_lon_to_screen_unwrapped(0.0, lon_f + wrap_deg, rect);
+                if p.x >= rect.min.x && p.x <= rect.max.x {
+                    painter.line_segment([Pos2::new(p.x, rect.min.y), Pos2::new(p.x, rect.max.y)], grid_stroke);
+                    if self.zoom_level < 10.0 {
+                        painter.text(
+                            Pos2::new(p.x + 4.0, rect.max.y - 24.0),
+                            egui::Align2::LEFT_BOTTOM,
+                            format!("{:+.0}°", lon_f),
+                            FontId::monospace(9.0),
+                            theme.text_muted,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Renders metric site surveying grid relative to `ground_origin_lat_lon` when zoomed to site level.
+    fn render_ground_metric_grid(
+        &self,
+        painter: &egui::Painter,
+        rect: Rect,
+        theme: &crate::theme::MacTheme,
+        ground_origin_lat_lon: (f64, f64),
+    ) {
+        let res_m_px = WebMercator::ground_resolution_m_px(ground_origin_lat_lon.0, self.zoom_level).max(1e-4);
+        let mut step_m = 1000.0_f64;
+        for candidate_m in [0.5_f64, 1.0, 2.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0] {
+            let px = candidate_m / res_m_px;
+            if px >= 36.0 && px <= 140.0 {
+                step_m = candidate_m;
+                break;
+            }
+        }
+        let step_mm = step_m * 1000.0;
+        let min_mm = self.screen_to_world_mm(ground_origin_lat_lon, Pos2::new(rect.min.x, rect.max.y), rect);
+        let max_mm = self.screen_to_world_mm(ground_origin_lat_lon, Pos2::new(rect.max.x, rect.min.y), rect);
+
+        let start_ix = (min_mm[0] / step_mm).floor() as i64 - 1;
+        let end_ix = (max_mm[0] / step_mm).ceil() as i64 + 1;
+        let start_iy = (min_mm[1] / step_mm).floor() as i64 - 1;
+        let end_iy = (max_mm[1] / step_mm).ceil() as i64 + 1;
+
+        if (end_ix - start_ix).abs() > 80 || (end_iy - start_iy).abs() > 80 {
+            return;
+        }
+
+        let minor_stroke = Stroke::new(0.8, theme.border_subtle.gamma_multiply(0.5));
+        let axis_x_stroke = Stroke::new(1.5, theme.accent_red.gamma_multiply(0.6));
+        let axis_y_stroke = Stroke::new(1.5, theme.accent_green.gamma_multiply(0.6));
+
+        for ix in start_ix..=end_ix {
+            let x_mm = ix as f64 * step_mm;
+            let p_screen = self.world_mm_to_screen(ground_origin_lat_lon, [x_mm, 0.0], rect);
+            if p_screen.x >= rect.min.x && p_screen.x <= rect.max.x {
+                let stroke = if ix == 0 { axis_y_stroke } else { minor_stroke };
+                painter.line_segment([Pos2::new(p_screen.x, rect.min.y), Pos2::new(p_screen.x, rect.max.y)], stroke);
+            }
+        }
+
+        for iy in start_iy..=end_iy {
+            let y_mm = iy as f64 * step_mm;
+            let p_screen = self.world_mm_to_screen(ground_origin_lat_lon, [0.0, y_mm], rect);
+            if p_screen.y >= rect.min.y && p_screen.y <= rect.max.y {
+                let stroke = if iy == 0 { axis_x_stroke } else { minor_stroke };
+                painter.line_segment([Pos2::new(rect.min.x, p_screen.y), Pos2::new(rect.max.x, p_screen.y)], stroke);
             }
         }
     }
@@ -678,7 +1396,8 @@ mod tests {
     #[test]
     fn test_slippy_map_state_pan_zoom_and_pins() {
         let mut map = SlippyMapState::new();
-        assert_eq!(map.site_pins.len(), 1);
+        assert_eq!(map.site_pins.len(), 0);
+        assert!(map.zoom_level < 3.0); // Global World Map overview by default
 
         let initial_lat = map.center_lat_lon.0;
         map.pan_by_pixels(100.0, 50.0);
@@ -688,18 +1407,28 @@ mod tests {
         map.zoom_in(1.0);
         assert_eq!(map.zoom_level, initial_zoom + 1.0);
 
-        map.zoom_out(2.0);
-        assert_eq!(map.zoom_level, initial_zoom - 1.0);
+        map.zoom_out(0.5);
+        assert_eq!(map.zoom_level, initial_zoom + 0.5);
 
         let pin_id = map.add_pin(-6.9175, 107.6191, "Bandung Project Lot");
-        assert_eq!(map.site_pins.len(), 2);
+        assert_eq!(map.site_pins.len(), 1);
         assert_eq!(map.active_pin, Some((-6.9175, 107.6191)));
 
         map.remove_pin(pin_id);
-        assert_eq!(map.site_pins.len(), 1);
+        assert_eq!(map.site_pins.len(), 0);
 
         let telem = map.telemetry();
-        assert_eq!(telem.pins_count, 1);
-        assert_eq!(telem.zoom, initial_zoom - 1.0);
+        assert_eq!(telem.pins_count, 0);
+        assert_eq!(telem.zoom, initial_zoom + 0.5);
+    }
+
+    #[test]
+    fn test_world_mm_lat_lon_bijection_roundtrip() {
+        let origin = (-6.2, 106.8);
+        let world_mm = [25_400.0, -14_250.0];
+        let (lat, lon) = SlippyMapState::world_mm_to_lat_lon(origin, world_mm);
+        let back = SlippyMapState::lat_lon_to_world_mm(origin, lat, lon);
+        assert!((back[0] - world_mm[0]).abs() < 1e-3);
+        assert!((back[1] - world_mm[1]).abs() < 1e-3);
     }
 }

@@ -115,22 +115,36 @@ impl ParametricView {
                 .input(|i| i.pointer.hover_pos().or(i.pointer.interact_pos()))
                 .is_some_and(|p| self.last_floating_rects.iter().any(|r| r.contains(p)));
 
-            // Pan & Zoom with Secondary Drag / Scroll Wheel (ignoring floating HUD overlays & freeze lock)
-            if !pointer_in_floating
-                && (response.dragged_by(egui::PointerButton::Secondary)
-                    || (response.dragged() && ui.input(|i| i.modifiers.shift)))
-            {
-                self.canvas_pan += response.drag_delta();
-            }
-            if !pointer_in_floating
-                && response.hovered()
-                && !universal_canvas.is_frozen
-                && !crate::ui_kit::is_canvas_frozen(ui.ctx())
-            {
-                let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
-                if scroll_y.abs() > 0.0 {
-                    self.canvas_zoom =
-                        (self.canvas_zoom * (1.0 + scroll_y * 0.002)).clamp(0.35, 4.5);
+            let is_frozen_now =
+                universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx());
+
+            // Pan & Zoom World Map with Drag / Scroll Wheel (strictly locked when Freeze Canvas is active)
+            if !is_frozen_now && !pointer_in_floating {
+                if response.dragged_by(egui::PointerButton::Secondary)
+                    || response.dragged_by(egui::PointerButton::Middle)
+                    || (response.dragged() && ui.input(|i| i.modifiers.shift))
+                {
+                    let delta = response.drag_delta();
+                    if self.view_mode == DraftingViewMode::FloorPlanViewRange {
+                        universal_canvas.world_map.pan_by_pixels(delta.x, delta.y);
+                    } else {
+                        self.canvas_pan += delta;
+                    }
+                }
+                if response.hovered() {
+                    let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
+                    if scroll_y.abs() > 0.2 {
+                        if self.view_mode == DraftingViewMode::FloorPlanViewRange {
+                            universal_canvas.world_map.zoom_at_screen_pos(
+                                scroll_y * 0.0028,
+                                response.hover_pos(),
+                                rect,
+                            );
+                        } else {
+                            self.canvas_zoom =
+                                (self.canvas_zoom * (1.0 + scroll_y * 0.002)).clamp(0.35, 4.5);
+                        }
+                    }
                 }
             }
 
@@ -213,11 +227,13 @@ impl ParametricView {
                 ui.horizontal_wrapped(|ui| {
                     ui.label(
                         RichText::new(format!(
-                            "Cursor: ({:.0}, {:.0}, {:.0}) mm • Zoom {:.0}% • {}",
+                            "Earth {:.4}°, {:.4}° (z{:.1}) • Local ({:.0}, {:.0}, {:.0}) mm • {}",
+                            universal_canvas.cursor_lat_lon.0,
+                            universal_canvas.cursor_lat_lon.1,
+                            universal_canvas.world_map.zoom_level,
                             self.cursor_pos_mm.0,
                             self.cursor_pos_mm.1,
                             self.cursor_pos_mm.2,
-                            self.canvas_zoom * 100.0,
                             lvl_name,
                         ))
                         .size(10.5)
@@ -287,37 +303,84 @@ impl ParametricView {
         universal_canvas: &mut crate::views::universal_canvas::UniversalCanvasState,
         pointer_in_floating: bool,
     ) {
-        let scale = 0.042 * self.canvas_zoom; // mm -> screen px
-        let origin = Pos2::new(
-            rect.left() + 120.0 + self.canvas_pan.x,
-            rect.bottom() - 95.0 + self.canvas_pan.y,
+        let is_frozen_now =
+            universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(&response.ctx);
+
+        // 0. Render Global Earth World Map Ground Basemap directly underneath the 2D floor plan
+        universal_canvas.world_map.render_world_background(
+            &egui::Ui::new(response.ctx.clone(), egui::Id::new("param_world_bg"), egui::UiBuilder::new().max_rect(rect)),
+            painter,
+            rect,
+            theme,
+            universal_canvas.ground_origin_lat_lon,
+            universal_canvas.show_grid,
+            false,
         );
 
+        let origin_lat_lon = universal_canvas.ground_origin_lat_lon;
+        let world_map_view = universal_canvas.world_map.clone();
+        let px_per_mm = world_map_view.pixels_per_mm_at_origin(origin_lat_lon);
+
         let to_screen = |p: P2| -> Pos2 {
-            Pos2::new(origin.x + (p.0 as f32) * scale, origin.y - (p.1 as f32) * scale)
+            world_map_view.world_mm_to_screen(origin_lat_lon, [p.0, p.1], rect)
         };
         let to_world = |s: Pos2| -> P2 {
-            P2(
-                ((s.x - origin.x) / scale) as f64,
-                ((origin.y - s.y) / scale) as f64,
-            )
+            let mm = world_map_view.screen_to_world_mm(origin_lat_lon, s, rect);
+            P2(mm[0], mm[1])
         };
 
-        // 1. Subtle Millimetre Grid
-        let grid_stroke = if theme.is_dark() {
-            Color32::from_rgba_premultiplied(50, 65, 90, 35)
-        } else {
-            Color32::from_rgba_premultiplied(15, 23, 42, 20)
-        };
-        for gx in (-2..=15).map(|i| i as f64 * 1000.0) {
-            let p0 = to_screen(P2(gx, -1500.0));
-            let p1 = to_screen(P2(gx, 10500.0));
-            painter.line_segment([p0, p1], Stroke::new(0.5, grid_stroke));
+        if let Some(hover) = response.hover_pos() {
+            universal_canvas.cursor_lat_lon = world_map_view.screen_to_lat_lon(hover, rect);
         }
-        for gy in (-1..=11).map(|i| i as f64 * 1000.0) {
-            let p0 = to_screen(P2(-1500.0, gy));
-            let p1 = to_screen(P2(13500.0, gy));
-            painter.line_segment([p0, p1], Stroke::new(0.5, grid_stroke));
+
+        // Primary drag pans World Map when in non-sketch BIM mode (clicking places elements)
+        if !self.sketch_draw_mode && !is_frozen_now && !pointer_in_floating {
+            if response.dragged_by(egui::PointerButton::Primary) {
+                let delta = response.drag_delta();
+                universal_canvas.world_map.pan_by_pixels(delta.x, delta.y);
+            }
+        }
+
+        // 1. Subtle Millimetre Site Grid when zoomed to architectural ground scale (z >= 15.5)
+        if universal_canvas.show_grid && universal_canvas.world_map.zoom_level >= 15.5 {
+            let grid_stroke = if theme.is_dark() {
+                Color32::from_rgba_premultiplied(80, 110, 150, 32)
+            } else {
+                Color32::from_rgba_premultiplied(15, 23, 42, 24)
+            };
+            for gx in (-5..=25).map(|i| i as f64 * 1000.0) {
+                let p0 = to_screen(P2(gx, -5000.0));
+                let p1 = to_screen(P2(gx, 20000.0));
+                painter.line_segment([p0, p1], Stroke::new(0.6, grid_stroke));
+            }
+            for gy in (-5..=20).map(|i| i as f64 * 1000.0) {
+                let p0 = to_screen(P2(-5000.0, gy));
+                let p1 = to_screen(P2(25000.0, gy));
+                painter.line_segment([p0, p1], Stroke::new(0.6, grid_stroke));
+            }
+        }
+
+        // Show site origin marker when zoomed out across continents/globe
+        if universal_canvas.world_map.zoom_level < 12.5
+            && (universal_canvas.ground_origin_anchored
+                || !universal_canvas.entities.is_empty()
+                || !self.bim_bus.project.is_empty())
+        {
+            let site_pos = to_screen(P2(0.0, 0.0));
+            if rect.expand(16.0).contains(site_pos) {
+                painter.circle_filled(site_pos, 6.0, theme.accent_blue);
+                painter.circle_stroke(site_pos, 11.0, Stroke::new(1.6, theme.accent_blue));
+                painter.text(
+                    site_pos + Vec2::new(12.0, -6.0),
+                    Align2::LEFT_BOTTOM,
+                    format!(
+                        "Site Origin ({:.3}°, {:.3}°)",
+                        origin_lat_lon.0, origin_lat_lon.1
+                    ),
+                    egui::FontId::monospace(10.0),
+                    theme.text_primary,
+                );
+            }
         }
 
         // 2. Structural Grids & Bubbles (1, 2, 3 / A, B, C)
@@ -577,10 +640,7 @@ impl ParametricView {
 
         // 10. Interactive Sketch Authoring OR BIMCraft Object Snap (`SE, SM, SI, SC, SP, SN`)
         if self.sketch_draw_mode {
-            if !pointer_in_floating
-                && !universal_canvas.is_frozen
-                && !crate::ui_kit::is_canvas_frozen(&response.ctx)
-            {
+            if !pointer_in_floating && !is_frozen_now {
                 if let Some(mpos) = response.hover_pos() {
                     let w = to_world(mpos);
                     let lvl_z = self
@@ -596,22 +656,50 @@ impl ParametricView {
                     && universal_canvas.active_tool
                         == crate::views::universal_canvas::UniversalCanvasTool::SelectPan
                 {
-                    self.canvas_pan += response.drag_delta();
+                    let delta = response.drag_delta();
+                    universal_canvas.world_map.pan_by_pixels(delta.x, delta.y);
                 } else {
+                    if universal_canvas.active_tool
+                        != crate::views::universal_canvas::UniversalCanvasTool::SelectPan
+                        && universal_canvas.active_tool
+                            != crate::views::universal_canvas::UniversalCanvasTool::Eraser
+                        && (response.drag_started_by(egui::PointerButton::Primary)
+                            || response.clicked_by(egui::PointerButton::Primary))
+                    {
+                        if let Some(pos) = response.interact_pointer_pos() {
+                            universal_canvas.ensure_ground_origin_at_screen(pos, rect);
+                        }
+                    }
+                    let origin_after = universal_canvas.ground_origin_lat_lon;
+                    let map_after = universal_canvas.world_map.clone();
                     let to_world_mm = |s: Pos2| -> [f64; 2] {
-                        let w = to_world(s);
-                        [w.0, w.1]
+                        map_after.screen_to_world_mm(origin_after, s, rect)
                     };
                     universal_canvas.handle_world_sketch_interaction(
                         response,
                         NavigationPillar::ParametricDED,
-                        350.0 / (self.canvas_zoom as f64).max(0.25),
+                        (16.0 / px_per_mm.max(1e-9)) as f64,
                         &to_world_mm,
                     );
                 }
             }
-        } else if let Some(mpos) = response.hover_pos().filter(|_| !pointer_in_floating) {
-            let raw_world = to_world(mpos);
+        } else if let Some(mpos) = response
+            .hover_pos()
+            .filter(|_| !pointer_in_floating && !is_frozen_now)
+        {
+            if response.clicked()
+                && !universal_canvas.ground_origin_anchored
+                && self.bim_bus.project.is_empty()
+            {
+                universal_canvas.ensure_ground_origin_at_screen(mpos, rect);
+            }
+            let updated_origin = universal_canvas.ground_origin_lat_lon;
+            let raw_world = {
+                let mm = universal_canvas
+                    .world_map
+                    .screen_to_world_mm(updated_origin, mpos, rect);
+                P2(mm[0], mm[1])
+            };
             let angle_step = if self.ortho_mode { 90.0 } else { 15.0 };
             let snap_hit = self.bim_bus.project.find_snap(
                 raw_world,
@@ -619,7 +707,9 @@ impl ParametricView {
                 if self.snap_to_grid { 380.0 } else { 50.0 },
                 angle_step,
             );
-            let snapped_screen = to_screen(snap_hit.point);
+            let snapped_screen = universal_canvas
+                .world_map
+                .world_mm_to_screen(updated_origin, [snap_hit.point.0, snap_hit.point.1], rect);
             self.cursor_pos_mm = (
                 snap_hit.point.0 as f32,
                 snap_hit.point.1 as f32,

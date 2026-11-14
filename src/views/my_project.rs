@@ -36,7 +36,7 @@ impl Default for MyProjectView {
             show_dossier_modal: false,
             export_success_msg: None,
             custom_vault_override: String::new(),
-            families: BimFamilyItem::default_catalog(),
+            families: Vec::new(),
             selected_family_idx: 0,
             family_search_query: String::new(),
             family_category_filter: "All Families".to_string(),
@@ -204,8 +204,8 @@ impl MyProjectView {
             ).clicked() {
                 let mut engine = crate::core::ParametricEngine::new();
                 if let Ok(mut model) = engine.generate_warren_truss() {
-                    model.name = "NVW_DCR-LOD300_Eng-CON".to_string();
-                    if let Ok(path) = crate::core::InternalVault::autosave_project_model("NVW_DCR-LOD300_Eng-CON.eigen", &model) {
+                    model.name = "EigenGraph_Workspace_Model".to_string();
+                    if let Ok(path) = crate::core::InternalVault::autosave_project_model("EigenGraph_Workspace_Model.eigen", &model) {
                         self.export_success_msg = Some(format!("Saved automatically to Package Contents: {}", path));
                     }
                 }
@@ -257,7 +257,7 @@ impl MyProjectView {
                 painter.text(
                     egui::pos2(rect.center().x, rect.bottom() - 8.0),
                     egui::Align2::CENTER_CENTER,
-                    "NVW_DCR-LOD (LOD 100 • 200 • 300)",
+                    "Blank World-Grounded BIM Workspace",
                     egui::FontId::proportional(10.0),
                     theme.text_secondary,
                 );
@@ -626,6 +626,61 @@ impl MyProjectView {
     }
 
     fn render_projects_grid(&self, ui: &mut Ui, theme: &MacTheme, projects: &[ProjectItem], active_pillar: &mut NavigationPillar) {
+        if projects.is_empty() {
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.vertical_centered(|ui| {
+                    ui.add_space(12.0);
+                    icons::icon_label(
+                        ui,
+                        AppIcon::Globe,
+                        16.0,
+                        theme.accent_blue,
+                        "Blank Workspace — No Demo Projects Loaded",
+                        14.0,
+                        theme.text_primary,
+                        true,
+                    );
+                    ui.add_space(6.0);
+                    ui.label(
+                        RichText::new("Start from the frozen World Map Ground Canvas above: click Unfreeze to pan/zoom anywhere on Earth, set your ground origin, and author parametric or 3D BIM models directly on the terrain.")
+                            .size(12.0)
+                            .color(theme.text_secondary),
+                    );
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Compass,
+                            "Open Parametric Ground Canvas",
+                            11.5,
+                            Color32::WHITE,
+                            theme.accent_blue,
+                            Stroke::NONE,
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        ).clicked() {
+                            *active_pillar = NavigationPillar::ParametricDED;
+                        }
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Cube3D,
+                            "Open 3D Geometry Canvas",
+                            11.5,
+                            theme.text_primary,
+                            theme.bg_sidebar,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::ZERO,
+                        ).clicked() {
+                            *active_pillar = NavigationPillar::GeometryAssembly;
+                        }
+                    });
+                    ui.add_space(12.0);
+                });
+            });
+            return;
+        }
         ui_kit::responsive_grid_n(ui, projects.len(), 320.0, |ui, idx| {
             self.render_project_card(ui, theme, &projects[idx], active_pillar);
         });
@@ -954,6 +1009,18 @@ impl MyProjectView {
         ui.label(RichText::new(format!("PARAMETRIC FAMILIES ({} FOUND)", indices.len())).size(11.5).strong().color(theme.text_secondary));
         ui.add_space(6.0);
 
+        if indices.is_empty() {
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.label(
+                    RichText::new("No BIM families in the active blank library. Click '+ Create Family' above to define your first parametric section.")
+                        .size(11.5)
+                        .color(theme.text_muted),
+                );
+            });
+            return;
+        }
+
         for idx in indices {
             let fam = &self.families[*idx];
             let is_sel = self.selected_family_idx == *idx;
@@ -1047,7 +1114,22 @@ impl MyProjectView {
     }
 
     fn render_family_inspector_panel(&mut self, ui: &mut Ui, theme: &MacTheme) {
-        let active_fam = self.families.get(self.selected_family_idx).cloned().unwrap_or_else(|| self.families[0].clone());
+        let Some(active_fam) = self
+            .families
+            .get(self.selected_family_idx)
+            .or_else(|| self.families.first())
+            .cloned()
+        else {
+            theme.card_frame().show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.label(
+                    RichText::new("Select or create a parametric family to inspect its Type, Instance, and IFC properties.")
+                        .size(11.5)
+                        .color(theme.text_muted),
+                );
+            });
+            return;
+        };
 
         Frame::new()
             .fill(theme.bg_card)

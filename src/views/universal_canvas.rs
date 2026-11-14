@@ -135,6 +135,12 @@ pub struct UnifiedWorkspaceArchive {
     pub parametric_variables: Vec<ParametricVariable>,
     pub canvas_entities: Vec<CanvasEntity>,
     pub workspace_settings: WorkspaceCanvasSettings,
+    #[serde(default)]
+    pub world_origin_lat_lon: Option<(f64, f64)>,
+    #[serde(default)]
+    pub map_center_lat_lon: Option<(f64, f64)>,
+    #[serde(default)]
+    pub map_zoom: Option<f32>,
     pub sha256_seal: String,
 }
 
@@ -230,6 +236,10 @@ pub struct UniversalCanvasState {
     pending_start_mm: Option<[f64; 2]>,
     active_freehand_mm: Vec<[f64; 2]>,
     pub cursor_world_mm: [f64; 2],
+    pub cursor_lat_lon: (f64, f64),
+    pub world_map: crate::core::gis::SlippyMapState,
+    pub ground_origin_lat_lon: (f64, f64),
+    pub ground_origin_anchored: bool,
     last_canvas_rect: Option<Rect>,
     last_inspector_rect: Option<Rect>,
     pub status_message: Option<String>,
@@ -241,35 +251,11 @@ pub struct UniversalCanvasState {
 
 impl Default for UniversalCanvasState {
     fn default() -> Self {
-        let starter_entities = vec![
-            CanvasEntity {
-                id: 1,
-                pillar_badge: "3D".to_string(),
-                pillar_name: "Geometry".to_string(),
-                kind: CanvasShapeKind::Dimension {
-                    start_mm: [0.0, -950.0],
-                    end_mm: [12000.0, -950.0],
-                },
-                color_rgb: [56, 189, 248],
-                stroke_width: 2.0,
-            },
-            CanvasEntity {
-                id: 2,
-                pillar_badge: "SIM".to_string(),
-                pillar_name: "Analysis".to_string(),
-                kind: CanvasShapeKind::Callout {
-                    pos_mm: [6000.0, 4500.0],
-                    text: "Core Grid B-2 • ARI 0.942".to_string(),
-                },
-                color_rgb: [16, 185, 129],
-                stroke_width: 2.0,
-            },
-        ];
-
         Self {
             pan: Vec2::ZERO,
             zoom: 1.0,
-            is_frozen: false,
+            // Phase 35: Frozen by default so vertical page scroll never zooms unintentionally; unfreeze to pan/draw on Earth map
+            is_frozen: true,
             active_tool: UniversalCanvasTool::SelectPan,
             active_color_idx: 0,
             stroke_width: 2.2,
@@ -281,13 +267,17 @@ impl Default for UniversalCanvasState {
             sync_all_layers: true,
             inspector_open: false,
             canvas_height_ratio: 0.74,
-            callout_draft: "Engineering Note".to_string(),
-            entities: starter_entities,
-            next_entity_id: 3,
+            callout_draft: "Note".to_string(),
+            entities: Vec::new(),
+            next_entity_id: 1,
             undo_stack: Vec::new(),
             pending_start_mm: None,
             active_freehand_mm: Vec::new(),
             cursor_world_mm: [0.0, 0.0],
+            cursor_lat_lon: (15.0, 15.0),
+            world_map: crate::core::gis::SlippyMapState::default(),
+            ground_origin_lat_lon: (0.0, 0.0),
+            ground_origin_anchored: false,
             last_canvas_rect: None,
             last_inspector_rect: None,
             status_message: None,
@@ -552,6 +542,11 @@ impl UniversalCanvasState {
             parametric_variables: variables.to_vec(),
             canvas_entities: self.entities.clone(),
             workspace_settings,
+            world_origin_lat_lon: self
+                .ground_origin_anchored
+                .then_some(self.ground_origin_lat_lon),
+            map_center_lat_lon: Some(self.world_map.center_lat_lon),
+            map_zoom: Some(self.world_map.zoom_level),
             sha256_seal: String::new(),
         }
     }
@@ -621,6 +616,16 @@ impl UniversalCanvasState {
         self.show_domain_overlay = archive.workspace_settings.show_domain_overlay;
         self.sync_all_layers = archive.workspace_settings.sync_all_layers;
         self.inspector_open = archive.workspace_settings.show_floating_inspector;
+        if let Some(orig) = archive.world_origin_lat_lon {
+            self.ground_origin_lat_lon = orig;
+            self.ground_origin_anchored = true;
+        }
+        if let Some(center) = archive.map_center_lat_lon {
+            self.world_map.set_center(center.0, center.1);
+        }
+        if let Some(zoom) = archive.map_zoom {
+            self.world_map.zoom_level = zoom.clamp(1.0, 19.0);
+        }
         self.status_message = Some(format!(
             "Imported verified 1-file workspace '{}' ({} canvas objects)",
             archive.project_name,
@@ -820,9 +825,20 @@ impl UniversalCanvasState {
                     pointer_in_inspector,
                 );
 
-                // Render Grid, BIM Base Layer, Domain Overlay, Synchronized Entities & Preview
+                // 2a. Phase 35: Earth World Map Ground Basemap (Vector Continents + Online Raster Tiles + Geodetic/Metric Grid)
+                self.world_map.render_world_background(
+                    ui,
+                    &painter,
+                    rect,
+                    theme,
+                    self.ground_origin_lat_lon,
+                    self.show_grid,
+                    false,
+                );
+
+                // 2b. Render Fine Millimeter Engineering Grid (site scale), BIM Base Layer, Domain Overlay, Entities & Preview
                 let world_to_screen = |w: [f64; 2]| self.world_to_screen(rect, w);
-                if self.show_grid {
+                if self.show_grid && self.world_map.zoom_level >= 15.5 {
                     self.paint_grid(&painter, rect, theme, &world_to_screen);
                 }
                 if self.show_bim_base_layer {
@@ -849,6 +865,39 @@ impl UniversalCanvasState {
                 }
                 self.paint_entities(&painter, rect, theme, active_pillar, &world_to_screen);
                 self.paint_live_preview(&painter, rect, theme, &world_to_screen);
+
+                // Highlight geodetic site anchor when zoomed out on World Map
+                if self.world_map.zoom_level < 12.5
+                    && (self.ground_origin_anchored || !self.entities.is_empty() || !bim_project.is_empty())
+                {
+                    let site_pos = world_to_screen([0.0, 0.0]);
+                    if rect.expand(16.0).contains(site_pos) {
+                        painter.circle_filled(site_pos, 6.0, theme.accent_blue);
+                        painter.circle_stroke(site_pos, 11.0, Stroke::new(1.6, theme.accent_blue));
+                        painter.text(
+                            site_pos + Vec2::new(12.0, -6.0),
+                            Align2::LEFT_BOTTOM,
+                            format!(
+                                "Site Origin ({:.3}°, {:.3}°)",
+                                self.ground_origin_lat_lon.0, self.ground_origin_lat_lon.1
+                            ),
+                            egui::FontId::monospace(10.0),
+                            theme.text_primary,
+                        );
+                    }
+                } else if !self.is_frozen
+                    && !self.ground_origin_anchored
+                    && self.entities.is_empty()
+                    && bim_project.is_empty()
+                {
+                    painter.text(
+                        Pos2::new(rect.left() + 14.0, rect.top() + 14.0),
+                        Align2::LEFT_TOP,
+                        "World Map Ground Canvas • Pan/Zoom to any site or click Ground 1:200 to draw directly on terrain",
+                        egui::FontId::proportional(11.0),
+                        theme.text_primary.gamma_multiply(0.85),
+                    );
+                }
 
                 // Floating Freeze Banner inside canvas when frozen
                 if self.is_frozen {
@@ -1018,12 +1067,16 @@ impl UniversalCanvasState {
                         CornerRadius::same(6),
                         Vec2::new(0.0, 26.0),
                     )
-                    .on_hover_text("Reset canvas pan and zoom to fit model")
+                    .on_hover_text("Fit Ground Site (or Global World Map when empty)")
                     .clicked()
                     {
-                        self.pan = Vec2::ZERO;
-                        self.zoom = 1.0;
+                        self.fit_world_or_site(!bim_project.is_empty());
                     }
+
+                    ui.separator();
+
+                    // Phase 35: World Map Basemap & Ground Scale Controls
+                    self.render_world_map_toolbar_controls(ui, theme, 26.0);
 
                     ui.separator();
 
@@ -1084,6 +1137,136 @@ impl UniversalCanvasState {
                     }
                 });
             });
+    }
+
+    /// World Map basemap selector, Global overview, Ground 1:200 site zoom, and Site Origin anchor controls.
+    pub fn render_world_map_toolbar_controls(
+        &mut self,
+        ui: &mut Ui,
+        theme: &MacTheme,
+        btn_h: f32,
+    ) {
+        use crate::core::gis::TileSource;
+        let short_name = |src: TileSource| -> &'static str {
+            match src {
+                TileSource::OpenStreetMap => "OSM Streets",
+                TileSource::EsriWorldImagery => "Satellite",
+                TileSource::OpenTopoMap => "Topo",
+                TileSource::CartoDbDarkMatter => "Dark Map",
+                TileSource::SyntheticVectorTerrain => "Offline Vector",
+            }
+        };
+
+        egui::ComboBox::from_id_salt("universal_world_basemap_combo")
+            .width(102.0)
+            .selected_text(short_name(self.world_map.tile_provider))
+            .show_ui(ui, |ui| {
+                for src in [
+                    TileSource::OpenStreetMap,
+                    TileSource::EsriWorldImagery,
+                    TileSource::OpenTopoMap,
+                    TileSource::CartoDbDarkMatter,
+                    TileSource::SyntheticVectorTerrain,
+                ] {
+                    ui.selectable_value(
+                        &mut self.world_map.tile_provider,
+                        src,
+                        src.display_name(),
+                    );
+                }
+            });
+
+        if icons::icon_button(
+            ui,
+            AppIcon::Globe,
+            "World",
+            10.5,
+            theme.text_secondary,
+            theme.bg_card,
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(0.0, btn_h),
+        )
+        .on_hover_text("Reset view to full Global World Map showing all continents")
+        .clicked()
+        {
+            self.world_map.reset_to_global_view();
+        }
+
+        if icons::icon_button(
+            ui,
+            AppIcon::Target,
+            "Ground 1:200",
+            10.5,
+            theme.text_secondary,
+            theme.bg_card,
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(0.0, btn_h),
+        )
+        .on_hover_text("Zoom directly onto Earth surface at architectural/structural drawing scale")
+        .clicked()
+        {
+            let target = if self.ground_origin_anchored {
+                self.ground_origin_lat_lon
+            } else {
+                self.world_map.center_lat_lon
+            };
+            self.ground_origin_lat_lon = target;
+            self.ground_origin_anchored = true;
+            self.world_map.zoom_to_ground_site(target.0, target.1, 17.5);
+        }
+
+        if icons::icon_button(
+            ui,
+            AppIcon::MapPin,
+            "Set Origin",
+            10.5,
+            if self.ground_origin_anchored {
+                theme.accent_blue
+            } else {
+                theme.text_secondary
+            },
+            theme.bg_card,
+            Stroke::NONE,
+            CornerRadius::same(6),
+            Vec2::new(0.0, btn_h),
+        )
+        .on_hover_text("Anchor local ground CAD origin (0, 0) mm at current World Map center")
+        .clicked()
+        {
+            let center = self.world_map.center_lat_lon;
+            self.ground_origin_lat_lon = center;
+            self.ground_origin_anchored = true;
+            self.status_message = Some(format!(
+                "Ground origin (0, 0) mm anchored at {:.5}°, {:.5}°",
+                center.0, center.1
+            ));
+        }
+    }
+
+    /// Fits either the active site drawing footprint (if non-empty) or resets to the Global World Map overview.
+    pub fn fit_world_or_site(&mut self, has_bim_elements: bool) {
+        if self.ground_origin_anchored || !self.entities.is_empty() || has_bim_elements {
+            self.world_map.zoom_to_ground_site(
+                self.ground_origin_lat_lon.0,
+                self.ground_origin_lat_lon.1,
+                17.5,
+            );
+        } else {
+            self.world_map.reset_to_global_view();
+        }
+        self.pan = Vec2::ZERO;
+        self.zoom = 1.0;
+    }
+
+    /// Anchors ground `(0, 0) mm` origin to `screen_pos` on Earth if the workspace is still blank.
+    pub fn ensure_ground_origin_at_screen(&mut self, screen_pos: Pos2, rect: Rect) {
+        if !self.ground_origin_anchored && self.entities.is_empty() {
+            let (lat, lon) = self.world_map.screen_to_lat_lon(screen_pos, rect);
+            self.ground_origin_lat_lon = (lat, lon);
+            self.ground_origin_anchored = true;
+        }
     }
 
     /// Renders Universal Canvas drawing tools palette (optionally omitting `SelectPan`).
@@ -1149,33 +1332,23 @@ impl UniversalCanvasState {
         }
     }
 
-    fn world_origin_and_scale(&self, rect: Rect) -> (Pos2, f32) {
-        let base_scale = (rect.width().min(rect.height()) / 17000.0).clamp(0.015, 0.085);
-        let scale = base_scale * self.zoom;
-        let origin = Pos2::new(
-            rect.center().x - 6000.0 * scale + self.pan.x,
-            rect.center().y + 4500.0 * scale + self.pan.y,
-        );
+    pub fn world_origin_and_scale(&self, rect: Rect) -> (Pos2, f32) {
+        let origin = self.world_to_screen(rect, [0.0, 0.0]);
+        let scale = self.world_map.pixels_per_mm_at_origin(self.ground_origin_lat_lon);
         (origin, scale)
     }
 
-    fn world_to_screen(&self, rect: Rect, world_mm: [f64; 2]) -> Pos2 {
-        let (origin, scale) = self.world_origin_and_scale(rect);
-        Pos2::new(
-            origin.x + (world_mm[0] as f32) * scale,
-            origin.y - (world_mm[1] as f32) * scale,
-        )
+    pub fn world_to_screen(&self, rect: Rect, world_mm: [f64; 2]) -> Pos2 {
+        self.world_map
+            .world_mm_to_screen(self.ground_origin_lat_lon, world_mm, rect)
     }
 
-    fn screen_to_world(&self, rect: Rect, screen: Pos2) -> [f64; 2] {
-        let (origin, scale) = self.world_origin_and_scale(rect);
-        [
-            ((screen.x - origin.x) / scale) as f64,
-            ((origin.y - screen.y) / scale) as f64,
-        ]
+    pub fn screen_to_world(&self, rect: Rect, screen: Pos2) -> [f64; 2] {
+        self.world_map
+            .screen_to_world_mm(self.ground_origin_lat_lon, screen, rect)
     }
 
-    fn snap_point(&self, raw_mm: [f64; 2]) -> [f64; 2] {
+    pub fn snap_point(&self, raw_mm: [f64; 2]) -> [f64; 2] {
         if !self.snap_to_grid || self.grid_spacing_mm <= 1.0 {
             return raw_mm;
         }
@@ -1200,50 +1373,54 @@ impl UniversalCanvasState {
             return;
         }
 
-        // Scroll Wheel Zoom around cursor
+        // Scroll Wheel Zoom around cursor on World Map
         if response.hovered() {
             let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
             if scroll_y.abs() > 0.2 {
-                let old_zoom = self.zoom;
-                let new_zoom = (old_zoom * (1.0 + scroll_y * 0.0022)).clamp(0.25, 6.0);
-                if let Some(hover) = response.hover_pos() {
-                    let world_before = self.screen_to_world(rect, hover);
-                    self.zoom = new_zoom;
-                    let screen_after = self.world_to_screen(rect, world_before);
-                    self.pan += hover - screen_after;
-                } else {
-                    self.zoom = new_zoom;
-                }
+                self.world_map
+                    .zoom_at_screen_pos(scroll_y * 0.0028, response.hover_pos(), rect);
             }
         }
 
         if let Some(hover) = response.hover_pos() {
+            self.cursor_lat_lon = self.world_map.screen_to_lat_lon(hover, rect);
             self.cursor_world_mm = self.snap_point(self.screen_to_world(rect, hover));
         }
 
-        // Right-drag or Shift-drag pans in any tool
+        // Right-drag, Middle-drag, or Shift-drag pans Earth map in any tool
         if response.dragged_by(egui::PointerButton::Secondary)
             || response.dragged_by(egui::PointerButton::Middle)
             || (response.dragged() && ui.input(|i| i.modifiers.shift))
         {
-            self.pan += response.drag_delta();
+            let delta = response.drag_delta();
+            self.world_map.pan_by_pixels(delta.x, delta.y);
             return;
         }
 
         if self.active_tool == UniversalCanvasTool::SelectPan {
             if response.dragged_by(egui::PointerButton::Primary) {
-                self.pan += response.drag_delta();
+                let delta = response.drag_delta();
+                self.world_map.pan_by_pixels(delta.x, delta.y);
             }
             return;
         }
 
-        let (origin, scale) = self.world_origin_and_scale(rect);
-        let hit_radius_mm = (16.0 / scale.max(0.001)) as f64;
+        // Auto-anchor ground origin on first drawing stroke anywhere on Earth
+        if self.active_tool != UniversalCanvasTool::Eraser
+            && (response.drag_started_by(egui::PointerButton::Primary)
+                || response.clicked_by(egui::PointerButton::Primary))
+        {
+            if let Some(pos) = response.interact_pointer_pos() {
+                self.ensure_ground_origin_at_screen(pos, rect);
+            }
+        }
+
+        let scale = self.world_map.pixels_per_mm_at_origin(self.ground_origin_lat_lon);
+        let hit_radius_mm = (16.0 / scale.max(1e-9)) as f64;
+        let world_map_snapshot = self.world_map.clone();
+        let origin_lat_lon = self.ground_origin_lat_lon;
         let to_world = |pos: Pos2| -> [f64; 2] {
-            [
-                ((pos.x - origin.x) / scale) as f64,
-                ((origin.y - pos.y) / scale) as f64,
-            ]
+            world_map_snapshot.screen_to_world_mm(origin_lat_lon, pos, rect)
         };
         self.handle_world_sketch_interaction(response, active_pillar, hit_radius_mm, &to_world);
     }
@@ -1611,6 +1788,9 @@ impl UniversalCanvasState {
         members: &[StructuralMember],
         to_screen: &impl Fn([f64; 2]) -> Pos2,
     ) {
+        if bim_project.is_empty() && members.is_empty() && self.entities.is_empty() {
+            return;
+        }
         let clip_painter = painter.with_clip_rect(rect);
 
         match active_pillar {
@@ -2303,13 +2483,17 @@ impl UniversalCanvasState {
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal_wrapped(|ui| {
-                    icons::draw_icon(ui, AppIcon::MapPin, 12.0, theme.accent_blue);
+                    let telem = self.world_map.telemetry();
+                    icons::draw_icon(ui, AppIcon::Globe, 12.0, theme.accent_blue);
                     ui.label(
                         RichText::new(format!(
-                            "({:.0}, {:.0}) mm  •  Zoom {:.0}%  •  {} Synced Drawings ({} in {})  •  {} BIM Elements",
+                            "{:.4}°, {:.4}°  •  Map z{:.1} ({:.1} m/px)  •  ({:.0}, {:.0}) mm  •  {} Drawings ({} in {})  •  {} BIM",
+                            self.cursor_lat_lon.0,
+                            self.cursor_lat_lon.1,
+                            self.world_map.zoom_level,
+                            telem.ground_resolution_m_px,
                             self.cursor_world_mm[0],
                             self.cursor_world_mm[1],
-                            self.zoom * 100.0,
                             self.entities.len(),
                             self.count_for_pillar(active_pillar),
                             active_pillar.badge(),
@@ -2461,7 +2645,7 @@ mod tests {
         WorkspaceCanvasSettings {
             theme_mode: ThemeMode::ProDark,
             canvas_height_ratio: 0.74,
-            freeze_by_default: false,
+            freeze_by_default: true,
             show_grid: true,
             snap_to_grid: true,
             grid_spacing_mm: 500.0,
@@ -2481,6 +2665,10 @@ mod tests {
     #[test]
     fn test_unified_single_file_archive_roundtrip_and_tamper_detection() {
         let canvas = UniversalCanvasState::default();
+        assert!(canvas.is_frozen);
+        assert!(canvas.entities.is_empty());
+        assert!(canvas.world_map.zoom_level < 3.0);
+
         let bim = BimProject::sample_bimcraft_building();
         let members = vec![StructuralMember::default()];
         let vars = vec![ParametricVariable {
@@ -2493,12 +2681,12 @@ mod tests {
         let archive = canvas.build_unified_archive(&bim, &members, &vars, sample_settings());
         let json = archive.to_pretty_json().expect("serialize archive");
         let verified = UnifiedWorkspaceArchive::from_verified_json(&json).expect("verify archive");
-        assert_eq!(verified.canvas_entities.len(), canvas.entities.len());
+        assert_eq!(verified.canvas_entities.len(), 0);
         assert_eq!(verified.members.len(), 1);
         assert_eq!(verified.bim_project.walls.len(), bim.walls.len());
 
         // Tampering with JSON content must fail SHA-256 verification
-        let tampered = json.replace("Core Grid B-2", "Tampered Grid");
+        let tampered = json.replace("24000", "99999");
         assert!(UnifiedWorkspaceArchive::from_verified_json(&tampered).is_err());
     }
 

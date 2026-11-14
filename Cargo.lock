@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "eigengraph"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "eframe",
  "egui",
@@ -937,6 +937,8 @@ dependencies = [
  "num-traits",
  "png",
  "tiff",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]

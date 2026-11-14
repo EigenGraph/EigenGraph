@@ -7,6 +7,22 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.5] - 2026-11-14 — Phase 35: Default-Frozen World Map Ground Canvas & Zero-Demo Blank Workspace
+
+### Added & Changed
+- **Default-Frozen Canvas Across All Viewports (`src/ui_kit.rs`, `src/views/settings.rs`, `src/views/universal_canvas.rs`, `src/views/parametric/`, `src/views/build/`)**:
+  - Enabled canvas freeze by default (`is_frozen: true`, `freeze_by_default: true`, `is_canvas_frozen` defaulting to `true`) across Universal Canvas, Parametric 2D, Geometry 3D, and Research GIS viewports so vertical page scrolling glides smoothly until the user explicitly clicks **Unfreeze**.
+  - Enforced freeze guards on zoom, pan, 3D orbit, node dragging, sketch drawing, and BIM element placement (`render_with_freeze`, `canvas_2d.rs`, `viewport_3d.rs`, `universal_canvas.rs`).
+- **World Map Ground Canvas (`src/core/gis/map_widget.rs`, `src/views/universal_canvas.rs`, `src/views/parametric/`, `src/views/build/`)**:
+  - Upgraded `SlippyMapState` to launch at a global World Map overview (`center: (15.0, 15.0)`, `zoom: 1.85`) featuring an ear-clipped offline vector world basemap (`triangulate_polygon_2d` with `-360°/0°/+360°` wrapping), live async OSM / Esri Satellite / OpenTopoMap / CartoDB tile streaming (`WorldTileCache` on both native and `wasm32`), metric ground surveying grids (`zoom >= 11.5`), and bidirectional `world_mm <-> lat_lon <-> screen` geodetic transforms.
+  - Integrated shared Earth basemap switching (`OSM`, `Satellite`, `Topo`, `Dark`, `Offline Vector`), `World`, `Ground 1:200`, and `Set Origin` toolbar controls (`render_world_map_toolbar_controls`) across Universal Canvas, Parametric 2D floor plan/drafting, and Geometry 3D viewport (with a 3D Earth Ground Terrain Plane at `y = 0.0` and cardinal North/East markers).
+- **Zero-Demo Blank Workspace (`src/core/vault.rs`, `src/core/bim.rs`, `src/models.rs`, `src/views/`)**:
+  - Cleared all starter demo structures, hardcoded site pins/presets, sample IFC buttons, demo node graphs, and seeded Vault datasets (`BimProject::empty()`, `VisualNodeGraph::empty()`, `InternalVault` blank defaults) so every module opens on a clean empty state ready for user authoring, with isolated temporary directories for Vault unit tests.
+  - Added defensive empty-state UI panels and bounds checks in `my_project.rs`, `ai_assistant.rs`, `research.rs`, `planning.rs`, `lean.rs`, `industrialized/`, and `results.rs`.
+- **Version Bump**: Incremented crate version sequentially from `0.3.4` to `0.3.5` in `Cargo.toml`, `README.md`, `src/views/settings.rs`, and `docs/CHANGELOG.md`.
+
+---
+
 ## [v0.3.4] - 2026-11-14 — Phase 34: Universal Canvas Parity & Floating In-Canvas HUD Panels for Parametric and Geometry
 
 ### Added & Changed

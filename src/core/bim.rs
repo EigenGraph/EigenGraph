@@ -740,14 +740,48 @@ pub struct BimProject {
 
 impl Default for BimProject {
     fn default() -> Self {
-        Self::sample_bimcraft_building()
+        Self::empty()
     }
 }
 
 impl BimProject {
-    /// Creates a rich multi-storey structural & architectural BIM project modeled after BIMCraft's
-    /// sample house + structural frame (Levels 1-3, Grids A-C / 1-4, Compound Walls with CSG Doors/Windows,
-    /// WF & RC Columns, Beams, Isolated Footings, Slabs with Shaft Opening, Roof, Rooms, and Rebar).
+    /// Creates a clean blank ground-level BIM workspace with zero demo elements.
+    pub fn empty() -> Self {
+        Self {
+            project_name: "Untitled Ground Project".to_string(),
+            next_id: 2,
+            levels: vec![BimLevel {
+                id: 1,
+                name: "Ground Level (+0.00m)".to_string(),
+                elevation_mm: 0.0,
+            }],
+            grids: Vec::new(),
+            walls: Vec::new(),
+            runs: Vec::new(),
+            columns: Vec::new(),
+            footings: Vec::new(),
+            slabs: Vec::new(),
+            rooms: Vec::new(),
+            dimensions: Vec::new(),
+            rebars: Vec::new(),
+            view_range: ViewRange::default(),
+            section_line: (P2(-5000.0, 0.0), P2(5000.0, 0.0)),
+        }
+    }
+
+    /// Returns true when the project has no user-authored structural or architectural elements.
+    pub fn is_empty(&self) -> bool {
+        self.walls.is_empty()
+            && self.runs.is_empty()
+            && self.columns.is_empty()
+            && self.footings.is_empty()
+            && self.slabs.is_empty()
+            && self.grids.is_empty()
+            && self.dimensions.is_empty()
+            && self.rebars.is_empty()
+    }
+
+    /// Creates a multi-storey structural & architectural BIM test fixture for geometry/CSG verification.
     pub fn sample_bimcraft_building() -> Self {
         let mut proj = Self {
             project_name: "EigenGraph × BIMCraft Integrated Building (LOD 350)".to_string(),
@@ -2314,16 +2348,23 @@ pub struct BimCommandBus {
 
 impl BimCommandBus {
     pub fn new() -> Self {
-        let bus = Self {
-            project: BimProject::sample_bimcraft_building(),
+        Self {
+            project: BimProject::empty(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             log: vec![
-                "Initialized BIMCraft-grade Relational Building Model (Levels 1-3, Grids 1-3/A-C, CSG Openings & Rebar)".to_string(),
+                "Blank Ground BIM Canvas initialized (0 demo elements)".to_string(),
             ],
-        };
-        crate::core::InternalVault::sync_live_bim_state(&bus.project, "Model Initialized");
-        bus
+        }
+    }
+
+    pub fn from_project(project: BimProject) -> Self {
+        Self {
+            project,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            log: vec!["Loaded project into Relational BIM Command Bus".to_string()],
+        }
     }
 
     /// Executes a `BimCommand` transactionally, recording a snapshot on `undo_stack`.
@@ -2810,9 +2851,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_bim_sample_building_rooms_rebar_and_live_ari() {
+    fn test_bim_empty_default_workspace() {
         let _guard = crate::core::vault::TEST_VAULT_LOCK.lock().unwrap_or_else(|p| p.into_inner());
         let bus = BimCommandBus::new();
+        assert!(bus.project.is_empty());
+        assert_eq!(bus.project.levels.len(), 1);
+    }
+
+    #[test]
+    fn test_bim_sample_building_rooms_rebar_and_live_ari() {
+        let _guard = crate::core::vault::TEST_VAULT_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let bus = BimCommandBus::from_project(BimProject::sample_bimcraft_building());
         assert_eq!(bus.project.levels.len(), 3);
         assert_eq!(bus.project.grids.len(), 6);
         // 3 rooms bounded by exterior + partition walls on Level 1
@@ -2835,7 +2884,7 @@ mod tests {
     #[test]
     fn test_transactional_command_bus_undo_redo_and_section_cut_export() {
         let _guard = crate::core::vault::TEST_VAULT_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-        let mut bus = BimCommandBus::new();
+        let mut bus = BimCommandBus::from_project(BimProject::sample_bimcraft_building());
         let initial_walls = bus.project.walls.len();
 
         let json_cmd = r#"{"command":"add_wall","base_level_id":1,"start":[3000.0,0.0],"end":[3000.0,9000.0],"thickness_mm":150.0,"is_structural":false}"#;

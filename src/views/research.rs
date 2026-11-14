@@ -69,9 +69,9 @@ pub struct ResearchConceptView {
 impl Default for ResearchConceptView {
     fn default() -> Self {
         let preset = DemTerrainPreset::VolcanicFoothillsRidge;
-        let tin_mesh = TinSurfaceMesh::generate_from_dem_preset(preset, 500.0, 500.0, 72, 72, 1.0);
-        let datum = 0.5 * (tin_mesh.min_elevation + tin_mesh.max_elevation);
-        let tin_contours = tin_mesh.extract_contours(1.0, 5.0);
+        let tin_mesh = TinSurfaceMesh::triangulate_bowyer_watson(Vec::new());
+        let datum = 0.0;
+        let tin_contours = Vec::new();
         let tin_cut_fill_report = tin_mesh.compute_cut_fill_report(datum, 30.0);
 
         Self {
@@ -81,15 +81,13 @@ impl Default for ResearchConceptView {
             target_design_span_m: 24.0,
             slippy_map: SlippyMapState::default(),
             projection_engine: GeoProjectionEngine::new(48, true),
-            crs_input_lat: "-6.175400".to_string(),
-            crs_input_lon: "106.827200".to_string(),
-            crs_input_easting: "702183.32".to_string(),
-            crs_input_northing: "9317059.38".to_string(),
+            crs_input_lat: String::new(),
+            crs_input_lon: String::new(),
+            crs_input_easting: String::new(),
+            crs_input_northing: String::new(),
             crs_selected_zone: 48,
             crs_is_south: true,
-            crs_conversion_log: vec![
-                "Monas Jakarta Benchmark: φ = -6.175400°, λ = 106.827200° -> UTM Zone 48S: E = 702,183.32 m, N = 9,317,059.38 m (γ = -0.1967°, k = 1.00000)".to_string(),
-            ],
+            crs_conversion_log: Vec::new(),
 
             tin_preset: preset,
             tin_mesh,
@@ -629,40 +627,47 @@ impl ResearchConceptView {
                 ui.horizontal_wrapped(|ui| {
                     icons::icon_label(
                         ui,
-                        AppIcon::MapPin,
+                        AppIcon::Globe,
                         13.0,
                         theme.text_primary,
-                        "Quick Jumps:",
+                        "Navigation:",
                         12.0,
                         theme.text_primary,
                         true,
                     );
-                    let presets = [
-                        ("Monas Jakarta", -6.175392, 106.827153, 14.5),
-                        ("ITB Bandung", -6.891500, 107.610700, 15.0),
-                        ("IKN Nusantara (Sepaku)", -0.957700, 116.702400, 13.0),
-                        ("Tanjung Perak Surabaya", -7.198300, 112.733100, 14.0),
-                        ("Shinjuku Tokyo", 35.693800, 139.703400, 14.0),
-                        ("SF Bay Golden Gate", 37.819900, -122.478300, 13.5),
-                    ];
-                    for (label, lat, lon, zoom) in presets {
-                        if icons::icon_button(
+                    if icons::icon_button(
+                        ui,
+                        AppIcon::Globe,
+                        "World Overview (1.8x)",
+                        11.0,
+                        theme.text_secondary,
+                        theme.bg_canvas,
+                        Stroke::NONE,
+                        CornerRadius::same(6),
+                        Vec2::ZERO,
+                    )
+                    .clicked()
+                    {
+                        self.slippy_map.set_center(15.0, 15.0);
+                        self.slippy_map.zoom_level = 1.85;
+                        self.slippy_map.active_pin = None;
+                    }
+                    if !self.slippy_map.site_pins.is_empty()
+                        && icons::icon_button(
                             ui,
-                            AppIcon::MapPin,
-                            label,
+                            AppIcon::Trash,
+                            "Clear Pins",
                             11.0,
-                            theme.text_secondary,
+                            theme.accent_red,
                             theme.bg_canvas,
                             Stroke::NONE,
                             CornerRadius::same(6),
                             Vec2::ZERO,
                         )
                         .clicked()
-                        {
-                            self.slippy_map.set_center(lat, lon);
-                            self.slippy_map.zoom_level = zoom;
-                            self.slippy_map.active_pin = Some((lat, lon));
-                        }
+                    {
+                        self.slippy_map.site_pins.clear();
+                        self.slippy_map.active_pin = None;
                     }
                 });
 
@@ -1439,6 +1444,15 @@ impl ResearchConceptView {
         };
 
         // 1. Render TIN surface facets & wireframe (using stride=2 on dense 72x72 grid for ultra-crisp 60 FPS)
+        if self.tin_mesh.triangles.is_empty() {
+            painter.text(
+                center,
+                Align2::CENTER_CENTER,
+                "Blank Topographic Canvas — select a DEM Terrain Source above or import survey coordinates.",
+                FontId::proportional(12.0),
+                theme.text_muted,
+            );
+        }
         let cols = self.tin_mesh.grid_cols;
         let rows = self.tin_mesh.grid_rows;
         if cols >= 4 && rows >= 4 {

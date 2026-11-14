@@ -79,9 +79,6 @@ impl IndustrializedView {
                     );
 
                     let sources = [
-                        (IfcSourceMode::SampleVillaIfc4, crate::icons::AppIcon::Building, "Sample Villa (IFC4)"),
-                        (IfcSourceMode::SamplePortalFrameIfc4, crate::icons::AppIcon::BoxPackage, "Steel Portal (IFC4)"),
-                        (IfcSourceMode::SampleDiagridIfc2x3, crate::icons::AppIcon::Building, "Diagrid Tower (IFC2x3)"),
                         (IfcSourceMode::CustomPaste, crate::icons::AppIcon::Clipboard, "Paste STEP SPF"),
                         (IfcSourceMode::FilePath, crate::icons::AppIcon::Folder, "Open Local File"),
                     ];
@@ -105,55 +102,6 @@ impl IndustrializedView {
                         .clicked()
                         {
                             self.ifc_source_mode = src;
-                            match src {
-                                IfcSourceMode::SampleVillaIfc4 => {
-                                    if let Ok(m) = IfcModel::parse(&IfcModel::sample_villa_ifc4()) {
-                                        self.baseline_model = Some(m.clone());
-                                        self.ifc_model = Some(m);
-                                        self.selected_element_id = Some(200);
-                                        self.clash_report = None;
-                                        self.model_diff = None;
-                                        self.ids_report = None;
-                                        self.export_status = Some(
-                                            "Loaded reference IFC4 Residential Duplex Villa."
-                                                .to_string(),
-                                        );
-                                    }
-                                }
-                                IfcSourceMode::SamplePortalFrameIfc4 => {
-                                    if let Ok(m) =
-                                        IfcModel::parse(&IfcModel::sample_portal_frame_ifc4())
-                                    {
-                                        self.baseline_model = Some(m.clone());
-                                        self.ifc_model = Some(m);
-                                        self.selected_element_id = Some(200);
-                                        self.clash_report = None;
-                                        self.model_diff = None;
-                                        self.ids_report = None;
-                                        self.export_status = Some(
-                                            "Loaded reference IFC4 Industrial Steel Portal Frame."
-                                                .to_string(),
-                                        );
-                                    }
-                                }
-                                IfcSourceMode::SampleDiagridIfc2x3 => {
-                                    if let Ok(m) =
-                                        IfcModel::parse(&IfcModel::sample_diagrid_tower_ifc2x3())
-                                    {
-                                        self.baseline_model = Some(m.clone());
-                                        self.ifc_model = Some(m);
-                                        self.selected_element_id = Some(200);
-                                        self.clash_report = None;
-                                        self.model_diff = None;
-                                        self.ids_report = None;
-                                        self.export_status = Some(
-                                            "Loaded reference IFC2x3 Diagrid High-Rise Tower."
-                                                .to_string(),
-                                        );
-                                    }
-                                }
-                                _ => {}
-                            }
                         }
                     }
                 });

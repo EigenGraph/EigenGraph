@@ -734,7 +734,16 @@ impl AiAssistantView {
         } else if p_lower.contains("top 5") || p_lower.contains("top 3") || p_lower.contains("critical") || p_lower.contains("paling kritis") {
             "[Top Fracture Critical Elements Ranking]:\n1. E1 (Center Bottom Chord): ARI = 0.5800, CI = 0.4200 — WARNING: Vulnerable to Collapse if severed\n2. E2 (Center Top Chord): ARI = 0.6500, CI = 0.3500 — Buckling verification required\n3. E3 (Diagonal Web): ARI = 0.8200, CI = 0.1800 — Good Redundancy\n4. E4 (Vertical Post): ARI = 0.9100, CI = 0.0900 — Very Safe\nOpen ANALYZE workspace to inspect full internal forces diagrams.".to_string()
         } else if p_lower.contains("portfolio") || p_lower.contains("summary") {
-            format!("[Portfolio Analysis]: Loaded {} active projects. Highest redundancy: '{}' (ARI = 0.94, Safe). Project '{}' has ARI = 0.64 and requires member screening before municipal submission.", projects.len(), projects[0].title, projects[2].title)
+            if projects.is_empty() {
+                "[Portfolio Analysis]: Workspace is blank (0 active projects loaded). Ground a new model on the World Map Canvas or create/import a structural project first.".to_string()
+            } else {
+                let names: Vec<&str> = projects.iter().take(3).map(|p| p.title.as_str()).collect();
+                format!(
+                    "[Portfolio Analysis]: Loaded {} active project(s): {}. Use Evaluate & Run Solver to compute live ARI metrics.",
+                    projects.len(),
+                    names.join(", ")
+                )
+            }
         } else if p_lower.contains("rank by safety") || p_lower.contains("rank") {
             "[Safety Ranking]:\n1. Steel Arch Bridge (ARI: 0.94, Defl: 1.2mm) — Grade A\n2. Airport Dome Structure (ARI: 0.91, Defl: 2.1mm) — Grade A\n3. Gedebage Industrial Warehouse (ARI: 0.64, Defl: 4.8mm) — Grade B- (Review Needed)".to_string()
         } else if p_lower.contains("ifc") || p_lower.contains("openbim") {

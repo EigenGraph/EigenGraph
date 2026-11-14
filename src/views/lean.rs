@@ -49,8 +49,8 @@ impl Default for LeanView {
             steel_price_idr_per_kg: 17500.0,
             selected_profile: "All Profiles".to_string(),
             export_status: None,
-            lps_history: LpsWeeklyPpcRecord::default_history(),
-            lps_tasks: LpsLookaheadTask::default_tasks(),
+            lps_history: Vec::new(),
+            lps_tasks: Vec::new(),
             lps_week_filter: "All Weeks".to_string(),
             lps_new_task_name: String::new(),
             lps_new_task_week: "W-06".to_string(),
@@ -468,10 +468,14 @@ impl LeanView {
                         CornerRadius::same(6),
                         Vec2::ZERO,
                     ).clicked() {
-                        let bbs = CuttingStockOptimizer::generate_sample_bbs(members.len());
-                        let csv = CuttingStockOptimizer::export_bbs_csv(&bbs);
-                        if let Ok(path) = crate::core::DiskExporter::write_export_file("Bar_Bending_Schedule_SNI2847.csv", &csv) {
-                            self.export_status = Some(format!("BBS exported to: {}", path));
+                        if members.is_empty() {
+                            self.export_status = Some("No structural members loaded yet. Author elements on the canvas before exporting BBS.".to_string());
+                        } else {
+                            let bbs = CuttingStockOptimizer::generate_sample_bbs(members.len());
+                            let csv = CuttingStockOptimizer::export_bbs_csv(&bbs);
+                            if let Ok(path) = crate::core::DiskExporter::write_export_file("Bar_Bending_Schedule_SNI2847.csv", &csv) {
+                                self.export_status = Some(format!("BBS exported to: {}", path));
+                            }
                         }
                     }
 

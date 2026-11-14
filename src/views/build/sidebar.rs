@@ -380,7 +380,7 @@ impl BuildView {
             let surrogate_ari = mem.predict_member_ari(62.0, 1.05, 5);
 
             theme.card_frame().show(ui, |ui| {
-                ui.label(RichText::new("GLOBAL REDUNDANCY KPI (NVW_DCR-LOD)").size(11.0).strong().color(theme.accent_blue));
+                ui.label(RichText::new("GLOBAL REDUNDANCY KPI").size(11.0).strong().color(theme.accent_blue));
                 ui.add_space(4.0);
 
                 let sys_rows = [
@@ -600,130 +600,36 @@ impl BuildView {
         egui::ScrollArea::vertical()
             .id_salt("build_geometry_scroll")
             .show(ui, |ui| {
-            // 1. Parametric Spatial Generator Wizard
+            // 1. Clean Blank-Start Ground Authoring Summary
             theme.card_frame().show(ui, |ui| {
                 crate::icons::icon_label(
                     ui,
-                    crate::icons::AppIcon::Sparkles,
+                    crate::icons::AppIcon::Globe,
                     13.5,
                     theme.accent_blue,
-                    "PARAMETRIC GENERATOR WIZARD",
+                    "EARTH GROUND 3D AUTHORING",
                     11.5,
                     theme.accent_blue,
                     true,
                 );
                 ui.add_space(4.0);
-
-                ui.label(RichText::new("Select Spatial Archetype:").size(10.0).color(theme.text_muted));
-                let wizards = [
-                    (ModelArchetype::PrestressedGirderBridge3D, crate::icons::AppIcon::Beam, "Prestressed PT Bridge Girder"),
-                    (ModelArchetype::DoubleLayerSpaceTruss3D, crate::icons::AppIcon::Wireframe, "Space Truss (MERO Octet)"),
-                    (ModelArchetype::GeodesicDome3D, crate::icons::AppIcon::Globe, "Geodesic Lattice Dome"),
-                    (ModelArchetype::HyparRuledShell3D, crate::icons::AppIcon::RulerSquare, "Hypar Inverted Umbrella"),
-                    (ModelArchetype::MultiStoryTower3D, crate::icons::AppIcon::Building, "Multi-Story Core Tower"),
-                ];
-
-                for (arch, ico, label) in wizards {
-                    let is_sel = self.active_model == arch;
-                    if crate::icons::icon_button(
-                        ui,
-                        ico,
-                        label,
-                        10.5,
-                        if is_sel { Color32::WHITE } else { theme.text_secondary },
-                        if is_sel { theme.accent_blue } else { theme.bg_card },
-                        Stroke::new(1.0, if is_sel { theme.accent_blue } else { theme.border_subtle }),
-                        CornerRadius::same(5),
-                        Vec2::new(ui.available_width(), 22.0),
-                    )
-                    .clicked()
-                    {
-                        self.active_model = arch;
-                        self.selected_member_id = None;
-                    }
-                    ui.add_space(2.0);
-                }
-
-                ui.add_space(6.0);
-                ui.separator();
-                ui.add_space(6.0);
-
-                match self.active_model {
-                    ModelArchetype::DoubleLayerSpaceTruss3D => {
-                        ui.label(RichText::new("Double-Layer Space Truss Parameters:").size(10.5).strong().color(theme.text_primary));
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("Lx:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_space_truss_lx).speed(1.0).range(8.0..=60.0).suffix(" m"));
-                            ui.label(RichText::new("Ly:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_space_truss_ly).speed(1.0).range(8.0..=60.0).suffix(" m"));
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("Depth H:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_space_truss_depth).speed(0.1).range(0.8..=6.0).suffix(" m"));
-                        });
-                    }
-                    ModelArchetype::GeodesicDome3D => {
-                        ui.label(RichText::new("Geodesic Dome Parameters:").size(10.5).strong().color(theme.text_primary));
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("Radius R:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_dome_radius).speed(1.0).range(6.0..=40.0).suffix(" m"));
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("Rings:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_dome_rings).speed(1.0).range(3..=12));
-                            ui.label(RichText::new("Sectors:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_dome_sectors).speed(1.0).range(8..=32));
-                        });
-                    }
-                    ModelArchetype::HyparRuledShell3D => {
-                        ui.label(RichText::new("Hypar Ruled Shell Parameters:").size(10.5).strong().color(theme.text_primary));
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("Lx:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_hypar_lx).speed(1.0).range(8.0..=40.0).suffix(" m"));
-                            ui.label(RichText::new("Ly:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_hypar_ly).speed(1.0).range(8.0..=40.0).suffix(" m"));
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("Sagitta c:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_hypar_sagitta).speed(0.2).range(1.0..=8.0).suffix(" m"));
-                        });
-                    }
-                    ModelArchetype::MultiStoryTower3D => {
-                        ui.label(RichText::new("Tower Parameters:").size(10.5).strong().color(theme.text_primary));
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("Stories:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_tower_stories).speed(1.0).range(2..=30));
-                            ui.label(RichText::new("Height/Fl:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_tower_story_h).speed(0.1).range(2.8..=5.0).suffix(" m"));
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("Bays X:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_tower_bays_x).speed(1.0).range(2..=8));
-                            ui.label(RichText::new("Bays Y:").size(10.0));
-                            ui.add(egui::DragValue::new(&mut self.wizard_tower_bays_y).speed(1.0).range(2..=8));
-                        });
-                    }
-                    _ => {
-                        ui.label(RichText::new("Select a spatial archetype above to configure parametric sliders.").size(10.0).color(theme.text_muted));
-                    }
-                }
-
-                ui.add_space(6.0);
-                if crate::icons::icon_button(
-                    ui,
-                    crate::icons::AppIcon::Bolt,
-                    "Generate & Load in 3D Viewport",
-                    10.5,
-                    Color32::WHITE,
-                    theme.accent_blue,
-                    Stroke::NONE,
-                    CornerRadius::same(5),
-                    Vec2::new(ui.available_width(), 24.0),
-                )
-                .clicked()
-                {
-                    self.modify_status_msg = Some(format!("Generated spatial model: {}", self.active_model.label()));
-                }
+                ui.label(
+                    RichText::new("Build structural members or BIM walls directly on your chosen Earth site. Switch Sketch mode on the toolbar to draw freehand/shapes on the y = 0.0m terrain plane.")
+                        .size(10.5)
+                        .color(theme.text_secondary),
+                );
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!(
+                        "Active Project Elements: {} Walls • {} Cols • {} Beams",
+                        self.bim_bus.project.walls.len(),
+                        self.bim_bus.project.columns.len(),
+                        self.bim_bus.project.runs.len()
+                    ))
+                    .size(10.5)
+                    .monospace()
+                    .color(theme.accent_green),
+                );
             });
 
             ui.add_space(8.0);
@@ -923,19 +829,14 @@ impl BuildView {
             // 1. Views Hierarchy (Floor plans, 3D views, Elevations, Sections, Schedules, Sheets)
             ui.collapsing("Views (All Architectural & Structural)", |ui| {
                 ui.collapsing("Floor Plans", |ui| {
-                    let plans = [
-                        ("Level 0 (GF 0.00m)", 4.0),
-                        ("Level 1 (+4.00m)", 8.0),
-                        ("Level 2 (+8.00m)", 12.0),
-                        ("Level 3 Roof (+12.00m)", 16.0),
-                    ];
-                    for (name, z_cut) in plans {
+                    for lvl in &self.bim_bus.project.levels {
+                        let z_cut = (lvl.elevation_mm as f32 / 1000.0) + 4.0;
                         ui.horizontal(|ui| {
-                            if ui.add(egui::Button::new(RichText::new(name).size(10.5).color(theme.text_primary))
+                            if ui.add(egui::Button::new(RichText::new(&lvl.name).size(10.5).color(theme.text_primary))
                                 .fill(theme.bg_card).corner_radius(CornerRadius::same(4))).clicked() {
                                 self.section_box_enabled = true;
                                 self.section_box_max_z_m = z_cut;
-                                self.modify_status_msg = Some(format!("Switched view range to {}", name));
+                                self.modify_status_msg = Some(format!("Switched view range to {}", lvl.name));
                             }
                         });
                     }

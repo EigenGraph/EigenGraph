@@ -25,47 +25,81 @@ impl ParametricView {
                             AppIcon::NodesGraph,
                             13.0,
                             theme.accent_blue,
-                            "ALGORITHMIC PRESET:",
+                            "NODE GRAPH BUILDER:",
                             11.0,
                             theme.accent_blue,
                             true,
                         );
-                        for preset in ParametricGeneratorPreset::all() {
-                            let is_sel = self.active_preset == *preset;
-                            let bg = if is_sel { theme.accent_blue } else { theme.bg_card };
-                            let fg = if is_sel { Color32::WHITE } else { theme.text_secondary };
-                            if icons::icon_button(
-                                ui,
-                                match preset {
-                                    ParametricGeneratorPreset::DiagridTower => AppIcon::Building,
-                                    ParametricGeneratorPreset::GeodesicDome => AppIcon::Globe,
-                                    ParametricGeneratorPreset::VoronoiCanopy => AppIcon::NodesGraph,
-                                },
-                                preset.label(),
-                                10.5,
-                                fg,
-                                bg,
-                                Stroke::NONE,
-                                CornerRadius::same(6),
-                                Vec2::new(0.0, 24.0),
-                            )
-                            .clicked()
-                            {
-                                self.active_preset = *preset;
-                                self.preset_params = preset.default_params();
-                                self.dragging_node_id = None;
-                                self.node_graph = crate::models::VisualNodeGraph::from_preset(
-                                    self.active_preset,
-                                    self.preset_params[0],
-                                    self.preset_params[1],
-                                    self.preset_params[2],
-                                    self.preset_params[3],
-                                );
-                                self.graph_bake_status = Some(format!(
-                                    "Loaded algorithmic template: {}",
-                                    preset.label()
-                                ));
-                            }
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Plus,
+                            "Number Node",
+                            10.5,
+                            theme.text_primary,
+                            theme.bg_card,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .clicked()
+                        {
+                            let next_id = self.node_graph.nodes.iter().map(|n| n.id).max().unwrap_or(0) + 1;
+                            self.node_graph.nodes.push(crate::models::VisualGraphNode {
+                                id: next_id,
+                                title: format!("Parameter #{}", next_id),
+                                category: crate::models::VisualNodeCategory::Input,
+                                pos: [60.0 + (next_id as f32 * 40.0) % 240.0, 90.0 + (next_id as f32 * 25.0) % 140.0],
+                                inputs: Vec::new(),
+                                outputs: vec!["Value".to_string()],
+                                value_display: "12.0".to_string(),
+                                is_active: true,
+                            });
+                            self.selected_node_id = Some(next_id);
+                        }
+
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::NodesGraph,
+                            "Math Node",
+                            10.5,
+                            theme.text_primary,
+                            theme.bg_card,
+                            Stroke::new(1.0, theme.border_subtle),
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .clicked()
+                        {
+                            let next_id = self.node_graph.nodes.iter().map(|n| n.id).max().unwrap_or(0) + 1;
+                            self.node_graph.nodes.push(crate::models::VisualGraphNode {
+                                id: next_id,
+                                title: format!("Expression #{}", next_id),
+                                category: crate::models::VisualNodeCategory::MathLogic,
+                                pos: [140.0 + (next_id as f32 * 40.0) % 240.0, 120.0 + (next_id as f32 * 25.0) % 140.0],
+                                inputs: vec!["x".to_string()],
+                                outputs: vec!["out".to_string()],
+                                value_display: "x * 1.5".to_string(),
+                                is_active: true,
+                            });
+                            self.selected_node_id = Some(next_id);
+                        }
+
+                        if icons::icon_button(
+                            ui,
+                            AppIcon::Trash,
+                            "Clear Graph",
+                            10.5,
+                            theme.accent_red,
+                            theme.bg_card,
+                            Stroke::new(1.0, theme.accent_red.gamma_multiply(0.35)),
+                            CornerRadius::same(6),
+                            Vec2::new(0.0, 24.0),
+                        )
+                        .clicked()
+                        {
+                            self.node_graph = crate::models::VisualNodeGraph::empty();
+                            self.selected_node_id = None;
+                            self.graph_bake_status = Some("Node graph cleared to blank canvas.".to_string());
                         }
 
                         if icons::icon_button(
@@ -85,56 +119,30 @@ impl ParametricView {
                         }
                     });
 
-                    ui.add_space(4.0);
-
-                    let labels = self.active_preset.param_labels();
-                    let ranges = match self.active_preset {
-                        ParametricGeneratorPreset::DiagridTower => {
-                            [(20.0, 120.0), (6.0, 24.0), (0.0, 120.0), (6.0, 18.0)]
-                        }
-                        ParametricGeneratorPreset::GeodesicDome => {
-                            [(12.0, 60.0), (4.0, 25.0), (2.0, 8.0), (6.0, 24.0)]
-                        }
-                        ParametricGeneratorPreset::VoronoiCanopy => {
-                            [(12.0, 50.0), (8.0, 36.0), (1.0, 10.0), (4.0, 14.0)]
-                        }
-                    };
-
-                    let mut any_changed = false;
-                    ui.horizontal_wrapped(|ui| {
-                        for idx in 0..4 {
-                            let (lo, hi) = ranges[idx];
-                            ui.label(
-                                RichText::new(format!("{}:", labels[idx]))
-                                    .size(10.0)
-                                    .color(theme.text_secondary),
-                            );
-                            let slider = if idx == 3
-                                || (self.active_preset == ParametricGeneratorPreset::GeodesicDome
-                                    && idx == 2)
-                            {
-                                egui::Slider::new(&mut self.preset_params[idx], lo..=hi)
-                                    .step_by(1.0)
-                                    .max_decimals(0)
-                            } else {
-                                egui::Slider::new(&mut self.preset_params[idx], lo..=hi)
-                                    .max_decimals(1)
-                            };
-                            if ui.add(slider).changed() {
-                                any_changed = true;
+                    if !self.node_graph.nodes.is_empty() {
+                        ui.add_space(4.0);
+                        let labels = ["Height / Scale", "Radius / Span", "Twist / Step", "Divisions"];
+                        let ranges = [(2.0_f32, 120.0), (2.0, 60.0), (0.0, 90.0), (3.0, 24.0)];
+                        ui.horizontal_wrapped(|ui| {
+                            for idx in 0..4 {
+                                let (lo, hi) = ranges[idx];
+                                ui.label(
+                                    RichText::new(format!("{}:", labels[idx]))
+                                        .size(10.0)
+                                        .color(theme.text_secondary),
+                                );
+                                let slider = if idx == 3 {
+                                    egui::Slider::new(&mut self.preset_params[idx], lo..=hi)
+                                        .step_by(1.0)
+                                        .max_decimals(0)
+                                } else {
+                                    egui::Slider::new(&mut self.preset_params[idx], lo..=hi)
+                                        .max_decimals(1)
+                                };
+                                ui.add(slider);
+                                ui.add_space(6.0);
                             }
-                            ui.add_space(6.0);
-                        }
-                    });
-
-                    if any_changed {
-                        self.node_graph = crate::models::VisualNodeGraph::from_preset(
-                            self.active_preset,
-                            self.preset_params[0],
-                            self.preset_params[1],
-                            self.preset_params[2],
-                            self.preset_params[3],
-                        );
+                        });
                     }
                 });
             });
@@ -205,6 +213,9 @@ impl ParametricView {
 
     /// Generates procedural 3D wireframe vertices & edges `(a, b, is_diagonal)` and estimated tonnage.
     pub(super) fn generate_parametric_wireframe(&self) -> (Vec<[f32; 3]>, Vec<(usize, usize, bool)>, f32) {
+        if self.node_graph.nodes.is_empty() {
+            return (Vec::new(), Vec::new(), 0.0);
+        }
         let mut verts: Vec<[f32; 3]> = Vec::new();
         let mut edges: Vec<(usize, usize, bool)> = Vec::new();
         let [p0, p1, p2, p3] = self.preset_params;

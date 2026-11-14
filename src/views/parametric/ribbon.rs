@@ -183,12 +183,18 @@ impl ParametricView {
                             CornerRadius::same(6),
                             Vec2::new(0.0, 26.0),
                         )
-                        .on_hover_text("Reset canvas pan and zoom")
+                        .on_hover_text("Fit Ground Site (or Global World Map when empty)")
                         .clicked()
                         {
-                            self.canvas_pan = Vec2::new(60.0, 40.0);
+                            universal_canvas.fit_world_or_site(!self.bim_bus.project.is_empty());
+                            self.canvas_pan = Vec2::ZERO;
                             self.canvas_zoom = 1.0;
                         }
+
+                        ui.separator();
+
+                        // Shared World Map Basemap, Globe Reset, Ground 1:200 Zoom, Set Origin
+                        universal_canvas.render_world_map_toolbar_controls(ui, theme, 26.0);
 
                         ui.separator();
 

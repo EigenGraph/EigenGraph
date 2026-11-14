@@ -18,9 +18,7 @@ use std::sync::RwLock;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::core::interop::EigenProjectArchive;
 use crate::core::model::StructuralModel;
-use crate::models::{
-    DatabaseComponent, ParametricVariable, ProjectItem, ProjectStatus, StructuralMember,
-};
+use crate::models::{DatabaseComponent, ProjectItem, ProjectStatus, StructuralMember};
 
 /// Runtime in-memory vault override (useful for testing and runtime session switching)
 static RUNTIME_VAULT_OVERRIDE: RwLock<Option<PathBuf>> = RwLock::new(None);
@@ -50,21 +48,14 @@ pub struct AriKnowledgeMemory {
 impl Default for AriKnowledgeMemory {
     fn default() -> Self {
         Self {
-            active_master_dataset: "EigenGraph Engineering Knowledge Vault".to_string(),
-            total_autosaves_count: 1,
-            total_ari_evaluations: 8,
-            total_parametric_mutations: 4,
-            best_recorded_system_ari: 0.9420,
-            learned_optimal_sections: vec![
-                "RC Column 500x500 (fc' 30 MPa)".to_string(),
-                "ASTM A36 WF 400x200 Girder".to_string(),
-                "Reinforced Concrete Shear Wall 300mm".to_string(),
-                "Grade 420 D10 Seismic Stirrup (135 deg)".to_string(),
-            ],
+            active_master_dataset: "EigenGraph Blank Workspace Vault".to_string(),
+            total_autosaves_count: 0,
+            total_ari_evaluations: 0,
+            total_parametric_mutations: 0,
+            best_recorded_system_ari: 0.0,
+            learned_optimal_sections: Vec::new(),
             recent_audit_log: vec![
-                "Initialized EigenGraph Engineering Knowledge Vault".to_string(),
-                "Parametric library catalog for Columns, Beams, and Rebar ready".to_string(),
-                "SVD & ARI evaluation memory active for structural integrity monitoring".to_string(),
+                "Blank Engineering Vault ready (zero demo files loaded)".to_string(),
             ],
             custom_export_dir: None,
         }
@@ -261,7 +252,7 @@ impl InternalVault {
             return PathBuf::from("browser://EigenGraph_Vault");
         }
 
-        // 1. In-memory override
+        // 1. In-memory override (and isolated test temp directory when running unit tests)
         #[cfg(not(target_arch = "wasm32"))]
         {
             if let Ok(lock) = RUNTIME_VAULT_OVERRIDE.read() {
@@ -272,28 +263,39 @@ impl InternalVault {
                 }
             }
 
+            #[cfg(test)]
+            {
+                let test_vault = std::env::temp_dir()
+                    .join(format!("eigengraph_isolated_unit_vault_{}", std::process::id()));
+                let _ = std::fs::create_dir_all(&test_vault);
+                return test_vault;
+            }
+
             // 2. Persistent configuration
-            let cfg = Self::load_config();
-            if let Some(ref custom_str) = cfg.custom_vault_path {
-                let custom_path = PathBuf::from(custom_str);
-                if std::fs::create_dir_all(&custom_path).is_ok() {
-                    Self::ensure_vault_notice(&custom_path);
-                    return custom_path;
+            #[cfg(not(test))]
+            {
+                let cfg = Self::load_config();
+                if let Some(ref custom_str) = cfg.custom_vault_path {
+                    let custom_path = PathBuf::from(custom_str);
+                    if std::fs::create_dir_all(&custom_path).is_ok() {
+                        Self::ensure_vault_notice(&custom_path);
+                        return custom_path;
+                    }
                 }
-            }
 
-            // 3. User Documents folder
-            let default_dir = Self::default_vault_dir();
-            if std::fs::create_dir_all(&default_dir).is_ok() {
-                Self::ensure_vault_notice(&default_dir);
-                return default_dir;
-            }
+                // 3. User Documents folder
+                let default_dir = Self::default_vault_dir();
+                if std::fs::create_dir_all(&default_dir).is_ok() {
+                    Self::ensure_vault_notice(&default_dir);
+                    return default_dir;
+                }
 
-            // 4. Temporary fallback
-            let tmp_vault = PathBuf::from("/tmp/EigenGraph_Vault");
-            let _ = std::fs::create_dir_all(&tmp_vault);
-            Self::ensure_vault_notice(&tmp_vault);
-            tmp_vault
+                // 4. Temporary fallback
+                let tmp_vault = PathBuf::from("/tmp/EigenGraph_Vault");
+                let _ = std::fs::create_dir_all(&tmp_vault);
+                Self::ensure_vault_notice(&tmp_vault);
+                tmp_vault
+            }
         }
     }
 
@@ -1001,7 +1003,8 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
         files
     }
 
-    /// Loads or initializes project items from the Vault.
+    /// Loads user-saved project items from the Vault (`Projects/`).
+    /// Returns an empty list on a clean blank workspace (zero demo projects).
     pub fn default_nvw_dcr_lod_projects() -> Vec<ProjectItem> {
         let proj_dir = Self::projects_dir();
         let mut loaded = Vec::new();
@@ -1018,7 +1021,7 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
                                 id: p.file_stem().and_then(|s| s.to_str()).unwrap_or("proj").to_string(),
                                 title: model.name.clone(),
                                 category: "Vault Structural Project".to_string(),
-                                description: format!("Proyek resmi dari Vault: {} elemen, {} titik buhul.", model.elements.len(), model.nodes.len()),
+                                description: format!("User project from Vault: {} elements, {} nodes.", model.elements.len(), model.nodes.len()),
                                 elements_count: model.elements.len(),
                                 nodes_count: model.nodes.len(),
                                 min_ari: 0.942,
@@ -1036,127 +1039,19 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
             }
         }
 
-        if !loaded.is_empty() {
-            return loaded;
-        }
-
-        // Clean authentic starter project
-        vec![ProjectItem {
-            id: "starter_vault_project".to_string(),
-            title: "Primary Project — 3D Space Truss Structure (EigenGraph Vault)".to_string(),
-            category: "Steel & Concrete Frame (Vault Ready)".to_string(),
-            description: "Default 3D space truss structural model with stiffness matrix verification, automated ARI redundancy screening, and BIM export readiness.".to_string(),
-            elements_count: 25,
-            nodes_count: 14,
-            min_ari: 0.942,
-            max_deflection_mm: 4.20,
-            status: ProjectStatus::Safe,
-            last_modified: "Vault Initialized".to_string(),
-            is_favorite: true,
-            is_featured: true,
-            tag: "Starter Project".to_string(),
-        }]
+        loaded
     }
 
-    /// Loads or initializes parametric components from the Vault.
+    /// Loads user-saved parametric components from the Vault (`parametric_components.json`).
+    /// Returns an empty list when none are saved (no demo seeding).
     pub fn load_or_init_parametric_components() -> Vec<DatabaseComponent> {
         let path = Self::parametric_dir().join("parametric_components.json");
         if let Ok(content) = std::fs::read_to_string(&path) {
             if let Ok(list) = serde_json::from_str::<Vec<DatabaseComponent>>(&content) {
-                if !list.is_empty() {
-                    return list;
-                }
+                return list;
             }
         }
-
-        // Clean authentic engineering standard templates
-        let defaults = vec![
-            DatabaseComponent {
-                id: "comp_rc_col_500".to_string(),
-                name: "Reinforced Concrete Column 500x500 (fc' 30 MPa)".to_string(),
-                category: "Columns".to_string(),
-                description: "Primary structural column for multi-story buildings per SNI 2847:2019 / ACI 318 seismic standards.".to_string(),
-                span_m: 4.0,
-                height_m: 4.0,
-                divisions: 1,
-                default_section: "RC-500x500 (fc' 30)".to_string(),
-                driving_formula: "A_g = B * H".to_string(),
-                elements_count: 12,
-                nodes_count: 16,
-                est_weight_ton: 2.4,
-                min_system_ari: 0.952,
-                created_at: "EigenGraph Vault Standard".to_string(),
-                variables: vec![
-                    ParametricVariable { name: "B".to_string(), expression: "500".to_string(), evaluated_value: 500.0, unit: "mm".to_string() },
-                    ParametricVariable { name: "H".to_string(), expression: "500".to_string(), evaluated_value: 500.0, unit: "mm".to_string() },
-                    ParametricVariable { name: "fc".to_string(), expression: "30".to_string(), evaluated_value: 30.0, unit: "MPa".to_string() },
-                ],
-            },
-            DatabaseComponent {
-                id: "comp_wf_beam_400".to_string(),
-                name: "Structural Steel WF 400x200 Girder (ASTM A36)".to_string(),
-                category: "Beams".to_string(),
-                description: "Hot-rolled structural steel beam profile with 8.0m span per AISC 360 standards.".to_string(),
-                span_m: 8.0,
-                height_m: 4.0,
-                divisions: 4,
-                default_section: "WF 400x200x8x13".to_string(),
-                driving_formula: "Z_x = b*h^2/6".to_string(),
-                elements_count: 24,
-                nodes_count: 18,
-                est_weight_ton: 0.528,
-                min_system_ari: 0.915,
-                created_at: "EigenGraph Vault Standard".to_string(),
-                variables: vec![
-                    ParametricVariable { name: "d".to_string(), expression: "400".to_string(), evaluated_value: 400.0, unit: "mm".to_string() },
-                    ParametricVariable { name: "bf".to_string(), expression: "200".to_string(), evaluated_value: 200.0, unit: "mm".to_string() },
-                    ParametricVariable { name: "Fy".to_string(), expression: "250".to_string(), evaluated_value: 250.0, unit: "MPa".to_string() },
-                ],
-            },
-            DatabaseComponent {
-                id: "comp_rc_tbeam_300x600".to_string(),
-                name: "Reinforced Concrete T-Beam 300x600 (fc' 30 MPa)".to_string(),
-                category: "Beams".to_string(),
-                description: "Supporting beam for monolithic floor slab with 6.0m span.".to_string(),
-                span_m: 6.0,
-                height_m: 3.5,
-                divisions: 3,
-                default_section: "T-Beam 300x600 (fc' 30)".to_string(),
-                driving_formula: "b_eff = min(L/4, b_w + 16*h_f)".to_string(),
-                elements_count: 18,
-                nodes_count: 12,
-                est_weight_ton: 2.6,
-                min_system_ari: 0.938,
-                created_at: "EigenGraph Vault Standard".to_string(),
-                variables: vec![
-                    ParametricVariable { name: "b_w".to_string(), expression: "300".to_string(), evaluated_value: 300.0, unit: "mm".to_string() },
-                    ParametricVariable { name: "h".to_string(), expression: "600".to_string(), evaluated_value: 600.0, unit: "mm".to_string() },
-                ],
-            },
-            DatabaseComponent {
-                id: "comp_rebar_stirrup_d10".to_string(),
-                name: "Seismic Stirrup 135° Standard Hook D10 (Grade 420)".to_string(),
-                category: "Rebar".to_string(),
-                description: "Confinement stirrup detail for columns and beams with 135-degree seismic hooks.".to_string(),
-                span_m: 0.5,
-                height_m: 0.5,
-                divisions: 1,
-                default_section: "D10 (BJTS 420)".to_string(),
-                driving_formula: "s_max = min(d/4, 150)".to_string(),
-                elements_count: 40,
-                nodes_count: 40,
-                est_weight_ton: 0.085,
-                min_system_ari: 0.980,
-                created_at: "EigenGraph Vault Standard".to_string(),
-                variables: vec![
-                    ParametricVariable { name: "db".to_string(), expression: "10".to_string(), evaluated_value: 10.0, unit: "mm".to_string() },
-                    ParametricVariable { name: "s_spacing".to_string(), expression: "100".to_string(), evaluated_value: 100.0, unit: "mm".to_string() },
-                ],
-            },
-        ];
-
-        let _ = Self::autosave_parametric_components(&defaults);
-        defaults
+        Vec::new()
     }
 
     /// Autosaves parametric components into the Vault's ParametricLibrary.
@@ -1223,9 +1118,7 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
                 return mem;
             }
         }
-        let default_mem = AriKnowledgeMemory::default();
-        let _ = Self::save_knowledge_memory(&default_mem);
-        default_mem
+        AriKnowledgeMemory::default()
     }
 
     pub fn save_knowledge_memory(mem: &AriKnowledgeMemory) -> Result<String, String> {
@@ -1235,90 +1128,9 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
         Ok(path.display().to_string())
     }
 
-    /// Default structural members extracted from active standards.
+    /// Blank startup structural member list (no demo data seeded).
     pub fn default_nvw_dcr_lod_members() -> Vec<StructuralMember> {
-        vec![
-            StructuralMember {
-                id: 1,
-                name: "Column_C1 — Perimeter RC Column (500x500 fc' 30)".to_string(),
-                section: "RC 500x500 (fc' 30 MPa)".to_string(),
-                force_kn: -1250.0,
-                capacity_kn: 2600.0,
-                utilization: 0.480,
-                moment_my_knm: 75.0,
-                moment_mz_knm: 35.0,
-                is_critical: false,
-                is_active: true,
-                ari_score: 0.945,
-                svd_sensitivity: 0.018,
-                ari: 0.945,
-                dcr_interaction: 0.480,
-                shear_vy_kn: 55.0,
-                svd_margin: 0.982,
-                ci: 0.055,
-                rr: 0.945,
-            },
-            StructuralMember {
-                id: 2,
-                name: "Column_C2 — Interior RC Column (600x600 fc' 35)".to_string(),
-                section: "RC 600x600 (fc' 35 MPa)".to_string(),
-                force_kn: -1680.0,
-                capacity_kn: 3400.0,
-                utilization: 0.494,
-                moment_my_knm: 88.0,
-                moment_mz_knm: 42.0,
-                is_critical: false,
-                is_active: true,
-                ari_score: 0.932,
-                svd_sensitivity: 0.024,
-                ari: 0.932,
-                dcr_interaction: 0.494,
-                shear_vy_kn: 68.0,
-                svd_margin: 0.976,
-                ci: 0.068,
-                rr: 0.932,
-            },
-            StructuralMember {
-                id: 3,
-                name: "Girder_B1 — Primary Floor Girder WF 400x200 (A36)".to_string(),
-                section: "WF 400x200 (A36)".to_string(),
-                force_kn: 320.0,
-                capacity_kn: 680.0,
-                utilization: 0.470,
-                moment_my_knm: 240.0,
-                moment_mz_knm: 12.0,
-                is_critical: false,
-                is_active: true,
-                ari_score: 0.915,
-                svd_sensitivity: 0.035,
-                ari: 0.915,
-                dcr_interaction: 0.470,
-                shear_vy_kn: 120.0,
-                svd_margin: 0.965,
-                ci: 0.085,
-                rr: 0.915,
-            },
-            StructuralMember {
-                id: 4,
-                name: "ShearWall_SW1 — Elevator Core RC Wall (t=300mm)".to_string(),
-                section: "RC Wall t=300mm (fc' 30)".to_string(),
-                force_kn: -2800.0,
-                capacity_kn: 5900.0,
-                utilization: 0.474,
-                moment_my_knm: 750.0,
-                moment_mz_knm: 180.0,
-                is_critical: false,
-                is_active: true,
-                ari_score: 0.968,
-                svd_sensitivity: 0.012,
-                ari: 0.968,
-                dcr_interaction: 0.474,
-                shear_vy_kn: 380.0,
-                svd_margin: 0.988,
-                ci: 0.032,
-                rr: 0.968,
-            },
-        ]
+        Vec::new()
     }
 
     /// Records live background checkpoints directly into the Vault's KnowledgeBase.
@@ -1411,6 +1223,7 @@ This folder is safe to synchronize with Google Drive, Dropbox, or GitHub.
 mod tests {
     use super::*;
     use crate::core::parametric::ParametricEngine;
+    use crate::models::ParametricVariable;
 
     #[test]
     fn test_internal_vault_autosave_and_clean_catalog() {
@@ -1419,21 +1232,45 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_vault);
         InternalVault::set_runtime_vault_dir(temp_vault.clone());
 
+        // Blank workspace startup has zero demo projects, zero demo components, and zero demo members
         let projects = InternalVault::default_nvw_dcr_lod_projects();
-        assert!(!projects.is_empty());
-        assert!(projects[0].title.contains("EigenGraph Vault") || projects[0].title.contains("Primary Project") || projects[0].title.contains("Proyek Perdana"));
-
-        let comps = InternalVault::load_or_init_parametric_components();
-        assert!(!comps.is_empty());
-        let saved_comp_path = InternalVault::autosave_parametric_components(&comps)
-            .expect("Parametric autosave should succeed");
-        assert!(saved_comp_path.ends_with("parametric_components.json"));
+        assert!(projects.is_empty());
+        assert!(InternalVault::load_or_init_parametric_components().is_empty());
+        assert!(InternalVault::default_nvw_dcr_lod_members().is_empty());
 
         let mut engine = ParametricEngine::new();
         let model = engine.generate_warren_truss().unwrap();
         let saved_proj = InternalVault::autosave_project_model("Warren_Autosave.eigen", &model)
             .expect("Project autosave should succeed");
         assert!(saved_proj.ends_with("Warren_Autosave.eigen"));
+        assert_eq!(InternalVault::default_nvw_dcr_lod_projects().len(), 1);
+
+        let user_comp = DatabaseComponent {
+            id: "user_col_400".to_string(),
+            name: "User RC Column 400x400".to_string(),
+            category: "Columns".to_string(),
+            description: "User-authored structural column".to_string(),
+            span_m: 4.0,
+            height_m: 4.0,
+            divisions: 1,
+            default_section: "RC-400x400".to_string(),
+            driving_formula: "A_g = B * H".to_string(),
+            elements_count: 1,
+            nodes_count: 2,
+            est_weight_ton: 1.5,
+            min_system_ari: 0.95,
+            created_at: "User".to_string(),
+            variables: vec![ParametricVariable {
+                name: "B".to_string(),
+                expression: "400".to_string(),
+                evaluated_value: 400.0,
+                unit: "mm".to_string(),
+            }],
+        };
+        let saved_comp_path = InternalVault::autosave_parametric_components(&[user_comp])
+            .expect("Parametric autosave should succeed");
+        assert!(saved_comp_path.ends_with("parametric_components.json"));
+        assert_eq!(InternalVault::load_or_init_parametric_components().len(), 1);
 
         // Verify Multi-LOD Convergence Engine
         let conv = InternalVault::evaluate_nvw_multi_lod_convergence();
@@ -1560,13 +1397,14 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_vault);
         InternalVault::set_runtime_vault_dir(temp_vault.clone());
 
-        // 1. Initialize BimCommandBus (simulates user starting modeling)
+        // 1. Initialize BimCommandBus cleanly empty
         let mut bus = crate::core::bim::BimCommandBus::new();
+        assert!(bus.project.is_empty());
 
-        // 2. Add a new Column via BimCommand (simulates user placing a column)
+        // 2. Add a new Column via BimCommand (simulates user placing a column on Ground Level)
         let cmd = crate::core::bim::BimCommand::AddColumn {
             base_level_id: 1,
-            top_level_id: 2,
+            top_level_id: 1,
             pos: crate::core::geom::P2(5000.0, 5000.0),
             width_mm: 600.0,
             depth_mm: 600.0,

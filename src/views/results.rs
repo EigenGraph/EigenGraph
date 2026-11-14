@@ -552,10 +552,10 @@ impl ResultsView {
                         ui.add_space(8.0);
 
                         let tokens = [
-                            ("{{project.min_ari}}", "0.942 [Grade A - Robust]"),
-                            ("{{project.max_dcr}}", "0.485 [SNI 1729:2020 Safe]"),
-                            ("{{project.svd_status}}", "Stable (sigma_min = 1.42e-3)"),
-                            ("{{project.seismic_zone}}", "Jakarta Pusat (Ss = 0.72g, S1 = 0.38g)"),
+                            ("{{project.min_ari}}", "Pending (Run Redundancy Solver)"),
+                            ("{{project.max_dcr}}", "Pending (Assign Members & Loads)"),
+                            ("{{project.svd_status}}", "Ready (Awaiting Structural Mesh)"),
+                            ("{{project.seismic_zone}}", "Unassigned (Set World Origin on Map)"),
                         ];
 
                         for (tok, val) in tokens {

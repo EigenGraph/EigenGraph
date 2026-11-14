@@ -78,11 +78,11 @@ impl Default for PlanningView {
             overhead_percent: 10.0,
             vat_percent: 11.0,
             active_currency: CurrencyUnit::Idr,
-            simulation_day: 145,
+            simulation_day: 0,
             is_simulating: false,
             simulation_speed: 1,
-            simulation_phases: ConstructionSimulationPhase::default_phases(),
-            wbs_catalog: WbsCostItem::default_catalog(),
+            simulation_phases: Vec::new(),
+            wbs_catalog: Vec::new(),
             selected_wbs_division: None,
             show_manpower_curve: true,
             show_cpm_only: false,
@@ -808,6 +808,12 @@ impl PlanningView {
                         }
                         ui.label(RichText::new(format!("Planned: {:.1}% | Actual: {:.1}%", phase.planned_progress_pct, phase.actual_progress_pct)).size(11.0).color(theme.text_muted));
                     });
+                } else {
+                    ui.label(
+                        RichText::new("No 4D construction schedule phases loaded. Author BIM elements or import an IFC/WBS schedule to simulate erection staging.")
+                            .size(11.5)
+                            .color(theme.text_muted),
+                    );
                 }
             });
 
@@ -835,6 +841,17 @@ impl PlanningView {
             let ground_y = rect.min.y + 190.0;
             painter.line_segment([Pos2::new(rect.min.x + 16.0, ground_y), Pos2::new(rect.max.x - 16.0, ground_y)], Stroke::new(2.0, Color32::from_rgb(120, 100, 70)));
             painter.text(Pos2::new(rect.min.x + 22.0, ground_y + 12.0), Align2::LEFT_TOP, "GROUND LEVEL EL. ±0.000", egui::FontId::proportional(8.5), Color32::from_rgb(160, 140, 110));
+
+            if self.simulation_phases.is_empty() {
+                painter.text(
+                    rect.center() - Vec2::new(0.0, 18.0),
+                    Align2::CENTER_CENTER,
+                    "Blank 4D Staging Elevation — no construction phases loaded yet.",
+                    egui::FontId::proportional(12.0),
+                    theme.text_muted,
+                );
+                return;
+            }
 
             // Building footprint centered
             let bldg_w = (rect.width() * 0.46).clamp(110.0, 360.0);
@@ -908,6 +925,10 @@ impl PlanningView {
         theme.card_frame().show(ui, |ui| {
             icons::icon_label(ui, AppIcon::Clock, 15.0, theme.accent_blue, "CRITICAL PATH METHOD (CPM) & STAGED WBS SCHEDULE", 13.0, theme.text_primary, true);
             ui.add_space(8.0);
+
+            if self.simulation_phases.is_empty() {
+                ui.label(RichText::new("No CPM WBS activities defined yet.").size(11.5).color(theme.text_muted));
+            }
 
             for phase in &self.simulation_phases {
                 let is_current = self.simulation_day >= phase.day_start && self.simulation_day <= phase.day_end;
@@ -1066,6 +1087,16 @@ impl PlanningView {
                             ui.label(RichText::new("TOTAL COST").size(11.0).strong().color(theme.text_muted));
                             ui.label(RichText::new("PROGRESS").size(11.0).strong().color(theme.text_muted));
                             ui.end_row();
+
+                            if self.wbs_catalog.is_empty() {
+                                ui.label(RichText::new("-").size(11.5).color(theme.text_muted));
+                                ui.label(RichText::new("Blank WBS catalog — add structural members or import WBS quantities.").size(11.5).color(theme.text_muted));
+                                ui.label(RichText::new("-").size(11.5).color(theme.text_muted));
+                                ui.label(RichText::new("-").size(11.5).color(theme.text_muted));
+                                ui.label(RichText::new("-").size(11.5).color(theme.text_muted));
+                                ui.label(RichText::new("0%").size(11.5).color(theme.text_muted));
+                                ui.end_row();
+                            }
 
                             for item in &self.wbs_catalog {
                                 if let Some(ref sel_div) = self.selected_wbs_division {

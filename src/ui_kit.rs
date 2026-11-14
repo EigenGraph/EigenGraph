@@ -409,8 +409,9 @@ pub fn set_canvas_frozen(ctx: &egui::Context, frozen: bool) {
 }
 
 /// Returns `true` when the user has enabled Freeze Canvas so scroll wheels pass through to page scroll.
+/// Defaults to `true` (frozen) in Phase 35 until the user clicks Unfreeze.
 pub fn is_canvas_frozen(ctx: &egui::Context) -> bool {
-    ctx.data(|d| d.get_temp::<bool>(egui::Id::new(CANVAS_FROZEN_MEMORY_ID)).unwrap_or(false))
+    ctx.data(|d| d.get_temp::<bool>(egui::Id::new(CANVAS_FROZEN_MEMORY_ID)).unwrap_or(true))
 }
 
 #[cfg(test)]

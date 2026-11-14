@@ -110,19 +110,18 @@ pub struct IndustrializedView {
 
 impl Default for IndustrializedView {
     fn default() -> Self {
-        let initial_model = IfcModel::parse(&IfcModel::sample_villa_ifc4()).ok();
         Self {
             active_subtab: IndustrializedSubTab::Lifecycle10DHub,
             offsite_ratio_pct: 82.5,
             robotic_speed_mm_s: 14.5,
             export_status: None,
 
-            ifc_model: initial_model.clone(),
-            selected_element_id: Some(200),
+            ifc_model: None,
+            selected_element_id: None,
             inspector_tab: IfcInspectorTab::Properties,
-            ifc_source_mode: IfcSourceMode::SampleVillaIfc4,
+            ifc_source_mode: IfcSourceMode::CustomPaste,
             custom_ifc_paste: String::new(),
-            custom_ifc_path: "models/building.ifc".to_string(),
+            custom_ifc_path: String::new(),
             element_search_query: String::new(),
             spatial_tree_expanded: HashMap::new(),
 
@@ -152,7 +151,7 @@ impl Default for IndustrializedView {
             synth_mat: "High-Strength Steel S460ML".to_string(),
             show_synth_modal: false,
 
-            baseline_model: initial_model,
+            baseline_model: None,
             clash_tolerance_mm: 10.0,
             clearance_buffer_mm: 50.0,
             clash_report: None,
@@ -160,14 +159,11 @@ impl Default for IndustrializedView {
             ids_report: None,
             diff_subtab: 0,
 
-            prefab_units: PrefabModuleUnit::default_units(),
+            prefab_units: Vec::new(),
             prefab_stage_filter: None,
-            scanner_input: "MOD-TR-014".to_string(),
-            selected_module_tag: "MOD-TR-014".to_string(),
-            scanner_log: vec![
-                "Fleet GPS Beacon: MOD-TR-014 departed plant; ETA Site Laydown Bay B-1.".to_string(),
-                "QA NDT Release: MOD-PC-208 Ultrasonic shear-weld scan passed (Zero defects).".to_string(),
-            ],
+            scanner_input: String::new(),
+            selected_module_tag: String::new(),
+            scanner_log: Vec::new(),
         }
     }
 }

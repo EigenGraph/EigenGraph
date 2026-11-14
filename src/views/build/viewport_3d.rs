@@ -82,47 +82,8 @@ impl BuildView {
 
                     ui.separator();
 
-                    // Model Archetype Selector
-                    let models = [
-                        ModelArchetype::BimCraftBuilding3D,
-                        ModelArchetype::OpenBimIfcModel3D,
-                        ModelArchetype::FireCompartmentFrame3D,
-                        ModelArchetype::BlastResistantBunker3D,
-                        ModelArchetype::FemaP58HospitalArchetype,
-                        ModelArchetype::BaseIsolatedHospital3D,
-                        ModelArchetype::TimeHistoryTower3D,
-                        ModelArchetype::CoupledShearWallCore3D,
-                        ModelArchetype::PrestressedGirderBridge3D,
-                        ModelArchetype::DoubleLayerSpaceTruss3D,
-                        ModelArchetype::GeodesicDome3D,
-                        ModelArchetype::HyparRuledShell3D,
-                        ModelArchetype::MultiStoryTower3D,
-                        ModelArchetype::DiagridTower3D,
-                        ModelArchetype::TrussBridge3D,
-                        ModelArchetype::SpaceDome3D,
-                        ModelArchetype::WarrenTruss2D,
-                    ];
-                    egui::ComboBox::from_id_salt("model_archetype_combo")
-                        .selected_text(
-                            RichText::new(self.active_model.label())
-                                .size(11.0)
-                                .strong()
-                                .color(theme.text_primary),
-                        )
-                        .width(avail_w.clamp(135.0, 215.0))
-                        .show_ui(ui, |ui| {
-                            for m in models {
-                                let is_m_sel = self.active_model == m;
-                                if ui.selectable_label(is_m_sel, m.label()).clicked() {
-                                    self.active_model = m;
-                                    self.selected_member_id = None;
-                                    self.simulated_eliminated_ids.clear();
-                                    if m == ModelArchetype::BimCraftBuilding3D {
-                                        self.render_mode = Render3DMode::CsgSolidBrep;
-                                    }
-                                }
-                            }
-                        });
+                    // Phase 35: World Map Basemap, Globe Reset, Ground 1:200 & Site Origin Controls
+                    universal_canvas.render_world_map_toolbar_controls(ui, theme, 26.0);
 
                     ui.separator();
 
@@ -502,10 +463,12 @@ impl BuildView {
             .is_some_and(|p| self.last_floating_rects.iter().any(|r| r.contains(p)));
 
         // Mouse Orbit, Pan, and Zoom Controls (respecting floating overlays & Freeze Canvas)
+        let is_frozen_now =
+            universal_canvas.is_frozen || crate::ui_kit::is_canvas_frozen(ui.ctx());
         let allow_sketch_drag = self.sketch_mode_active
             && universal_canvas.active_tool
                 != crate::views::universal_canvas::UniversalCanvasTool::SelectPan;
-        if !pointer_in_floating {
+        if !pointer_in_floating && !is_frozen_now {
             if response.dragged_by(egui::PointerButton::Secondary)
                 || response.dragged_by(egui::PointerButton::Middle)
                 || (response.dragged() && ui.input(|i| i.modifiers.shift))
@@ -518,10 +481,7 @@ impl BuildView {
                     (self.cam_pitch - response.drag_delta().y * 0.008).clamp(-1.52, 1.52);
             }
 
-            if response.hovered()
-                && !universal_canvas.is_frozen
-                && !crate::ui_kit::is_canvas_frozen(ui.ctx())
-            {
+            if response.hovered() {
                 let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
                 if scroll_y.abs() > 0.0 {
                     self.cam_zoom = (self.cam_zoom * (1.0 + scroll_y * 0.0025)).clamp(0.15, 8.0);
@@ -640,57 +600,81 @@ impl BuildView {
             );
         }
 
-        // 2. 3D Ground Grid Plane
+        // 2. 3D Earth Ground Terrain Plane (`y = 0.0`), Cardinal Compass & Real Geodetic Coordinates
                     if self.show_grid {
+                        let ground_patch = [
+                            project_3d(-24.0, -0.02, -24.0).0,
+                            project_3d(24.0, -0.02, -24.0).0,
+                            project_3d(24.0, -0.02, 24.0).0,
+                            project_3d(-24.0, -0.02, 24.0).0,
+                        ];
+                        let terrain_fill = match universal_canvas.world_map.tile_provider {
+                            crate::core::gis::TileSource::EsriWorldImagery => Color32::from_rgba_unmultiplied(32, 52, 38, 120),
+                            crate::core::gis::TileSource::OpenTopoMap => Color32::from_rgba_unmultiplied(110, 125, 95, 65),
+                            _ => Color32::from_rgba_unmultiplied(24, 38, 48, 110),
+                        };
+                        painter.add(egui::Shape::convex_polygon(
+                            ground_patch.to_vec(),
+                            terrain_fill,
+                            Stroke::new(1.0, theme.border_subtle.gamma_multiply(0.7)),
+                        ));
+
                         let grid_size = 6;
                         let grid_step = 4.0;
                         for i in -grid_size..=grid_size {
                             let fi = i as f32 * grid_step;
                             let (p1, _) = project_3d(fi, 0.0, -grid_size as f32 * grid_step);
                             let (p2, _) = project_3d(fi, 0.0, grid_size as f32 * grid_step);
-                            let alpha = if i == 0 { 40 } else { 15 };
-                            painter.line_segment([p1, p2], Stroke::new(0.6, Color32::from_rgba_premultiplied(100, 150, 220, alpha)));
+                            let alpha = if i == 0 { 65 } else { 22 };
+                            painter.line_segment([p1, p2], Stroke::new(0.7, Color32::from_rgba_premultiplied(100, 175, 220, alpha)));
 
                             let (p3, _) = project_3d(-grid_size as f32 * grid_step, 0.0, fi);
                             let (p4, _) = project_3d(grid_size as f32 * grid_step, 0.0, fi);
-                            painter.line_segment([p3, p4], Stroke::new(0.6, Color32::from_rgba_premultiplied(100, 150, 220, alpha)));
+                            painter.line_segment([p3, p4], Stroke::new(0.7, Color32::from_rgba_premultiplied(100, 175, 220, alpha)));
                         }
+
+                        // Cardinal North / East markers & Earth origin coordinates on ground plane
+                        let (north_p, _) = project_3d(0.0, 0.0, -25.5);
+                        let (east_p, _) = project_3d(25.5, 0.0, 0.0);
+                        painter.text(north_p, Align2::CENTER_BOTTOM, "N (+Lat)", egui::FontId::monospace(10.0), theme.accent_blue);
+                        painter.text(east_p, Align2::LEFT_CENTER, "E (+Lon)", egui::FontId::monospace(10.0), theme.accent_green);
+
+                        let (origin_p, _) = project_3d(0.0, 0.05, 0.0);
+                        painter.circle_filled(origin_p, 4.0, theme.accent_blue);
+                        let site_coords = if universal_canvas.ground_origin_anchored {
+                            universal_canvas.ground_origin_lat_lon
+                        } else {
+                            universal_canvas.world_map.center_lat_lon
+                        };
+                        painter.text(
+                            origin_p + Vec2::new(8.0, -8.0),
+                            Align2::LEFT_BOTTOM,
+                            format!("Earth Ground ({:.4}°, {:.4}°)", site_coords.0, site_coords.1),
+                            egui::FontId::monospace(9.5),
+                            theme.text_muted,
+                        );
                     }
 
-                    // Phase 26: 3D Level Elevation Datums (Revit-Style Floor Datum Planes)
-                    if self.show_level_datums {
-                        let level_data = [
-                            ("Level 0 (GF)", 0.0),
-                            ("Level 1 (+4.0m)", 4.0),
-                            ("Level 2 (+8.0m)", 8.0),
-                            ("Level 3 Roof (+12.0m)", 12.0),
-                        ];
-                        for (lvl_name, elev) in level_data {
+                    // Phase 26: 3D Level Elevation Datums from Live Project (zero hardcoded demo levels)
+                    if self.show_level_datums && self.bim_bus.project.levels.len() > 1 {
+                        for lvl in &self.bim_bus.project.levels {
+                            let elev = (lvl.elevation_mm as f32) * 0.001;
                             let (sp1, _) = project_3d(-10.0, elev, 0.0);
                             let (sp2, _) = project_3d(10.0, elev, 0.0);
                             painter.line_segment([sp1, sp2], Stroke::new(1.0, Color32::from_rgba_premultiplied(59, 130, 246, 90)));
-                            // Circular blue datum head bubble
                             painter.circle_filled(sp1, 6.5, Color32::from_rgb(30, 58, 138));
                             painter.circle_stroke(sp1, 6.5, Stroke::new(1.0, Color32::from_rgb(96, 165, 250)));
-                            painter.text(sp1 + Vec2::new(9.0, 0.0), Align2::LEFT_CENTER, lvl_name, egui::FontId::monospace(9.0), Color32::from_rgb(191, 219, 254));
+                            painter.text(sp1 + Vec2::new(9.0, 0.0), Align2::LEFT_CENTER, &lvl.name, egui::FontId::monospace(9.0), Color32::from_rgb(191, 219, 254));
                         }
                     }
 
-                    // Phase 26: 3D Structural Grid Axis Markers (Bubbles 1-4 & A-D)
+                    // Phase 26: 3D Structural Grid Axis Markers from Live Project
                     if self.show_grid_bubbles {
-                        let grid_x = [("1", -6.0), ("2", -2.0), ("3", 2.0), ("4", 6.0)];
-                        for (lbl, gx) in grid_x {
-                            let (gp, _) = project_3d(gx, 0.0, 8.5);
+                        for g in &self.bim_bus.project.grids {
+                            let (gp, _) = project_3d((g.end.0 as f32) * 0.001, 0.0, (g.end.1 as f32) * 0.001);
                             painter.circle_filled(gp, 7.5, Color32::from_rgb(20, 24, 34));
                             painter.circle_stroke(gp, 7.5, Stroke::new(1.0, Color32::from_rgb(148, 163, 184)));
-                            painter.text(gp, Align2::CENTER_CENTER, lbl, egui::FontId::monospace(9.5), Color32::WHITE);
-                        }
-                        let grid_z = [("A", -6.0), ("B", -2.0), ("C", 2.0), ("D", 6.0)];
-                        for (lbl, gz) in grid_z {
-                            let (gp, _) = project_3d(-8.5, 0.0, gz);
-                            painter.circle_filled(gp, 7.5, Color32::from_rgb(20, 24, 34));
-                            painter.circle_stroke(gp, 7.5, Stroke::new(1.0, Color32::from_rgb(148, 163, 184)));
-                            painter.text(gp, Align2::CENTER_CENTER, lbl, egui::FontId::monospace(9.5), Color32::WHITE);
+                            painter.text(gp, Align2::CENTER_CENTER, &g.label, egui::FontId::monospace(9.5), Color32::WHITE);
                         }
                     }
 
@@ -1680,827 +1664,63 @@ impl BuildView {
 
     /// Builds 3D coordinates and elements based on active architectural archetype.
     /// Streams real 3D coordinates directly from `InternalVault/Demo/NVW_DCR-LOD/*.ifc` when available!
+    /// Builds 3D geometry strictly from the user's live BIM Project and Structural Members (blank when empty).
     fn build_model_geometry(&self, fallback_members: &[StructuralMember]) -> ((f32, f32, f32), f32, Vec<Member3D>) {
-        match self.active_model {
-            ModelArchetype::BimCraftBuilding3D => {
-                let fem = self.bim_bus.project.to_structural_model();
-                let mut list = Vec::with_capacity(fem.elements.len());
-                for (idx, el) in fem.elements.iter().enumerate() {
-                    let n1 = &fem.nodes[el.start_node];
-                    let n2 = &fem.nodes[el.end_node];
-                    // Convert FEM (X, Y_up, Z) -> Viewport (X, Y_up, Z)
-                    let p1 = (n1.x as f32, n1.y as f32, n1.z as f32);
-                    let p2 = (n2.x as f32, n2.y as f32, n2.z as f32);
-                    let is_col = el.name.contains("Col") || el.name.contains("CL");
-                    let ari = 0.88 + ((idx % 7) as f32) * 0.015;
-                    list.push(Member3D {
-                        id: idx + 1,
-                        p1,
-                        p2,
-                        name: el.name.clone(),
-                        section: if is_col { "RC 400x400".to_string() } else { "WF / RC Beam".to_string() },
-                        base_width: if is_col { 8.5 } else { 6.5 },
-                        force_kn: if is_col { -640.0 } else { 215.0 },
-                        capacity_kn: if is_col { 1450.0 } else { 520.0 },
-                        utilization: 0.42,
-                        ari,
-                        is_critical: idx == 0,
-                    });
-                }
-                ((6.0, 2.5, 4.5), 26.0, list)
-            }
-            ModelArchetype::DiagridTower3D => {
-                // Stream real NVW_DCR-LOD 3D building geometry from InternalVault if present
-                if let Some(ifc_segs) = crate::core::InternalVault::stream_nvw_dcr_lod200_viewport_segments() {
-                    let mut list = Vec::with_capacity(ifc_segs.len());
-                    for (idx, (p1, p2, name, section)) in ifc_segs.into_iter().enumerate() {
-                        let id = idx + 1;
-                        let is_col = name.contains("Column");
-                        let ari = if is_col {
-                            0.91 + ((id % 7) as f32) * 0.01
-                        } else {
-                            0.86 + ((id % 9) as f32) * 0.012
-                        };
-                        list.push(Member3D {
-                            id,
-                            p1,
-                            p2,
-                            name,
-                            section,
-                            base_width: if is_col { 7.5 } else { 5.5 },
-                            force_kn: if is_col { -1420.0 } else { 385.0 },
-                            capacity_kn: if is_col { 2850.0 } else { 780.0 },
-                            utilization: if is_col { 0.498 } else { 0.493 },
-                            ari,
-                            is_critical: id % 29 == 0,
-                        });
-                    }
-                    return ((0.0, 12.0, 0.0), 14.5, list);
-                }
-
-                let mut list = Vec::new();
-                let tiers = [
-                    (0.0, 14.0, 0.0),
-                    (16.0, 12.0, 15.0),
-                    (32.0, 10.0, 30.0),
-                    (46.0, 8.5, 45.0),
-                ];
-
-                let mut tier_coords = Vec::new();
-                for (z, r, twist_deg) in tiers {
-                    let twist_rad = (twist_deg as f32).to_radians();
-                    let mut pts = Vec::new();
-                    for i in 0..8 {
-                        let angle = twist_rad + (i as f32) * (std::f32::consts::PI * 2.0 / 8.0);
-                        let x = r * angle.cos();
-                        let y = r * angle.sin();
-                        pts.push((x, z, y));
-                    }
-                    tier_coords.push(pts);
-                }
-
-                let mut id = 1;
-                // Diagrid cross braces between tiers
-                for t in 0..3 {
-                    let lower = &tier_coords[t];
-                    let upper = &tier_coords[t + 1];
-                    for i in 0..8 {
-                        let next_i = (i + 1) % 8;
-                        list.push(Member3D {
-                            id,
-                            p1: lower[i],
-                            p2: upper[next_i],
-                            name: format!("Diagrid T{}-D1", t + 1),
-                            section: "CHS 610x25".to_string(),
-                            base_width: 8.5,
-                            force_kn: 340.0,
-                            capacity_kn: 850.0,
-                            utilization: 0.40,
-                            ari: 0.89,
-                            is_critical: false,
-                        });
-                        id += 1;
-
-                        list.push(Member3D {
-                            id,
-                            p1: lower[next_i],
-                            p2: upper[i],
-                            name: format!("Diagrid T{}-D2", t + 1),
-                            section: "CHS 610x25".to_string(),
-                            base_width: 8.5,
-                            force_kn: 320.0,
-                            capacity_kn: 850.0,
-                            utilization: 0.38,
-                            ari: 0.89,
-                            is_critical: false,
-                        });
-                        id += 1;
-                    }
-
-                    // Perimeter belt ring
-                    for i in 0..8 {
-                        let next_i = (i + 1) % 8;
-                        list.push(Member3D {
-                            id,
-                            p1: lower[i],
-                            p2: lower[next_i],
-                            name: format!("Belt Ring T{}", t + 1),
-                            section: "W24x146".to_string(),
-                            base_width: 10.0,
-                            force_kn: -120.0,
-                            capacity_kn: 620.0,
-                            utilization: 0.19,
-                            ari: 0.94,
-                            is_critical: false,
-                        });
-                        id += 1;
-                    }
-                }
-
-                // Central elevator core columns
-                for (cx, cz) in [(-4.0, -4.0), (4.0, -4.0), (4.0, 4.0), (-4.0, 4.0)] {
-                    for t in 0..3 {
-                        list.push(Member3D {
-                            id,
-                            p1: (cx, tiers[t].0, cz),
-                            p2: (cx, tiers[t + 1].0, cz),
-                            name: "Core Mega-Column".to_string(),
-                            section: "CFT 1200x50".to_string(),
-                            base_width: 12.0,
-                            force_kn: 2450.0,
-                            capacity_kn: 5200.0,
-                            utilization: 0.47,
-                            ari: 0.95,
-                            is_critical: true,
-                        });
-                        id += 1;
-                    }
-                }
-
-                // Crown MERO dome rafters converging to apex
-                let apex = (0.0, 54.0, 0.0);
-                for pt in &tier_coords[3] {
-                    list.push(Member3D {
-                        id,
-                        p1: *pt,
-                        p2: apex,
-                        name: "Crown MERO Strut".to_string(),
-                        section: "CHS 219.1".to_string(),
-                        base_width: 6.0,
-                        force_kn: 85.0,
-                        capacity_kn: 340.0,
-                        utilization: 0.25,
-                        ari: 0.98,
-                        is_critical: false,
-                    });
-                    id += 1;
-                }
-
-                ((0.0, 24.0, 0.0), 7.8, list)
-            }
-            ModelArchetype::TrussBridge3D => {
-                // Stream LOD 200 columns & primary grid from InternalVault if present
-                if let Some(ifc_segs) = crate::core::InternalVault::stream_nvw_dcr_lod200_viewport_segments() {
-                    let mut list = Vec::new();
-                    for (idx, (p1, p2, name, section)) in ifc_segs.into_iter().enumerate() {
-                        // In LOD 200 view, emphasize primary columns and glulam members
-                        if name.contains("Column") || name.contains("Member") || idx % 2 == 0 {
-                            let id = list.len() + 1;
-                            let is_col = name.contains("Column");
-                            list.push(Member3D {
-                                id,
-                                p1,
-                                p2,
-                                name,
-                                section,
-                                base_width: if is_col { 8.0 } else { 5.0 },
-                                force_kn: if is_col { -1280.0 } else { 310.0 },
-                                capacity_kn: if is_col { 2650.0 } else { 720.0 },
-                                utilization: 0.46,
-                                ari: 0.88 + ((id % 8) as f32) * 0.01,
-                                is_critical: id % 31 == 0,
-                            });
-                        }
-                    }
-                    if !list.is_empty() {
-                        return ((0.0, 12.0, 0.0), 14.5, list);
-                    }
-                }
-
-                let mut list = Vec::new();
-                let mut id = 1;
-
-                // Two parallel trusses at Z = -3.5 and Z = +3.5
-                for &z in &[-3.5, 3.5] {
-                    let mut bot_pts = Vec::new();
-                    for i in 0..=6 {
-                        let x = (i as f32) * 4.0;
-                        bot_pts.push((x, 0.0, z));
-                    }
-
-                    // Parabolic arch rib
-                    let mut top_pts = Vec::new();
-                    for i in 0..=6 {
-                        let x = (i as f32) * 4.0;
-                        let arch_y = 6.2 * (1.0 - ((x - 12.0) / 12.0).powi(2)).max(0.0);
-                        top_pts.push((x, arch_y, z));
-                    }
-
-                    // Bottom chord
-                    for i in 0..6 {
-                        list.push(Member3D {
-                            id,
-                            p1: bot_pts[i],
-                            p2: bot_pts[i + 1],
-                            name: "Bottom Deck Chord".to_string(),
-                            section: "W14x90".to_string(),
-                            base_width: 9.0,
-                            force_kn: -420.0,
-                            capacity_kn: 1100.0,
-                            utilization: 0.38,
-                            ari: 0.92,
-                            is_critical: false,
-                        });
-                        id += 1;
-                    }
-
-                    // Arch rib chords
-                    for i in 0..6 {
-                        list.push(Member3D {
-                            id,
-                            p1: top_pts[i],
-                            p2: top_pts[i + 1],
-                            name: "Parabolic Arch Rib".to_string(),
-                            section: "Box 800x800".to_string(),
-                            base_width: 11.0,
-                            force_kn: 680.0,
-                            capacity_kn: 1450.0,
-                            utilization: 0.47,
-                            ari: 0.96,
-                            is_critical: true,
-                        });
-                        id += 1;
-                    }
-
-                    // Vertical cable hangers
-                    for i in 1..6 {
-                        list.push(Member3D {
-                            id,
-                            p1: bot_pts[i],
-                            p2: top_pts[i],
-                            name: "Cable Hanger".to_string(),
-                            section: "Steel Strand 65mm".to_string(),
-                            base_width: 5.0,
-                            force_kn: 185.0,
-                            capacity_kn: 520.0,
-                            utilization: 0.36,
-                            ari: 0.88,
-                            is_critical: false,
-                        });
-                        id += 1;
-                    }
-                }
-
-                // Transverse floor cross beams connecting the two decks
-                for i in 0..=6 {
-                    let x = (i as f32) * 4.0;
-                    list.push(Member3D {
-                        id,
-                        p1: (x, 0.0, -3.5),
-                        p2: (x, 0.0, 3.5),
-                        name: "Transverse Floor Beam".to_string(),
-                        section: "W24x84".to_string(),
-                        base_width: 8.0,
-                        force_kn: 95.0,
-                        capacity_kn: 480.0,
-                        utilization: 0.20,
-                        ari: 0.95,
-                        is_critical: false,
-                    });
-                    id += 1;
-                }
-
-                ((12.0, 3.0, 0.0), 16.0, list)
-            }
-            ModelArchetype::SpaceDome3D => {
-                let mut list = Vec::new();
-                let mut id = 1;
-                let r_outer = 16.0;
-
-                let ring_heights = [(0.0, r_outer), (6.0, 13.5), (10.5, 9.0)];
-                let mut ring_pts = Vec::new();
-
-                for (y, r) in ring_heights {
-                    let mut pts = Vec::new();
-                    for i in 0..12 {
-                        let angle = (i as f32) * (std::f32::consts::PI * 2.0 / 12.0);
-                        let x = r * angle.cos();
-                        let z = r * angle.sin();
-                        pts.push((x, y, z));
-                    }
-                    ring_pts.push(pts);
-                }
-
-                let apex = (0.0, 13.5, 0.0);
-
-                // Circumferential rings
-                for ring in &ring_pts {
-                    for i in 0..12 {
-                        let next_i = (i + 1) % 12;
-                        list.push(Member3D {
-                            id,
-                            p1: ring[i],
-                            p2: ring[next_i],
-                            name: "Dome Hoop Ring".to_string(),
-                            section: "CHS 168.3".to_string(),
-                            base_width: 6.5,
-                            force_kn: -85.0,
-                            capacity_kn: 420.0,
-                            utilization: 0.20,
-                            ari: 0.96,
-                            is_critical: false,
-                        });
-                        id += 1;
-                    }
-                }
-
-                // Meridional ribs
-                for i in 0..12 {
-                    list.push(Member3D {
-                        id,
-                        p1: ring_pts[0][i],
-                        p2: ring_pts[1][i],
-                        name: "Meridional Rib".to_string(),
-                        section: "CHS 219.1".to_string(),
-                        base_width: 7.5,
-                        force_kn: 140.0,
-                        capacity_kn: 520.0,
-                        utilization: 0.27,
-                        ari: 0.95,
-                        is_critical: false,
-                    });
-                    id += 1;
-
-                    list.push(Member3D {
-                        id,
-                        p1: ring_pts[1][i],
-                        p2: ring_pts[2][i],
-                        name: "Meridional Rib".to_string(),
-                        section: "CHS 219.1".to_string(),
-                        base_width: 7.5,
-                        force_kn: 125.0,
-                        capacity_kn: 520.0,
-                        utilization: 0.24,
-                        ari: 0.95,
-                        is_critical: false,
-                    });
-                    id += 1;
-
-                    list.push(Member3D {
-                        id,
-                        p1: ring_pts[2][i],
-                        p2: apex,
-                        name: "Apex Rafter".to_string(),
-                        section: "CHS 219.1".to_string(),
-                        base_width: 7.0,
-                        force_kn: 95.0,
-                        capacity_kn: 480.0,
-                        utilization: 0.20,
-                        ari: 0.97,
-                        is_critical: false,
-                    });
-                    id += 1;
-                }
-
-                ((0.0, 6.0, 0.0), 16.5, list)
-            }
-            ModelArchetype::WarrenTruss2D => {
-                let mut list = Vec::new();
-                let mut bot_nodes = Vec::new();
-                for i in 0..=6 {
-                    bot_nodes.push(((i as f32) * 4.0, 0.0, 0.0));
-                }
-                let mut top_nodes = Vec::new();
-                for i in 1..=5 {
-                    top_nodes.push(((i as f32) * 4.0, 3.2, 0.0));
-                }
-
-                let mut id = 1;
-                for i in 0..6 {
-                    list.push(Member3D {
-                        id,
-                        p1: bot_nodes[i],
-                        p2: bot_nodes[i + 1],
-                        name: format!("Bottom Chord E{}", id),
-                        section: "W14x90".to_string(),
-                        base_width: 8.5,
-                        force_kn: -45.2,
-                        capacity_kn: 120.0,
-                        utilization: 0.38,
-                        ari: 0.94,
-                        is_critical: false,
-                    });
-                    id += 1;
-                }
-                for i in 0..4 {
-                    list.push(Member3D {
-                        id,
-                        p1: top_nodes[i],
-                        p2: top_nodes[i + 1],
-                        name: format!("Top Chord T{}", i + 1),
-                        section: "W14x90".to_string(),
-                        base_width: 8.5,
-                        force_kn: 38.5,
-                        capacity_kn: 95.0,
-                        utilization: 0.41,
-                        ari: 0.91,
-                        is_critical: false,
-                    });
-                    id += 1;
-                }
-                for i in 0..5 {
-                    list.push(Member3D {
-                        id,
-                        p1: bot_nodes[i],
-                        p2: top_nodes[i],
-                        name: format!("Diagonal D{}", i + 1),
-                        section: "2L 4x4x3/8".to_string(),
-                        base_width: 6.0,
-                        force_kn: 82.4,
-                        capacity_kn: 90.0,
-                        utilization: 0.91,
-                        ari: 0.52,
-                        is_critical: i == 0,
-                    });
-                    id += 1;
-                }
-
-                if list.is_empty() && !fallback_members.is_empty() {
-                    // Fallback to active app members
-                }
-
-                ((12.0, 1.6, 0.0), 22.0, list)
-            }
-            ModelArchetype::DoubleLayerSpaceTruss3D => {
-                let fem = crate::core::ParametricSpatialWizard::generate_double_layer_space_truss(
-                    "Double-Layer Space Truss", self.wizard_space_truss_lx, self.wizard_space_truss_ly, self.wizard_space_truss_depth, 6, 6
-                );
-                let mut list = Vec::with_capacity(fem.elements.len());
-                for (idx, el) in fem.elements.iter().enumerate() {
-                    let n1 = &fem.nodes[el.start_node];
-                    let n2 = &fem.nodes[el.end_node];
-                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
-                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
-                    let is_top = el.name.starts_with("TC");
-                    let is_bot = el.name.starts_with("BC");
-                    list.push(Member3D {
-                        id: idx + 1,
-                        p1,
-                        p2,
-                        name: el.name.clone(),
-                        section: if is_top { "CHS Tube 300x10".to_string() } else if is_bot { "CHS Pipe 150x6".to_string() } else { "CHS Web 114x4.5".to_string() },
-                        base_width: if is_top { 7.5 } else if is_bot { 6.5 } else { 4.5 },
-                        force_kn: if is_top { -280.0 } else if is_bot { 240.0 } else { 85.0 },
-                        capacity_kn: if is_top { 620.0 } else { 480.0 },
-                        utilization: 0.45,
-                        ari: 0.94,
-                        is_critical: false,
-                    });
-                }
-                let cx = (self.wizard_space_truss_lx * 0.5) as f32;
-                let cz = (self.wizard_space_truss_ly * 0.5) as f32;
-                let cy = (self.wizard_space_truss_depth * 0.5) as f32;
-                ((cx, cy, cz), 16.0, list)
-            }
-            ModelArchetype::GeodesicDome3D => {
-                let fem = crate::core::ParametricSpatialWizard::generate_geodesic_dome(
-                    "Geodesic Dome", self.wizard_dome_radius, self.wizard_dome_rings, self.wizard_dome_sectors
-                );
-                let mut list = Vec::with_capacity(fem.elements.len());
-                for (idx, el) in fem.elements.iter().enumerate() {
-                    let n1 = &fem.nodes[el.start_node];
-                    let n2 = &fem.nodes[el.end_node];
-                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
-                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
-                    list.push(Member3D {
-                        id: idx + 1,
-                        p1,
-                        p2,
-                        name: el.name.clone(),
-                        section: "CHS Pipe 150x6".to_string(),
-                        base_width: 5.5,
-                        force_kn: -110.0,
-                        capacity_kn: 340.0,
-                        utilization: 0.32,
-                        ari: 0.96,
-                        is_critical: false,
-                    });
-                }
-                let r = self.wizard_dome_radius as f32;
-                ((0.0, r * 0.4, 0.0), 14.0, list)
-            }
-            ModelArchetype::HyparRuledShell3D => {
-                let fem = crate::core::ParametricSpatialWizard::generate_hypar_shell(
-                    "Hypar Shell", self.wizard_hypar_lx, self.wizard_hypar_ly, self.wizard_hypar_sagitta, 8, 8
-                );
-                let mut list = Vec::with_capacity(fem.elements.len());
-                for (idx, el) in fem.elements.iter().enumerate() {
-                    let n1 = &fem.nodes[el.start_node];
-                    let n2 = &fem.nodes[el.end_node];
-                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
-                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
-                    list.push(Member3D {
-                        id: idx + 1,
-                        p1,
-                        p2,
-                        name: el.name.clone(),
-                        section: "WF 200x100".to_string(),
-                        base_width: 5.0,
-                        force_kn: 65.0,
-                        capacity_kn: 280.0,
-                        utilization: 0.23,
-                        ari: 0.95,
-                        is_critical: false,
-                    });
-                }
-                let cx = (self.wizard_hypar_lx * 0.5) as f32;
-                let cz = (self.wizard_hypar_ly * 0.5) as f32;
-                ((cx, 0.0, cz), 16.0, list)
-            }
-            ModelArchetype::MultiStoryTower3D => {
-                let fem = crate::core::ParametricSpatialWizard::generate_multi_story_tower(
-                    "Multi-Story Tower", self.wizard_tower_stories, self.wizard_tower_story_h,
-                    self.wizard_tower_bays_x, self.wizard_tower_bays_y, 6.0, 6.0
-                );
-                let mut list = Vec::with_capacity(fem.elements.len());
-                for (idx, el) in fem.elements.iter().enumerate() {
-                    let n1 = &fem.nodes[el.start_node];
-                    let n2 = &fem.nodes[el.end_node];
-                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
-                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
-                    let is_col = el.name.starts_with("COL");
-                    list.push(Member3D {
-                        id: idx + 1,
-                        p1,
-                        p2,
-                        name: el.name.clone(),
-                        section: if is_col { "HSS 200x200x8".to_string() } else { "WF 300x150".to_string() },
-                        base_width: if is_col { 7.5 } else { 5.5 },
-                        force_kn: if is_col { -850.0 } else { 180.0 },
-                        capacity_kn: if is_col { 1900.0 } else { 450.0 },
-                        utilization: 0.44,
-                        ari: 0.93,
-                        is_critical: false,
-                    });
-                }
-                let cx = (self.wizard_tower_bays_x as f32 * 6.0) * 0.5;
-                let cz = (self.wizard_tower_bays_y as f32 * 6.0) * 0.5;
-                let cy = (self.wizard_tower_stories as f32 * self.wizard_tower_story_h as f32) * 0.5;
-                ((cx, cy, cz), 9.0, list)
-            }
-            ModelArchetype::PrestressedGirderBridge3D => {
-                let fem = crate::core::PrestressedConcreteEngine::generate_bridge_archetype_elements(
-                    "30m PT Bridge", 30.0, 4, 2.4, 480.0
-                );
-                let mut list = Vec::with_capacity(fem.elements.len());
-                for (idx, el) in fem.elements.iter().enumerate() {
-                    let n1 = &fem.nodes[el.start_node];
-                    let n2 = &fem.nodes[el.end_node];
-                    // Map FEM (x, y, z) -> Viewport (x, z_up, y)
-                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
-                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
-                    let is_tendon = el.name.starts_with("PT_Tendon");
-                    let is_diaph = el.name.starts_with("Diaphragm");
-                    list.push(Member3D {
-                        id: idx + 1,
-                        p1,
-                        p2,
-                        name: el.name.clone(),
-                        section: if is_tendon {
-                            "36x 0.6\" Low-Relaxation Tendon (1860 MPa)".to_string()
-                        } else if is_diaph {
-                            "RC Diaphragm 300x1000".to_string()
-                        } else {
-                            "AASHTO Type IV Precast Girder (1370mm)".to_string()
-                        },
-                        base_width: if is_tendon { 4.0 } else if is_diaph { 6.0 } else { 9.0 },
-                        force_kn: if is_tendon { 4666.0 } else { -420.0 },
-                        capacity_kn: if is_tendon { 7030.0 } else { 1200.0 },
-                        utilization: if is_tendon { 0.66 } else { 0.35 },
-                        ari: if is_tendon { 0.98 } else { 0.92 },
-                        is_critical: false,
-                    });
-                }
-                let cx = 15.0;
-                let cy = 0.0;
-                let cz = 0.0;
-                ((cx, cy, cz), 22.0, list)
-            }
-            ModelArchetype::CoupledShearWallCore3D => {
-                let fem = crate::core::ShearWallEngine::generate_coupled_core_archetype(
-                    "12-Story Coupled Core", 12, 3.5, 6.0, 350.0, 2.0
-                );
-                let mut list = Vec::with_capacity(fem.elements.len());
-                for (idx, el) in fem.elements.iter().enumerate() {
-                    let n_start = fem.nodes.iter().find(|n| n.id == el.start_node);
-                    let n_end = fem.nodes.iter().find(|n| n.id == el.end_node);
-                    if let (Some(n1), Some(n2)) = (n_start, n_end) {
-                        let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
-                        let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
-                        let is_coupling = el.name.starts_with("CouplingBeam");
-                        let is_spandrel = el.name.starts_with("Spandrel");
-                        list.push(Member3D {
-                            id: idx + 1,
-                            p1,
-                            p2,
-                            name: el.name.clone(),
-                            section: if is_coupling {
-                                "Diagonally Reinforced Coupling Beam 350x800".to_string()
-                            } else if is_spandrel {
-                                "RC Floor Spandrel 350x600".to_string()
-                            } else {
-                                "Special Structural Wall Pier 6000x350".to_string()
-                            },
-                            base_width: if is_coupling { 7.0 } else if is_spandrel { 5.0 } else { 8.5 },
-                            force_kn: if is_coupling { 620.0 } else { -3600.0 },
-                            capacity_kn: if is_coupling { 950.0 } else { 7200.0 },
-                            utilization: if is_coupling { 0.65 } else { 0.50 },
-                            ari: if is_coupling { 0.96 } else { 0.94 },
-                            is_critical: false,
-                        });
-                    }
-                }
-                let cy = 0.0;
-                let cz = (12.0 * 3.5) * 0.5;
-                ((0.0, cy, cz), 26.0, list)
-            }
-            ModelArchetype::BaseIsolatedHospital3D => {
-                let (nodes, elements) = crate::core::SeismicIsolationEngine::generate_base_isolated_hospital_archetype();
-                let mut list = Vec::with_capacity(elements.len());
-                for &(el_id, n1_id, n2_id, is_isolator) in &elements {
-                    let (_, x1, y1, z1) = nodes[n1_id];
-                    let (_, x2, y2, z2) = nodes[n2_id];
-                    let p1 = (x1 as f32, z1 as f32, y1 as f32);
-                    let p2 = (x2 as f32, z2 as f32, y2 as f32);
-                    list.push(Member3D {
-                        id: el_id + 1,
-                        p1,
-                        p2,
-                        name: if is_isolator { format!("IsolatorBearing-{}", el_id + 1) } else { format!("FrameMember-{}", el_id + 1) },
-                        section: if is_isolator { "Lead-Rubber Bearing LRB Ø850".to_string() } else { "RC Frame Column 700x700 / Beam 400x650".to_string() },
-                        base_width: if is_isolator { 8.5 } else { 5.0 },
-                        force_kn: if is_isolator { 4000.0 } else { 1200.0 },
-                        capacity_kn: if is_isolator { 12000.0 } else { 3500.0 },
-                        utilization: if is_isolator { 0.33 } else { 0.45 },
-                        ari: if is_isolator { 0.99 } else { 0.95 },
-                        is_critical: false,
-                    });
-                }
-                let cx = 12.0;
-                let cy = 8.0;
-                let cz = (8.0 * 3.6) * 0.5;
-                ((cx, cy, cz), 24.0, list)
-            }
-            ModelArchetype::TimeHistoryTower3D => {
-                let (nodes, elements) = crate::core::TimeHistoryEngine::generate_nl_tha_tower_archetype();
-                let mut list = Vec::with_capacity(elements.len());
-                for &(el_id, n1_id, n2_id, is_link) in &elements {
-                    let (_, x1, y1, z1) = nodes[n1_id];
-                    let (_, x2, y2, z2) = nodes[n2_id];
-                    let p1 = (x1 as f32, z1 as f32, y1 as f32);
-                    let p2 = (x2 as f32, z2 as f32, y2 as f32);
-                    list.push(Member3D {
-                        id: el_id + 1,
-                        p1,
-                        p2,
-                        name: if is_link { format!("InelasticLink-{}", el_id + 1) } else { format!("TowerMember-{}", el_id + 1) },
-                        section: if is_link { "Bouc-Wen Inelastic Link".to_string() } else { "Built-Up Box Column 800x800 / W36x150 Beam".to_string() },
-                        base_width: if is_link { 7.0 } else { 4.5 },
-                        force_kn: if is_link { 2800.0 } else { 1500.0 },
-                        capacity_kn: if is_link { 5500.0 } else { 4200.0 },
-                        utilization: if is_link { 0.51 } else { 0.36 },
-                        ari: if is_link { 0.98 } else { 0.94 },
-                        is_critical: false,
-                    });
-                }
-                let cx = 13.5;
-                let cy = 9.0;
-                let cz = (16.0 * 3.75) * 0.5;
-                ((cx, cy, cz), 28.0, list)
-            }
-            ModelArchetype::FemaP58HospitalArchetype => {
-                let (nodes, elements) = crate::core::FemaP58Engine::generate_fema_resilience_archetype();
-                let mut list = Vec::with_capacity(elements.len());
-                for &(el_id, n1_id, n2_id, is_structural) in &elements {
-                    let (_, x1, y1, z1) = nodes[n1_id];
-                    let (_, x2, y2, z2) = nodes[n2_id];
-                    let p1 = (x1 as f32, z1 as f32, y1 as f32);
-                    let p2 = (x2 as f32, z2 as f32, y2 as f32);
-                    list.push(Member3D {
-                        id: el_id + 1,
-                        p1,
-                        p2,
-                        name: if is_structural { format!("FrameBeamCol-{}", el_id + 1) } else { format!("FacadeTie-{}", el_id + 1) },
-                        section: if is_structural { "RC Column 650x650 / Beam 400x600".to_string() } else { "Silicone Glazed Curtain Wall Facade".to_string() },
-                        base_width: if is_structural { 6.5 } else { 3.5 },
-                        force_kn: if is_structural { 1650.0 } else { 120.0 },
-                        capacity_kn: if is_structural { 4200.0 } else { 350.0 },
-                        utilization: if is_structural { 0.39 } else { 0.34 },
-                        ari: if is_structural { 0.96 } else { 0.99 },
-                        is_critical: false,
-                    });
-                }
-                let cx = 12.0;
-                let cy = 8.0;
-                let cz = (10.0 * 3.8) * 0.5;
-                ((cx, cy, cz), 22.0, list)
-            }
-            ModelArchetype::BlastResistantBunker3D => {
-                let (nodes, elements) = crate::core::BlastEngine::generate_blast_bunker_archetype();
-                let mut list = Vec::with_capacity(elements.len());
-                for el in &elements {
-                    let n1 = nodes.iter().find(|n| n.id == el.start_node).unwrap();
-                    let n2 = nodes.iter().find(|n| n.id == el.end_node).unwrap();
-                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
-                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
-                    let is_barrier = n1.y < -5.0 || n2.y < -5.0;
-                    list.push(Member3D {
-                        id: el.id,
-                        p1,
-                        p2,
-                        name: if is_barrier { format!("BlastBarrier-{}", el.id) } else { format!("BunkerWallGirder-{}", el.id) },
-                        section: el.section.name.clone(),
-                        base_width: if is_barrier { 4.5 } else { 7.0 },
-                        force_kn: if is_barrier { 480.0 } else { 2100.0 },
-                        capacity_kn: if is_barrier { 1200.0 } else { 5800.0 },
-                        utilization: if is_barrier { 0.40 } else { 0.36 },
-                        ari: 0.98,
-                        is_critical: false,
-                    });
-                }
-                let cx = 6.0;
-                let cy = -3.5;
-                let cz = 2.1;
-                ((cx, cy, cz), 16.0, list)
-            }
-            ModelArchetype::FireCompartmentFrame3D => {
-                let (nodes, elements) = crate::core::FireEngine::generate_fire_compartment_archetype();
-                let mut list = Vec::with_capacity(elements.len());
-                for el in &elements {
-                    let n1 = nodes.iter().find(|n| n.id == el.start_node).unwrap();
-                    let n2 = nodes.iter().find(|n| n.id == el.end_node).unwrap();
-                    let p1 = (n1.x as f32, n1.z as f32, n1.y as f32);
-                    let p2 = (n2.x as f32, n2.z as f32, n2.y as f32);
-                    let is_fire_zone = n1.x <= 7.5 && n1.y <= 7.5 && n2.x <= 7.5 && n2.y <= 7.5;
-                    list.push(Member3D {
-                        id: el.id,
-                        p1,
-                        p2,
-                        name: if is_fire_zone { format!("FireZone-{}", el.id) } else { format!("ColdFrame-{}", el.id) },
-                        section: el.section.name.clone(),
-                        base_width: if is_fire_zone { 6.0 } else { 4.5 },
-                        force_kn: if is_fire_zone { 350.0 } else { 180.0 },
-                        capacity_kn: if is_fire_zone { 480.0 } else { 850.0 },
-                        utilization: if is_fire_zone { 0.73 } else { 0.21 },
-                        ari: 0.97,
-                        is_critical: is_fire_zone,
-                    });
-                }
-                let cx = 7.5;
-                let cy = 7.5;
-                let cz = 1.9;
-                ((cx, cy, cz), 20.0, list)
-            }
-            ModelArchetype::OpenBimIfcModel3D => {
-                let ifc_text = crate::core::IfcModel::sample_villa_ifc4();
-                let ifc_model = crate::core::IfcModel::parse(&ifc_text).unwrap();
-                let mut list = Vec::new();
-                let mut id_counter = 0;
-                for el in &ifc_model.elements {
-                    for &(p1, p2) in &el.wireframe_lines {
-                        id_counter += 1;
-                        let is_col = el.class_name == "IFCCOLUMN";
-                        list.push(Member3D {
-                            id: id_counter,
-                            p1: (p1.0 as f32, p1.2 as f32, p1.1 as f32),
-                            p2: (p2.0 as f32, p2.2 as f32, p2.1 as f32),
-                            name: format!("{}: {}", el.class_name, el.name),
-                            section: if el.object_type.is_empty() { "OpenBIM Standard".to_string() } else { el.object_type.clone() },
-                            base_width: if is_col { 5.5 } else { 4.0 },
-                            force_kn: if is_col { 220.0 } else { 95.0 },
-                            capacity_kn: if is_col { 650.0 } else { 380.0 },
-                            utilization: if is_col { 0.34 } else { 0.25 },
-                            ari: 0.98,
-                            is_critical: false,
-                        });
-                    }
-                }
-                let cx = 3.0;
-                let cy = 3.0;
-                let cz = 1.75;
-                ((cx, cy, cz), 12.0, list)
+        let fem = self.bim_bus.project.to_structural_model();
+        let mut list = Vec::with_capacity(fem.elements.len() + fallback_members.len());
+        for (idx, el) in fem.elements.iter().enumerate() {
+            let n1 = &fem.nodes[el.start_node];
+            let n2 = &fem.nodes[el.end_node];
+            let p1 = (n1.x as f32, n1.y as f32, n1.z as f32);
+            let p2 = (n2.x as f32, n2.y as f32, n2.z as f32);
+            let is_col = el.name.contains("Col") || el.name.contains("CL");
+            let ari = 0.88 + ((idx % 7) as f32) * 0.015;
+            list.push(Member3D {
+                id: idx + 1,
+                p1,
+                p2,
+                name: el.name.clone(),
+                section: if is_col { "RC 400x400".to_string() } else { "WF / RC Beam".to_string() },
+                base_width: if is_col { 8.5 } else { 6.5 },
+                force_kn: if is_col { -640.0 } else { 215.0 },
+                capacity_kn: if is_col { 1450.0 } else { 520.0 },
+                utilization: 0.42,
+                ari,
+                is_critical: idx == 0,
+            });
+        }
+        if list.is_empty() {
+            for (idx, m) in fallback_members.iter().enumerate() {
+                let x = (idx % 4) as f32 * 5.0;
+                let z = (idx / 4) as f32 * 5.0;
+                list.push(Member3D {
+                    id: m.id,
+                    p1: (x, 0.0, z),
+                    p2: (x, 3.8, z),
+                    name: m.name.clone(),
+                    section: m.section.clone(),
+                    base_width: 6.5,
+                    force_kn: m.force_kn as f32,
+                    capacity_kn: m.capacity_kn as f32,
+                    utilization: m.utilization as f32,
+                    ari: m.ari as f32,
+                    is_critical: m.utilization > 0.85,
+                });
             }
         }
+        if list.is_empty() {
+            return ((0.0, 0.0, 0.0), 26.0, list);
+        }
+        let mut sx = 0.0_f32;
+        let mut sy = 0.0_f32;
+        let mut sz = 0.0_f32;
+        for m in &list {
+            sx += (m.p1.0 + m.p2.0) * 0.5;
+            sy += (m.p1.1 + m.p2.1) * 0.5;
+            sz += (m.p1.2 + m.p2.2) * 0.5;
+        }
+        let n = list.len() as f32;
+        ((sx / n, sy / n, sz / n), 26.0, list)
     }
 
 }

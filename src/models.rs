@@ -679,8 +679,25 @@ pub struct VisualNodeGraph {
     pub wires: Vec<VisualGraphWire>,
 }
 
+impl VisualNodeGraph {
+    pub fn empty() -> Self {
+        Self {
+            nodes: Vec::new(),
+            wires: Vec::new(),
+        }
+    }
+}
+
 impl Default for VisualNodeGraph {
     fn default() -> Self {
+        Self::empty()
+    }
+}
+
+#[cfg(test)]
+impl VisualNodeGraph {
+    #[allow(dead_code)]
+    pub fn sample_default_graph() -> Self {
         Self {
             nodes: vec![
                 VisualGraphNode {
