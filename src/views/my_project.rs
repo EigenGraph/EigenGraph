@@ -55,7 +55,7 @@ impl MyProjectView {
         let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
         let outer_margin = Margin::symmetric(if is_mobile { 10 } else { 20 }, 12);
 
-        ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+        ui.vertical(|ui| {
             Frame::new().inner_margin(outer_margin).show(ui, |ui| {
                 // Top Library Mode Selector (Phase 31 Responsive Sub-Tab Bar)
                 ui_kit::subtab_bar(

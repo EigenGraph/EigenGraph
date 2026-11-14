@@ -80,7 +80,7 @@ impl ResultsView {
         let is_mobile = ui.available_width() < MacTheme::MOBILE_BREAKPOINT;
         let pad = if is_mobile { 10 } else { 20 };
 
-        ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+        ui.vertical(|ui| {
             Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
                 // 1. TOP SUBTABS SELECTOR
                 self.render_header_bar(ui, theme);

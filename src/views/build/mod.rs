@@ -322,22 +322,30 @@ impl BuildView {
         features: &mut FeatureRegistry,
     ) {
         let avail_w = ui.available_width();
+        let deck_h = (MacTheme::viewport_size(ui.ctx()).y * 0.68).clamp(440.0, 680.0);
         if avail_w >= 780.0 {
             let panel_w = (avail_w * 0.30).clamp(250.0, 320.0);
             ui.horizontal(|ui| {
-                self.render_unified_sidebar(ui, theme, members, db_components, features, Some(panel_w));
-                self.render_canvas(ui, theme, members, features, None);
+                ui.allocate_ui(egui::Vec2::new(panel_w, deck_h), |ui| {
+                    self.render_unified_sidebar(
+                        ui,
+                        theme,
+                        members,
+                        db_components,
+                        features,
+                        Some(panel_w),
+                    );
+                });
+                self.render_canvas(ui, theme, members, features, Some(deck_h));
             });
         } else {
             let stacked_canvas_h = (MacTheme::viewport_size(ui.ctx()).y * 0.48).clamp(260.0, 420.0);
-            egui::ScrollArea::vertical()
-                .id_salt("build_compact_scroll")
-                .show(ui, |ui| {
-                    self.render_canvas(ui, theme, members, features, Some(stacked_canvas_h));
-                    ui.add_space(10.0);
-                    self.render_unified_sidebar(ui, theme, members, db_components, features, None);
-                    ui.add_space(68.0);
-                });
+            ui.vertical(|ui| {
+                self.render_canvas(ui, theme, members, features, Some(stacked_canvas_h));
+                ui.add_space(10.0);
+                self.render_unified_sidebar(ui, theme, members, db_components, features, None);
+                ui.add_space(24.0);
+            });
         }
     }
 }

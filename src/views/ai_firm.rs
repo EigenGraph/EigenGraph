@@ -156,7 +156,7 @@ impl AiFirmView {
         } else {
             20
         };
-        ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+        ui.vertical(|ui| {
             Frame::new().inner_margin(Margin::symmetric(margin_x, 16)).show(ui, |ui| {
                 // 1. Top Subtabs Bar
                 self.render_header_bar(ui, theme);

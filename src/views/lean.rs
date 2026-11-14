@@ -67,7 +67,7 @@ impl LeanView {
         features: &mut FeatureRegistry,
     ) {
         let margin_x = if MacTheme::is_mobile(ui.ctx()) { 12 } else { 20 };
-        ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+        ui.vertical(|ui| {
             Frame::new().inner_margin(Margin::symmetric(margin_x, 12)).show(ui, |ui| {
                 // Toast notification if export triggered
                 let mut dismiss_toast = false;

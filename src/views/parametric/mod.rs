@@ -291,22 +291,43 @@ impl ParametricView {
             self.render_drafting_ribbon(ui, theme, db_components, active_pillar);
 
             // 2. MAIN WORKSPACE (Side-by-side on Desktop, Stacked on Mobile/Narrow Tablet)
+            let deck_h = (MacTheme::viewport_size(ui.ctx()).y * 0.68).clamp(440.0, 680.0);
             if avail_w >= 780.0 {
                 let panel_w = (avail_w * 0.28).clamp(240.0, 300.0);
                 ui.horizontal(|ui| {
-                    self.render_variables_panel(ui, theme, active_pillar, features, Some(panel_w));
-                    self.render_drawing_canvas(ui, theme, db_components, active_pillar, features, None);
+                    ui.allocate_ui(egui::Vec2::new(panel_w, deck_h), |ui| {
+                        self.render_variables_panel(
+                            ui,
+                            theme,
+                            active_pillar,
+                            features,
+                            Some(panel_w),
+                        );
+                    });
+                    self.render_drawing_canvas(
+                        ui,
+                        theme,
+                        db_components,
+                        active_pillar,
+                        features,
+                        Some(deck_h),
+                    );
                 });
             } else {
                 let stacked_h = (MacTheme::viewport_size(ui.ctx()).y * 0.45).clamp(260.0, 380.0);
-                egui::ScrollArea::vertical()
-                    .id_salt("parametric_compact_scroll")
-                    .show(ui, |ui| {
-                        self.render_drawing_canvas(ui, theme, db_components, active_pillar, features, Some(stacked_h));
-                        ui.add_space(10.0);
-                        self.render_variables_panel(ui, theme, active_pillar, features, None);
-                        ui.add_space(68.0);
-                    });
+                ui.vertical(|ui| {
+                    self.render_drawing_canvas(
+                        ui,
+                        theme,
+                        db_components,
+                        active_pillar,
+                        features,
+                        Some(stacked_h),
+                    );
+                    ui.add_space(10.0);
+                    self.render_variables_panel(ui, theme, active_pillar, features, None);
+                    ui.add_space(24.0);
+                });
             }
         });
 

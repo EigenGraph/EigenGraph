@@ -180,7 +180,7 @@ impl IndustrializedView {
         _members: &[StructuralMember],
         features: &mut FeatureRegistry,
     ) {
-        ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+        ui.vertical(|ui| {
             Frame::new().inner_margin(Margin::symmetric(20, 12)).show(ui, |ui| {
                 // 1. TOP SUBTABS SELECTOR
                 self.render_header_bar(ui, theme);

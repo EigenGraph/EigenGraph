@@ -1,9 +1,27 @@
-//! theme.rs — Modern macOS Sequoia / Pro Dark Engineering Visual System.
+//! theme.rs — Modern macOS Sequoia / Pro Dark & Engineering Daylight Visual System.
 
 use egui::{Color32, CornerRadius, Frame, Margin, Stroke, Vec2};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ThemeMode {
+    #[default]
+    ProDark,
+    EngineeringLight,
+}
+
+impl ThemeMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::ProDark => "🌑 Pro Obsidian Dark",
+            Self::EngineeringLight => "☀️ Engineering Daylight",
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct MacTheme {
+    pub mode: ThemeMode,
     pub bg_canvas: Color32,
     pub bg_sidebar: Color32,
     pub bg_card: Color32,
@@ -22,30 +40,62 @@ pub struct MacTheme {
 
 impl Default for MacTheme {
     fn default() -> Self {
-        Self {
-            // Deep obsidian & elevated slate glassmorphic surfaces
-            bg_canvas: Color32::from_rgb(15, 17, 23),
-            bg_sidebar: Color32::from_rgb(20, 23, 31),
-            bg_card: Color32::from_rgb(26, 30, 40),
-            bg_card_hover: Color32::from_rgb(35, 41, 56),
-            bg_hero: Color32::from_rgb(22, 34, 58),
-            // High-clarity engineering semantic accents
-            accent_blue: Color32::from_rgb(45, 140, 255),
-            accent_green: Color32::from_rgb(16, 185, 129),
-            accent_orange: Color32::from_rgb(245, 158, 11),
-            accent_red: Color32::from_rgb(239, 68, 68),
-            // Crisp typographic hierarchy
-            text_primary: Color32::from_rgb(248, 250, 252),
-            text_secondary: Color32::from_rgb(165, 180, 202),
-            text_muted: Color32::from_rgb(108, 122, 145),
-            // Subtle architectural hairline borders
-            border_subtle: Color32::from_rgb(38, 44, 58),
-            border_card: Color32::from_rgb(48, 56, 74),
-        }
+        Self::for_mode(ThemeMode::ProDark)
     }
 }
 
 impl MacTheme {
+    /// Builds a theme palette for the requested [`ThemeMode`].
+    pub fn for_mode(mode: ThemeMode) -> Self {
+        match mode {
+            ThemeMode::ProDark => Self {
+                mode,
+                // Deep obsidian & elevated slate glassmorphic surfaces
+                bg_canvas: Color32::from_rgb(15, 17, 23),
+                bg_sidebar: Color32::from_rgb(20, 23, 31),
+                bg_card: Color32::from_rgb(26, 30, 40),
+                bg_card_hover: Color32::from_rgb(35, 41, 56),
+                bg_hero: Color32::from_rgb(22, 34, 58),
+                // High-clarity engineering semantic accents
+                accent_blue: Color32::from_rgb(45, 140, 255),
+                accent_green: Color32::from_rgb(16, 185, 129),
+                accent_orange: Color32::from_rgb(245, 158, 11),
+                accent_red: Color32::from_rgb(239, 68, 68),
+                // Crisp typographic hierarchy
+                text_primary: Color32::from_rgb(248, 250, 252),
+                text_secondary: Color32::from_rgb(165, 180, 202),
+                text_muted: Color32::from_rgb(108, 122, 145),
+                // Subtle architectural hairline borders
+                border_subtle: Color32::from_rgb(38, 44, 58),
+                border_card: Color32::from_rgb(48, 56, 74),
+            },
+            ThemeMode::EngineeringLight => Self {
+                mode,
+                // Crisp CAD paper & elevated slate daylight surfaces
+                bg_canvas: Color32::from_rgb(244, 246, 250),
+                bg_sidebar: Color32::from_rgb(233, 238, 246),
+                bg_card: Color32::from_rgb(255, 255, 255),
+                bg_card_hover: Color32::from_rgb(226, 233, 245),
+                bg_hero: Color32::from_rgb(228, 239, 255),
+                // High-contrast engineering accents on light surfaces
+                accent_blue: Color32::from_rgb(24, 108, 224),
+                accent_green: Color32::from_rgb(10, 146, 100),
+                accent_orange: Color32::from_rgb(206, 120, 6),
+                accent_red: Color32::from_rgb(212, 42, 42),
+                // Deep ink typography
+                text_primary: Color32::from_rgb(15, 23, 42),
+                text_secondary: Color32::from_rgb(51, 65, 85),
+                text_muted: Color32::from_rgb(100, 116, 139),
+                // Clean technical drafting hairlines
+                border_subtle: Color32::from_rgb(203, 213, 225),
+                border_card: Color32::from_rgb(184, 196, 212),
+            },
+        }
+    }
+
+    pub fn is_dark(&self) -> bool {
+        self.mode == ThemeMode::ProDark
+    }
     /// Card frame with modern rounded corners and subtle architectural border
     pub fn card_frame(&self) -> Frame {
         Frame::new()
@@ -106,8 +156,13 @@ impl MacTheme {
 
     /// Floating Dynamic Island / Pill Frame (Collapsed Capsule)
     pub fn floating_pill_frame(&self) -> Frame {
+        let fill = if self.is_dark() {
+            Color32::from_rgba_premultiplied(22, 26, 36, 240)
+        } else {
+            Color32::from_rgba_premultiplied(248, 250, 252, 245)
+        };
         Frame::new()
-            .fill(Color32::from_rgba_premultiplied(22, 26, 36, 240))
+            .fill(fill)
             .corner_radius(CornerRadius::same(22))
             .stroke(Stroke::new(1.2, self.accent_blue.gamma_multiply(0.6)))
             .inner_margin(Margin::symmetric(14, 7))
@@ -115,22 +170,40 @@ impl MacTheme {
 
     /// Floating Dynamic Island Expanded Console Frame
     pub fn floating_island_expanded_frame(&self) -> Frame {
+        let fill = if self.is_dark() {
+            Color32::from_rgba_premultiplied(18, 22, 31, 250)
+        } else {
+            Color32::from_rgba_premultiplied(255, 255, 255, 252)
+        };
         Frame::new()
-            .fill(Color32::from_rgba_premultiplied(18, 22, 31, 250))
+            .fill(fill)
             .corner_radius(CornerRadius::same(16))
             .stroke(Stroke::new(1.5, self.accent_blue.gamma_multiply(0.75)))
             .inner_margin(Margin::same(14))
     }
 
-    /// Apply modern Pro Dark visuals to the global egui Context
+    /// Apply modern Pro Dark or Engineering Daylight visuals to the global egui Context
     pub fn apply_to_ctx(&self, ctx: &egui::Context) {
-        let mut visuals = egui::Visuals::dark();
+        let is_dark = self.is_dark();
+        let mut visuals = if is_dark {
+            egui::Visuals::dark()
+        } else {
+            egui::Visuals::light()
+        };
         visuals.panel_fill = self.bg_canvas;
         visuals.window_fill = self.bg_card;
-        visuals.extreme_bg_color = Color32::from_rgb(11, 13, 18);
-        visuals.faint_bg_color = Color32::from_rgb(22, 26, 35);
+        visuals.extreme_bg_color = if is_dark {
+            Color32::from_rgb(11, 13, 18)
+        } else {
+            Color32::from_rgb(232, 236, 244)
+        };
+        visuals.faint_bg_color = if is_dark {
+            Color32::from_rgb(22, 26, 35)
+        } else {
+            Color32::from_rgb(238, 242, 248)
+        };
 
-        visuals.selection.bg_fill = self.accent_blue.gamma_multiply(0.35);
+        visuals.selection.bg_fill = self.accent_blue.gamma_multiply(0.30);
         visuals.selection.stroke = Stroke::new(1.0, self.accent_blue);
 
         visuals.widgets.noninteractive.bg_fill = self.bg_card;
@@ -139,16 +212,29 @@ impl MacTheme {
         visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, self.text_secondary);
         visuals.widgets.noninteractive.corner_radius = CornerRadius::same(8);
 
-        visuals.widgets.inactive.bg_fill = Color32::from_rgb(32, 38, 52);
-        visuals.widgets.inactive.weak_bg_fill = Color32::from_rgb(28, 33, 45);
+        visuals.widgets.inactive.bg_fill = if is_dark {
+            Color32::from_rgb(32, 38, 52)
+        } else {
+            Color32::from_rgb(226, 232, 240)
+        };
+        visuals.widgets.inactive.weak_bg_fill = if is_dark {
+            Color32::from_rgb(28, 33, 45)
+        } else {
+            Color32::from_rgb(234, 239, 246)
+        };
         visuals.widgets.inactive.bg_stroke = Stroke::new(1.0, self.border_card);
         visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, self.text_primary);
         visuals.widgets.inactive.corner_radius = CornerRadius::same(8);
 
+        let hover_fg = if is_dark {
+            Color32::WHITE
+        } else {
+            self.text_primary
+        };
         visuals.widgets.hovered.bg_fill = self.bg_card_hover;
         visuals.widgets.hovered.weak_bg_fill = self.bg_card_hover;
         visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, self.accent_blue);
-        visuals.widgets.hovered.fg_stroke = Stroke::new(1.2, Color32::WHITE);
+        visuals.widgets.hovered.fg_stroke = Stroke::new(1.2, hover_fg);
         visuals.widgets.hovered.corner_radius = CornerRadius::same(8);
 
         visuals.widgets.active.bg_fill = self.accent_blue;
@@ -160,7 +246,7 @@ impl MacTheme {
         visuals.widgets.open.bg_fill = self.bg_card_hover;
         visuals.widgets.open.weak_bg_fill = self.bg_card_hover;
         visuals.widgets.open.bg_stroke = Stroke::new(1.0, self.accent_blue);
-        visuals.widgets.open.fg_stroke = Stroke::new(1.2, Color32::WHITE);
+        visuals.widgets.open.fg_stroke = Stroke::new(1.2, hover_fg);
         visuals.widgets.open.corner_radius = CornerRadius::same(8);
 
         ctx.set_visuals(visuals);

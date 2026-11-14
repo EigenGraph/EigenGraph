@@ -354,7 +354,10 @@ impl SlippyMapState {
 
         // 2. Mouse Wheel Smooth Zooming (Centering on Cursor)
         let scroll_delta = ui.input(|i| i.smooth_scroll_delta.y);
-        if response.hovered() && scroll_delta.abs() > 0.5 {
+        if response.hovered()
+            && scroll_delta.abs() > 0.5
+            && !crate::ui_kit::is_canvas_frozen(ui.ctx())
+        {
             let zoom_delta = scroll_delta * 0.003;
             if let Some(mouse_pos) = response.hover_pos() {
                 let (mouse_lat, mouse_lon) = self.screen_to_lat_lon(mouse_pos, rect);

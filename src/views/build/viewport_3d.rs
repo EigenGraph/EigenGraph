@@ -183,7 +183,7 @@ impl BuildView {
                         self.cam_pitch = (self.cam_pitch - response.drag_delta().y * 0.008).clamp(-1.52, 1.52);
                     }
 
-                    if response.hovered() {
+                    if response.hovered() && !crate::ui_kit::is_canvas_frozen(ui.ctx()) {
                         let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
                         if scroll_y.abs() > 0.0 {
                             self.cam_zoom = (self.cam_zoom * (1.0 + scroll_y * 0.0025)).clamp(0.15, 8.0);

@@ -71,7 +71,7 @@ impl ParametricView {
                         {
                             self.canvas_pan += response.drag_delta();
                         }
-                        if response.hovered() {
+                        if response.hovered() && !crate::ui_kit::is_canvas_frozen(ui.ctx()) {
                             let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
                             if scroll_y.abs() > 0.0 {
                                 self.canvas_zoom =

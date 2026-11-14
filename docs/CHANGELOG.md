@@ -7,6 +7,24 @@ The project strictly adheres to sequential versioning and strict 1-to-1 phase ma
 
 ---
 
+## [v0.3.2] - 2026-11-14 — Phase 32: Canvas-First Unified Workspace & Settings Consolidation
+
+### Added & Changed
+- **Top Toolbar Removed (`src/app.rs`)**:
+  - Removed the `CentralPanel` top header banner, active-module title bar, status/roadmap badges, and `WORKFLOW:` shortcut ribbon so every module opens directly onto the workspace.
+  - Added a floating top-left `☰` button when the sidebar is collapsed or closed so users can reopen the navigation drawer effortlessly.
+- **Consolidated Workspace Settings & Future Roadmap (`src/views/settings.rs`, `src/theme.rs`)**:
+  - Merged Workspace Settings and Future Roadmap (`SettingsSubTab::WorkspaceSettings`, `SettingsSubTab::FutureRoadmap`, `SettingsSubTab::About`) inside the single `⚙️ Settings` dialog (`Cmd+,` or sidebar footer), keeping existing Phase 32 locked feature slots frozen until UI stabilization is complete.
+  - Added `ThemeMode::ProDark` / `ThemeMode::EngineeringLight` theme switching, Floating AI Copilot visibility toggle (`src/views/ai_assistant.rs`), unified canvas defaults (height ratio, Freeze by Default, Grid/Snap/Spacing, BIM underlay, Domain telemetry HUD, Floating Inspector, and Sync All 15 Modules), alongside Engineering Units, Design Standards, Solver Safeguards, and single-file sync actions.
+- **One Synchronized Canvas-First Drawing Workspace Across All 15 Modules (`src/views/universal_canvas.rs`, `src/ui_kit.rs`, `src/app.rs`)**:
+  - Implemented `UniversalCanvasState` rendered at the top of every `NavigationPillar` module inside a single vertical `ScrollArea`, with an interactive 8-tool CAD/sketch toolbar, synchronized multi-layer BIM underlay, domain telemetry overlays, floating collapsible inspector, and `"⬇ <Module> Workbench"` jump button.
+  - Added the **`❄️ Frozen (Scroll Page)` / `🔓 Freeze Canvas`** guard (`ui_kit::set_canvas_frozen` / `is_canvas_frozen`) shared across the unified canvas and existing domain viewports (`viewport_3d.rs`, `canvas_2d.rs`, `dynamo_studio.rs`, `map_widget.rs`) so vertical scrolling glides cleanly past the canvas without unintended zoom or pan.
+  - Removed conflicting outer full-page vertical scroll containers across module workbenches (`my_project.rs`, `ai_firm.rs`, `research.rs`, `analyze/mod.rs`, `planning.rs`, `sustainability.rs`, `facility.rs`, `safety.rs`, `lean.rs`, `industrialized/mod.rs`, `prediction.rs`, `results.rs`, `build/mod.rs`, `parametric/mod.rs`).
+- **Unified Single-File `.eigen.json` Sync (`UnifiedWorkspaceArchive`)**:
+  - Sealed BIM entities, `StructuralMember`s, `ParametricVariable`s, all 15-module canvas drawings, and `WorkspaceCanvasSettings` into a single SHA-256 verified `.eigen.json` archive (with optional SVG export and explicit per-module split export when needed).
+
+---
+
 ## [v0.3.1] - 2026-11-13 — Phase 31: Full-Suite 15-Pillar Workspace Layout & 74-Capability Unlock Architecture
 
 ### Added

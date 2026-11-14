@@ -148,7 +148,7 @@ impl ParametricView {
                             Vec2::new(left_w, pane_h),
                             Sense::click_and_drag(),
                         );
-                        if response.hovered() {
+                        if response.hovered() && !crate::ui_kit::is_canvas_frozen(ui.ctx()) {
                             let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
                             if scroll_y.abs() > 0.0 {
                                 self.canvas_zoom =
@@ -174,7 +174,7 @@ impl ParametricView {
                         Vec2::new(available_width, stacked_h),
                         Sense::click_and_drag(),
                     );
-                    if response.hovered() {
+                    if response.hovered() && !crate::ui_kit::is_canvas_frozen(ui.ctx()) {
                         let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
                         if scroll_y.abs() > 0.0 {
                             self.canvas_zoom =

@@ -47,6 +47,10 @@ impl AiAssistantView {
         db_components: &mut Vec<DatabaseComponent>,
         sidebar_offset_x: f32,
     ) {
+        if !self.is_visible {
+            return;
+        }
+
         // Global Keyboard Shortcut: Cmd+K toggles the Floating AI Copilot, Esc closes it
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::K)) {
             self.expanded = !self.expanded;

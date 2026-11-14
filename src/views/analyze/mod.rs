@@ -525,7 +525,7 @@ impl AnalyzeView {
             Margin::symmetric(20, 12)
         };
 
-        ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+        ui.vertical(|ui| {
             Frame::new().inner_margin(outer_margin).show(ui, |ui| {
                 // 1. TWO-TIER GROUPED ANALYSIS NAVIGATION & EXPORT HEADER
                 self.render_subtabs_header(ui, theme);

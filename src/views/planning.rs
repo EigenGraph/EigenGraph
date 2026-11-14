@@ -270,7 +270,7 @@ impl PlanningView {
             20
         };
 
-        ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+        ui.vertical(|ui| {
             Frame::new().inner_margin(Margin::symmetric(pad, 12)).show(ui, |ui| {
                 // 1. TOP SUB-TABS SELECTOR & EXPORT BAR
                 self.render_header_bar(ui, theme, &takeoff, active_pillar);

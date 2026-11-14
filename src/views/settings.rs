@@ -7,10 +7,15 @@ use crate::models::NavigationPillar;
 use crate::theme::MacTheme;
 use crate::ui_kit;
 
+use crate::core::BimProject;
+use crate::models::{ParametricVariable, StructuralMember};
+use crate::theme::ThemeMode;
+use crate::views::universal_canvas::{UniversalCanvasState, WorkspaceCanvasSettings};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsSubTab {
-    Preferences,
-    FeatureRegistry,
+    WorkspaceSettings,
+    FutureRoadmap,
     About,
 }
 
@@ -29,6 +34,7 @@ pub struct SettingsView {
     pub solver_threads: usize,
     pub enable_svd_guard: bool,
     pub enable_anti_leakage: bool,
+    pub freeze_by_default: bool,
     pub gemini_api_key: String,
     pub registry_search: String,
     pub registry_filter: RegistryFilter,
@@ -40,7 +46,8 @@ pub struct SettingsView {
 impl Default for SettingsView {
     fn default() -> Self {
         Self {
-            active_subtab: SettingsSubTab::FeatureRegistry,
+            active_subtab: SettingsSubTab::WorkspaceSettings,
+            freeze_by_default: false,
             unit_system: "kN, mm, MPa (Structural Metric)".to_string(),
             design_standard: "SNI 1729 / AISC 360-16".to_string(),
             solver_threads: 8,
@@ -57,12 +64,64 @@ impl Default for SettingsView {
 }
 
 impl SettingsView {
-    /// Renders System Preferences & Feature Unlock Roadmap.
+    /// Captures the active workspace settings snapshot for single-file `.eigen.json` synchronization.
+    pub fn workspace_settings_snapshot(
+        &self,
+        theme: &MacTheme,
+        canvas: &UniversalCanvasState,
+        ai_copilot_visible: bool,
+    ) -> WorkspaceCanvasSettings {
+        WorkspaceCanvasSettings {
+            theme_mode: theme.mode,
+            canvas_height_ratio: canvas.canvas_height_ratio,
+            freeze_by_default: self.freeze_by_default,
+            show_grid: canvas.show_grid,
+            snap_to_grid: canvas.snap_to_grid,
+            grid_spacing_mm: canvas.grid_spacing_mm,
+            show_bim_base_layer: canvas.show_bim_base_layer,
+            show_domain_overlay: canvas.show_domain_overlay,
+            sync_all_layers: canvas.sync_all_layers,
+            show_floating_inspector: canvas.inspector_open,
+            show_ai_copilot: ai_copilot_visible,
+            unit_system: self.unit_system.clone(),
+            design_standard: self.design_standard.clone(),
+            solver_threads: self.solver_threads,
+            enable_svd_guard: self.enable_svd_guard,
+            enable_anti_leakage: self.enable_anti_leakage,
+        }
+    }
+
+    /// Applies imported single-file `.eigen.json` workspace settings across theme, AI copilot, and preferences.
+    pub fn apply_workspace_settings(
+        &mut self,
+        settings: &WorkspaceCanvasSettings,
+        theme: &mut MacTheme,
+        ai_copilot_visible: &mut bool,
+    ) {
+        if theme.mode != settings.theme_mode {
+            *theme = MacTheme::for_mode(settings.theme_mode);
+        }
+        self.freeze_by_default = settings.freeze_by_default;
+        self.unit_system = settings.unit_system.clone();
+        self.design_standard = settings.design_standard.clone();
+        self.solver_threads = settings.solver_threads;
+        self.enable_svd_guard = settings.enable_svd_guard;
+        self.enable_anti_leakage = settings.enable_anti_leakage;
+        *ai_copilot_visible = settings.show_ai_copilot;
+    }
+
+    /// Renders Consolidated Workspace Settings, Future Roadmap & About.
     /// Returns `true` if the user clicked an Inspect action to jump straight to a domain workspace.
+    #[allow(clippy::too_many_arguments)]
     pub fn show(
         &mut self,
         ui: &mut Ui,
-        theme: &MacTheme,
+        theme: &mut MacTheme,
+        universal_canvas: &mut UniversalCanvasState,
+        ai_copilot_visible: &mut bool,
+        bim_project: &BimProject,
+        members: &[StructuralMember],
+        variables: &[ParametricVariable],
         registry: &mut FeatureRegistry,
         active_pillar: &mut NavigationPillar,
     ) -> bool {
@@ -74,8 +133,8 @@ impl SettingsView {
             "settings_subtabs",
             &mut self.active_subtab,
             &[
-                (SettingsSubTab::FeatureRegistry, "🔐 Feature Registry & Unlock Roadmap"),
-                (SettingsSubTab::Preferences, "⚙️ Preferences & Standards"),
+                (SettingsSubTab::WorkspaceSettings, "⚙️ Workspace Settings"),
+                (SettingsSubTab::FutureRoadmap, "🗺️ Future Roadmap"),
                 (SettingsSubTab::About, "ℹ️ About EigenGraph"),
             ],
         );
@@ -85,11 +144,19 @@ impl SettingsView {
             .id_salt("settings_scroll_body")
             .auto_shrink([false, false])
             .show(ui, |ui| match self.active_subtab {
-                SettingsSubTab::FeatureRegistry => {
-                    requested_jump = self.render_feature_registry(ui, theme, registry, active_pillar);
+                SettingsSubTab::WorkspaceSettings => {
+                    self.render_preferences(
+                        ui,
+                        theme,
+                        universal_canvas,
+                        ai_copilot_visible,
+                        bim_project,
+                        members,
+                        variables,
+                    );
                 }
-                SettingsSubTab::Preferences => {
-                    self.render_preferences(ui, theme);
+                SettingsSubTab::FutureRoadmap => {
+                    requested_jump = self.render_feature_registry(ui, theme, registry, active_pillar);
                 }
                 SettingsSubTab::About => {
                     self.render_about(ui, theme);
@@ -647,18 +714,272 @@ impl SettingsView {
         jump_clicked
     }
 
-    fn render_preferences(&mut self, ui: &mut Ui, theme: &MacTheme) {
+    #[allow(clippy::too_many_arguments)]
+    fn render_preferences(
+        &mut self,
+        ui: &mut Ui,
+        theme: &mut MacTheme,
+        universal_canvas: &mut UniversalCanvasState,
+        ai_copilot_visible: &mut bool,
+        bim_project: &BimProject,
+        members: &[StructuralMember],
+        variables: &[ParametricVariable],
+    ) {
         ui.heading(
-            RichText::new("⚙️ System Preferences")
+            RichText::new("⚙️ Workspace Settings")
                 .size(20.0)
                 .strong()
                 .color(theme.text_primary),
         );
         ui.label(
-            RichText::new("Configure engineering units, solver safeguards, and AI copilot credentials.")
-                .size(12.5)
-                .color(theme.text_secondary),
+            RichText::new(
+                "Unified theme, universal 15-module canvas defaults, single-file sync, engineering standards, solver safeguards, and AI copilot configuration.",
+            )
+            .size(12.5)
+            .color(theme.text_secondary),
         );
+        ui.add_space(12.0);
+
+        let mut pending_theme_mode: Option<ThemeMode> = None;
+        ui_kit::responsive_two_columns(
+            ui,
+            640.0,
+            |ui| {
+                theme.card_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.label(
+                        RichText::new("APPEARANCE & AI COPILOT")
+                            .strong()
+                            .size(11.5)
+                            .color(theme.accent_blue),
+                    );
+                    ui.separator();
+                    ui.add_space(8.0);
+
+                    ui.label(
+                        RichText::new("Workspace Theme Mode:")
+                            .size(12.5)
+                            .color(theme.text_primary),
+                    );
+                    ui.add_space(4.0);
+                    ui.horizontal_wrapped(|ui| {
+                        for (mode, label) in [
+                            (ThemeMode::ProDark, "🌙 Pro Dark"),
+                            (ThemeMode::EngineeringLight, "☀️ Engineering Light"),
+                        ] {
+                            let is_active = theme.mode == mode;
+                            if ui
+                                .add(
+                                    egui::Button::new(RichText::new(label).size(11.5).strong().color(
+                                        if is_active {
+                                            Color32::WHITE
+                                        } else {
+                                            theme.text_primary
+                                        },
+                                    ))
+                                    .fill(if is_active {
+                                        theme.accent_blue
+                                    } else {
+                                        theme.bg_sidebar
+                                    })
+                                    .corner_radius(egui::CornerRadius::same(7)),
+                                )
+                                .clicked()
+                            {
+                                pending_theme_mode = Some(mode);
+                            }
+                        }
+                    });
+
+                    ui.add_space(12.0);
+                    ui.checkbox(
+                        ai_copilot_visible,
+                        RichText::new("Show Floating AI Copilot Pill (Cmd+K)")
+                            .size(12.0)
+                            .color(theme.text_primary),
+                    );
+                    ui.label(
+                        RichText::new(
+                            "Hide or reveal the bottom-right AI Copilot floating pill across all 15 modules.",
+                        )
+                        .size(11.0)
+                        .color(theme.text_muted),
+                    );
+                });
+            },
+            |ui| {
+                theme.card_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.label(
+                        RichText::new("UNIFIED 15-MODULE CANVAS DEFAULTS")
+                            .strong()
+                            .size(11.5)
+                            .color(theme.accent_blue),
+                    );
+                    ui.separator();
+                    ui.add_space(8.0);
+
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(
+                            RichText::new("Canvas Viewport Height Ratio:")
+                                .size(12.0)
+                                .color(theme.text_primary),
+                        );
+                        ui.add(
+                            egui::Slider::new(
+                                &mut universal_canvas.canvas_height_ratio,
+                                0.45..=0.88,
+                            )
+                            .fixed_decimals(2),
+                        );
+                    });
+                    ui.add_space(6.0);
+
+                    if ui
+                        .checkbox(
+                            &mut self.freeze_by_default,
+                            RichText::new("Freeze Canvas by Default (Wheel Scrolls Page Only)")
+                                .size(12.0)
+                                .color(theme.text_primary),
+                        )
+                        .changed()
+                    {
+                        universal_canvas.is_frozen = self.freeze_by_default;
+                    }
+                    ui.checkbox(
+                        &mut universal_canvas.sync_all_layers,
+                        RichText::new("Synchronize Drawings Across All 15 Modules")
+                            .size(12.0)
+                            .color(theme.text_primary),
+                    );
+                    ui.checkbox(
+                        &mut universal_canvas.show_bim_base_layer,
+                        RichText::new("Show BIM Base Plan Underlay")
+                            .size(12.0)
+                            .color(theme.text_primary),
+                    );
+                    ui.checkbox(
+                        &mut universal_canvas.show_domain_overlay,
+                        RichText::new("Show Module Telemetry HUD Overlay")
+                            .size(12.0)
+                            .color(theme.text_primary),
+                    );
+                    ui.horizontal_wrapped(|ui| {
+                        ui.checkbox(
+                            &mut universal_canvas.show_grid,
+                            RichText::new("Grid").size(12.0).color(theme.text_primary),
+                        );
+                        ui.checkbox(
+                            &mut universal_canvas.snap_to_grid,
+                            RichText::new("Snap").size(12.0).color(theme.text_primary),
+                        );
+                        ui.checkbox(
+                            &mut universal_canvas.inspector_open,
+                            RichText::new("Floating Inspector")
+                                .size(12.0)
+                                .color(theme.text_primary),
+                        );
+                    });
+
+                    ui.add_space(6.0);
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(
+                            RichText::new("Grid Spacing (mm):")
+                                .size(12.0)
+                                .color(theme.text_primary),
+                        );
+                        egui::ComboBox::from_id_salt("settings_canvas_grid_spacing")
+                            .selected_text(format!("{:.0} mm", universal_canvas.grid_spacing_mm))
+                            .show_ui(ui, |ui| {
+                                for step in [250.0_f64, 500.0, 1000.0, 1500.0] {
+                                    ui.selectable_value(
+                                        &mut universal_canvas.grid_spacing_mm,
+                                        step,
+                                        format!("{step:.0} mm"),
+                                    );
+                                }
+                            });
+                    });
+                });
+            },
+        );
+        if let Some(mode) = pending_theme_mode {
+            *theme = MacTheme::for_mode(mode);
+            theme.apply_to_ctx(ui.ctx());
+        }
+
+        ui.add_space(12.0);
+
+        theme.card_frame().show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.label(
+                RichText::new("1-FILE SYNCHRONIZED WORKSPACE ARCHIVE (.eigen.json)")
+                    .strong()
+                    .size(11.5)
+                    .color(theme.accent_blue),
+            );
+            ui.separator();
+            ui.add_space(6.0);
+            ui.label(
+                RichText::new(format!(
+                    "Synchronized state: {} canvas objects • {} structural members • {} parametric variables • {} BIM elements",
+                    universal_canvas.entities.len(),
+                    members.len(),
+                    variables.len(),
+                    bim_project.walls.len() + bim_project.columns.len() + bim_project.runs.len(),
+                ))
+                .size(11.5)
+                .color(theme.text_secondary),
+            );
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                if ui
+                    .add(
+                        egui::Button::new(
+                            RichText::new("💾 Export 1-File Unified Workspace (.eigen.json)")
+                                .size(11.5)
+                                .strong()
+                                .color(Color32::WHITE),
+                        )
+                        .fill(theme.accent_blue)
+                        .corner_radius(egui::CornerRadius::same(7)),
+                    )
+                    .clicked()
+                {
+                    let snap = self.workspace_settings_snapshot(
+                        theme,
+                        universal_canvas,
+                        *ai_copilot_visible,
+                    );
+                    universal_canvas.export_unified_file(bim_project, members, variables, snap);
+                }
+
+                if ui
+                    .add(
+                        egui::Button::new(
+                            RichText::new("📥 Import 1-File Archive (.eigen.json)")
+                                .size(11.5)
+                                .strong()
+                                .color(theme.text_primary),
+                        )
+                        .fill(theme.bg_sidebar)
+                        .corner_radius(egui::CornerRadius::same(7)),
+                    )
+                    .clicked()
+                {
+                    universal_canvas.import_json_open = true;
+                }
+            });
+            if let Some(status) = &universal_canvas.status_message {
+                ui.add_space(6.0);
+                ui.label(
+                    RichText::new(status)
+                        .size(11.0)
+                        .color(theme.accent_green),
+                );
+            }
+        });
+
         ui.add_space(12.0);
 
         ui_kit::responsive_two_columns(
@@ -793,7 +1114,7 @@ impl SettingsView {
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("Version:").strong().size(13.0).color(theme.text_primary));
                 ui.label(
-                    RichText::new(format!("v{} — Phase 31 Full-Suite Master Workspace", env!("CARGO_PKG_VERSION")))
+                    RichText::new(format!("v{} — Phase 32 Streamlined Canvas Workspace", env!("CARGO_PKG_VERSION")))
                         .size(13.0)
                         .color(theme.accent_green)
                         .strong(),

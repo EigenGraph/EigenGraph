@@ -390,6 +390,19 @@ pub fn feature_slot_card(
     }
 }
 
+const CANVAS_FROZEN_MEMORY_ID: &str = "eigengraph_canvas_frozen_state";
+
+/// Publishes the workspace-wide Freeze Canvas flag into `egui::Context` temporary memory
+/// so nested 2D/3D/map canvases honor vertical page scrolling without zooming when frozen.
+pub fn set_canvas_frozen(ctx: &egui::Context, frozen: bool) {
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new(CANVAS_FROZEN_MEMORY_ID), frozen));
+}
+
+/// Returns `true` when the user has enabled Freeze Canvas so scroll wheels pass through to page scroll.
+pub fn is_canvas_frozen(ctx: &egui::Context) -> bool {
+    ctx.data(|d| d.get_temp::<bool>(egui::Id::new(CANVAS_FROZEN_MEMORY_ID)).unwrap_or(false))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

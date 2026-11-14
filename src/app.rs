@@ -10,9 +10,10 @@ use crate::features::FeatureRegistry;
 use crate::models::{DatabaseComponent, NavigationPillar, ProjectItem, StructuralMember};
 use crate::theme::MacTheme;
 use crate::views::{
-    settings::SettingsSubTab, AiAssistantView, AiFirmView, AnalyzeView, BuildView, FacilityView,
+    AiAssistantView, AiFirmView, AnalyzeView, BuildView, FacilityView,
     IndustrializedView, LeanView, MyProjectView, ParametricView, PlanningView, PredictionView,
     ResearchConceptView, ResultsView, SafetyView, SettingsView, SustainabilityView,
+    UniversalCanvasState,
 };
 
 pub struct EigenGraphApp {
@@ -43,6 +44,7 @@ pub struct EigenGraphApp {
     pub prediction_view: PredictionView,        // Pillar 14: 🔮 Prediction (AI Aging & Drift)
     pub results_view: ResultsView,              // Pillar 15: 📑 Report (Living Docs, Sheets, Slides)
     pub settings_view: SettingsView,
+    pub universal_canvas: UniversalCanvasState,
     pub ai_assistant_view: AiAssistantView,
 
     // Domain Data & Parametric Component Database
@@ -79,6 +81,7 @@ impl Default for EigenGraphApp {
             prediction_view: PredictionView::default(),
             results_view: ResultsView::default(),
             settings_view: SettingsView::default(),
+            universal_canvas: UniversalCanvasState::default(),
             ai_assistant_view: AiAssistantView::default(),
 
             projects: crate::core::InternalVault::default_nvw_dcr_lod_projects(),
@@ -245,7 +248,7 @@ impl EigenGraphApp {
                                 }
 
                                 let text_color = if is_active || is_hovered {
-                                    Color32::WHITE
+                                    self.theme.text_primary
                                 } else {
                                     self.theme.text_secondary
                                 };
@@ -295,7 +298,7 @@ impl EigenGraphApp {
                     .corner_radius(CornerRadius::same(7))
                     .min_size(Vec2::new(ui.available_width(), 32.0)),
                 )
-                .on_hover_text("Workspace Settings")
+                .on_hover_text("Workspace Settings & Future Roadmap")
                 .clicked()
             {
                 self.show_settings = !self.show_settings;
@@ -306,133 +309,25 @@ impl EigenGraphApp {
         });
     }
 
-    /// Renders compact status, feature roadmap gate, and build version pills inside the workspace header.
-    fn render_header_badges(&mut self, ui: &mut egui::Ui) {
-        let active_features = self.feature_registry.active_count();
-        let locked_features = self.feature_registry.locked_count();
-        let total_features = self.feature_registry.total_count();
-        let roadmap_label = format!(
-            "🔓 {active_features}/{total_features} Active • 🔒 {locked_features} Slots • 📋 Roadmap"
-        );
-
-        if ui
-            .add(
-                egui::Button::new(
-                    RichText::new(roadmap_label)
-                        .size(10.5)
-                        .strong()
-                        .color(self.theme.accent_blue),
-                )
-                .fill(self.theme.accent_blue.gamma_multiply(0.14))
-                .stroke(Stroke::new(
-                    1.0,
-                    self.theme.accent_blue.gamma_multiply(0.55),
-                ))
-                .corner_radius(CornerRadius::same(7)),
-            )
-            .on_hover_text("Open Feature Unlock Roadmap & Workspace Settings")
-            .clicked()
-        {
-            self.settings_view.active_subtab = SettingsSubTab::FeatureRegistry;
-            self.show_settings = true;
-        }
-
-        Frame::new()
-            .fill(self.theme.accent_green.gamma_multiply(0.14))
-            .stroke(Stroke::new(1.0, self.theme.accent_green.gamma_multiply(0.6)))
-            .corner_radius(CornerRadius::same(7))
-            .inner_margin(Margin::symmetric(8, 4))
-            .show(ui, |ui| {
-                ui.label(
-                    RichText::new("🟢 ARI 0.942 • SVD Verified")
-                        .size(10.5)
-                        .strong()
-                        .color(self.theme.accent_green),
-                );
-            });
-
-        Frame::new()
-            .fill(self.theme.bg_card)
-            .stroke(Stroke::new(1.0, self.theme.border_card))
-            .corner_radius(CornerRadius::same(7))
-            .inner_margin(Margin::symmetric(8, 4))
-            .show(ui, |ui| {
-                ui.label(
-                    RichText::new(format!("v{} • Phase 31", env!("CARGO_PKG_VERSION")))
-                        .size(10.5)
-                        .strong()
-                        .color(self.theme.accent_blue),
-                );
-            });
-    }
-
-    /// Renders the quick stage ribbon with horizontal scrolling on phones and wrapping on wider screens.
-    fn render_workflow_ribbon(&mut self, ui: &mut egui::Ui, is_mobile: bool) {
-        let quick_stages = [
-            (NavigationPillar::MyLibrary, "📁 Vault"),
-            (NavigationPillar::ResearchConcept, "🗺️ 1D GIS & TIN"),
-            (NavigationPillar::ParametricDED, "📐 2D Parametric"),
-            (NavigationPillar::GeometryAssembly, "🏗️ 3D BIM"),
-            (NavigationPillar::AnalysisSimulation, "⚡ FEA Solver"),
-            (NavigationPillar::TimeScheduling, "⏱️ 4D Schedule"),
-            (NavigationPillar::CostBudgeting, "💰 5D Cost"),
-            (NavigationPillar::IndustrializedAutomation, "🤖 10D OpenBIM"),
-            (NavigationPillar::ReportPublishing, "📑 Report"),
-        ];
-
-        let mut render_chips = |ui: &mut egui::Ui| {
-            ui.label(
-                RichText::new("WORKFLOW:")
-                    .size(10.0)
-                    .strong()
-                    .color(self.theme.text_muted),
-            );
-            for (p, label) in quick_stages {
-                let active = self.active_pillar == p;
-                let bg = if active {
-                    self.theme.accent_blue
-                } else {
-                    self.theme.bg_card
-                };
-                let fg = if active {
-                    Color32::WHITE
-                } else {
-                    self.theme.text_secondary
-                };
-                if ui
-                    .add(
-                        egui::Button::new(RichText::new(label).size(10.5).color(fg))
-                            .fill(bg)
-                            .corner_radius(CornerRadius::same(6))
-                            .min_size(Vec2::new(0.0, if is_mobile { 28.0 } else { 24.0 })),
-                    )
-                    .clicked()
-                {
-                    self.active_pillar = p;
-                }
-            }
-        };
-
-        if is_mobile {
-            ScrollArea::horizontal()
-                .id_salt("mobile_workflow_ribbon")
-                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-                .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        render_chips(ui);
-                    });
-                });
-        } else {
-            ui.horizontal_wrapped(|ui| {
-                render_chips(ui);
-            });
-        }
-    }
 }
 
 impl App for EigenGraphApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+
+        if let Some(imported) = self.universal_canvas.pending_imported_settings.take() {
+            self.settings_view.apply_workspace_settings(
+                &imported,
+                &mut self.theme,
+                &mut self.ai_assistant_view.is_visible,
+            );
+            if self.active_pillar == NavigationPillar::ParametricDED {
+                self.build_view.bim_bus.project = self.parametric_view.bim_bus.project.clone();
+            } else {
+                self.parametric_view.bim_bus.project = self.build_view.bim_bus.project.clone();
+            }
+        }
+
         self.theme.apply_to_ctx(&ctx);
 
         // Keyboard shortcut (Cmd+,) toggles Settings modal
@@ -475,126 +370,67 @@ impl App for EigenGraphApp {
             docked_sidebar_width = panel_resp.response.rect.width();
         }
 
-        // 2. CENTRAL PANEL (Responsive Workspace Layout for Phone, Tablet & Desktop)
+        // 2. CENTRAL PANEL (Canvas-First Vertical Scroll Workspace without Top Toolbar)
+        let workspace_snapshot = self.settings_view.workspace_settings_snapshot(
+            &self.theme,
+            &self.universal_canvas,
+            self.ai_assistant_view.is_visible,
+        );
+        let scroll_source = if !self.universal_canvas.is_frozen
+            && self.universal_canvas.is_pointer_in_live_canvas(&ctx)
+        {
+            egui::scroll_area::ScrollSource::SCROLL_BAR
+        } else {
+            egui::scroll_area::ScrollSource::default()
+        };
+        let outer_margin = if is_mobile {
+            Margin::symmetric(8, 8)
+        } else {
+            Margin::symmetric(14, 12)
+        };
+        let sidebar_inset = if !self.sidebar_open { 44.0 } else { 0.0 };
+
         CentralPanel::default()
             .frame(Frame::new().fill(self.theme.bg_canvas))
             .show(ui, |ui| {
-                let header_margin = if is_mobile {
-                    Margin::symmetric(12, 10)
-                } else {
-                    Margin::symmetric(20, 12)
-                };
-                Frame::new()
-                    .fill(self.theme.bg_sidebar)
-                    .stroke(Stroke::new(1.0, self.theme.border_subtle))
-                    .inner_margin(header_margin)
+                ScrollArea::vertical()
+                    .id_salt("workspace_main_vertical_scroll")
+                    .auto_shrink([false, false])
+                    .scroll_source(scroll_source)
                     .show(ui, |ui| {
-                        let avail_w = ui.available_width();
-                        let toggle_icon = if self.sidebar_open { "✕" } else { "☰" };
-                        let toggle_tip = if self.sidebar_open {
-                            "Hide navigation menu"
-                        } else {
-                            "Open navigation menu"
-                        };
+                        Frame::new().inner_margin(outer_margin).show(ui, |ui| {
+                            let active_bim_project =
+                                if self.active_pillar == NavigationPillar::ParametricDED {
+                                    &mut self.parametric_view.bim_bus.project
+                                } else {
+                                    &mut self.build_view.bim_bus.project
+                                };
+                            self.universal_canvas.show(
+                                ui,
+                                &self.theme,
+                                self.active_pillar,
+                                active_bim_project,
+                                &mut self.members,
+                                &mut self.parametric_view.variables,
+                                workspace_snapshot,
+                                sidebar_inset,
+                            );
 
-                        if avail_w >= 680.0 {
-                            ui.horizontal(|ui| {
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new(toggle_icon)
-                                                .size(15.0)
-                                                .strong()
-                                                .color(self.theme.text_primary),
-                                        )
-                                        .fill(self.theme.bg_card)
-                                        .stroke(Stroke::new(1.0, self.theme.border_card))
-                                        .corner_radius(CornerRadius::same(8))
-                                        .min_size(Vec2::new(34.0, 34.0)),
-                                    )
-                                    .on_hover_text(toggle_tip)
-                                    .clicked()
-                                {
-                                    self.sidebar_open = !self.sidebar_open;
-                                }
+                            ui.add_space(10.0);
 
-                                ui.add_space(6.0);
-                                ui.vertical(|ui| {
-                                    ui.label(
-                                        RichText::new(format!(
-                                            "{}  {}",
-                                            self.active_pillar.icon(),
-                                            self.active_pillar.clean_name()
-                                        ))
-                                        .size(20.0)
-                                        .strong()
-                                        .color(self.theme.text_primary),
-                                    );
-                                    ui.label(
-                                        RichText::new(self.active_pillar.subtitle())
-                                            .size(11.5)
-                                            .color(self.theme.text_secondary),
-                                    );
-                                });
+                            let (_anchor_rect, anchor_resp) = ui.allocate_exact_size(
+                                Vec2::new(ui.available_width().max(1.0), 1.0),
+                                egui::Sense::hover(),
+                            );
+                            if std::mem::take(
+                                &mut self.universal_canvas.request_scroll_to_workbench,
+                            ) {
+                                anchor_resp.scroll_to_me(Some(Align::TOP));
+                            }
 
-                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    self.render_header_badges(ui);
-                                });
-                            });
-                        } else {
-                            ui.horizontal(|ui| {
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            RichText::new(toggle_icon)
-                                                .size(16.0)
-                                                .strong()
-                                                .color(self.theme.text_primary),
-                                        )
-                                        .fill(self.theme.bg_card)
-                                        .stroke(Stroke::new(1.0, self.theme.border_card))
-                                        .corner_radius(CornerRadius::same(8))
-                                        .min_size(Vec2::new(36.0, 36.0)),
-                                    )
-                                    .on_hover_text(toggle_tip)
-                                    .clicked()
-                                {
-                                    self.sidebar_open = !self.sidebar_open;
-                                }
+                            ui.add_space(4.0);
 
-                                ui.add_space(6.0);
-                                ui.vertical(|ui| {
-                                    ui.label(
-                                        RichText::new(format!(
-                                            "{}  {}",
-                                            self.active_pillar.icon(),
-                                            self.active_pillar.clean_name()
-                                        ))
-                                        .size(if is_mobile { 17.0 } else { 19.0 })
-                                        .strong()
-                                        .color(self.theme.text_primary),
-                                    );
-                                    ui.label(
-                                        RichText::new(self.active_pillar.subtitle())
-                                            .size(11.0)
-                                            .color(self.theme.text_secondary),
-                                    );
-                                });
-                            });
-
-                            ui.add_space(6.0);
-                            ui.horizontal_wrapped(|ui| {
-                                self.render_header_badges(ui);
-                            });
-                        }
-
-                        ui.add_space(8.0);
-                        self.render_workflow_ribbon(ui, is_mobile);
-                    });
-
-                ui.add_space(6.0);
-
-                match self.active_pillar {
+                            match self.active_pillar {
                     NavigationPillar::MyLibrary => {
                         self.my_project_view.show(
                             ui,
@@ -747,7 +583,36 @@ impl App for EigenGraphApp {
                         );
                     }
                 }
+                        });
+                    });
             });
+
+        // Floating top-left sidebar reopen toggle when the navigation menu is closed
+        if !self.sidebar_open {
+            Area::new(Id::new("floating_sidebar_toggle"))
+                .order(Order::Foreground)
+                .fixed_pos(Pos2::new(screen_rect.left() + 10.0, screen_rect.top() + 10.0))
+                .show(&ctx, |ui| {
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("☰")
+                                    .size(16.0)
+                                    .strong()
+                                    .color(self.theme.text_primary),
+                            )
+                            .fill(self.theme.bg_card.gamma_multiply(0.95))
+                            .stroke(Stroke::new(1.0, self.theme.border_card))
+                            .corner_radius(CornerRadius::same(8))
+                            .min_size(Vec2::new(34.0, 34.0)),
+                        )
+                        .on_hover_text("Open navigation menu")
+                        .clicked()
+                    {
+                        self.sidebar_open = true;
+                    }
+                });
+        }
 
         // 3. FLOATING DYNAMIC ISLAND AI COPILOT
         self.ai_assistant_view.show(
@@ -808,11 +673,11 @@ impl App for EigenGraphApp {
             }
         }
 
-        // 5. SETTINGS & FEATURE ROADMAP MODAL (Responsive to Mobile, Tablet & Desktop)
+        // 5. CONSOLIDATED SETTINGS (WORKSPACE SETTINGS & FUTURE ROADMAP MODAL)
         if self.show_settings {
             let mut open = self.show_settings;
             let mut close_after_jump = false;
-            egui::Window::new("⚙️ Workspace Settings & Feature Roadmap")
+            egui::Window::new("⚙️ Settings — Workspace & Future Roadmap")
                 .open(&mut open)
                 .collapsible(false)
                 .resizable(true)
@@ -827,9 +692,20 @@ impl App for EigenGraphApp {
                         .inner_margin(Margin::same(if is_mobile { 12 } else { 18 })),
                 )
                 .show(&ctx, |ui| {
+                    let active_bim_project =
+                        if self.active_pillar == NavigationPillar::ParametricDED {
+                            &self.parametric_view.bim_bus.project
+                        } else {
+                            &self.build_view.bim_bus.project
+                        };
                     if self.settings_view.show(
                         ui,
-                        &self.theme,
+                        &mut self.theme,
+                        &mut self.universal_canvas,
+                        &mut self.ai_assistant_view.is_visible,
+                        active_bim_project,
+                        &self.members,
+                        &self.parametric_view.variables,
                         &mut self.feature_registry,
                         &mut self.active_pillar,
                     ) {
